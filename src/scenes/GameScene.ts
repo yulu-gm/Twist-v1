@@ -40,6 +40,7 @@ import {
   type WorldGridConfig
 } from "../game/world-grid";
 import { formatMockGridCellHoverText } from "./mock-grid-cell-info";
+import { mockIssuedTaskLabelForVillagerToolId } from "./mock-task-marker-commands";
 import { MOCK_SCATTERED_GROUND_ITEMS } from "./mock-ground-items";
 import {
   MOCK_VILLAGER_TOOLS,
@@ -79,6 +80,10 @@ export class GameScene extends Phaser.Scene {
   private toolSlotEls: HTMLElement[] = [];
   private toolKeyObjects: Phaser.Input.Keyboard.Key[] = [];
   private toolUiAbort: AbortController | null = null;
+  /** 各格上的 mock 任务标记文案（键为 `coordKey`）。 */
+  private taskMarkersByCell = new Map<string, string>();
+  private taskMarkerGraphics!: Phaser.GameObjects.Graphics;
+  private taskMarkerTexts = new Map<string, Phaser.GameObjects.Text>();
 
   public constructor() {
     super("game");
@@ -146,6 +151,11 @@ export class GameScene extends Phaser.Scene {
     this.bindSceneVariantSelect();
     this.hoverHudEl = document.getElementById("grid-hover-info");
     this.setupVillagerToolBar();
+
+    this.taskMarkerGraphics = this.add.graphics();
+    this.taskMarkerGraphics.setDepth(35);
+    this.bindGridTaskMarkerInput();
+    this.syncTaskMarkerView();
   }
 
   public update(_time: number, delta: number): void {
@@ -373,6 +383,82 @@ export class GameScene extends Phaser.Scene {
     const cam = this.cameras.main;
     const w = cam.getWorldPoint(pointer.x, pointer.y);
     return cellAtWorldPixel(this.worldGrid, this.gridOriginX, this.gridOriginY, w.x, w.y);
+  }
+
+  /**
+   * 左键点格：当前工具若视为下达指令则在该格显示任务标记；待机工具则清除该格标记。
+   * 数据为 mock，见 `mock-task-marker-commands`。
+   */
+  private bindGridTaskMarkerInput(): void {
+    this.input.on(Phaser.Input.Events.POINTER_DOWN, (pointer: Phaser.Input.Pointer) => {
+      if (!pointer.leftButtonDown()) return;
+      const cell = this.pointerToCell(pointer);
+      if (!cell) return;
+
+      const tool = MOCK_VILLAGER_TOOLS[this.selectedToolIndex];
+      const issuedLabel = mockIssuedTaskLabelForVillagerToolId(tool.id);
+      const key = coordKey(cell);
+      if (issuedLabel === null) {
+        this.taskMarkersByCell.delete(key);
+      } else {
+        this.taskMarkersByCell.set(key, issuedLabel);
+      }
+      this.syncTaskMarkerView();
+    });
+  }
+
+  private parseCoordKey(key: string): GridCoord | null {
+    const comma = key.indexOf(",");
+    if (comma <= 0) return null;
+    const col = Number(key.slice(0, comma));
+    const row = Number(key.slice(comma + 1));
+    if (!Number.isInteger(col) || !Number.isInteger(row)) return null;
+    return { col, row };
+  }
+
+  /** 半格直径的圆线框 + 任务名于格心（临时表现）。 */
+  private syncTaskMarkerView(): void {
+    const g = this.taskMarkerGraphics;
+    g.clear();
+    const cs = this.worldGrid.cellSizePx;
+    const radius = cs * 0.25;
+
+    for (const [key, text] of [...this.taskMarkerTexts]) {
+      if (!this.taskMarkersByCell.has(key)) {
+        text.destroy();
+        this.taskMarkerTexts.delete(key);
+      }
+    }
+
+    g.lineStyle(2, 0xd4a84b, 0.92);
+
+    for (const [key, taskName] of this.taskMarkersByCell) {
+      const cell = this.parseCoordKey(key);
+      if (!cell) continue;
+      const cx = this.gridOriginX + cell.col * cs + cs / 2;
+      const cy = this.gridOriginY + cell.row * cs + cs / 2;
+
+      g.strokeCircle(cx, cy, radius);
+
+      let text = this.taskMarkerTexts.get(key);
+      if (!text) {
+        text = this.add
+          .text(cx, cy, taskName, {
+            fontFamily: "Segoe UI, sans-serif",
+            fontSize: "10px",
+            color: "#f0e6d2",
+            align: "center",
+            stroke: "#000000",
+            strokeThickness: 3
+          })
+          .setOrigin(0.5, 0.5)
+          .setDepth(36);
+        this.taskMarkerTexts.set(key, text);
+      } else {
+        text.setText(taskName);
+        text.setPosition(cx, cy);
+      }
+    }
   }
 
   private syncHoverFromPointer(): void {
