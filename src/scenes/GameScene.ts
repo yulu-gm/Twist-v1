@@ -40,6 +40,7 @@ import {
   type WorldGridConfig
 } from "../game/world-grid";
 import { formatMockGridCellHoverText } from "./mock-grid-cell-info";
+import { MOCK_SCATTERED_GROUND_ITEMS } from "./mock-ground-items";
 import {
   MOCK_VILLAGER_TOOLS,
   MOCK_VILLAGER_TOOL_KEY_CODES
@@ -110,6 +111,7 @@ export class GameScene extends Phaser.Scene {
     this.drawStoneCells(stoneCells);
     this.interactionGraphics = this.add.graphics();
     this.drawInteractionPoints();
+    this.drawGroundItemStacks();
 
     const names =
       this.variant === "alt-en"
@@ -401,6 +403,50 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /** 临时掉落物：线框 + 名称 + 右下角数量（数据见 `mock-ground-items`）。 */
+  private drawGroundItemStacks(): void {
+    const g = this.add.graphics();
+    g.setDepth(25);
+    const cs = this.worldGrid.cellSizePx;
+    const pad = 4;
+    const ox = this.gridOriginX;
+    const oy = this.gridOriginY;
+
+    for (const stack of MOCK_SCATTERED_GROUND_ITEMS) {
+      const { col, row } = stack.cell;
+      const left = ox + col * cs + pad;
+      const top = oy + row * cs + pad;
+      const w = cs - pad * 2;
+      const h = cs - pad * 2;
+
+      g.lineStyle(2, 0xc9b87a, 0.95);
+      g.strokeRect(left, top, w, h);
+
+      const cx = ox + (col + 0.5) * cs;
+      const cy = oy + (row + 0.5) * cs;
+      this.add
+        .text(cx, cy, stack.displayName, {
+          fontFamily: "Segoe UI, sans-serif",
+          fontSize: "11px",
+          color: "#e8dcc8",
+          align: "center"
+        })
+        .setOrigin(0.5, 0.5)
+        .setDepth(25);
+
+      const rx = ox + (col + 1) * cs - pad;
+      const ry = oy + (row + 1) * cs - pad;
+      this.add
+        .text(rx, ry, String(stack.quantity), {
+          fontFamily: "Segoe UI, sans-serif",
+          fontSize: "10px",
+          color: "#f0e6d2"
+        })
+        .setOrigin(1, 1)
+        .setDepth(25);
+    }
+  }
+
   private drawInteractionPoints(): void {
     this.interactionGraphics.clear();
 
@@ -529,6 +575,8 @@ export class GameScene extends Phaser.Scene {
     }
     this.toolKeyObjects = [];
     this.toolSlotEls = [];
+    const toolRoot = document.getElementById("villager-tool-bar");
+    if (toolRoot) toolRoot.replaceChildren();
     this.events.off(Phaser.Scenes.Events.SHUTDOWN, this.teardownVillagerToolBar, this);
   }
 }
