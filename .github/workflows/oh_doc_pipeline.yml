@@ -1,9 +1,13 @@
 name: Auto Generate System Design Docs
 
+# 已临时停用此工作流。
+# 原触发配置保留如下，便于后续恢复：
+# on:
+#   push:
+#     paths:
+#       - 'oh-story/**.md'
+#   workflow_dispatch:
 on:
-  push:
-    paths:
-      - 'oh-story/**.md'
   workflow_dispatch:
 
 permissions:
@@ -11,6 +15,7 @@ permissions:
 
 jobs:
   update-docs:
+    if: ${{ false }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
