@@ -2,4 +2,4 @@
 
 **所有规则与配置已统一至 [`TWIST.md`](TWIST.md)，请直接阅读该文件。**
 
-新增玩法、改交互、扩系统、补规则时，请先走 [`route-demand`](.agent/skills/route-demand/SKILL.md)。
+所有对 Agent.md / CLAUDE.md 的修改加入到 TWIST.md 中。

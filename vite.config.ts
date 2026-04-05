@@ -1,4 +1,7 @@
 import { defineConfig } from "vite";
+import { viteSingleFile } from "vite-plugin-singlefile";
+
+const release = process.env.TWIST_RELEASE === "1";
 
 export default defineConfig({
   server: {
@@ -7,5 +10,14 @@ export default defineConfig({
   },
   test: {
     globals: true
-  }
+  },
+  ...(release
+    ? {
+        plugins: [viteSingleFile()],
+        build: {
+          outDir: "release",
+          emptyOutDir: true
+        }
+      }
+    : {})
 });
