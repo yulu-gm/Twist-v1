@@ -13,6 +13,7 @@
 | system | 职责摘要 | 标准文档 | 系统 aidoc 目录 | 关键源码文件 | 关键测试文件 | 主要场景/接入文件 | 最近相关 aidoc |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `time-of-day` | 维护世界时间、跨天归一化与昼夜调色板 | `docs/ai/system-standards/time-of-day.md` | `docs/ai/systems/time-of-day/` | `src/game/time-of-day.ts` | `tests/domain/time-of-day.test.ts` | `src/scenes/GameScene.ts` | `docs/ai/systems/time-of-day/2026-04-05-time-of-day-system.md` |
+| `world-core` | 维护统一世界真相源、实体占用、工作闭环和建造落地 | `docs/ai/system-standards/world-core.md` | `docs/ai/systems/world-core/` | `src/game/world-core.ts` | `tests/domain/world-core.test.ts` | 暂无 | `docs/ai/systems/world-core/2026-04-05-a-line-world-core-and-build-loop.md` |
 | `pawn-state` | 维护角色基础状态、名字、移动过渡和显示派生字段 | `docs/ai/system-standards/pawn-state.md` | `docs/ai/systems/pawn-state/` | `src/game/pawn-state.ts` | `tests/domain/pawn-state.test.ts` | `src/scenes/GameScene.ts` | `docs/ai/systems/pawn-state/2026-04-05-default-grid-wandering-pawns.md` |
 | `scene-hud` | 维护 HUD、状态卡、菜单和场景信息展示 | `docs/ai/system-standards/scene-hud.md` | `docs/ai/systems/scene-hud/` | `src/scenes/villager-tool-bar-config.ts` | `tests/component/villager-tool-bar-model.test.ts` | `src/scenes/GameScene.ts` | `docs/ai/systems/scene-hud/2026-04-05-time-of-day-system.md` |
 | `selection-ui` | 维护选中、高亮、焦点和目标切换反馈 | `docs/ai/system-standards/selection-ui.md` | `docs/ai/systems/selection-ui/` | `src/game/floor-selection.ts` | `tests/domain/floor-selection.test.ts` | `src/scenes/GameScene.ts` | `docs/ai/systems/selection-ui/2026-04-05-floor-area-selection-foundation.md` |

@@ -5,6 +5,7 @@
 | system | 职责摘要 | 标准文档 | aidoc 路径 | 默认 failing test | 主要依赖 |
 | --- | --- | --- | --- | --- | --- |
 | time-of-day | 处理世界时间推进、跨天归一化、时间文案和昼夜调色板 | docs/ai/system-standards/time-of-day.md | docs/ai/systems/time-of-day/ | domain | scene-hud |
+| world-core | 处理世界真相源、实体快照、占用索引、工作单与建造落地 | docs/ai/system-standards/world-core.md | docs/ai/systems/world-core/ | domain | world-grid, time-of-day, task-planning |
 | world-grid | 处理格子地图尺寸、格坐标、邻格、边界、出生点和占用快照 | docs/ai/system-standards/world-grid.md | docs/ai/systems/world-grid/ | domain | pawn-state, task-planning |
 | selection-ui | 处理选中、焦点、高亮、可点击反馈和目标对象切换 | docs/ai/system-standards/selection-ui.md | docs/ai/systems/selection-ui/ | acceptance | scene-hud, pawn-state |
 | scene-hud | 处理 HUD、状态卡、菜单、按钮和场景内信息展示 | docs/ai/system-standards/scene-hud.md | docs/ai/systems/scene-hud/ | component | selection-ui, pawn-state |

@@ -47,6 +47,7 @@ description: Use when Twist_V1 receives a new gameplay, interaction, rules, or m
 | system | 职责摘要 | 标准文档 | aidoc 路径 | 默认 failing test | 主要依赖 |
 |---|---|---|---|---|---|
 | time-of-day | 世界时间推进、跨天归一化、时间文案和昼夜调色板 | docs/ai/system-standards/time-of-day.md | docs/ai/systems/time-of-day/ | domain | scene-hud |
+| world-core | 世界真相源、实体快照、占用索引、工作单与建造落地 | docs/ai/system-standards/world-core.md | docs/ai/systems/world-core/ | domain | world-grid, time-of-day, task-planning |
 | world-grid | 格子地图尺寸、格坐标、邻格、边界、出生点、占用快照 | docs/ai/system-standards/world-grid.md | docs/ai/systems/world-grid/ | domain | pawn-state, task-planning |
 | selection-ui | 选中、焦点、高亮、可点击反馈、目标切换 | docs/ai/system-standards/selection-ui.md | docs/ai/systems/selection-ui/ | acceptance | scene-hud, pawn-state |
 | scene-hud | HUD、状态卡、菜单、按钮、场景内信息展示 | docs/ai/system-standards/scene-hud.md | docs/ai/systems/scene-hud/ | component | selection-ui, pawn-state |

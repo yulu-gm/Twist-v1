@@ -28,6 +28,26 @@
       ]
     },
     {
+      "key": "world-core",
+      "summary": "维护统一世界真相源、实体快照、占用索引、工作闭环和建造落地。",
+      "standardDoc": "docs/ai/system-standards/world-core.md",
+      "aidocDir": "docs/ai/systems/world-core",
+      "systemReadme": "docs/ai/systems/world-core/README.md",
+      "sourceFiles": [
+        "src/game/world-core.ts"
+      ],
+      "testFiles": [
+        "tests/domain/world-core.test.ts"
+      ],
+      "sceneEntryFiles": [],
+      "integrationFiles": [
+        "docs/ai/integration/2026-04-05-a-line-world-core-and-build-loop.md"
+      ],
+      "latestAidocs": [
+        "docs/ai/systems/world-core/2026-04-05-a-line-world-core-and-build-loop.md"
+      ]
+    },
+    {
       "key": "pawn-state",
       "summary": "维护角色基础状态、名字、移动过渡和供场景读取的派生显示信息。",
       "standardDoc": "docs/ai/system-standards/pawn-state.md",
