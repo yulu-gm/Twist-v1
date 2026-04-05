@@ -1,6 +1,28 @@
 {
   "systems": [
     {
+      "key": "time-of-day",
+      "summary": "维护世界时间、跨天归一化、时间文案和昼夜调色板。",
+      "standardDoc": "docs/ai/system-standards/time-of-day.md",
+      "aidocDir": "docs/ai/systems/time-of-day",
+      "systemReadme": "docs/ai/systems/time-of-day/README.md",
+      "sourceFiles": [
+        "src/game/time-of-day.ts"
+      ],
+      "testFiles": [
+        "tests/domain/time-of-day.test.ts"
+      ],
+      "sceneEntryFiles": [
+        "src/scenes/GameScene.ts"
+      ],
+      "integrationFiles": [
+        "docs/ai/integration/2026-04-05-time-of-day-system.md"
+      ],
+      "latestAidocs": [
+        "docs/ai/systems/time-of-day/2026-04-05-time-of-day-system.md"
+      ]
+    },
+    {
       "key": "pawn-state",
       "summary": "维护角色基础状态、名字、移动过渡和供场景读取的派生显示信息。",
       "standardDoc": "docs/ai/system-standards/pawn-state.md",
@@ -49,6 +71,7 @@
       "integrationFiles": [
         "docs/ai/integration/2026-04-05-default-grid-wandering-pawns.md",
         "docs/ai/integration/2026-04-05-goal-driven-pawn-ai-prototype.md",
+        "docs/ai/integration/2026-04-05-time-of-day-system.md",
         "docs/ai/integration/2026-04-05-villager-tool-bar.md",
         "docs/ai/integration/2026-04-05-mock-ground-items.md",
         "docs/ai/integration/2026-04-05-mock-task-markers-on-grid.md",
@@ -58,7 +81,8 @@
         "docs/ai/systems/scene-hud/2026-04-05-mock-ground-items.md",
         "docs/ai/systems/scene-hud/2026-04-05-villager-tool-bar.md",
         "docs/ai/systems/scene-hud/2026-04-05-mock-task-markers-on-grid.md",
-        "docs/ai/systems/scene-hud/2026-04-05-pawn-roster-detail-panel.md"
+        "docs/ai/systems/scene-hud/2026-04-05-pawn-roster-detail-panel.md",
+        "docs/ai/systems/scene-hud/2026-04-05-time-of-day-system.md"
       ]
     },
     {

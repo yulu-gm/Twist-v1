@@ -48,7 +48,10 @@ describe("aidoc index and push workflow", () => {
     expect(readme).toContain("关键源码文件");
 
     const systemIndex = readSystemIndex(rootDir);
-    expect(systemIndex.systems.length).toBeGreaterThanOrEqual(5);
+    expect(systemIndex.systems.length).toBeGreaterThanOrEqual(6);
+    expect(systemIndex.systems.some((system: { key: string }) => system.key === "time-of-day")).toBe(
+      true
+    );
 
     for (const system of systemIndex.systems) {
       expect(system.key.length).toBeGreaterThan(0);
@@ -131,10 +134,12 @@ describe("aidoc index and push workflow", () => {
       "scene-hud",
       "selection-ui",
       "task-planning",
+      "time-of-day",
       "world-grid"
     ]);
     expect(result.docPathsToReview).toContain("docs/ai/systems/world-grid/README.md");
     expect(result.docPathsToReview).toContain("docs/ai/systems/pawn-state/README.md");
+    expect(result.docPathsToReview).toContain("docs/ai/systems/time-of-day/README.md");
     expect(result.docPathsToReview).toContain("docs/ai/integration/2026-04-05-default-grid-wandering-pawns.md");
     expect(result.requiresSystemAidocReview).toBe(true);
   });

@@ -18,6 +18,10 @@ const requiredReferenceFiles = [
 
 const requiredSystems = [
   {
+    key: "time-of-day",
+    standard: path.join(rootDir, "docs", "ai", "system-standards", "time-of-day.md"),
+  },
+  {
     key: "selection-ui",
     standard: path.join(rootDir, "docs", "ai", "system-standards", "selection-ui.md"),
   },

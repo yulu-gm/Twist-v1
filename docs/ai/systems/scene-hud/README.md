@@ -32,6 +32,7 @@
 - `docs/ai/systems/scene-hud/2026-04-05-villager-tool-bar.md`
 - `docs/ai/systems/scene-hud/2026-04-05-mock-task-markers-on-grid.md`
 - `docs/ai/systems/scene-hud/2026-04-05-pawn-roster-detail-panel.md`
+- `docs/ai/systems/scene-hud/2026-04-05-time-of-day-system.md`
 
 ## 何时必须回填
 
