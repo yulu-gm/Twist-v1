@@ -29,6 +29,3 @@ coverage/
 
 # Agent 运行时日志
 .agent/runtime/
-
-# 本地故事草稿（不入库）
-oh-story/
