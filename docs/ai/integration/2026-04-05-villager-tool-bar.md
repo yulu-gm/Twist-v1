@@ -8,11 +8,12 @@
 
 1. 玩家进入 `GameScene`，画面底部居中呈现小人指令工具栏（mock 数据填充）。
 2. 玩家按下 **Q–O** 之一，或点击对应按钮 → **scene-hud** 更新当前选中槽位（高亮、`aria-pressed`）。
-3. 模拟层小人行为不变；无跨系统状态回写。
+3. 玩家在地图网格内 **左键点格** → 若当前工具非待机，则该格出现 **mock 任务标记**（半格圆线框 + 格心任务名）；待机工具点格则清除该格标记（详见 `2026-04-05-mock-task-markers-on-grid.md`）。
+4. 模拟层小人行为不变；无跨系统状态回写。
 
 ## 参与系统
 
-- **scene-hud**：DOM 工具栏、`GameScene` 内快捷键绑定、选中索引生命周期与清理（`SHUTDOWN` / `AbortController`）。
+- **scene-hud**：DOM 工具栏、`GameScene` 内快捷键绑定、选中索引生命周期与清理（`SHUTDOWN` / `AbortController`）；格上任务标记的指针与绘制（mock）。
 - **task-planning**（将来）：读取「当前工具」生成可执行动作；本次不接入。
 
 ## 当前 UI-first fake
@@ -33,5 +34,5 @@
 
 ## 必跑回归组合
 
-- `scene-hud`（component：`villager-tool-bar-model`）
+- `scene-hud`（component：`villager-tool-bar-model`、`mock-task-marker-commands`）
 - `scene-hud` + `GameScene` 启动路径（手工）

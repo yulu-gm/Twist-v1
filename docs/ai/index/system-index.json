@@ -17,7 +17,8 @@
       ],
       "integrationFiles": [
         "docs/ai/integration/2026-04-05-default-grid-wandering-pawns.md",
-        "docs/ai/integration/2026-04-05-goal-driven-pawn-ai-prototype.md"
+        "docs/ai/integration/2026-04-05-goal-driven-pawn-ai-prototype.md",
+        "docs/ai/integration/2026-04-05-mock-task-markers-on-grid.md"
       ],
       "latestAidocs": [
         "docs/ai/systems/pawn-state/2026-04-05-default-grid-wandering-pawns.md",
@@ -34,10 +35,12 @@
         "src/scenes/villager-tool-bar-config.ts",
         "src/scenes/mock-villager-tools.ts",
         "src/scenes/mock-ground-items.ts",
-        "src/scenes/mock-grid-cell-info.ts"
+        "src/scenes/mock-grid-cell-info.ts",
+        "src/scenes/mock-task-marker-commands.ts"
       ],
       "testFiles": [
-        "tests/component/villager-tool-bar-model.test.ts"
+        "tests/component/villager-tool-bar-model.test.ts",
+        "tests/component/mock-task-marker-commands.test.ts"
       ],
       "sceneEntryFiles": [
         "src/scenes/GameScene.ts"
@@ -46,11 +49,13 @@
         "docs/ai/integration/2026-04-05-default-grid-wandering-pawns.md",
         "docs/ai/integration/2026-04-05-goal-driven-pawn-ai-prototype.md",
         "docs/ai/integration/2026-04-05-villager-tool-bar.md",
-        "docs/ai/integration/2026-04-05-mock-ground-items.md"
+        "docs/ai/integration/2026-04-05-mock-ground-items.md",
+        "docs/ai/integration/2026-04-05-mock-task-markers-on-grid.md"
       ],
       "latestAidocs": [
         "docs/ai/systems/scene-hud/2026-04-05-mock-ground-items.md",
-        "docs/ai/systems/scene-hud/2026-04-05-villager-tool-bar.md"
+        "docs/ai/systems/scene-hud/2026-04-05-villager-tool-bar.md",
+        "docs/ai/systems/scene-hud/2026-04-05-mock-task-markers-on-grid.md"
       ]
     },
     {
@@ -66,7 +71,8 @@
       ],
       "integrationFiles": [
         "docs/ai/integration/2026-04-05-default-grid-wandering-pawns.md",
-        "docs/ai/integration/2026-04-05-goal-driven-pawn-ai-prototype.md"
+        "docs/ai/integration/2026-04-05-goal-driven-pawn-ai-prototype.md",
+        "docs/ai/integration/2026-04-05-mock-task-markers-on-grid.md"
       ],
       "latestAidocs": []
     },
@@ -90,7 +96,8 @@
       "integrationFiles": [
         "docs/ai/integration/2026-04-05-default-grid-wandering-pawns.md",
         "docs/ai/integration/2026-04-05-random-stone-obstacles.md",
-        "docs/ai/integration/2026-04-05-goal-driven-pawn-ai-prototype.md"
+        "docs/ai/integration/2026-04-05-goal-driven-pawn-ai-prototype.md",
+        "docs/ai/integration/2026-04-05-mock-task-markers-on-grid.md"
       ],
       "latestAidocs": [
         "docs/ai/systems/task-planning/2026-04-05-default-grid-wandering-pawns.md",
@@ -116,7 +123,8 @@
       "integrationFiles": [
         "docs/ai/integration/2026-04-05-default-grid-wandering-pawns.md",
         "docs/ai/integration/2026-04-05-random-stone-obstacles.md",
-        "docs/ai/integration/2026-04-05-goal-driven-pawn-ai-prototype.md"
+        "docs/ai/integration/2026-04-05-goal-driven-pawn-ai-prototype.md",
+        "docs/ai/integration/2026-04-05-mock-task-markers-on-grid.md"
       ],
       "latestAidocs": [
         "docs/ai/systems/world-grid/2026-04-05-default-grid-wandering-pawns.md",

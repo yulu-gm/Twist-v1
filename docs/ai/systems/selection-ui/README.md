@@ -18,11 +18,11 @@
 
 ## 当前接入场景文件
 
-- `src/scenes/GameScene.ts`
+- `src/scenes/GameScene.ts`（格上 **工具点格** 的 mock 任务标记为点击反馈，规格见 **scene-hud** `2026-04-05-mock-task-markers-on-grid.md` 与集成 `2026-04-05-mock-task-markers-on-grid.md`）
 
 ## 最新/历史 aidoc
 
-- 暂无 routed aidoc；新增交互前先补 routed aidoc
+- 暂无本系统独立 routed aidoc；若将「选中格 / 指令目标」提升为一等选择模型，先补 aidoc 再登记实现文件
 
 ## 何时必须回填
 

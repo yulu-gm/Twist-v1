@@ -14,10 +14,12 @@
 - `src/scenes/mock-villager-tools.ts`（对上述模块的导出入口，兼容旧路径）
 - `src/scenes/mock-ground-items.ts`（格子 mock 掉落物堆叠数据与按格查询）
 - `src/scenes/mock-grid-cell-info.ts`（格子悬停文案；可拼接掉落物行）
+- `src/scenes/mock-task-marker-commands.ts`（工具 id → mock 是否视为对该格派工及显示标签）
 
 ## 当前关键测试文件
 
 - `tests/component/villager-tool-bar-model.test.ts`
+- `tests/component/mock-task-marker-commands.test.ts`
 
 ## 当前接入场景文件
 
@@ -27,6 +29,7 @@
 
 - `docs/ai/systems/scene-hud/2026-04-05-mock-ground-items.md`
 - `docs/ai/systems/scene-hud/2026-04-05-villager-tool-bar.md`
+- `docs/ai/systems/scene-hud/2026-04-05-mock-task-markers-on-grid.md`
 
 ## 何时必须回填
 
