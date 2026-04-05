@@ -26,9 +26,7 @@
 
 推送约束：
 
-- 准备推送远端前，必须先走 `.agent/skills/push-with-aidoc/SKILL.md`。
-- `push-with-aidoc` 必须先读取 `docs/ai/index/system-index.json` 判定受影响系统。
-- 通过受控推送流程生成的收尾提交必须使用 `[aidoc-sync]` 前缀和固定 `AIDOC-*` trailer。
+- 推送远端前必须走 `.agent/skills/push-with-aidoc/SKILL.md`（流程与提交格式详见该文件）。
 
 写作风格：
 
