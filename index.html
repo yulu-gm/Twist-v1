@@ -23,20 +23,83 @@
       #scene-hud {
         position: fixed;
         left: 12px;
-        top: 50%;
-        transform: translateY(-50%);
+        top: 12px;
         z-index: 10;
         display: flex;
-        flex-direction: column;
-        gap: 6px;
+        flex-direction: row;
+        align-items: end;
+        gap: 16px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid #5c5346;
+        background: rgba(28, 24, 20, 0.94);
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
         font-size: 13px;
         color: #f5f1e8;
         pointer-events: auto;
       }
 
-      #scene-hud label {
+      #scene-hud label,
+      #scene-hud .scene-hud-label {
         opacity: 0.85;
         letter-spacing: 0.02em;
+      }
+
+      .scene-hud-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      #scene-time {
+        min-width: 108px;
+      }
+
+      #scene-time-controls {
+        min-width: 220px;
+      }
+
+      #scene-time-value {
+        font-size: 16px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+      }
+
+      #scene-speed-controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .scene-time-button {
+        min-width: 54px;
+        padding: 6px 10px;
+        border-radius: 6px;
+        border: 1px solid #5c5346;
+        background: #242019;
+        color: #f5f1e8;
+        font: inherit;
+        cursor: pointer;
+        transition:
+          border-color 0.12s ease,
+          background 0.12s ease,
+          box-shadow 0.12s ease;
+      }
+
+      .scene-time-button:hover {
+        border-color: #6e6558;
+        background: #2a241c;
+      }
+
+      .scene-time-button:focus-visible {
+        outline: 2px solid #81b29a;
+        outline-offset: 2px;
+      }
+
+      .scene-time-button.selected {
+        border-color: #e8c547;
+        box-shadow: 0 0 0 1px rgba(232, 197, 71, 0.45);
+        background: #2f281c;
       }
 
       #scene-variant {
@@ -285,12 +348,35 @@
     </style>
   </head>
   <body>
-    <div id="scene-hud" aria-label="测试场景切换">
-      <label for="scene-variant">测试场景</label>
-      <select id="scene-variant" title="切换原型测试场景">
-        <option value="default">默认（原显示名）</option>
-        <option value="alt-en">随机英文名 ×5</option>
-      </select>
+    <div id="scene-hud" aria-label="场景菜单栏">
+      <div class="scene-hud-group">
+        <label for="scene-variant">测试场景</label>
+        <select id="scene-variant" title="切换原型测试场景">
+          <option value="default">默认（原显示名）</option>
+          <option value="alt-en">随机英文名 ×5</option>
+        </select>
+      </div>
+      <div id="scene-time" class="scene-hud-group" aria-live="polite">
+        <span class="scene-hud-label">时间</span>
+        <span id="scene-time-value">Day 1 06:00</span>
+      </div>
+      <div id="scene-time-controls" class="scene-hud-group">
+        <span class="scene-hud-label">时间控制</span>
+        <div id="scene-speed-controls">
+          <button id="scene-time-toggle" class="scene-time-button" type="button" title="空格：暂停或继续">
+            暂停
+          </button>
+          <button id="scene-speed-1" class="scene-time-button selected" type="button" title="按键 1：1 倍速">
+            1x
+          </button>
+          <button id="scene-speed-2" class="scene-time-button" type="button" title="按键 2：2 倍速">
+            2x
+          </button>
+          <button id="scene-speed-3" class="scene-time-button" type="button" title="按键 3：3 倍速">
+            3x
+          </button>
+        </div>
+      </div>
     </div>
     <div id="grid-hover-info" hidden aria-live="polite"></div>
     <div id="villager-tool-bar" role="toolbar" aria-label="小人指令工具"></div>

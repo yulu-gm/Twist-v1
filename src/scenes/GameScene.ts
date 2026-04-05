@@ -34,6 +34,19 @@ import {
   type PawnState
 } from "../game/pawn-state";
 import {
+  DEFAULT_TIME_CONTROL_STATE,
+  DEFAULT_TIME_OF_DAY_CONFIG,
+  advanceTimeOfDay,
+  createInitialTimeOfDayState,
+  effectiveSimulationDeltaSeconds,
+  formatTimeOfDayLabel,
+  sampleTimeOfDayPalette,
+  type TimeControlState,
+  type TimeOfDayPalette,
+  type TimeSpeed,
+  type TimeOfDayState
+} from "../game/time-of-day";
+import {
   blockedKeysFromCells,
   cellAtWorldPixel,
   cellCenterWorld,
@@ -49,7 +62,7 @@ import {
   type WorldGridConfig
 } from "../game/world-grid";
 import { formatMockGridCellHoverText } from "./mock-grid-cell-info";
-import { mockIssuedTaskLabelForVillagerToolId } from "./mock-task-marker-commands";
+import { applyMockTaskMarkersForSelection } from "./mock-task-marker-selection";
 import { MOCK_SCATTERED_GROUND_ITEMS } from "./mock-ground-items";
 import {
   MOCK_VILLAGER_TOOLS,
@@ -80,16 +93,28 @@ export class GameScene extends Phaser.Scene {
   private pawns: PawnState[] = [];
   private views = new Map<string, PawnView>();
   private variant: GameSceneVariant = "default";
+  private timeOfDayState: TimeOfDayState = createInitialTimeOfDayState(DEFAULT_TIME_OF_DAY_CONFIG);
+  private timeOfDayPalette: TimeOfDayPalette = sampleTimeOfDayPalette(
+    createInitialTimeOfDayState(DEFAULT_TIME_OF_DAY_CONFIG)
+  );
+  private timeControlState: TimeControlState = DEFAULT_TIME_CONTROL_STATE;
   private reservations: ReservationSnapshot = createReservationSnapshot();
+  private gridGraphics!: Phaser.GameObjects.Graphics;
   private interactionGraphics!: Phaser.GameObjects.Graphics;
   private interactionLabels = new Map<string, Phaser.GameObjects.Text>();
   private hoverHighlightFrame!: Phaser.GameObjects.Rectangle;
   private lastHoverKey: string | null = "\0";
+  private sceneHudEl: HTMLElement | null = null;
+  private sceneTimeValueEl: HTMLElement | null = null;
+  private sceneTimeToggleEl: HTMLButtonElement | null = null;
+  private sceneSpeedEls = new Map<TimeSpeed, HTMLButtonElement>();
   private hoverHudEl: HTMLElement | null = null;
   private selectedToolIndex = 0;
   private toolSlotEls: HTMLElement[] = [];
   private toolKeyObjects: Phaser.Input.Keyboard.Key[] = [];
   private toolUiAbort: AbortController | null = null;
+  private timeControlAbort: AbortController | null = null;
+  private timeControlKeyObjects: Phaser.Input.Keyboard.Key[] = [];
   private pawnRosterAbort: AbortController | null = null;
   private pawnRosterSlotEls: HTMLElement[] = [];
   private selectedPawnId: string | null = null;
@@ -111,10 +136,13 @@ export class GameScene extends Phaser.Scene {
     const v = data.variant;
     this.variant = v === "alt-en" ? "alt-en" : "default";
     this.selectedToolIndex = 0;
+    this.timeOfDayState = createInitialTimeOfDayState(DEFAULT_TIME_OF_DAY_CONFIG);
+    this.timeOfDayPalette = sampleTimeOfDayPalette(this.timeOfDayState);
+    this.timeControlState = DEFAULT_TIME_CONTROL_STATE;
   }
 
   public create(): void {
-    this.cameras.main.setBackgroundColor("#171411");
+    this.cameras.main.setBackgroundColor(this.timeOfDayPalette.backgroundColor);
     this.layoutGrid();
     this.setupGridHoverHighlight();
 
@@ -130,6 +158,7 @@ export class GameScene extends Phaser.Scene {
       blockedCellKeys: blockedKeysFromCells(stoneCells)
     };
 
+    this.gridGraphics = this.add.graphics();
     this.drawGridLines();
     this.drawStoneCells(stoneCells);
     this.interactionGraphics = this.add.graphics();
@@ -164,7 +193,7 @@ export class GameScene extends Phaser.Scene {
           fontFamily: "Segoe UI, sans-serif",
           fontSize: "12px",
           align: "center",
-          color: "#f5f1e8"
+          color: this.colorToCss(this.timeOfDayPalette.primaryTextColor)
         })
         .setOrigin(0.5, 1)
         .setLineSpacing(2);
@@ -172,25 +201,65 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.bindSceneVariantSelect();
+    this.sceneHudEl = document.getElementById("scene-hud");
+    this.sceneTimeValueEl = document.getElementById("scene-time-value");
+    this.sceneTimeToggleEl = document.getElementById("scene-time-toggle") as HTMLButtonElement | null;
+    this.sceneSpeedEls = new Map<TimeSpeed, HTMLButtonElement>(
+      [
+        [1, document.getElementById("scene-speed-1") as HTMLButtonElement | null],
+        [2, document.getElementById("scene-speed-2") as HTMLButtonElement | null],
+        [3, document.getElementById("scene-speed-3") as HTMLButtonElement | null]
+      ].filter((entry): entry is [TimeSpeed, HTMLButtonElement] => entry[1] !== null)
+    );
+    this.setupTimeControls();
+    this.syncTimeOfDayHud();
     this.hoverHudEl = document.getElementById("grid-hover-info");
+    if (this.hoverHudEl) {
+      this.hoverHudEl.style.color = this.colorToCss(this.timeOfDayPalette.primaryTextColor);
+    }
     this.setupVillagerToolBar();
     this.setupPawnRosterUi();
 
     this.taskMarkerGraphics = this.add.graphics();
     this.taskMarkerGraphics.setDepth(35);
-    this.bindGridTaskMarkerInput();
     this.syncTaskMarkerView();
     this.bindFloorSelectionInput();
   }
 
   public update(_time: number, delta: number): void {
-    const dt = delta / 1000;
+    const realDt = delta / 1000;
+    const simulationDt = effectiveSimulationDeltaSeconds(realDt, this.timeControlState);
+    const nextTimeOfDayState = advanceTimeOfDay(
+      this.timeOfDayState,
+      simulationDt,
+      DEFAULT_TIME_OF_DAY_CONFIG
+    );
+    const nextTimeOfDayPalette = sampleTimeOfDayPalette(nextTimeOfDayState);
+    const paletteChanged = !this.sameTimeOfDayPalette(
+      this.timeOfDayPalette,
+      nextTimeOfDayPalette
+    );
+    this.timeOfDayState = nextTimeOfDayState;
+    if (paletteChanged) {
+      this.timeOfDayPalette = nextTimeOfDayPalette;
+      this.applyTimeOfDayPalette();
+    }
+    this.syncTimeOfDayHud();
+
+    if (simulationDt <= 0) {
+      this.syncHoverFromPointer();
+      this.syncPawnDetailPanel();
+      return;
+    }
+
     const grid = this.worldGrid;
     let nextReservations = this.reservations;
 
     let nextPawns = this.pawns.map((pawn) => {
-      let updated = advanceNeeds(pawn, dt, NEED_GROWTH_PER_SEC);
-      updated = finishMoveIfComplete(advanceMoveTowardTarget(updated, dt, MOVE_DURATION_SEC));
+      let updated = advanceNeeds(pawn, simulationDt, NEED_GROWTH_PER_SEC);
+      updated = finishMoveIfComplete(
+        advanceMoveTowardTarget(updated, simulationDt, MOVE_DURATION_SEC)
+      );
 
       if (updated.currentAction?.kind !== "use-target") {
         return updated;
@@ -202,7 +271,7 @@ export class GameScene extends Phaser.Scene {
         return clearPawnIntent(updated);
       }
 
-      updated = advancePawnActionTimer(updated, dt);
+      updated = advancePawnActionTimer(updated, simulationDt);
       if (updated.actionTimerSec < point.useDurationSec) {
         return updated;
       }
@@ -376,14 +445,15 @@ export class GameScene extends Phaser.Scene {
   }
 
   private drawGridLines(): void {
-    const g = this.add.graphics();
-    const { columns, rows, cellSizePx } = DEFAULT_WORLD_GRID;
+    const g = this.gridGraphics;
+    const { columns, rows, cellSizePx } = this.worldGrid;
     const ox = this.gridOriginX;
     const oy = this.gridOriginY;
     const gridW = columns * cellSizePx;
     const gridH = rows * cellSizePx;
 
-    g.lineStyle(1, 0x3d3830, 0.9);
+    g.clear();
+    g.lineStyle(1, this.timeOfDayPalette.gridLineColor, 0.9);
     for (let c = 0; c <= columns; c++) {
       const x = ox + c * cellSizePx;
       g.lineBetween(x, oy, x, oy + gridH);
@@ -392,7 +462,7 @@ export class GameScene extends Phaser.Scene {
       const y = oy + r * cellSizePx;
       g.lineBetween(ox, y, ox + gridW, y);
     }
-    g.lineStyle(2, 0x5c5346, 0.55);
+    g.lineStyle(2, this.timeOfDayPalette.gridBorderColor, 0.55);
     g.strokeRect(ox + 1, oy + 1, gridW - 2, gridH - 2);
   }
 
@@ -409,29 +479,6 @@ export class GameScene extends Phaser.Scene {
     const cam = this.cameras.main;
     const w = cam.getWorldPoint(pointer.x, pointer.y);
     return cellAtWorldPixel(this.worldGrid, this.gridOriginX, this.gridOriginY, w.x, w.y);
-  }
-
-  /**
-   * 左键点格：当前工具若视为下达指令则在该格显示任务标记；待机工具则清除该格标记。
-   * 数据为 mock，见 `mock-task-marker-commands`。
-   */
-  private bindGridTaskMarkerInput(): void {
-    this.input.on(Phaser.Input.Events.POINTER_DOWN, (pointer: Phaser.Input.Pointer) => {
-      if (!pointer.leftButtonDown()) return;
-      if (this.shouldUseFloorSelection(pointer)) return;
-      const cell = this.pointerToCell(pointer);
-      if (!cell) return;
-
-      const tool = MOCK_VILLAGER_TOOLS[this.selectedToolIndex];
-      const issuedLabel = mockIssuedTaskLabelForVillagerToolId(tool.id);
-      const key = coordKey(cell);
-      if (issuedLabel === null) {
-        this.taskMarkersByCell.delete(key);
-      } else {
-        this.taskMarkersByCell.set(key, issuedLabel);
-      }
-      this.syncTaskMarkerView();
-    });
   }
 
   private parseCoordKey(key: string): GridCoord | null {
@@ -604,13 +651,14 @@ export class GameScene extends Phaser.Scene {
           .text(pos.x, pos.y + 18, point.kind.toUpperCase(), {
             fontFamily: "Segoe UI, sans-serif",
             fontSize: "10px",
-            color: "#eadfcb"
+            color: this.colorToCss(this.timeOfDayPalette.secondaryTextColor)
           })
           .setOrigin(0.5, 0);
         this.interactionLabels.set(point.id, label);
       }
       label.setPosition(pos.x, pos.y + 18);
       label.setAlpha(reserved ? 1 : 0.8);
+      label.setColor(this.colorToCss(this.timeOfDayPalette.secondaryTextColor));
     }
   }
 
@@ -626,6 +674,74 @@ export class GameScene extends Phaser.Scene {
       const next = sel.value === "alt-en" ? "alt-en" : "default";
       this.scene.restart({ variant: next });
     };
+  }
+
+  private setupTimeControls(): void {
+    this.teardownTimeControls();
+
+    this.timeControlAbort = new AbortController();
+    const signal = this.timeControlAbort.signal;
+
+    this.sceneTimeToggleEl?.addEventListener(
+      "click",
+      () => {
+        this.toggleTimePaused();
+      },
+      { signal }
+    );
+
+    for (const [speed, button] of this.sceneSpeedEls) {
+      button.addEventListener(
+        "click",
+        () => {
+          this.setTimeSpeed(speed);
+        },
+        { signal }
+      );
+    }
+
+    if (this.input.keyboard) {
+      const keyBindings: ReadonlyArray<readonly [number, () => void]> = [
+        [Phaser.Input.Keyboard.KeyCodes.SPACE, () => this.toggleTimePaused()],
+        [Phaser.Input.Keyboard.KeyCodes.ONE, () => this.setTimeSpeed(1)],
+        [Phaser.Input.Keyboard.KeyCodes.TWO, () => this.setTimeSpeed(2)],
+        [Phaser.Input.Keyboard.KeyCodes.THREE, () => this.setTimeSpeed(3)]
+      ];
+
+      for (const [keyCode, handler] of keyBindings) {
+        const key = this.input.keyboard.addKey(keyCode);
+        key.on("down", handler);
+        this.timeControlKeyObjects.push(key);
+      }
+    }
+
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.teardownTimeControls, this);
+  }
+
+  private teardownTimeControls(): void {
+    this.timeControlAbort?.abort();
+    this.timeControlAbort = null;
+    for (const key of this.timeControlKeyObjects) {
+      key.destroy();
+    }
+    this.timeControlKeyObjects = [];
+    this.events.off(Phaser.Scenes.Events.SHUTDOWN, this.teardownTimeControls, this);
+  }
+
+  private toggleTimePaused(): void {
+    this.timeControlState = {
+      ...this.timeControlState,
+      paused: !this.timeControlState.paused
+    };
+    this.syncTimeOfDayHud();
+  }
+
+  private setTimeSpeed(speed: TimeSpeed): void {
+    this.timeControlState = {
+      ...this.timeControlState,
+      speed
+    };
+    this.syncTimeOfDayHud();
   }
 
   private setupVillagerToolBar(): void {
@@ -805,6 +921,10 @@ export class GameScene extends Phaser.Scene {
     return `#${rgb.toString(16).padStart(6, "0")}`;
   }
 
+  private colorToCss(color: number): string {
+    return this.phaserFillColorToCss(color);
+  }
+
   private escapeHtml(raw: string): string {
     return raw
       .replace(/&/g, "&amp;")
@@ -829,6 +949,66 @@ export class GameScene extends Phaser.Scene {
     this.events.off(Phaser.Scenes.Events.SHUTDOWN, this.teardownPawnRosterUi, this);
   }
 
+  private applyTimeOfDayPalette(): void {
+    this.cameras.main.setBackgroundColor(this.timeOfDayPalette.backgroundColor);
+    this.drawGridLines();
+
+    const primaryTextColor = this.colorToCss(this.timeOfDayPalette.primaryTextColor);
+    const secondaryTextColor = this.colorToCss(this.timeOfDayPalette.secondaryTextColor);
+
+    for (const view of this.views.values()) {
+      view.label.setColor(primaryTextColor);
+    }
+    for (const label of this.interactionLabels.values()) {
+      label.setColor(secondaryTextColor);
+    }
+    if (this.hoverHudEl) {
+      this.hoverHudEl.style.color = primaryTextColor;
+    }
+  }
+
+  private syncTimeOfDayHud(): void {
+    if (this.sceneHudEl) {
+      this.sceneHudEl.style.color = this.colorToCss(this.timeOfDayPalette.primaryTextColor);
+    }
+    const primaryColor = this.colorToCss(this.timeOfDayPalette.primaryTextColor);
+
+    if (this.sceneTimeValueEl) {
+      const nextLabel = formatTimeOfDayLabel(this.timeOfDayState);
+      if (this.sceneTimeValueEl.textContent !== nextLabel) {
+        this.sceneTimeValueEl.textContent = nextLabel;
+      }
+      this.sceneTimeValueEl.style.color = primaryColor;
+    }
+
+    if (this.sceneTimeToggleEl) {
+      this.sceneTimeToggleEl.textContent = this.timeControlState.paused ? "开启" : "暂停";
+      this.sceneTimeToggleEl.classList.toggle("selected", this.timeControlState.paused);
+      this.sceneTimeToggleEl.setAttribute(
+        "aria-pressed",
+        this.timeControlState.paused ? "true" : "false"
+      );
+      this.sceneTimeToggleEl.style.color = primaryColor;
+    }
+
+    for (const [speed, button] of this.sceneSpeedEls) {
+      const selected = this.timeControlState.speed === speed;
+      button.classList.toggle("selected", selected);
+      button.setAttribute("aria-pressed", selected ? "true" : "false");
+      button.style.color = primaryColor;
+    }
+  }
+
+  private sameTimeOfDayPalette(left: TimeOfDayPalette, right: TimeOfDayPalette): boolean {
+    return (
+      left.backgroundColor === right.backgroundColor &&
+      left.gridLineColor === right.gridLineColor &&
+      left.gridBorderColor === right.gridBorderColor &&
+      left.primaryTextColor === right.primaryTextColor &&
+      left.secondaryTextColor === right.secondaryTextColor
+    );
+  }
+
   private bindFloorSelectionInput(): void {
     this.input.off("pointerdown", this.handleFloorPointerDown, this);
     this.input.off("pointermove", this.handleFloorPointerMove, this);
@@ -841,7 +1021,6 @@ export class GameScene extends Phaser.Scene {
 
   private handleFloorPointerDown(pointer: Phaser.Input.Pointer): void {
     if (!pointer.leftButtonDown()) return;
-    if (!this.shouldUseFloorSelection(pointer)) return;
 
     const modifier = resolveSelectionModifier(
       this.pointerHasShift(pointer),
@@ -893,9 +1072,19 @@ export class GameScene extends Phaser.Scene {
       );
     }
 
+    const draft = this.floorSelectionState.draft;
     this.floorSelectionState = commitFloorSelection(this.floorSelectionState);
     this.activeSelectionPointerId = undefined;
     this.redrawFloorSelection();
+
+    if (!draft) return;
+
+    this.taskMarkersByCell = applyMockTaskMarkersForSelection(this.taskMarkersByCell, {
+      toolId: this.selectedVillagerToolId(),
+      modifier: draft.modifier,
+      cellKeys: draft.cellKeys
+    });
+    this.syncTaskMarkerView();
   }
 
   private redrawFloorSelection(): void {
@@ -1000,14 +1189,6 @@ export class GameScene extends Phaser.Scene {
   private pointerHasCtrl(pointer: Phaser.Input.Pointer): boolean {
     const event = pointer.event as MouseEvent | PointerEvent | undefined;
     return event?.ctrlKey ?? false;
-  }
-
-  private shouldUseFloorSelection(pointer: Phaser.Input.Pointer): boolean {
-    return (
-      this.selectedVillagerToolId() === "idle" ||
-      this.pointerHasShift(pointer) ||
-      this.pointerHasCtrl(pointer)
-    );
   }
 
   private selectedVillagerToolId(): string {
