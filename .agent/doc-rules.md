@@ -10,6 +10,10 @@
 
 - 面向人的上手说明与协作说明放入 `docs/human/`。
 - 系统规格、架构笔记、数据结构与 AI 工作流文档放入 `docs/ai/`。
+- 需求路由后的主控需求单放入 `docs/ai/requests/`。
+- 跨系统集成文档放入 `docs/ai/integration/`。
+- 按系统拆分的 aidoc 放入 `docs/ai/systems/<system>/`。
+- 系统级文档规范放入 `docs/ai/system-standards/`。
 - 当项目初始化方式或开发流程变化时，需要同步更新 `README.md`。
 
 重大功能必须具备的文档内容：
