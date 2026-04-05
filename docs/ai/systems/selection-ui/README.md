@@ -11,6 +11,7 @@
 ## 当前关键实现文件
 
 - `src/game/floor-selection.ts`
+- `src/player/brush-stroke.ts`、`src/player/tool-input-policy.ts`（建造笔刷路径与工具输入形态）
 - `src/scenes/renderers/selection-renderer.ts`
 - `src/data/task-markers.ts`
 - `src/scenes/GameScene.ts`（仅负责布局、输入和状态 wiring）
@@ -27,6 +28,7 @@
 
 - `docs/ai/systems/selection-ui/2026-04-05-gamescene-runtime-refactor.md`
 - `docs/ai/systems/selection-ui/2026-04-05-floor-area-selection-foundation.md`
+- `docs/ai/systems/selection-ui/2026-04-05-brush-and-gateway-ordered-commit.md`
 
 ## 何时必须回填
 

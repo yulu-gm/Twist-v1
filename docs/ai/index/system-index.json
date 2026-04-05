@@ -62,26 +62,6 @@
       "standardDoc": "docs/ai/system-standards/scene-hud.md",
       "aidocDir": "docs/ai/systems/scene-hud",
       "systemReadme": "docs/ai/systems/scene-hud/README.md",
-      "sourceFiles": [
-        "src/ui/hud-manager.ts",
-        "src/data/villager-tools.ts",
-        "src/data/ground-items.ts",
-        "src/data/grid-cell-info.ts",
-        "src/data/task-markers.ts",
-        "src/data/pawn-profiles.ts",
-        "src/scenes/villager-tool-bar-config.ts",
-        "src/scenes/mock-villager-tools.ts",
-        "src/scenes/mock-ground-items.ts",
-        "src/scenes/mock-grid-cell-info.ts",
-        "src/scenes/mock-task-marker-commands.ts",
-        "src/scenes/mock-task-marker-selection.ts",
-        "src/scenes/mock-pawn-profile-data.ts"
-      ],
-      "testFiles": [
-        "tests/component/villager-tool-bar-model.test.ts",
-        "tests/component/mock-task-marker-commands.test.ts",
-        "tests/component/mock-task-marker-selection.test.ts"
-      ],
       "sceneEntryFiles": [
         "src/scenes/GameScene.ts"
       ],
@@ -93,7 +73,8 @@
         "docs/ai/integration/2026-04-05-mock-ground-items.md",
         "docs/ai/integration/2026-04-05-mock-task-markers-on-grid.md",
         "docs/ai/integration/2026-04-05-pawn-roster-detail-panel.md",
-        "docs/ai/integration/2026-04-05-gamescene-runtime-refactor.md"
+        "docs/ai/integration/2026-04-05-gamescene-runtime-refactor.md",
+        "docs/ai/integration/2026-04-05-b-line-player-channel-mock-gateway.md"
       ],
       "latestAidocs": [
         "docs/ai/systems/scene-hud/2026-04-05-gamescene-runtime-refactor.md",
@@ -101,7 +82,43 @@
         "docs/ai/systems/scene-hud/2026-04-05-villager-tool-bar.md",
         "docs/ai/systems/scene-hud/2026-04-05-mock-task-markers-on-grid.md",
         "docs/ai/systems/scene-hud/2026-04-05-pawn-roster-detail-panel.md",
-        "docs/ai/systems/scene-hud/2026-04-05-time-of-day-system.md"
+        "docs/ai/systems/scene-hud/2026-04-05-time-of-day-system.md",
+        "docs/ai/systems/scene-hud/2026-04-05-b-line-player-channel.md"
+      ],
+      "sourceFiles": [
+        "src/ui/hud-manager.ts",
+        "src/data/villager-tools.ts",
+        "src/data/ground-items.ts",
+        "src/data/grid-cell-info.ts",
+        "src/data/task-markers.ts",
+        "src/data/pawn-profiles.ts",
+        "src/data/player-acceptance-scenarios.ts",
+        "src/player/brush-stroke.ts",
+        "src/player/build-domain-command.ts",
+        "src/player/commit-player-intent.ts",
+        "src/player/interaction-mode-presenter.ts",
+        "src/player/mock-world-port.ts",
+        "src/player/need-signals.ts",
+        "src/player/s0-contract.ts",
+        "src/player/tool-input-policy.ts",
+        "src/scenes/villager-tool-bar-config.ts",
+        "src/scenes/mock-villager-tools.ts",
+        "src/scenes/mock-ground-items.ts",
+        "src/scenes/mock-grid-cell-info.ts",
+        "src/scenes/mock-task-marker-commands.ts",
+        "src/scenes/mock-task-marker-selection.ts",
+        "src/scenes/mock-pawn-profile-data.ts"
+      ],
+      "testFiles": [
+        "tests/component/villager-tool-bar-model.test.ts",
+        "tests/component/mock-task-marker-commands.test.ts",
+        "tests/component/mock-task-marker-selection.test.ts",
+        "tests/scene-hud-markup.test.ts",
+        "tests/domain/commit-player-intent.test.ts",
+        "tests/domain/mock-world-port.test.ts",
+        "tests/domain/need-signals.test.ts",
+        "tests/domain/player-acceptance-scenarios.test.ts",
+        "tests/domain/player-channel-domain-command.test.ts"
       ]
     },
     {
@@ -112,6 +129,8 @@
       "systemReadme": "docs/ai/systems/selection-ui/README.md",
       "sourceFiles": [
         "src/game/floor-selection.ts",
+        "src/player/brush-stroke.ts",
+        "src/player/tool-input-policy.ts",
         "src/scenes/renderers/selection-renderer.ts",
         "src/data/task-markers.ts"
       ],
@@ -127,11 +146,13 @@
         "docs/ai/integration/2026-04-05-goal-driven-pawn-ai-prototype.md",
         "docs/ai/integration/2026-04-05-mock-task-markers-on-grid.md",
         "docs/ai/integration/2026-04-05-floor-area-selection-foundation.md",
-        "docs/ai/integration/2026-04-05-gamescene-runtime-refactor.md"
+        "docs/ai/integration/2026-04-05-gamescene-runtime-refactor.md",
+        "docs/ai/integration/2026-04-05-b-line-player-channel-mock-gateway.md"
       ],
       "latestAidocs": [
         "docs/ai/systems/selection-ui/2026-04-05-gamescene-runtime-refactor.md",
-        "docs/ai/systems/selection-ui/2026-04-05-floor-area-selection-foundation.md"
+        "docs/ai/systems/selection-ui/2026-04-05-floor-area-selection-foundation.md",
+        "docs/ai/systems/selection-ui/2026-04-05-brush-and-gateway-ordered-commit.md"
       ]
     },
     {
@@ -182,7 +203,8 @@
         "src/scenes/renderers/selection-renderer.ts"
       ],
       "testFiles": [
-        "tests/domain/world-grid.test.ts"
+        "tests/domain/world-grid.test.ts",
+        "tests/domain/world-grid-line.test.ts"
       ],
       "sceneEntryFiles": [
         "src/scenes/GameScene.ts"
@@ -193,14 +215,16 @@
         "docs/ai/integration/2026-04-05-goal-driven-pawn-ai-prototype.md",
         "docs/ai/integration/2026-04-05-mock-task-markers-on-grid.md",
         "docs/ai/integration/2026-04-05-floor-area-selection-foundation.md",
-        "docs/ai/integration/2026-04-05-gamescene-runtime-refactor.md"
+        "docs/ai/integration/2026-04-05-gamescene-runtime-refactor.md",
+        "docs/ai/integration/2026-04-05-b-line-player-channel-mock-gateway.md"
       ],
       "latestAidocs": [
         "docs/ai/systems/world-grid/2026-04-05-gamescene-runtime-refactor.md",
         "docs/ai/systems/world-grid/2026-04-05-default-grid-wandering-pawns.md",
         "docs/ai/systems/world-grid/2026-04-05-random-stone-obstacles.md",
         "docs/ai/systems/world-grid/2026-04-05-goal-driven-pawn-ai-prototype.md",
-        "docs/ai/systems/world-grid/2026-04-05-floor-area-selection-foundation.md"
+        "docs/ai/systems/world-grid/2026-04-05-floor-area-selection-foundation.md",
+        "docs/ai/systems/world-grid/2026-04-05-grid-line-segment-cells.md"
       ]
     }
   ]

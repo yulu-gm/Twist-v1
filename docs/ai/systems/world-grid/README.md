@@ -20,6 +20,7 @@
 ## 当前关键测试文件
 
 - `tests/domain/world-grid.test.ts`
+- `tests/domain/world-grid-line.test.ts`（线段覆盖格，`gridLineCells`）
 
 ## 当前接入场景文件
 
@@ -32,6 +33,7 @@
 - `docs/ai/systems/world-grid/2026-04-05-random-stone-obstacles.md`
 - `docs/ai/systems/world-grid/2026-04-05-default-grid-wandering-pawns.md`
 - `docs/ai/systems/world-grid/2026-04-05-goal-driven-pawn-ai-prototype.md`
+- `docs/ai/systems/world-grid/2026-04-05-grid-line-segment-cells.md`
 
 ## 何时必须回填
 
