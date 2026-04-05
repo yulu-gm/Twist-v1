@@ -9,28 +9,10 @@ import {
   type FloorSelectionState
 } from "../game/floor-selection";
 import {
-  canChooseNewGoal,
-  chooseGoalDecision,
-  chooseStepTowardCell,
-  chooseWanderStep,
-  targetCellForDecision
-} from "../game/goal-driven-planning";
-import {
-  advanceNeeds,
-  advancePawnActionTimer,
-  advanceMoveTowardTarget,
-  applyNeedDelta,
-  beginMove,
-  clearPawnIntent,
   createDefaultPawnStates,
   DEFAULT_PAWN_NAMES,
-  finishMoveIfComplete,
-  isMoving,
   logicalCellsByPawnId,
   pickRandomAltPawnNames,
-  pawnDisplayWorldCenter,
-  resetPawnActionTimer,
-  setPawnIntent,
   type PawnState
 } from "../game/pawn-state";
 import {
@@ -39,7 +21,6 @@ import {
   advanceTimeOfDay,
   createInitialTimeOfDayState,
   effectiveSimulationDeltaSeconds,
-  formatTimeOfDayLabel,
   sampleTimeOfDayPalette,
   type TimeControlState,
   type TimeOfDayPalette,
@@ -49,84 +30,69 @@ import {
 import {
   blockedKeysFromCells,
   cellAtWorldPixel,
-  cellCenterWorld,
   coordKey,
   createReservationSnapshot,
   DEFAULT_WORLD_GRID,
-  findInteractionPointById,
   pickRandomBlockedCells,
-  releaseInteractionPoint,
-  reserveInteractionPoint,
   type GridCoord,
   type ReservationSnapshot,
   type WorldGridConfig
 } from "../game/world-grid";
-import { formatMockGridCellHoverText } from "./mock-grid-cell-info";
-import { applyMockTaskMarkersForSelection } from "./mock-task-marker-selection";
-import { MOCK_SCATTERED_GROUND_ITEMS } from "./mock-ground-items";
-import {
-  MOCK_VILLAGER_TOOLS,
-  MOCK_VILLAGER_TOOL_KEY_CODES
-} from "./mock-villager-tools";
-import { mockPawnProfileForId } from "./mock-pawn-profile-data";
-
-const MOVE_DURATION_SEC = 0.42;
-/** 开局随机散落的石头格数量（不与默认出生点重叠）。 */
-const STONE_CELL_COUNT = 14;
-const NEED_GROWTH_PER_SEC = {
-  hunger: 2.6,
-  rest: 1.9,
-  recreation: 1.4
-} as const;
-
-type PawnView = Readonly<{
-  circle: Phaser.GameObjects.Arc;
-  label: Phaser.GameObjects.Text;
-}>;
+import { DEFAULT_SIM_CONFIG } from "../game/sim-config";
+import { tickSimulation } from "../game/sim-loop";
+import { formatGridCellHoverText } from "../data/grid-cell-info";
+import { applyTaskMarkersForSelection } from "../data/task-markers";
+import { HudManager } from "../ui/hud-manager";
+import { VILLAGER_TOOLS, VILLAGER_TOOL_KEY_CODES } from "../data/villager-tools";
+import { drawGridLines, drawStoneCells, drawInteractionPoints } from "./renderers/grid-renderer";
+import { createPawnViews, syncPawnViews, applyPaletteToViews, type PawnView } from "./renderers/pawn-renderer";
+import { drawGroundItemStacks } from "./renderers/ground-items-renderer";
+import { redrawFloorSelection, syncTaskMarkerView } from "./renderers/selection-renderer";
 
 export type GameSceneVariant = "default" | "alt-en";
 
 export class GameScene extends Phaser.Scene {
+  // Layout
   private gridOriginX = 0;
   private gridOriginY = 0;
   private worldGrid: WorldGridConfig = DEFAULT_WORLD_GRID;
+
+  // Simulation state
   private pawns: PawnState[] = [];
-  private views = new Map<string, PawnView>();
-  private variant: GameSceneVariant = "default";
+  private reservations: ReservationSnapshot = createReservationSnapshot();
   private timeOfDayState: TimeOfDayState = createInitialTimeOfDayState(DEFAULT_TIME_OF_DAY_CONFIG);
   private timeOfDayPalette: TimeOfDayPalette = sampleTimeOfDayPalette(
     createInitialTimeOfDayState(DEFAULT_TIME_OF_DAY_CONFIG)
   );
   private timeControlState: TimeControlState = DEFAULT_TIME_CONTROL_STATE;
-  private reservations: ReservationSnapshot = createReservationSnapshot();
+
+  // Phaser renderables
+  private views = new Map<string, PawnView>();
   private gridGraphics!: Phaser.GameObjects.Graphics;
   private interactionGraphics!: Phaser.GameObjects.Graphics;
   private interactionLabels = new Map<string, Phaser.GameObjects.Text>();
   private hoverHighlightFrame!: Phaser.GameObjects.Rectangle;
   private lastHoverKey: string | null = "\0";
-  private sceneHudEl: HTMLElement | null = null;
-  private sceneTimeValueEl: HTMLElement | null = null;
-  private sceneTimeToggleEl: HTMLButtonElement | null = null;
-  private sceneSpeedEls = new Map<TimeSpeed, HTMLButtonElement>();
-  private hoverHudEl: HTMLElement | null = null;
-  private selectedToolIndex = 0;
-  private toolSlotEls: HTMLElement[] = [];
-  private toolKeyObjects: Phaser.Input.Keyboard.Key[] = [];
-  private toolUiAbort: AbortController | null = null;
-  private timeControlAbort: AbortController | null = null;
-  private timeControlKeyObjects: Phaser.Input.Keyboard.Key[] = [];
-  private pawnRosterAbort: AbortController | null = null;
-  private pawnRosterSlotEls: HTMLElement[] = [];
-  private selectedPawnId: string | null = null;
-  private pawnDetailEl: HTMLElement | null = null;
-  /** 各格上的 mock 任务标记文案（键为 `coordKey`）。 */
-  private taskMarkersByCell = new Map<string, string>();
-  private taskMarkerGraphics!: Phaser.GameObjects.Graphics;
-  private taskMarkerTexts = new Map<string, Phaser.GameObjects.Text>();
   private floorSelectionGraphics!: Phaser.GameObjects.Graphics;
   private floorSelectionDraftGraphics!: Phaser.GameObjects.Graphics;
+  private taskMarkerGraphics!: Phaser.GameObjects.Graphics;
+  private taskMarkerTexts = new Map<string, Phaser.GameObjects.Text>();
+
+  // Input / selection state
+  private variant: GameSceneVariant = "default";
   private floorSelectionState: FloorSelectionState = createFloorSelectionState();
   private activeSelectionPointerId?: number;
+  private selectedToolIndex = 0;
+  private selectedPawnId: string | null = null;
+  private taskMarkersByCell = new Map<string, string>();
+
+  // Keyboard key objects (for cleanup)
+  private toolKeyObjects: Phaser.Input.Keyboard.Key[] = [];
+  private timeControlKeyObjects: Phaser.Input.Keyboard.Key[] = [];
+  private timeControlAbort: AbortController | null = null;
+
+  // HUD manager
+  private hud!: HudManager;
 
   public constructor() {
     super("game");
@@ -142,14 +108,16 @@ export class GameScene extends Phaser.Scene {
   }
 
   public create(): void {
+    this.hud = new HudManager();
     this.cameras.main.setBackgroundColor(this.timeOfDayPalette.backgroundColor);
     this.layoutGrid();
     this.setupGridHoverHighlight();
 
+    // Build world grid with random blocked cells
     const excludeSpawn = blockedKeysFromCells(DEFAULT_WORLD_GRID.defaultSpawnPoints);
     const stoneCells = pickRandomBlockedCells(
       DEFAULT_WORLD_GRID,
-      STONE_CELL_COUNT,
+      DEFAULT_SIM_CONFIG.stoneCellCount,
       excludeSpawn,
       () => Math.random()
     );
@@ -158,93 +126,76 @@ export class GameScene extends Phaser.Scene {
       blockedCellKeys: blockedKeysFromCells(stoneCells)
     };
 
+    // Grid graphics
     this.gridGraphics = this.add.graphics();
-    this.drawGridLines();
-    this.drawStoneCells(stoneCells);
+    drawGridLines(this.gridGraphics, this.worldGrid, this.gridOriginX, this.gridOriginY, this.timeOfDayPalette);
+    drawStoneCells(this, this.worldGrid, this.gridOriginX, this.gridOriginY, stoneCells);
     this.interactionGraphics = this.add.graphics();
-    this.drawInteractionPoints();
-    this.drawGroundItemStacks();
+    drawInteractionPoints(
+      this.interactionGraphics, this.interactionLabels, this,
+      this.worldGrid, this.gridOriginX, this.gridOriginY,
+      this.reservations, this.timeOfDayPalette
+    );
+    drawGroundItemStacks(this, this.worldGrid, this.gridOriginX, this.gridOriginY);
+
+    // Selection graphics
     this.floorSelectionGraphics = this.add.graphics();
     this.floorSelectionDraftGraphics = this.add.graphics();
     this.floorSelectionState = createFloorSelectionState();
     this.activeSelectionPointerId = undefined;
-    this.redrawFloorSelection();
+    redrawFloorSelection(
+      this.floorSelectionGraphics, this.floorSelectionDraftGraphics,
+      this.floorSelectionState, this.worldGrid, this.gridOriginX, this.gridOriginY
+    );
 
+    // Task marker graphics
+    this.taskMarkerGraphics = this.add.graphics();
+    this.taskMarkerGraphics.setDepth(35);
+    syncTaskMarkerView(
+      this.taskMarkerGraphics, this.taskMarkerTexts, this,
+      this.taskMarkersByCell, this.worldGrid, this.gridOriginX, this.gridOriginY
+    );
+
+    // Spawn pawns
     const names =
       this.variant === "alt-en"
         ? pickRandomAltPawnNames(DEFAULT_PAWN_NAMES.length)
         : [...DEFAULT_PAWN_NAMES];
     this.pawns = createDefaultPawnStates(this.worldGrid.defaultSpawnPoints, names);
     this.reservations = createReservationSnapshot();
-
-    for (const pawn of this.pawns) {
-      const pos = pawnDisplayWorldCenter(
-        pawn,
-        this.worldGrid,
-        this.gridOriginX,
-        this.gridOriginY
-      );
-      const cell = this.worldGrid.cellSizePx;
-      const radius = Math.max(10, cell * 0.32);
-      const circle = this.add.circle(pos.x, pos.y, radius, pawn.fillColor, 1);
-      circle.setStrokeStyle(2, 0x1a1a1a, 0.85);
-      const label = this.add
-        .text(pos.x, pos.y - radius - 10, `${pawn.name}\n${pawn.debugLabel}`, {
-          fontFamily: "Segoe UI, sans-serif",
-          fontSize: "12px",
-          align: "center",
-          color: this.colorToCss(this.timeOfDayPalette.primaryTextColor)
-        })
-        .setOrigin(0.5, 1)
-        .setLineSpacing(2);
-      this.views.set(pawn.id, { circle, label });
-    }
-
-    this.bindSceneVariantSelect();
-    this.sceneHudEl = document.getElementById("scene-hud");
-    this.sceneTimeValueEl = document.getElementById("scene-time-value");
-    this.sceneTimeToggleEl = document.getElementById("scene-time-toggle") as HTMLButtonElement | null;
-    this.sceneSpeedEls = new Map<TimeSpeed, HTMLButtonElement>(
-      [
-        [1, document.getElementById("scene-speed-1") as HTMLButtonElement | null],
-        [2, document.getElementById("scene-speed-2") as HTMLButtonElement | null],
-        [3, document.getElementById("scene-speed-3") as HTMLButtonElement | null]
-      ].filter((entry): entry is [TimeSpeed, HTMLButtonElement] => entry[1] !== null)
+    this.views = createPawnViews(
+      this, this.pawns, this.worldGrid, this.gridOriginX, this.gridOriginY, this.timeOfDayPalette
     );
+
+    // HUD setup
+    this.hud.bindSceneVariantSelect(this.variant, (next) => {
+      this.scene.restart({ variant: next });
+    });
+    this.hud.setHoverInfoColor(this.timeOfDayPalette);
+    this.hud.syncTimeOfDayHud(this.timeOfDayState, this.timeControlState, this.timeOfDayPalette);
     this.setupTimeControls();
-    this.syncTimeOfDayHud();
-    this.hoverHudEl = document.getElementById("grid-hover-info");
-    if (this.hoverHudEl) {
-      this.hoverHudEl.style.color = this.colorToCss(this.timeOfDayPalette.primaryTextColor);
-    }
-    this.setupVillagerToolBar();
+    this.setupVillagerToolBarKeys();
+    this.hud.setupToolBar((i) => this.selectVillagerTool(i), this.selectedToolIndex);
     this.setupPawnRosterUi();
 
-    this.taskMarkerGraphics = this.add.graphics();
-    this.taskMarkerGraphics.setDepth(35);
-    this.syncTaskMarkerView();
     this.bindFloorSelectionInput();
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.onShutdown, this);
   }
 
   public update(_time: number, delta: number): void {
     const realDt = delta / 1000;
     const simulationDt = effectiveSimulationDeltaSeconds(realDt, this.timeControlState);
-    const nextTimeOfDayState = advanceTimeOfDay(
-      this.timeOfDayState,
-      simulationDt,
-      DEFAULT_TIME_OF_DAY_CONFIG
-    );
-    const nextTimeOfDayPalette = sampleTimeOfDayPalette(nextTimeOfDayState);
-    const paletteChanged = !this.sameTimeOfDayPalette(
-      this.timeOfDayPalette,
-      nextTimeOfDayPalette
-    );
-    this.timeOfDayState = nextTimeOfDayState;
+
+    // Advance time of day
+    const nextTimeState = advanceTimeOfDay(this.timeOfDayState, simulationDt, DEFAULT_TIME_OF_DAY_CONFIG);
+    const nextPalette = sampleTimeOfDayPalette(nextTimeState);
+    const paletteChanged = !sameTimeOfDayPalette(this.timeOfDayPalette, nextPalette);
+    this.timeOfDayState = nextTimeState;
     if (paletteChanged) {
-      this.timeOfDayPalette = nextTimeOfDayPalette;
+      this.timeOfDayPalette = nextPalette;
       this.applyTimeOfDayPalette();
     }
-    this.syncTimeOfDayHud();
+    this.hud.syncTimeOfDayHud(this.timeOfDayState, this.timeControlState, this.timeOfDayPalette);
 
     if (simulationDt <= 0) {
       this.syncHoverFromPointer();
@@ -252,178 +203,34 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    const grid = this.worldGrid;
-    let nextReservations = this.reservations;
-
-    let nextPawns = this.pawns.map((pawn) => {
-      let updated = advanceNeeds(pawn, simulationDt, NEED_GROWTH_PER_SEC);
-      updated = finishMoveIfComplete(
-        advanceMoveTowardTarget(updated, simulationDt, MOVE_DURATION_SEC)
-      );
-
-      if (updated.currentAction?.kind !== "use-target") {
-        return updated;
-      }
-
-      const targetId = updated.currentAction.targetId ?? updated.reservedTargetId;
-      const point = targetId ? findInteractionPointById(grid, targetId) : undefined;
-      if (!targetId || !point) {
-        return clearPawnIntent(updated);
-      }
-
-      updated = advancePawnActionTimer(updated, simulationDt);
-      if (updated.actionTimerSec < point.useDurationSec) {
-        return updated;
-      }
-
-      nextReservations = releaseInteractionPoint(nextReservations, point.id, updated.id);
-      const completed = clearPawnIntent(applyNeedDelta(updated, point.needDelta));
-      this.logAiEvent(updated.name, `completed ${point.kind} at ${point.id}`);
-      return completed;
+    // Run simulation tick
+    const result = tickSimulation({
+      pawns: this.pawns,
+      reservations: this.reservations,
+      grid: this.worldGrid,
+      simulationDt,
+      config: DEFAULT_SIM_CONFIG,
+      rng: () => Math.random()
     });
 
-    nextPawns = nextPawns.map((pawn) => {
-      if (isMoving(pawn) || pawn.currentAction?.kind !== "move-to-target") {
-        return pawn;
-      }
-
-      const targetId = pawn.currentAction.targetId ?? pawn.reservedTargetId;
-      const point = targetId ? findInteractionPointById(grid, targetId) : undefined;
-      if (!targetId || !point) {
-        return clearPawnIntent(pawn);
-      }
-
-      if (
-        pawn.logicalCell.col === point.cell.col &&
-        pawn.logicalCell.row === point.cell.row
-      ) {
-        return setPawnIntent(
-          resetPawnActionTimer(pawn),
-          pawn.currentGoal,
-          { kind: "use-target", targetId: point.id },
-          point.id
-        );
-      }
-
-      return pawn;
-    });
-
-    const plannedStepTargets = new Set<string>();
-    nextPawns = nextPawns.map((pawn) => {
-      if (!canChooseNewGoal(pawn)) {
-        return pawn;
-      }
-
-      const logicalCells = logicalCellsByPawnId(nextPawns);
-      const decision = chooseGoalDecision({
-        grid,
-        pawn,
-        reservations: nextReservations
-      });
-      const previousLabel = pawn.debugLabel;
-
-      if (decision.goal === "wander") {
-        const step = chooseWanderStep(grid, pawn, logicalCells, () => Math.random());
-        const wandered = setPawnIntent(
-          step ? beginMove(pawn, step) : pawn,
-          { kind: "wander", reason: decision.reason },
-          step ? { kind: "move-to-target" } : { kind: "idle" },
-          undefined
-        );
-        if (wandered.debugLabel !== previousLabel) {
-          this.logAiEvent(wandered.name, `${wandered.debugLabel} (${decision.reason})`);
-        }
-        return wandered;
-      }
-
-      const targetCell = targetCellForDecision(grid, decision);
-      const point = decision.targetId ? findInteractionPointById(grid, decision.targetId) : undefined;
-      if (!targetCell || !point) {
-        return clearPawnIntent(pawn);
-      }
-
-      const reserved = reserveInteractionPoint(nextReservations, point.id, pawn.id);
-      if (!reserved) {
-        this.logAiEvent(pawn.name, `reserve failed for ${point.id}`);
-        return setPawnIntent(
-          pawn,
-          { kind: "wander", reason: "reservation-failed" },
-          { kind: "idle" },
-          undefined
-        );
-      }
-      nextReservations = reserved;
-
-      if (
-        pawn.logicalCell.col === targetCell.col &&
-        pawn.logicalCell.row === targetCell.row
-      ) {
-        const using = setPawnIntent(
-          resetPawnActionTimer(pawn),
-          { kind: decision.goal, reason: decision.reason, targetId: point.id },
-          { kind: "use-target", targetId: point.id },
-          point.id
-        );
-        if (using.debugLabel !== previousLabel) {
-          this.logAiEvent(using.name, `${using.debugLabel} (${decision.reason})`);
-        }
-        return using;
-      }
-
-      const step = chooseStepTowardCell(grid, pawn, logicalCells, targetCell);
-      if (!step) {
-        nextReservations = releaseInteractionPoint(nextReservations, point.id, pawn.id);
-        this.logAiEvent(pawn.name, `wait: no step toward ${point.id}`);
-        return setPawnIntent(
-          pawn,
-          { kind: decision.goal, reason: "step-blocked", targetId: point.id },
-          { kind: "idle", targetId: point.id },
-          undefined
-        );
-      }
-
-      const stepKey = `${step.col},${step.row}`;
-      if (plannedStepTargets.has(stepKey)) {
-        nextReservations = releaseInteractionPoint(nextReservations, point.id, pawn.id);
-        return setPawnIntent(
-          pawn,
-          { kind: decision.goal, reason: "step-conflict", targetId: point.id },
-          { kind: "idle", targetId: point.id },
-          undefined
-        );
-      }
-
-      plannedStepTargets.add(stepKey);
-      const moving = setPawnIntent(
-        beginMove(pawn, step),
-        { kind: decision.goal, reason: decision.reason, targetId: point.id },
-        { kind: "move-to-target", targetId: point.id },
-        point.id
-      );
-      if (moving.debugLabel !== previousLabel) {
-        this.logAiEvent(moving.name, `${moving.debugLabel} (${decision.reason})`);
-      }
-      return moving;
-    });
-
-    this.reservations = nextReservations;
-    this.pawns = nextPawns;
-    this.drawInteractionPoints();
-
-    for (const pawn of this.pawns) {
-      const view = this.views.get(pawn.id);
-      if (!view) continue;
-
-      const pos = pawnDisplayWorldCenter(pawn, grid, this.gridOriginX, this.gridOriginY);
-      view.circle.setPosition(pos.x, pos.y);
-      const radius = view.circle.radius;
-      view.label.setPosition(pos.x, pos.y - radius - 10);
-      view.label.setText(`${pawn.name}\n${pawn.debugLabel}`);
+    for (const msg of result.aiEvents) {
+      console.info(msg);
     }
 
+    this.reservations = result.reservations;
+    this.pawns = [...result.pawns];
+
+    drawInteractionPoints(
+      this.interactionGraphics, this.interactionLabels, this,
+      this.worldGrid, this.gridOriginX, this.gridOriginY,
+      this.reservations, this.timeOfDayPalette
+    );
+    syncPawnViews(this.views, this.pawns, this.worldGrid, this.gridOriginX, this.gridOriginY);
     this.syncHoverFromPointer();
     this.syncPawnDetailPanel();
   }
+
+  // ── Layout ────────────────────────────────────────────────
 
   private layoutGrid(): void {
     const { width, height } = this.scale;
@@ -432,38 +239,6 @@ export class GameScene extends Phaser.Scene {
     const gridH = rows * cellSizePx;
     this.gridOriginX = (width - gridW) / 2;
     this.gridOriginY = (height - gridH) / 2;
-  }
-
-  private drawStoneCells(cells: readonly GridCoord[]): void {
-    const cellPx = this.worldGrid.cellSizePx;
-    const side = Math.max(14, cellPx * 0.42);
-    for (const cell of cells) {
-      const pos = cellCenterWorld(this.worldGrid, cell, this.gridOriginX, this.gridOriginY);
-      const stone = this.add.rectangle(pos.x, pos.y, side, side * 0.88, 0x6b6560, 1);
-      stone.setStrokeStyle(1, 0x3d3830, 0.92);
-    }
-  }
-
-  private drawGridLines(): void {
-    const g = this.gridGraphics;
-    const { columns, rows, cellSizePx } = this.worldGrid;
-    const ox = this.gridOriginX;
-    const oy = this.gridOriginY;
-    const gridW = columns * cellSizePx;
-    const gridH = rows * cellSizePx;
-
-    g.clear();
-    g.lineStyle(1, this.timeOfDayPalette.gridLineColor, 0.9);
-    for (let c = 0; c <= columns; c++) {
-      const x = ox + c * cellSizePx;
-      g.lineBetween(x, oy, x, oy + gridH);
-    }
-    for (let r = 0; r <= rows; r++) {
-      const y = oy + r * cellSizePx;
-      g.lineBetween(ox, y, ox + gridW, y);
-    }
-    g.lineStyle(2, this.timeOfDayPalette.gridBorderColor, 0.55);
-    g.strokeRect(ox + 1, oy + 1, gridW - 2, gridH - 2);
   }
 
   private setupGridHoverHighlight(): void {
@@ -475,77 +250,33 @@ export class GameScene extends Phaser.Scene {
     this.hoverHighlightFrame = frame;
   }
 
-  private pointerToCell(pointer: Phaser.Input.Pointer): GridCoord | null {
-    const cam = this.cameras.main;
-    const w = cam.getWorldPoint(pointer.x, pointer.y);
-    return cellAtWorldPixel(this.worldGrid, this.gridOriginX, this.gridOriginY, w.x, w.y);
-  }
+  // ── Palette application ───────────────────────────────────
 
-  private parseCoordKey(key: string): GridCoord | null {
-    const comma = key.indexOf(",");
-    if (comma <= 0) return null;
-    const col = Number(key.slice(0, comma));
-    const row = Number(key.slice(comma + 1));
-    if (!Number.isInteger(col) || !Number.isInteger(row)) return null;
-    return { col, row };
-  }
-
-  /** 半格直径的圆线框 + 任务名于格心（临时表现）。 */
-  private syncTaskMarkerView(): void {
-    const g = this.taskMarkerGraphics;
-    g.clear();
-    const cs = this.worldGrid.cellSizePx;
-    const radius = cs * 0.25;
-
-    for (const [key, text] of [...this.taskMarkerTexts]) {
-      if (!this.taskMarkersByCell.has(key)) {
-        text.destroy();
-        this.taskMarkerTexts.delete(key);
-      }
+  private applyTimeOfDayPalette(): void {
+    this.cameras.main.setBackgroundColor(this.timeOfDayPalette.backgroundColor);
+    drawGridLines(this.gridGraphics, this.worldGrid, this.gridOriginX, this.gridOriginY, this.timeOfDayPalette);
+    applyPaletteToViews(this.views, this.timeOfDayPalette);
+    const secondaryColor = `#${(this.timeOfDayPalette.secondaryTextColor & 0xffffff).toString(16).padStart(6, "0")}`;
+    for (const label of this.interactionLabels.values()) {
+      label.setColor(secondaryColor);
     }
-
-    g.lineStyle(2, 0xd4a84b, 0.92);
-
-    for (const [key, taskName] of this.taskMarkersByCell) {
-      const cell = this.parseCoordKey(key);
-      if (!cell) continue;
-      const cx = this.gridOriginX + cell.col * cs + cs / 2;
-      const cy = this.gridOriginY + cell.row * cs + cs / 2;
-
-      g.strokeCircle(cx, cy, radius);
-
-      let text = this.taskMarkerTexts.get(key);
-      if (!text) {
-        text = this.add
-          .text(cx, cy, taskName, {
-            fontFamily: "Segoe UI, sans-serif",
-            fontSize: "10px",
-            color: "#f0e6d2",
-            align: "center",
-            stroke: "#000000",
-            strokeThickness: 3
-          })
-          .setOrigin(0.5, 0.5)
-          .setDepth(36);
-        this.taskMarkerTexts.set(key, text);
-      } else {
-        text.setText(taskName);
-        text.setPosition(cx, cy);
-      }
-    }
+    this.hud.setHoverInfoColor(this.timeOfDayPalette);
   }
+
+  // ── Hover sync ────────────────────────────────────────────
 
   private syncHoverFromPointer(): void {
     const ptr = this.input.activePointer;
-    const cell = this.pointerToCell(ptr);
+    const cam = this.cameras.main;
+    const w = cam.getWorldPoint(ptr.x, ptr.y);
+    const cell = cellAtWorldPixel(this.worldGrid, this.gridOriginX, this.gridOriginY, w.x, w.y);
     const key = cell ? coordKey(cell) : null;
     if (key === this.lastHoverKey) return;
     this.lastHoverKey = key;
 
     if (!cell) {
       this.hoverHighlightFrame.setVisible(false);
-      const el = this.hoverHudEl;
-      if (el) el.hidden = true;
+      this.hud.hideHoverInfo();
       return;
     }
 
@@ -555,465 +286,106 @@ export class GameScene extends Phaser.Scene {
     this.hoverHighlightFrame.setPosition(cx, cy);
     this.hoverHighlightFrame.setSize(cs - 2, cs - 2);
     this.hoverHighlightFrame.setVisible(true);
-
-    const el = this.hoverHudEl;
-    if (el) {
-      el.hidden = false;
-      el.textContent = formatMockGridCellHoverText(cell, this.worldGrid);
-    }
+    this.hud.showHoverInfo(formatGridCellHoverText(cell, this.worldGrid));
   }
 
-  /** 临时掉落物：线框 + 名称 + 右下角数量（数据见 `mock-ground-items`）。 */
-  private drawGroundItemStacks(): void {
-    const g = this.add.graphics();
-    g.setDepth(25);
-    const cs = this.worldGrid.cellSizePx;
-    const pad = 4;
-    const ox = this.gridOriginX;
-    const oy = this.gridOriginY;
+  // ── Pawn detail ───────────────────────────────────────────
 
-    for (const stack of MOCK_SCATTERED_GROUND_ITEMS) {
-      const { col, row } = stack.cell;
-      const left = ox + col * cs + pad;
-      const top = oy + row * cs + pad;
-      const w = cs - pad * 2;
-      const h = cs - pad * 2;
-
-      g.lineStyle(2, 0xc9b87a, 0.95);
-      g.strokeRect(left, top, w, h);
-
-      const cx = ox + (col + 0.5) * cs;
-      const cy = oy + (row + 0.5) * cs;
-      this.add
-        .text(cx, cy, stack.displayName, {
-          fontFamily: "Segoe UI, sans-serif",
-          fontSize: "11px",
-          color: "#e8dcc8",
-          align: "center"
-        })
-        .setOrigin(0.5, 0.5)
-        .setDepth(25);
-
-      const rx = ox + (col + 1) * cs - pad;
-      const ry = oy + (row + 1) * cs - pad;
-      this.add
-        .text(rx, ry, String(stack.quantity), {
-          fontFamily: "Segoe UI, sans-serif",
-          fontSize: "10px",
-          color: "#f0e6d2"
-        })
-        .setOrigin(1, 1)
-        .setDepth(25);
-    }
+  private syncPawnDetailPanel(): void {
+    const pawn = this.selectedPawnId
+      ? this.pawns.find((p) => p.id === this.selectedPawnId)
+      : undefined;
+    this.hud.syncPawnDetail(pawn);
   }
 
-  private drawInteractionPoints(): void {
-    this.interactionGraphics.clear();
-
-    for (const point of this.worldGrid.interactionPoints) {
-      const pos = cellCenterWorld(
-        this.worldGrid,
-        point.cell,
-        this.gridOriginX,
-        this.gridOriginY
-      );
-      const reserved = this.reservations.has(point.id);
-      const color =
-        point.kind === "food"
-          ? 0xc57b57
-          : point.kind === "bed"
-            ? 0x5d7fa3
-            : 0x5ea37c;
-
-      this.interactionGraphics.fillStyle(color, reserved ? 0.95 : 0.65);
-      this.interactionGraphics.lineStyle(2, reserved ? 0xf5f1e8 : 0x1f1a16, 0.85);
-
-      if (point.kind === "bed") {
-        this.interactionGraphics.fillRect(pos.x - 14, pos.y - 10, 28, 20);
-        this.interactionGraphics.strokeRect(pos.x - 14, pos.y - 10, 28, 20);
-      } else if (point.kind === "food") {
-        this.interactionGraphics.fillCircle(pos.x, pos.y, 12);
-        this.interactionGraphics.strokeCircle(pos.x, pos.y, 12);
-      } else {
-        this.interactionGraphics.beginPath();
-        this.interactionGraphics.moveTo(pos.x, pos.y - 12);
-        this.interactionGraphics.lineTo(pos.x + 12, pos.y);
-        this.interactionGraphics.lineTo(pos.x, pos.y + 12);
-        this.interactionGraphics.lineTo(pos.x - 12, pos.y);
-        this.interactionGraphics.closePath();
-        this.interactionGraphics.fillPath();
-        this.interactionGraphics.strokePath();
-      }
-
-      let label = this.interactionLabels.get(point.id);
-      if (!label) {
-        label = this.add
-          .text(pos.x, pos.y + 18, point.kind.toUpperCase(), {
-            fontFamily: "Segoe UI, sans-serif",
-            fontSize: "10px",
-            color: this.colorToCss(this.timeOfDayPalette.secondaryTextColor)
-          })
-          .setOrigin(0.5, 0);
-        this.interactionLabels.set(point.id, label);
-      }
-      label.setPosition(pos.x, pos.y + 18);
-      label.setAlpha(reserved ? 1 : 0.8);
-      label.setColor(this.colorToCss(this.timeOfDayPalette.secondaryTextColor));
-    }
-  }
-
-  private logAiEvent(pawnName: string, message: string): void {
-    console.info(`[AI] ${pawnName}: ${message}`);
-  }
-
-  private bindSceneVariantSelect(): void {
-    const sel = document.getElementById("scene-variant") as HTMLSelectElement | null;
-    if (!sel) return;
-    sel.value = this.variant;
-    sel.onchange = () => {
-      const next = sel.value === "alt-en" ? "alt-en" : "default";
-      this.scene.restart({ variant: next });
-    };
-  }
+  // ── Time controls ─────────────────────────────────────────
 
   private setupTimeControls(): void {
     this.teardownTimeControls();
-
-    this.timeControlAbort = new AbortController();
-    const signal = this.timeControlAbort.signal;
-
-    this.sceneTimeToggleEl?.addEventListener(
-      "click",
-      () => {
-        this.toggleTimePaused();
-      },
-      { signal }
-    );
-
-    for (const [speed, button] of this.sceneSpeedEls) {
-      button.addEventListener(
-        "click",
-        () => {
-          this.setTimeSpeed(speed);
-        },
-        { signal }
-      );
-    }
+    this.timeControlAbort = this.hud.setupTimeControls({
+      onTogglePause: () => this.toggleTimePaused(),
+      onSetSpeed: (s) => this.setTimeSpeed(s)
+    });
 
     if (this.input.keyboard) {
-      const keyBindings: ReadonlyArray<readonly [number, () => void]> = [
+      const bindings: ReadonlyArray<readonly [number, () => void]> = [
         [Phaser.Input.Keyboard.KeyCodes.SPACE, () => this.toggleTimePaused()],
         [Phaser.Input.Keyboard.KeyCodes.ONE, () => this.setTimeSpeed(1)],
         [Phaser.Input.Keyboard.KeyCodes.TWO, () => this.setTimeSpeed(2)],
         [Phaser.Input.Keyboard.KeyCodes.THREE, () => this.setTimeSpeed(3)]
       ];
-
-      for (const [keyCode, handler] of keyBindings) {
-        const key = this.input.keyboard.addKey(keyCode);
+      for (const [code, handler] of bindings) {
+        const key = this.input.keyboard.addKey(code);
         key.on("down", handler);
         this.timeControlKeyObjects.push(key);
       }
     }
-
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.teardownTimeControls, this);
   }
 
   private teardownTimeControls(): void {
     this.timeControlAbort?.abort();
     this.timeControlAbort = null;
-    for (const key of this.timeControlKeyObjects) {
-      key.destroy();
-    }
+    for (const key of this.timeControlKeyObjects) key.destroy();
     this.timeControlKeyObjects = [];
-    this.events.off(Phaser.Scenes.Events.SHUTDOWN, this.teardownTimeControls, this);
   }
 
   private toggleTimePaused(): void {
-    this.timeControlState = {
-      ...this.timeControlState,
-      paused: !this.timeControlState.paused
-    };
-    this.syncTimeOfDayHud();
+    this.timeControlState = { ...this.timeControlState, paused: !this.timeControlState.paused };
+    this.hud.syncTimeOfDayHud(this.timeOfDayState, this.timeControlState, this.timeOfDayPalette);
   }
 
   private setTimeSpeed(speed: TimeSpeed): void {
-    this.timeControlState = {
-      ...this.timeControlState,
-      speed
-    };
-    this.syncTimeOfDayHud();
+    this.timeControlState = { ...this.timeControlState, speed };
+    this.hud.syncTimeOfDayHud(this.timeOfDayState, this.timeControlState, this.timeOfDayPalette);
   }
 
-  private setupVillagerToolBar(): void {
-    this.teardownVillagerToolBar();
-    const root = document.getElementById("villager-tool-bar");
-    if (!root || !this.input.keyboard) return;
+  // ── Villager tool bar ─────────────────────────────────────
 
-    this.toolUiAbort = new AbortController();
-    const { signal } = this.toolUiAbort;
-
-    for (let i = 0; i < MOCK_VILLAGER_TOOLS.length; i++) {
-      const tool = MOCK_VILLAGER_TOOLS[i];
-      const slot = document.createElement("button");
-      slot.type = "button";
-      slot.className = "tool-slot";
-      slot.dataset.toolId = tool.id;
-      slot.title = `${tool.hint}（${tool.hotkey}）`;
-      slot.setAttribute("aria-label", `${tool.label}，快捷键 ${tool.hotkey}`);
-      slot.innerHTML = `<span class="tool-key">${tool.hotkey}</span><div class="tool-label">${tool.label}</div>`;
-      slot.addEventListener(
-        "click",
-        () => {
-          this.selectVillagerTool(i);
-        },
-        { signal }
-      );
-      root.appendChild(slot);
-      this.toolSlotEls.push(slot);
-    }
-
-    for (let i = 0; i < MOCK_VILLAGER_TOOL_KEY_CODES.length; i++) {
-      const code = MOCK_VILLAGER_TOOL_KEY_CODES[i];
+  private setupVillagerToolBarKeys(): void {
+    if (!this.input.keyboard) return;
+    for (let i = 0; i < VILLAGER_TOOL_KEY_CODES.length; i++) {
+      const code = VILLAGER_TOOL_KEY_CODES[i]!;
       const key = this.input.keyboard.addKey(code);
+      key.on("down", () => this.selectVillagerTool(i));
       this.toolKeyObjects.push(key);
-      key.on("down", () => {
-        this.selectVillagerTool(i);
-      });
     }
+  }
 
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.teardownVillagerToolBar, this);
-    this.selectVillagerTool(this.selectedToolIndex);
+  private teardownVillagerToolBarKeys(): void {
+    for (const k of this.toolKeyObjects) k.destroy();
+    this.toolKeyObjects = [];
   }
 
   private selectVillagerTool(index: number): void {
-    if (index < 0 || index >= MOCK_VILLAGER_TOOLS.length) return;
+    if (index < 0 || index >= VILLAGER_TOOLS.length) return;
     this.selectedToolIndex = index;
-    for (let i = 0; i < this.toolSlotEls.length; i++) {
-      const el = this.toolSlotEls[i];
-      const on = i === index;
-      el.classList.toggle("selected", on);
-      el.setAttribute("aria-pressed", on ? "true" : "false");
-    }
+    this.hud.syncToolBarSelection(index);
   }
 
-  private teardownVillagerToolBar(): void {
-    this.toolUiAbort?.abort();
-    this.toolUiAbort = null;
-    for (const k of this.toolKeyObjects) {
-      k.destroy();
-    }
-    this.toolKeyObjects = [];
-    this.toolSlotEls = [];
-    const toolRoot = document.getElementById("villager-tool-bar");
-    if (toolRoot) toolRoot.replaceChildren();
-    this.events.off(Phaser.Scenes.Events.SHUTDOWN, this.teardownVillagerToolBar, this);
+  private selectedVillagerToolId(): string {
+    return VILLAGER_TOOLS[this.selectedToolIndex]?.id ?? "idle";
   }
+
+  // ── Pawn roster ───────────────────────────────────────────
 
   private setupPawnRosterUi(): void {
-    this.teardownPawnRosterUi();
-    const rosterRoot = document.getElementById("pawn-roster");
-    this.pawnDetailEl = document.getElementById("pawn-detail-panel");
-    if (!rosterRoot || !this.pawnDetailEl) return;
-
-    this.pawnRosterAbort = new AbortController();
-    const { signal } = this.pawnRosterAbort;
-
-    for (const pawn of this.pawns) {
-      const slot = document.createElement("button");
-      slot.type = "button";
-      slot.className = "pawn-roster-item";
-      slot.dataset.pawnId = pawn.id;
-      slot.role = "tab";
-      slot.title = `查看 ${pawn.name}`;
-      slot.setAttribute("aria-label", `${pawn.name}，打开人物信息`);
-
-      const thumb = document.createElement("span");
-      thumb.className = "pawn-roster-thumb";
-      thumb.style.backgroundColor = this.phaserFillColorToCss(pawn.fillColor);
-      thumb.setAttribute("aria-hidden", "true");
-
-      const nameEl = document.createElement("span");
-      nameEl.className = "pawn-roster-name";
-      nameEl.textContent = pawn.name;
-
-      slot.append(thumb, nameEl);
-      slot.addEventListener(
-        "click",
-        () => {
-          this.selectPawnForRoster(pawn.id);
-        },
-        { signal }
-      );
-      rosterRoot.appendChild(slot);
-      this.pawnRosterSlotEls.push(slot);
-    }
-
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.teardownPawnRosterUi, this);
-    this.selectPawnForRoster(this.pawns[0]?.id ?? null);
+    this.hud.setupPawnRoster(this.pawns, (id) => this.selectPawnForRoster(id));
+    const firstId = this.pawns[0]?.id ?? null;
+    this.selectPawnForRoster(firstId);
   }
 
   private selectPawnForRoster(pawnId: string | null): void {
     this.selectedPawnId = pawnId;
-    for (const el of this.pawnRosterSlotEls) {
-      const on = el.dataset.pawnId === pawnId;
-      el.classList.toggle("selected", on);
-      el.setAttribute("aria-selected", on ? "true" : "false");
-    }
+    this.hud.syncRosterSelection(pawnId);
     this.syncPawnDetailPanel();
   }
 
-  private syncPawnDetailPanel(): void {
-    const panel = this.pawnDetailEl;
-    if (!panel) return;
-    const id = this.selectedPawnId;
-    if (!id) {
-      panel.hidden = true;
-      panel.replaceChildren();
-      return;
-    }
-    const pawn = this.pawns.find((p) => p.id === id);
-    if (!pawn) {
-      panel.hidden = true;
-      panel.replaceChildren();
-      return;
-    }
-
-    panel.hidden = false;
-    const profile = mockPawnProfileForId(pawn.id);
-    const tags = profile
-      ? profile.mockTags
-          .map((t) => `<span class="pawn-detail-tag">${this.escapeHtml(t)}</span>`)
-          .join("")
-      : "";
-
-    const goal = pawn.currentGoal?.kind ?? "—";
-    const action = pawn.currentAction?.kind ?? "—";
-    const n = pawn.needs;
-
-    panel.innerHTML = `
-      <h2>${this.escapeHtml(pawn.name)}</h2>
-      <p class="pawn-detail-epithet">${this.escapeHtml(profile?.epithet ?? "（无 mock 档案）")}</p>
-      <div class="pawn-detail-section">
-        <div class="pawn-detail-label">简介（mock）</div>
-        <div>${this.escapeHtml(profile?.bio ?? "暂无。")}</div>
-      </div>
-      <div class="pawn-detail-section">
-        <div class="pawn-detail-label">备注（mock）</div>
-        <div>${this.escapeHtml(profile?.notes ?? "—")}</div>
-      </div>
-      <div class="pawn-detail-section">
-        <div class="pawn-detail-label">当前状态</div>
-        <div>饥饿 ${n.hunger.toFixed(1)}　休息 ${n.rest.toFixed(1)}　娱乐 ${n.recreation.toFixed(1)}</div>
-        <div>目标 <code style="font-size:12px;color:#d4c4a8">${this.escapeHtml(String(goal))}</code>
-        　行动 <code style="font-size:12px;color:#d4c4a8">${this.escapeHtml(String(action))}</code></div>
-        <div style="font-size:12px;color:#a89878;margin-top:4px">${this.escapeHtml(pawn.debugLabel)}</div>
-      </div>
-      ${
-        tags
-          ? `<div class="pawn-detail-section"><div class="pawn-detail-label">标签（mock）</div><div class="pawn-detail-tags">${tags}</div></div>`
-          : ""
-      }
-    `;
-  }
-
-  private phaserFillColorToCss(fillColor: number): string {
-    const rgb = fillColor & 0xffffff;
-    return `#${rgb.toString(16).padStart(6, "0")}`;
-  }
-
-  private colorToCss(color: number): string {
-    return this.phaserFillColorToCss(color);
-  }
-
-  private escapeHtml(raw: string): string {
-    return raw
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
-  }
-
-  private teardownPawnRosterUi(): void {
-    this.pawnRosterAbort?.abort();
-    this.pawnRosterAbort = null;
-    this.pawnRosterSlotEls = [];
-    this.selectedPawnId = null;
-    this.pawnDetailEl = null;
-    const roster = document.getElementById("pawn-roster");
-    if (roster) roster.replaceChildren();
-    const panel = document.getElementById("pawn-detail-panel");
-    if (panel) {
-      panel.hidden = true;
-      panel.replaceChildren();
-    }
-    this.events.off(Phaser.Scenes.Events.SHUTDOWN, this.teardownPawnRosterUi, this);
-  }
-
-  private applyTimeOfDayPalette(): void {
-    this.cameras.main.setBackgroundColor(this.timeOfDayPalette.backgroundColor);
-    this.drawGridLines();
-
-    const primaryTextColor = this.colorToCss(this.timeOfDayPalette.primaryTextColor);
-    const secondaryTextColor = this.colorToCss(this.timeOfDayPalette.secondaryTextColor);
-
-    for (const view of this.views.values()) {
-      view.label.setColor(primaryTextColor);
-    }
-    for (const label of this.interactionLabels.values()) {
-      label.setColor(secondaryTextColor);
-    }
-    if (this.hoverHudEl) {
-      this.hoverHudEl.style.color = primaryTextColor;
-    }
-  }
-
-  private syncTimeOfDayHud(): void {
-    if (this.sceneHudEl) {
-      this.sceneHudEl.style.color = this.colorToCss(this.timeOfDayPalette.primaryTextColor);
-    }
-    const primaryColor = this.colorToCss(this.timeOfDayPalette.primaryTextColor);
-
-    if (this.sceneTimeValueEl) {
-      const nextLabel = formatTimeOfDayLabel(this.timeOfDayState);
-      if (this.sceneTimeValueEl.textContent !== nextLabel) {
-        this.sceneTimeValueEl.textContent = nextLabel;
-      }
-      this.sceneTimeValueEl.style.color = primaryColor;
-    }
-
-    if (this.sceneTimeToggleEl) {
-      this.sceneTimeToggleEl.textContent = this.timeControlState.paused ? "开启" : "暂停";
-      this.sceneTimeToggleEl.classList.toggle("selected", this.timeControlState.paused);
-      this.sceneTimeToggleEl.setAttribute(
-        "aria-pressed",
-        this.timeControlState.paused ? "true" : "false"
-      );
-      this.sceneTimeToggleEl.style.color = primaryColor;
-    }
-
-    for (const [speed, button] of this.sceneSpeedEls) {
-      const selected = this.timeControlState.speed === speed;
-      button.classList.toggle("selected", selected);
-      button.setAttribute("aria-pressed", selected ? "true" : "false");
-      button.style.color = primaryColor;
-    }
-  }
-
-  private sameTimeOfDayPalette(left: TimeOfDayPalette, right: TimeOfDayPalette): boolean {
-    return (
-      left.backgroundColor === right.backgroundColor &&
-      left.gridLineColor === right.gridLineColor &&
-      left.gridBorderColor === right.gridBorderColor &&
-      left.primaryTextColor === right.primaryTextColor &&
-      left.secondaryTextColor === right.secondaryTextColor
-    );
-  }
+  // ── Floor selection input ─────────────────────────────────
 
   private bindFloorSelectionInput(): void {
     this.input.off("pointerdown", this.handleFloorPointerDown, this);
     this.input.off("pointermove", this.handleFloorPointerMove, this);
     this.input.off("pointerup", this.handleFloorPointerUp, this);
-
     this.input.on("pointerdown", this.handleFloorPointerDown, this);
     this.input.on("pointermove", this.handleFloorPointerMove, this);
     this.input.on("pointerup", this.handleFloorPointerUp, this);
@@ -1021,160 +393,75 @@ export class GameScene extends Phaser.Scene {
 
   private handleFloorPointerDown(pointer: Phaser.Input.Pointer): void {
     if (!pointer.leftButtonDown()) return;
-
-    const modifier = resolveSelectionModifier(
-      this.pointerHasShift(pointer),
-      this.pointerHasCtrl(pointer)
-    );
+    const modifier = resolveSelectionModifier(this.pointerHasShift(pointer), this.pointerHasCtrl(pointer));
     const cell = this.pointerCell(pointer);
 
     if (!cell) {
       this.floorSelectionState = handleOutsidePointerDown(this.floorSelectionState, modifier);
       this.activeSelectionPointerId = undefined;
-      this.redrawFloorSelection();
+      this.redrawSelection();
       return;
     }
 
-    this.floorSelectionState = beginFloorSelection(
-      this.floorSelectionState,
-      this.worldGrid,
-      cell,
-      modifier
-    );
+    this.floorSelectionState = beginFloorSelection(this.floorSelectionState, this.worldGrid, cell, modifier);
     this.activeSelectionPointerId = pointer.id;
-    this.redrawFloorSelection();
+    this.redrawSelection();
   }
 
   private handleFloorPointerMove(pointer: Phaser.Input.Pointer): void {
     if (this.activeSelectionPointerId !== pointer.id || !pointer.isDown) return;
     if (!this.floorSelectionState.draft) return;
-
     const cell = this.pointerCell(pointer, true);
     if (!cell) return;
-
-    this.floorSelectionState = updateFloorSelection(
-      this.floorSelectionState,
-      this.worldGrid,
-      cell
-    );
-    this.redrawFloorSelection();
+    this.floorSelectionState = updateFloorSelection(this.floorSelectionState, this.worldGrid, cell);
+    this.redrawSelection();
   }
 
   private handleFloorPointerUp(pointer: Phaser.Input.Pointer): void {
     if (this.activeSelectionPointerId !== pointer.id) return;
-
     const cell = this.pointerCell(pointer, true);
     if (cell && this.floorSelectionState.draft) {
-      this.floorSelectionState = updateFloorSelection(
-        this.floorSelectionState,
-        this.worldGrid,
-        cell
-      );
+      this.floorSelectionState = updateFloorSelection(this.floorSelectionState, this.worldGrid, cell);
     }
-
     const draft = this.floorSelectionState.draft;
     this.floorSelectionState = commitFloorSelection(this.floorSelectionState);
     this.activeSelectionPointerId = undefined;
-    this.redrawFloorSelection();
+    this.redrawSelection();
 
     if (!draft) return;
-
-    this.taskMarkersByCell = applyMockTaskMarkersForSelection(this.taskMarkersByCell, {
+    this.taskMarkersByCell = applyTaskMarkersForSelection(this.taskMarkersByCell, {
       toolId: this.selectedVillagerToolId(),
       modifier: draft.modifier,
       cellKeys: draft.cellKeys
     });
-    this.syncTaskMarkerView();
-  }
-
-  private redrawFloorSelection(): void {
-    this.floorSelectionGraphics.clear();
-    this.floorSelectionDraftGraphics.clear();
-
-    this.drawSelectionOverlay(
-      this.floorSelectionGraphics,
-      this.floorSelectionState.selectedCellKeys,
-      0x81b29a,
-      0.18,
-      0xb8e0d2,
-      0.8
-    );
-
-    const draft = this.floorSelectionState.draft;
-    if (!draft) return;
-
-    if (draft.modifier === "toggle") {
-      this.drawSelectionOverlay(
-        this.floorSelectionDraftGraphics,
-        draft.addedCellKeys,
-        0x88c0a8,
-        0.34,
-        0xd8f3dc,
-        0.95
-      );
-      this.drawSelectionOverlay(
-        this.floorSelectionDraftGraphics,
-        draft.removedCellKeys,
-        0xc1666b,
-        0.34,
-        0xffd6d9,
-        0.95
-      );
-      return;
-    }
-
-    this.drawSelectionOverlay(
-      this.floorSelectionDraftGraphics,
-      draft.cellKeys,
-      0xd2b96c,
-      0.2,
-      0xf4e3b2,
-      0.95
+    syncTaskMarkerView(
+      this.taskMarkerGraphics, this.taskMarkerTexts, this,
+      this.taskMarkersByCell, this.worldGrid, this.gridOriginX, this.gridOriginY
     );
   }
 
-  private drawSelectionOverlay(
-    graphics: Phaser.GameObjects.Graphics,
-    cellKeys: ReadonlySet<string>,
-    fillColor: number,
-    fillAlpha: number,
-    strokeColor: number,
-    strokeAlpha: number
-  ): void {
-    if (cellKeys.size === 0) return;
-
-    const cellSize = this.worldGrid.cellSizePx;
-
-    for (let row = 0; row < this.worldGrid.rows; row++) {
-      for (let col = 0; col < this.worldGrid.columns; col++) {
-        const cell = { col, row };
-        if (!cellKeys.has(coordKey(cell))) continue;
-
-        const x = this.gridOriginX + col * cellSize;
-        const y = this.gridOriginY + row * cellSize;
-        graphics.fillStyle(fillColor, fillAlpha);
-        graphics.fillRect(x + 2, y + 2, cellSize - 4, cellSize - 4);
-        graphics.lineStyle(2, strokeColor, strokeAlpha);
-        graphics.strokeRect(x + 2, y + 2, cellSize - 4, cellSize - 4);
-      }
-    }
+  private redrawSelection(): void {
+    redrawFloorSelection(
+      this.floorSelectionGraphics, this.floorSelectionDraftGraphics,
+      this.floorSelectionState, this.worldGrid, this.gridOriginX, this.gridOriginY
+    );
   }
 
-  private pointerCell(
-    pointer: Phaser.Input.Pointer,
-    clampToGrid = false
-  ): GridCoord | undefined {
-    const direct = this.pointerToCell(pointer);
+  // ── Pointer helpers ───────────────────────────────────────
+
+  private pointerCell(pointer: Phaser.Input.Pointer, clampToGrid = false): GridCoord | undefined {
+    const cam = this.cameras.main;
+    const w = cam.getWorldPoint(pointer.x, pointer.y);
+    const direct = cellAtWorldPixel(this.worldGrid, this.gridOriginX, this.gridOriginY, w.x, w.y);
     if (direct || !clampToGrid) return direct ?? undefined;
 
-    const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
     const col = Phaser.Math.Clamp(
-      Math.floor((world.x - this.gridOriginX) / this.worldGrid.cellSizePx),
+      Math.floor((w.x - this.gridOriginX) / this.worldGrid.cellSizePx),
       0,
       this.worldGrid.columns - 1
     );
     const row = Phaser.Math.Clamp(
-      Math.floor((world.y - this.gridOriginY) / this.worldGrid.cellSizePx),
+      Math.floor((w.y - this.gridOriginY) / this.worldGrid.cellSizePx),
       0,
       this.worldGrid.rows - 1
     );
@@ -1191,7 +478,23 @@ export class GameScene extends Phaser.Scene {
     return event?.ctrlKey ?? false;
   }
 
-  private selectedVillagerToolId(): string {
-    return MOCK_VILLAGER_TOOLS[this.selectedToolIndex]?.id ?? "idle";
+  // ── Shutdown ──────────────────────────────────────────────
+
+  private onShutdown(): void {
+    this.teardownTimeControls();
+    this.teardownVillagerToolBarKeys();
+    this.hud.teardownAll();
   }
+}
+
+// ── Pure helper ───────────────────────────────────────────────
+
+function sameTimeOfDayPalette(left: TimeOfDayPalette, right: TimeOfDayPalette): boolean {
+  return (
+    left.backgroundColor === right.backgroundColor &&
+    left.gridLineColor === right.gridLineColor &&
+    left.gridBorderColor === right.gridBorderColor &&
+    left.primaryTextColor === right.primaryTextColor &&
+    left.secondaryTextColor === right.secondaryTextColor
+  );
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyMockTaskMarkersForSelection } from "../../src/scenes/mock-task-marker-selection";
+import { applyTaskMarkersForSelection as applyMockTaskMarkersForSelection } from "../../src/data/task-markers";
 
 function keys(map: ReadonlyMap<string, string>): string[] {
   return [...map.keys()].sort();

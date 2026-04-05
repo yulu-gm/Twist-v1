@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  MOCK_VILLAGER_TOOLS,
-  validateMockVillagerToolBarConfig
-} from "../../src/scenes/villager-tool-bar-config";
+  VILLAGER_TOOLS as MOCK_VILLAGER_TOOLS,
+  validateVillagerToolBarConfig as validateMockVillagerToolBarConfig
+} from "../../src/data/villager-tools";
 
 /**
  * scene-hud：小人指令工具栏 mock 配置（component 层级，无 Phaser 场景）。

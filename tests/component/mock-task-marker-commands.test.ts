@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mockIssuedTaskLabelForVillagerToolId } from "../../src/scenes/mock-task-marker-commands";
+import { issuedTaskLabelForToolId as mockIssuedTaskLabelForVillagerToolId } from "../../src/data/task-markers";
 
 describe("mock task marker commands (scene-hud)", () => {
   it("returns null for idle and unknown tools", () => {

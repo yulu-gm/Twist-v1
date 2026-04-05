@@ -1,11 +1,7 @@
-/**
- * 小人指令工具栏 mock 的统一导出入口（兼容旧 import 路径）。
- * 纯数据与校验见 `villager-tool-bar-config.ts`。
- */
-
+/** @deprecated 使用 src/data/villager-tools.ts。此文件仅作兼容转发。 */
 export {
-  MOCK_VILLAGER_TOOLS,
-  MOCK_VILLAGER_TOOL_KEY_CODES,
-  validateMockVillagerToolBarConfig,
-  type MockVillagerTool
-} from "./villager-tool-bar-config";
+  VILLAGER_TOOLS as MOCK_VILLAGER_TOOLS,
+  VILLAGER_TOOL_KEY_CODES as MOCK_VILLAGER_TOOL_KEY_CODES,
+  validateVillagerToolBarConfig as validateMockVillagerToolBarConfig,
+  type VillagerTool as MockVillagerTool
+} from "../data/villager-tools";
