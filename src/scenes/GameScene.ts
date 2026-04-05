@@ -539,6 +539,9 @@ export class GameScene extends Phaser.Scene {
     if (rectOutcome.resultSummaryLine !== null) {
       this.hud.syncPlayerChannelLastResult(rectOutcome.resultSummaryLine);
     }
+    // 框选只为采集本轮格集合并提交意图；提交后清空 persisted selection，避免松手仍留高亮（与网关接受/拒绝无关）。
+    this.floorSelectionState = clearFloorSelection(this.floorSelectionState);
+    this.redrawSelectionAndBrush();
   }
 
   private redrawSelectionAndBrush(): void {
