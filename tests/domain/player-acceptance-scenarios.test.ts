@@ -21,17 +21,18 @@ describe("player acceptance scenarios", () => {
     }
   });
 
-  it("scenarioToMockWorldPortConfig honors reject cells and alwaysAccept", () => {
-    const s = playerAcceptanceScenarioById("b-m1-reject-cell")!;
+  it("ab-gateway-reject-cell pins 0,0 as forced stone; gateway config has no inject reject set", () => {
+    const s = playerAcceptanceScenarioById("ab-gateway-reject-cell")!;
+    expect(s.forcedBlockedCellKeys?.includes("0,0")).toBe(true);
     const c = scenarioToMockWorldPortConfig(s);
     expect(c.alwaysAccept).toBe(true);
-    expect(c.rejectIfTouchesCellKeys.has("0,0")).toBe(true);
+    expect(c.rejectIfTouchesCellKeys.size).toBe(0);
   });
 
   it("resolveSimConfigForScenario applies simOverrides", () => {
-    const sparse = playerAcceptanceScenarioById("demo-sparse-map")!;
+    const sparse = playerAcceptanceScenarioById("demo-sparse-stones")!;
     expect(resolveSimConfigForScenario(sparse).stoneCellCount).toBe(4);
-    const fastNeed = playerAcceptanceScenarioById("b-m2-need-signals")!;
+    const fastNeed = playerAcceptanceScenarioById("ab-need-signals-panel")!;
     const cfg = resolveSimConfigForScenario(fastNeed);
     expect(cfg.needGrowthPerSec.hunger).toBeGreaterThan(DEFAULT_SIM_CONFIG.needGrowthPerSec.hunger);
   });

@@ -1,0 +1,73 @@
+import { describe, expect, it } from "vitest";
+import { DEFAULT_WORLD_GRID } from "../../src/game/world-grid";
+import { createWorldCore, removeWorldEntity, spawnWorldEntity } from "../../src/game/world-core";
+import {
+  obstacleBlockedCellKeys,
+  simulationInteractionPoints,
+  syncWorldGridForSimulation
+} from "../../src/game/world-sim-bridge";
+
+describe("world-sim-bridge", () => {
+  it("obstacleBlockedCellKeys 收集 obstacle 占用格", () => {
+    let w = createWorldCore({ grid: DEFAULT_WORLD_GRID });
+    const s = spawnWorldEntity(w, {
+      kind: "obstacle",
+      cell: { col: 1, row: 2 },
+      occupiedCells: [{ col: 1, row: 2 }, { col: 2, row: 2 }]
+    });
+    expect(s.outcome.kind).toBe("created");
+    w = s.world;
+    expect(obstacleBlockedCellKeys(w)).toEqual(new Set(["1,2", "2,2"]));
+  });
+
+  it("拆除障碍后障碍格集合缩小", () => {
+    let w = createWorldCore({ grid: DEFAULT_WORLD_GRID });
+    const s = spawnWorldEntity(w, {
+      kind: "obstacle",
+      cell: { col: 3, row: 3 },
+      occupiedCells: [{ col: 3, row: 3 }]
+    });
+    w = s.world;
+    const rm = removeWorldEntity(w, s.entityId);
+    expect(rm.outcome.kind).toBe("removed");
+    expect(obstacleBlockedCellKeys(rm.world).size).toBe(0);
+  });
+
+  it("simulationInteractionPoints 为世界 restSpots 追加床位", () => {
+    const w = createWorldCore({ grid: DEFAULT_WORLD_GRID });
+    const withSpots = {
+      ...w,
+      restSpots: [
+        {
+          buildingEntityId: "b1",
+          cell: { col: 2, row: 2 },
+          assignmentReason: "unassigned" as const
+        }
+      ]
+    };
+    const pts = simulationInteractionPoints(DEFAULT_WORLD_GRID, withSpots);
+    const ids = pts.map((p) => p.id);
+    expect(ids.some((id) => id === "world-rest-b1")).toBe(true);
+    const dynamic = pts.find((p) => p.id === "world-rest-b1");
+    expect(dynamic?.cell).toEqual({ col: 2, row: 2 });
+  });
+
+  it("syncWorldGridForSimulation 就地更新 blocked 与 interactionPoints", () => {
+    const grid: typeof DEFAULT_WORLD_GRID = {
+      ...DEFAULT_WORLD_GRID,
+      blockedCellKeys: new Set()
+    };
+    let w = createWorldCore({ grid });
+    const s = spawnWorldEntity(w, {
+      kind: "obstacle",
+      cell: { col: 0, row: 0 },
+      occupiedCells: [{ col: 0, row: 0 }]
+    });
+    w = s.world;
+
+    const r = syncWorldGridForSimulation(grid, w, DEFAULT_WORLD_GRID, null);
+    expect(r.blockedChanged).toBe(true);
+    expect(grid.blockedCellKeys?.has("0,0")).toBe(true);
+    expect(r.next.interactionPointIds.length).toBeGreaterThan(0);
+  });
+});

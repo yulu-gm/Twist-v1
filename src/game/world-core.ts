@@ -173,6 +173,11 @@ function cloneWorld(world: WorldCore): WorldCore {
   };
 }
 
+/** 深拷贝世界状态（回放基线、验收重绕等）。 */
+export function cloneWorldCoreState(world: WorldCore): WorldCore {
+  return cloneWorld(world);
+}
+
 function timePeriodForMinute(minuteOfDay: number): TimePeriod {
   return minuteOfDay >= 6 * 60 && minuteOfDay < 18 * 60 ? "day" : "night";
 }
@@ -560,6 +565,44 @@ export function advanceWorldClock(
   };
 }
 
+/**
+ * 按格键清除玩家任务标记：移除对应 {@link MarkerSnapshot}，并对仅被这些标记引用的未领取工单做清理。
+ */
+export function clearTaskMarkersAtCells(
+  world: WorldCore,
+  cellKeys: ReadonlySet<string>
+): WorldCore {
+  const nextWorld = cloneWorld(world);
+  const removedWorkIds = new Set<string>();
+  for (const [markerId, marker] of nextWorld.markers) {
+    if (!cellKeys.has(coordKey(marker.cell))) continue;
+    nextWorld.markers.delete(markerId);
+    removedWorkIds.add(marker.workItemId);
+  }
+
+  for (const workId of removedWorkIds) {
+    const stillReferenced = [...nextWorld.markers.values()].some((m) => m.workItemId === workId);
+    if (stillReferenced) continue;
+
+    const work = nextWorld.workItems.get(workId);
+    if (!work || work.status !== "open") continue;
+    if (work.claimedBy) continue;
+
+    nextWorld.workItems.delete(workId);
+    if (work.targetEntityId) {
+      const ent = nextWorld.entities.get(work.targetEntityId);
+      if (ent) {
+        nextWorld.entities.set(work.targetEntityId, {
+          ...ent,
+          relatedWorkItemIds: ent.relatedWorkItemIds.filter((id) => id !== workId)
+        });
+      }
+    }
+  }
+
+  return nextWorld;
+}
+
 export function placeTaskMarker(
   world: WorldCore,
   input: Readonly<{
@@ -602,14 +645,17 @@ export function placeTaskMarker(
   };
 }
 
-export function placeBlueprint(
+export function safePlaceBlueprint(
   world: WorldCore,
   input: Readonly<{
     buildingKind: BuildingKind;
     cell: GridCoord;
     occupiedCells?: readonly GridCoord[];
   }>
-): Readonly<{ world: WorldCore; blueprintEntityId: string; workItemId: string }> {
+): Readonly<
+  | { ok: true; world: WorldCore; blueprintEntityId: string; workItemId: string }
+  | { ok: false; world: WorldCore; reason: string }
+> {
   const spawned = spawnWorldEntity(world, {
     kind: "blueprint",
     cell: input.cell,
@@ -620,7 +666,13 @@ export function placeBlueprint(
     buildState: "planned"
   });
   if (spawned.outcome.kind !== "created") {
-    throw new Error(`world-core: failed to place blueprint: ${spawned.outcome.kind}`);
+    const reason =
+      spawned.outcome.kind === "conflict"
+        ? `与实体 ${spawned.outcome.blockingEntityId} 占用冲突`
+        : spawned.outcome.kind === "out-of-bounds"
+          ? "蓝图超出地图边界"
+          : "无法放置蓝图";
+    return { ok: false, world, reason };
   }
 
   const nextWorld = cloneWorld(spawned.world);
@@ -640,10 +692,26 @@ export function placeBlueprint(
   attachWorkItemToEntityMutable(nextWorld, spawned.entityId, workItemId);
 
   return {
+    ok: true,
     world: nextWorld,
     blueprintEntityId: spawned.entityId,
     workItemId
   };
+}
+
+export function placeBlueprint(
+  world: WorldCore,
+  input: Readonly<{
+    buildingKind: BuildingKind;
+    cell: GridCoord;
+    occupiedCells?: readonly GridCoord[];
+  }>
+): Readonly<{ world: WorldCore; blueprintEntityId: string; workItemId: string }> {
+  const r = safePlaceBlueprint(world, input);
+  if (!r.ok) {
+    throw new Error(`world-core: failed to place blueprint: ${r.reason}`);
+  }
+  return { world: r.world, blueprintEntityId: r.blueprintEntityId, workItemId: r.workItemId };
 }
 
 export function claimWorkItem(

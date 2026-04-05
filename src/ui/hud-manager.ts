@@ -26,7 +26,7 @@ export type ToolSelectCallback = (index: number) => void;
 /** Pawn 选中回调。 */
 export type PawnSelectCallback = (pawnId: string | null) => void;
 
-/** 右下角 B 线验收切换与回放（切换时应重启场景）。 */
+/** 右下角人工验收场景切换与回放（切换时应重启场景）。 */
 export type BAcceptanceCallbacks = Readonly<{
   onScenarioChange: (scenarioId: string) => void;
   onReplay: () => void;
@@ -54,7 +54,7 @@ export class HudManager {
   // Hover 信息
   private hoverHudEl: HTMLElement | null;
 
-  // B 线：交互模式提示 + mock 契约脚注
+  // 玩家通道：交互模式提示 + 世界快照脚注
   private playerChannelModeEl: HTMLElement | null;
   private playerChannelResultEl: HTMLElement | null;
   private playerChannelContractEl: HTMLElement | null;

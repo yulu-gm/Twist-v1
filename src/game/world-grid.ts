@@ -222,6 +222,18 @@ export function coordKey(cell: GridCoord): string {
 }
 
 /** 解析 {@link coordKey} 格式；失败时返回 `undefined`。 */
+/** 移除已不存在的交互点预订（动态床位 id 变化时避免陈留）。 */
+export function pruneReservationSnapshot(
+  reservations: ReservationSnapshot,
+  validIds: ReadonlySet<string>
+): ReservationSnapshot {
+  const next = new Map(reservations);
+  for (const id of [...next.keys()]) {
+    if (!validIds.has(id)) next.delete(id);
+  }
+  return next;
+}
+
 export function parseCoordKey(key: string): GridCoord | undefined {
   const comma = key.indexOf(",");
   if (comma <= 0) return undefined;

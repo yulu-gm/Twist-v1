@@ -6,6 +6,7 @@
 import Phaser from "phaser";
 import {
   cellCenterWorld,
+  parseCoordKey,
   type GridCoord,
   type InteractionPoint,
   type ReservationSnapshot,
@@ -54,6 +55,29 @@ export function drawStoneCells(
   }
 }
 
+/** 与障碍实体同步的石头格绘制（避免每帧创建独立 Rectangle）。 */
+export function drawStoneCellsToGraphics(
+  g: Phaser.GameObjects.Graphics,
+  grid: WorldGridConfig,
+  ox: number,
+  oy: number,
+  blockedCellKeys: ReadonlySet<string>
+): void {
+  g.clear();
+  const cellPx = grid.cellSizePx;
+  const w = Math.max(14, cellPx * 0.42);
+  const h = w * 0.88;
+  for (const key of blockedCellKeys) {
+    const cell = parseCoordKey(key);
+    if (!cell) continue;
+    const pos = cellCenterWorld(grid, cell, ox, oy);
+    g.fillStyle(0x6b6560, 1);
+    g.fillRect(pos.x - w / 2, pos.y - h / 2, w, h);
+    g.lineStyle(1, 0x3d3830, 0.92);
+    g.strokeRect(pos.x - w / 2, pos.y - h / 2, w, h);
+  }
+}
+
 export function drawInteractionPoints(
   g: Phaser.GameObjects.Graphics,
   labelMap: Map<string, Phaser.GameObjects.Text>,
@@ -66,6 +90,14 @@ export function drawInteractionPoints(
 ): void {
   g.clear();
   const secondaryColor = `#${(palette.secondaryTextColor & 0xffffff).toString(16).padStart(6, "0")}`;
+
+  const activeIds = new Set(grid.interactionPoints.map((p) => p.id));
+  for (const [id, label] of labelMap) {
+    if (!activeIds.has(id)) {
+      label.destroy();
+      labelMap.delete(id);
+    }
+  }
 
   for (const point of grid.interactionPoints) {
     const pos = cellCenterWorld(grid, point.cell, ox, oy);

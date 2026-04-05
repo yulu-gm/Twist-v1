@@ -62,6 +62,19 @@ export function buildDomainCommand(input: BuildCommandInput): DomainCommand | nu
   };
 }
 
+/**
+ * 从已记录命令恢复任务标记叠加层时使用的工具 id（与 {@link buildDomainCommand} 语义一致）。
+ * 优先读动词，便于来源为 menu 等仍携带 `assign_tool_task:*` 的回放日志。
+ */
+export function toolbarToolIdForDomainCommand(cmd: DomainCommand): string {
+  if (cmd.verb === "clear_task_markers") return "idle";
+  if (cmd.verb.startsWith("assign_tool_task:")) {
+    return cmd.verb.slice("assign_tool_task:".length);
+  }
+  const src = cmd.sourceMode.source;
+  return src.kind === "toolbar" ? src.toolId : "idle";
+}
+
 /** 由工具 id 推断默认输入形态（单测与场景共用）。 */
 export function defaultInputShapeForTool(toolId: string): "rect-selection" | "brush-stroke" {
   return interactionInputShapeForToolId(toolId);

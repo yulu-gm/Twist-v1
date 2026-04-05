@@ -20,7 +20,6 @@ import {
 import {
   DEFAULT_TIME_CONTROL_STATE,
   DEFAULT_TIME_OF_DAY_CONFIG,
-  advanceTimeOfDay,
   createInitialTimeOfDayState,
   effectiveSimulationDeltaSeconds,
   sampleTimeOfDayPalette,
@@ -30,19 +29,32 @@ import {
   type TimeOfDayState
 } from "../game/time-of-day";
 import {
+  advanceWorldClock,
+  createWorldCore,
+  getWorldSnapshot
+} from "../game/world-core";
+import { seedBlockedCellsAsObstacles } from "../game/world-core-seed";
+import {
   blockedKeysFromCells,
   cellAtWorldPixel,
   coordKey,
   createReservationSnapshot,
   DEFAULT_WORLD_GRID,
+  parseCoordKey,
   pickRandomBlockedCells,
+  pruneReservationSnapshot,
   type GridCoord,
   type ReservationSnapshot,
   type WorldGridConfig
 } from "../game/world-grid";
+import {
+  syncWorldGridForSimulation,
+  type SimGridSyncState
+} from "../game/world-sim-bridge";
 import { DEFAULT_SIM_CONFIG, type SimConfig } from "../game/sim-config";
 import { tickSimulation } from "../game/sim-loop";
 import { formatGridCellHoverText } from "../data/grid-cell-info";
+import { taskMarkerMapsEqual } from "../data/task-markers";
 import {
   DEFAULT_PLAYER_ACCEPTANCE_SCENARIO_ID,
   PLAYER_ACCEPTANCE_SCENARIOS,
@@ -52,7 +64,10 @@ import {
 } from "../data/player-acceptance-scenarios";
 import { HudManager } from "../ui/hud-manager";
 import { VILLAGER_TOOLS, VILLAGER_TOOL_KEY_CODES } from "../data/villager-tools";
-import { commitPlayerSelectionToWorld } from "../player/commit-player-intent";
+import {
+  commitPlayerSelectionToWorld,
+  rebuildTaskMarkersFromCommandResults
+} from "../player/commit-player-intent";
 import { presentationForVillagerTool } from "../player/interaction-mode-presenter";
 import {
   beginBrushStroke,
@@ -61,8 +76,12 @@ import {
   inactiveBrushStroke,
   type BrushStrokeState
 } from "../player/brush-stroke";
-import { MockWorldPort } from "../player/mock-world-port";
-import { drawGridLines, drawStoneCells, drawInteractionPoints } from "./renderers/grid-renderer";
+import { WorldCoreWorldPort } from "../player/world-core-world-port";
+import {
+  drawGridLines,
+  drawStoneCellsToGraphics,
+  drawInteractionPoints
+} from "./renderers/grid-renderer";
 import { createPawnViews, syncPawnViews, applyPaletteToViews, type PawnView } from "./renderers/pawn-renderer";
 import { drawGroundItemStacks } from "./renderers/ground-items-renderer";
 import {
@@ -91,6 +110,7 @@ export class GameScene extends Phaser.Scene {
   // Phaser renderables
   private views = new Map<string, PawnView>();
   private gridGraphics!: Phaser.GameObjects.Graphics;
+  private stoneGraphics!: Phaser.GameObjects.Graphics;
   private interactionGraphics!: Phaser.GameObjects.Graphics;
   private interactionLabels = new Map<string, Phaser.GameObjects.Text>();
   private hoverHighlightFrame!: Phaser.GameObjects.Rectangle;
@@ -114,12 +134,13 @@ export class GameScene extends Phaser.Scene {
   private escKeyObject: Phaser.Input.Keyboard.Key | null = null;
   private timeControlAbort: AbortController | null = null;
 
-  // B 线：领域命令 mock 网关 + 建造笔刷
-  private mockWorldPort = new MockWorldPort();
+  // 领域命令经 WorldCore 网关 + 建造笔刷
+  private worldPort!: WorldCoreWorldPort;
   private brushState: BrushStrokeState = inactiveBrushStroke();
   private brushGestureModifier: SelectionModifier = "replace";
   private acceptanceScenarioId = DEFAULT_PLAYER_ACCEPTANCE_SCENARIO_ID;
   private simConfig: SimConfig = DEFAULT_SIM_CONFIG;
+  private simGridSyncState: SimGridSyncState | null = null;
 
   // HUD manager
   private hud!: HudManager;
@@ -152,21 +173,48 @@ export class GameScene extends Phaser.Scene {
 
     // Build world grid with random blocked cells
     const excludeSpawn = blockedKeysFromCells(DEFAULT_WORLD_GRID.defaultSpawnPoints);
-    const stoneCells = pickRandomBlockedCells(
+    const forcedBlockedKeys = accScenario?.forcedBlockedCellKeys ?? [];
+    const stoneCellsRandom = pickRandomBlockedCells(
       DEFAULT_WORLD_GRID,
       this.simConfig.stoneCellCount,
       excludeSpawn,
       () => Math.random()
     );
+    const stoneCells = [...stoneCellsRandom];
+    for (const fk of forcedBlockedKeys) {
+      const p = parseCoordKey(fk);
+      if (!p) continue;
+      if (!stoneCells.some((s) => s.col === p.col && s.row === p.row)) {
+        stoneCells.push(p);
+      }
+    }
     this.worldGrid = {
       ...DEFAULT_WORLD_GRID,
-      blockedCellKeys: blockedKeysFromCells(stoneCells)
+      blockedCellKeys: new Set([...blockedKeysFromCells(stoneCells), ...forcedBlockedKeys])
     };
+
+    const worldCore = seedBlockedCellsAsObstacles(
+      createWorldCore({
+        grid: this.worldGrid,
+        timeState: { dayNumber: this.timeOfDayState.dayNumber, minuteOfDay: this.timeOfDayState.minuteOfDay },
+        timeConfig: DEFAULT_TIME_OF_DAY_CONFIG
+      }),
+      this.worldGrid.blockedCellKeys ?? new Set()
+    );
+    this.worldPort = new WorldCoreWorldPort(worldCore);
 
     // Grid graphics
     this.gridGraphics = this.add.graphics();
     drawGridLines(this.gridGraphics, this.worldGrid, this.gridOriginX, this.gridOriginY, this.timeOfDayPalette);
-    drawStoneCells(this, this.worldGrid, this.gridOriginX, this.gridOriginY, stoneCells);
+    this.stoneGraphics = this.add.graphics();
+    this.stoneGraphics.setDepth(12);
+    drawStoneCellsToGraphics(
+      this.stoneGraphics,
+      this.worldGrid,
+      this.gridOriginX,
+      this.gridOriginY,
+      this.worldGrid.blockedCellKeys ?? new Set()
+    );
     this.interactionGraphics = this.add.graphics();
     drawInteractionPoints(
       this.interactionGraphics, this.interactionLabels, this,
@@ -216,6 +264,7 @@ export class GameScene extends Phaser.Scene {
       onReplay: () => this.runAcceptanceReplay()
     });
     this.applyAcceptanceScenario(this.acceptanceScenarioId);
+    this.refreshSimulationGridFromWorldCore(true);
     this.syncPlayerChannelUi();
 
     this.bindFloorSelectionInput();
@@ -227,8 +276,14 @@ export class GameScene extends Phaser.Scene {
     const realDt = delta / 1000;
     const simulationDt = effectiveSimulationDeltaSeconds(realDt, this.timeControlState);
 
-    // Advance time of day
-    const nextTimeState = advanceTimeOfDay(this.timeOfDayState, simulationDt, DEFAULT_TIME_OF_DAY_CONFIG);
+    const clock = advanceWorldClock(this.worldPort.getWorld(), simulationDt, this.timeControlState);
+    this.worldPort.setWorld(clock.world);
+    this.refreshSimulationGridFromWorldCore(false);
+    const snapshotTime = getWorldSnapshot(clock.world).time;
+    const nextTimeState: TimeOfDayState = {
+      dayNumber: snapshotTime.dayNumber,
+      minuteOfDay: snapshotTime.minuteOfDay
+    };
     const nextPalette = sampleTimeOfDayPalette(nextTimeState);
     const paletteChanged = !sameTimeOfDayPalette(this.timeOfDayPalette, nextPalette);
     this.timeOfDayState = nextTimeState;
@@ -239,6 +294,7 @@ export class GameScene extends Phaser.Scene {
     this.hud.syncTimeOfDayHud(this.timeOfDayState, this.timeControlState, this.timeOfDayPalette);
 
     if (simulationDt <= 0) {
+      this.syncMarkerOverlayWithWorld();
       this.syncHoverFromPointer();
       this.syncPawnDetailPanel();
       return;
@@ -267,6 +323,7 @@ export class GameScene extends Phaser.Scene {
       this.reservations, this.timeOfDayPalette
     );
     syncPawnViews(this.views, this.pawns, this.worldGrid, this.gridOriginX, this.gridOriginY);
+    this.syncMarkerOverlayWithWorld();
     this.syncHoverFromPointer();
     this.syncPawnDetailPanel();
   }
@@ -306,6 +363,35 @@ export class GameScene extends Phaser.Scene {
 
   // ── Hover sync ────────────────────────────────────────────
 
+  /**
+   * 把 WorldCore 障碍实体与休息床位同步到与领域共用的 `worldGrid`，并视需重画石头格、清理失效交互点预订。
+   */
+  private refreshSimulationGridFromWorldCore(forceRedrawStones: boolean): void {
+    const world = this.worldPort.getWorld();
+    const { blockedChanged, interactionChanged, next } = syncWorldGridForSimulation(
+      this.worldGrid,
+      world,
+      DEFAULT_WORLD_GRID,
+      this.simGridSyncState
+    );
+    this.simGridSyncState = next;
+
+    if (blockedChanged || forceRedrawStones) {
+      drawStoneCellsToGraphics(
+        this.stoneGraphics,
+        this.worldGrid,
+        this.gridOriginX,
+        this.gridOriginY,
+        this.worldGrid.blockedCellKeys ?? new Set()
+      );
+    }
+
+    if (interactionChanged) {
+      const ids = new Set(this.worldGrid.interactionPoints.map((p) => p.id));
+      this.reservations = pruneReservationSnapshot(this.reservations, ids);
+    }
+  }
+
   private syncHoverFromPointer(): void {
     const ptr = this.input.activePointer;
     const cam = this.cameras.main;
@@ -331,6 +417,22 @@ export class GameScene extends Phaser.Scene {
   }
 
   // ── Pawn detail ───────────────────────────────────────────
+
+  private syncMarkerOverlayWithWorld(): void {
+    const merged = this.worldPort.mergeTaskMarkerOverlayWithWorld(this.taskMarkersByCell);
+    if (!taskMarkerMapsEqual(merged, this.taskMarkersByCell)) {
+      this.taskMarkersByCell = merged;
+      syncTaskMarkerView(
+        this.taskMarkerGraphics,
+        this.taskMarkerTexts,
+        this,
+        this.taskMarkersByCell,
+        this.worldGrid,
+        this.gridOriginX,
+        this.gridOriginY
+      );
+    }
+  }
 
   private syncPawnDetailPanel(): void {
     const pawn = this.selectedPawnId
@@ -492,7 +594,7 @@ export class GameScene extends Phaser.Scene {
       this.redrawSelectionAndBrush();
       if (keys.size === 0) return;
 
-      const brushOutcome = commitPlayerSelectionToWorld(this.mockWorldPort, {
+      const brushOutcome = commitPlayerSelectionToWorld(this.worldPort, {
         toolId: "build",
         selectionModifier: this.brushGestureModifier,
         cellKeys: keys,
@@ -523,7 +625,7 @@ export class GameScene extends Phaser.Scene {
     if (!draft) return;
     const shape =
       draft.cellKeys.size === 1 ? ("single-cell" as const) : ("rect-selection" as const);
-    const rectOutcome = commitPlayerSelectionToWorld(this.mockWorldPort, {
+    const rectOutcome = commitPlayerSelectionToWorld(this.worldPort, {
       toolId: this.selectedVillagerToolId(),
       selectionModifier: draft.modifier,
       cellKeys: draft.cellKeys,
@@ -569,7 +671,7 @@ export class GameScene extends Phaser.Scene {
     const { modeLine } = presentationForVillagerTool(tool);
     const scen = playerAcceptanceScenarioById(this.acceptanceScenarioId);
     const tag = scen && scen.id !== "off" ? ` · 验收：${scen.title}` : "";
-    const foot = `线间 mock：${this.mockWorldPort.lineA.snapshotLabel}${tag}`;
+    const foot = `世界快照：${this.worldPort.lineA.snapshotLabel}${tag}`;
     this.hud.syncPlayerChannelHint(modeLine, foot);
   }
 
@@ -578,8 +680,8 @@ export class GameScene extends Phaser.Scene {
       playerAcceptanceScenarioById(scenarioId) ??
       playerAcceptanceScenarioById(DEFAULT_PLAYER_ACCEPTANCE_SCENARIO_ID)!;
     this.acceptanceScenarioId = scenario.id;
-    this.mockWorldPort.resetSession();
-    this.mockWorldPort.applyMockConfig(scenarioToMockWorldPortConfig(scenario));
+    this.worldPort.resetSession();
+    this.worldPort.applyMockConfig(scenarioToMockWorldPortConfig(scenario));
 
     if (scenario.resetMarkersOnEnter) {
       this.taskMarkersByCell = new Map();
@@ -604,11 +706,23 @@ export class GameScene extends Phaser.Scene {
   }
 
   private runAcceptanceReplay(): void {
-    if (this.mockWorldPort.getCommandLog().length === 0) {
+    if (this.worldPort.getCommandLog().length === 0) {
       this.hud.syncPlayerChannelLastResult("回放：暂无已记录的命令");
       return;
     }
-    const results = this.mockWorldPort.replayAll(performance.now());
+    const results = this.worldPort.replayAll(performance.now());
+    this.taskMarkersByCell = this.worldPort.mergeTaskMarkerOverlayWithWorld(
+      rebuildTaskMarkersFromCommandResults(this.worldPort.getCommandLog(), results)
+    );
+    syncTaskMarkerView(
+      this.taskMarkerGraphics,
+      this.taskMarkerTexts,
+      this,
+      this.taskMarkersByCell,
+      this.worldGrid,
+      this.gridOriginX,
+      this.gridOriginY
+    );
     const n = results.length;
     const ok = results.filter((r) => r.accepted).length;
     this.hud.syncPlayerChannelLastResult(`回放完成：${n} 条，接受 ${ok}/${n}`);

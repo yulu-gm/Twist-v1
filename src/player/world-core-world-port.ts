@@ -1,23 +1,32 @@
-/**
- * 线间 mock 网关：记录命令、返回固定结构，合并 A 线时替换实现即可。
- */
-
+import { mergeTaskMarkerOverlayWithWorldSnapshot } from "../data/task-markers";
+import {
+  cloneWorldCoreState,
+  getWorldSnapshot,
+  type WorldCore
+} from "../game/world-core";
+import { applyDomainCommandToWorldCore } from "./apply-domain-command";
 import type { DomainCommand, MockLineAPort, MockWorldSubmitResult } from "./s0-contract";
 import type { MockWorldPortConfig, PlayerWorldPort } from "./world-port-types";
-
-export type { MockWorldPortConfig } from "./world-port-types";
 
 const DEFAULT_CONFIG: MockWorldPortConfig = {
   alwaysAccept: true,
   rejectIfTouchesCellKeys: new Set()
 };
 
-export class MockWorldPort implements PlayerWorldPort {
+/**
+ * A 线 WorldCore + B 线验收用的「冲突格 / 全局拒绝」规则。
+ * 回放时从 {@link resetSession} 记录的基线重放命令序列。
+ */
+export class WorldCoreWorldPort implements PlayerWorldPort {
+  private world: WorldCore;
+  private sessionBaseline: WorldCore;
   private config: MockWorldPortConfig;
   private readonly log: DomainCommand[] = [];
   private readonly results: MockWorldSubmitResult[] = [];
 
-  public constructor(config: Partial<MockWorldPortConfig> = {}) {
+  public constructor(initialWorld: WorldCore, config: Partial<MockWorldPortConfig> = {}) {
+    this.world = initialWorld;
+    this.sessionBaseline = cloneWorldCoreState(initialWorld);
     this.config = {
       alwaysAccept: config.alwaysAccept ?? DEFAULT_CONFIG.alwaysAccept,
       rejectIfTouchesCellKeys:
@@ -27,13 +36,20 @@ export class MockWorldPort implements PlayerWorldPort {
     };
   }
 
-  /** 清空命令与结果历史（切换验收场景或重跑前调用）。 */
+  public getWorld(): WorldCore {
+    return this.world;
+  }
+
+  public setWorld(next: WorldCore): void {
+    this.world = next;
+  }
+
   public resetSession(): void {
     this.log.length = 0;
     this.results.length = 0;
+    this.sessionBaseline = cloneWorldCoreState(this.world);
   }
 
-  /** 运行时切换 mock 规则；与当前配置按字段合并（未提供的字段保留原值）。 */
   public applyMockConfig(partial: Partial<MockWorldPortConfig>): void {
     this.config = {
       alwaysAccept: partial.alwaysAccept ?? this.config.alwaysAccept,
@@ -45,7 +61,10 @@ export class MockWorldPort implements PlayerWorldPort {
   }
 
   public get lineA(): MockLineAPort {
-    return { snapshotLabel: "mock-A-snapshot:v0" };
+    const snap = getWorldSnapshot(this.world);
+    return {
+      snapshotLabel: `world-core·实体${snap.entities.length}·工单${snap.workItems.length}·标记${snap.markers.length}`
+    };
   }
 
   public getCommandLog(): readonly DomainCommand[] {
@@ -54,6 +73,10 @@ export class MockWorldPort implements PlayerWorldPort {
 
   public getSubmitResults(): readonly MockWorldSubmitResult[] {
     return this.results;
+  }
+
+  public mergeTaskMarkerOverlayWithWorld(overlay: ReadonlyMap<string, string>): Map<string, string> {
+    return mergeTaskMarkerOverlayWithWorldSnapshot(overlay, getWorldSnapshot(this.world));
   }
 
   public submit(raw: DomainCommand, nowMs: number): MockWorldSubmitResult {
@@ -84,24 +107,17 @@ export class MockWorldPort implements PlayerWorldPort {
       return rejected;
     }
 
-    const ok: MockWorldSubmitResult = {
-      accepted: true,
-      messages: [`网关：已接收 ${cmd.verb}，格数 ${cmd.targetCellKeys.length}`],
-      workOrderId: `mock-wo-${this.log.length}`
-    };
-    this.results.push(ok);
-    return ok;
+    const applied = applyDomainCommandToWorldCore(this.world, cmd);
+    this.world = applied.world;
+    this.results.push(applied.result);
+    return applied.result;
   }
 
-  public mergeTaskMarkerOverlayWithWorld(overlay: ReadonlyMap<string, string>): Map<string, string> {
-    return new Map(overlay);
-  }
-
-  /** 将历史命令按顺序再次提交（用于回放验收）。 */
   public replayAll(nowMsStart: number): readonly MockWorldSubmitResult[] {
     const previous = [...this.log];
     this.log.length = 0;
     this.results.length = 0;
+    this.world = cloneWorldCoreState(this.sessionBaseline);
     const out: MockWorldSubmitResult[] = [];
     let t = nowMsStart;
     for (const cmd of previous) {
