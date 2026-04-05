@@ -4,6 +4,7 @@
 
 | system | 职责摘要 | 标准文档 | aidoc 路径 | 默认 failing test | 主要依赖 |
 | --- | --- | --- | --- | --- | --- |
+| world-grid | 处理格子地图尺寸、格坐标、邻格、边界、出生点和占用快照 | docs/ai/system-standards/world-grid.md | docs/ai/systems/world-grid/ | domain | pawn-state, task-planning |
 | selection-ui | 处理选中、焦点、高亮、可点击反馈和目标对象切换 | docs/ai/system-standards/selection-ui.md | docs/ai/systems/selection-ui/ | acceptance | scene-hud, pawn-state |
 | scene-hud | 处理 HUD、状态卡、菜单、按钮和场景内信息展示 | docs/ai/system-standards/scene-hud.md | docs/ai/systems/scene-hud/ | component | selection-ui, pawn-state |
 | pawn-state | 处理角色可读状态、属性、需求和 UI 所需派生字段 | docs/ai/system-standards/pawn-state.md | docs/ai/systems/pawn-state/ | domain | task-planning |

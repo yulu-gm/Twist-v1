@@ -4,6 +4,7 @@
 
 推荐结构：
 
+- `docs/ai/systems/world-grid/`
 - `docs/ai/systems/selection-ui/`
 - `docs/ai/systems/scene-hud/`
 - `docs/ai/systems/pawn-state/`
