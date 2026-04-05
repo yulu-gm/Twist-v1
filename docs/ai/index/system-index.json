@@ -16,10 +16,12 @@
         "src/scenes/GameScene.ts"
       ],
       "integrationFiles": [
-        "docs/ai/integration/2026-04-05-default-grid-wandering-pawns.md"
+        "docs/ai/integration/2026-04-05-default-grid-wandering-pawns.md",
+        "docs/ai/integration/2026-04-05-goal-driven-pawn-ai-prototype.md"
       ],
       "latestAidocs": [
-        "docs/ai/systems/pawn-state/2026-04-05-default-grid-wandering-pawns.md"
+        "docs/ai/systems/pawn-state/2026-04-05-default-grid-wandering-pawns.md",
+        "docs/ai/systems/pawn-state/2026-04-05-goal-driven-pawn-ai-prototype.md"
       ]
     },
     {
@@ -34,7 +36,8 @@
         "src/scenes/GameScene.ts"
       ],
       "integrationFiles": [
-        "docs/ai/integration/2026-04-05-default-grid-wandering-pawns.md"
+        "docs/ai/integration/2026-04-05-default-grid-wandering-pawns.md",
+        "docs/ai/integration/2026-04-05-goal-driven-pawn-ai-prototype.md"
       ],
       "latestAidocs": []
     },
@@ -50,7 +53,8 @@
         "src/scenes/GameScene.ts"
       ],
       "integrationFiles": [
-        "docs/ai/integration/2026-04-05-default-grid-wandering-pawns.md"
+        "docs/ai/integration/2026-04-05-default-grid-wandering-pawns.md",
+        "docs/ai/integration/2026-04-05-goal-driven-pawn-ai-prototype.md"
       ],
       "latestAidocs": []
     },
@@ -61,21 +65,25 @@
       "aidocDir": "docs/ai/systems/task-planning",
       "systemReadme": "docs/ai/systems/task-planning/README.md",
       "sourceFiles": [
-        "src/game/wander-planning.ts"
+        "src/game/wander-planning.ts",
+        "src/game/goal-driven-planning.ts"
       ],
       "testFiles": [
-        "tests/domain/wander-planning.test.ts"
+        "tests/domain/wander-planning.test.ts",
+        "tests/domain/goal-driven-planning.test.ts"
       ],
       "sceneEntryFiles": [
         "src/scenes/GameScene.ts"
       ],
       "integrationFiles": [
         "docs/ai/integration/2026-04-05-default-grid-wandering-pawns.md",
-        "docs/ai/integration/2026-04-05-random-stone-obstacles.md"
+        "docs/ai/integration/2026-04-05-random-stone-obstacles.md",
+        "docs/ai/integration/2026-04-05-goal-driven-pawn-ai-prototype.md"
       ],
       "latestAidocs": [
         "docs/ai/systems/task-planning/2026-04-05-default-grid-wandering-pawns.md",
-        "docs/ai/systems/task-planning/2026-04-05-random-stone-obstacles.md"
+        "docs/ai/systems/task-planning/2026-04-05-random-stone-obstacles.md",
+        "docs/ai/systems/task-planning/2026-04-05-goal-driven-pawn-ai-prototype.md"
       ]
     },
     {
@@ -95,13 +103,14 @@
       ],
       "integrationFiles": [
         "docs/ai/integration/2026-04-05-default-grid-wandering-pawns.md",
-        "docs/ai/integration/2026-04-05-random-stone-obstacles.md"
+        "docs/ai/integration/2026-04-05-random-stone-obstacles.md",
+        "docs/ai/integration/2026-04-05-goal-driven-pawn-ai-prototype.md"
       ],
       "latestAidocs": [
         "docs/ai/systems/world-grid/2026-04-05-default-grid-wandering-pawns.md",
-        "docs/ai/systems/world-grid/2026-04-05-random-stone-obstacles.md"
+        "docs/ai/systems/world-grid/2026-04-05-random-stone-obstacles.md",
+        "docs/ai/systems/world-grid/2026-04-05-goal-driven-pawn-ai-prototype.md"
       ]
     }
   ]
 }
-

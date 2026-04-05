@@ -23,6 +23,7 @@
 ## 最新/历史 aidoc
 
 - `docs/ai/systems/pawn-state/2026-04-05-default-grid-wandering-pawns.md`
+- `docs/ai/systems/pawn-state/2026-04-05-goal-driven-pawn-ai-prototype.md`
 
 ## 何时必须回填
 

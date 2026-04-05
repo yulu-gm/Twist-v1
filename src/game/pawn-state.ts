@@ -2,6 +2,7 @@
 
 import type { GridCoord, WorldGridConfig } from "./world-grid";
 import { cellCenterWorld } from "./world-grid";
+import type { ActionKind, GoalKind } from "./goal-driven-planning";
 
 export const DEFAULT_PAWN_NAMES = [
   "Alex",
@@ -54,6 +55,21 @@ export function pickRandomAltPawnNames(
 
 export type PawnId = string;
 
+export type NeedKind = "hunger" | "rest" | "recreation";
+
+export type PawnNeeds = Readonly<Record<NeedKind, number>>;
+
+export type PawnGoalState = Readonly<{
+  kind: GoalKind;
+  reason: string;
+  targetId?: string;
+}>;
+
+export type PawnActionState = Readonly<{
+  kind: ActionKind;
+  targetId?: string;
+}>;
+
 export type PawnState = Readonly<{
   id: PawnId;
   name: string;
@@ -65,7 +81,20 @@ export type PawnState = Readonly<{
   moveProgress01: number;
   /** 占位圆颜色（十六进制 0xRRGGBB）。 */
   fillColor: number;
+  /** 需求值统一为 0..100，数值越高表示越急迫。 */
+  needs: PawnNeeds;
+  currentGoal: PawnGoalState | undefined;
+  currentAction: PawnActionState | undefined;
+  reservedTargetId: string | undefined;
+  actionTimerSec: number;
+  debugLabel: string;
 }>;
+
+export const DEFAULT_PAWN_NEEDS: PawnNeeds = {
+  hunger: 20,
+  rest: 10,
+  recreation: 20
+};
 
 export function createDefaultPawnStates(
   spawnPoints: readonly GridCoord[],
@@ -81,7 +110,13 @@ export function createDefaultPawnStates(
     logicalCell: spawnPoints[i]!,
     moveTarget: undefined,
     moveProgress01: 0,
-    fillColor: palette[i % palette.length]!
+    fillColor: palette[i % palette.length]!,
+    needs: DEFAULT_PAWN_NEEDS,
+    currentGoal: undefined,
+    currentAction: undefined,
+    reservedTargetId: undefined,
+    actionTimerSec: 0,
+    debugLabel: "goal:none action:idle"
   }));
 }
 
@@ -90,26 +125,26 @@ export function isMoving(pawn: PawnState): boolean {
 }
 
 export function beginMove(pawn: PawnState, target: GridCoord): PawnState {
-  return {
+  return withDebugLabel({
     ...pawn,
     moveTarget: target,
     moveProgress01: 0
-  };
+  });
 }
 
 export function withMoveProgress(pawn: PawnState, progress01: number): PawnState {
   const p = Math.max(0, Math.min(1, progress01));
-  return { ...pawn, moveProgress01: p };
+  return withDebugLabel({ ...pawn, moveProgress01: p });
 }
 
 export function finishMoveIfComplete(pawn: PawnState): PawnState {
   if (!pawn.moveTarget || pawn.moveProgress01 < 1) return pawn;
-  return {
+  return withDebugLabel({
     ...pawn,
     logicalCell: pawn.moveTarget,
     moveTarget: undefined,
     moveProgress01: 0
-  };
+  });
 }
 
 /** 平滑缓动，视觉略好于线性。 */
@@ -150,4 +185,97 @@ export function pawnDisplayWorldCenter(
     x: from.x + (to.x - from.x) * t,
     y: from.y + (to.y - from.y) * t
   };
+}
+
+function clampNeedValue(value: number): number {
+  return Math.max(0, Math.min(100, value));
+}
+
+function withDebugLabel(pawn: PawnState): PawnState {
+  return {
+    ...pawn,
+    debugLabel: describePawnDebugLabel(pawn)
+  };
+}
+
+export function withPawnNeeds(pawn: PawnState, needs: PawnNeeds): PawnState {
+  return withDebugLabel({
+    ...pawn,
+    needs: {
+      hunger: clampNeedValue(needs.hunger),
+      rest: clampNeedValue(needs.rest),
+      recreation: clampNeedValue(needs.recreation)
+    }
+  });
+}
+
+export function advanceNeeds(
+  pawn: PawnState,
+  deltaSeconds: number,
+  ratesPerSecond: Record<NeedKind, number>
+): PawnState {
+  return withPawnNeeds(pawn, {
+    hunger: pawn.needs.hunger + ratesPerSecond.hunger * deltaSeconds,
+    rest: pawn.needs.rest + ratesPerSecond.rest * deltaSeconds,
+    recreation: pawn.needs.recreation + ratesPerSecond.recreation * deltaSeconds
+  });
+}
+
+export function applyNeedDelta(
+  pawn: PawnState,
+  deltas: Partial<Record<NeedKind, number>>
+): PawnState {
+  return withPawnNeeds(pawn, {
+    hunger: pawn.needs.hunger + (deltas.hunger ?? 0),
+    rest: pawn.needs.rest + (deltas.rest ?? 0),
+    recreation: pawn.needs.recreation + (deltas.recreation ?? 0)
+  });
+}
+
+export function setPawnIntent(
+  pawn: PawnState,
+  goal: PawnGoalState | undefined,
+  action: PawnActionState | undefined,
+  reservedTargetId: string | undefined
+): PawnState {
+  return withDebugLabel({
+    ...pawn,
+    currentGoal: goal,
+    currentAction: action,
+    reservedTargetId,
+    actionTimerSec: action?.kind === "use-target" ? 0 : pawn.actionTimerSec
+  });
+}
+
+export function clearPawnIntent(pawn: PawnState): PawnState {
+  return withDebugLabel({
+    ...pawn,
+    currentGoal: undefined,
+    currentAction: undefined,
+    reservedTargetId: undefined,
+    actionTimerSec: 0
+  });
+}
+
+export function advancePawnActionTimer(pawn: PawnState, deltaSeconds: number): PawnState {
+  return withDebugLabel({
+    ...pawn,
+    actionTimerSec: pawn.actionTimerSec + deltaSeconds
+  });
+}
+
+export function resetPawnActionTimer(pawn: PawnState): PawnState {
+  return withDebugLabel({
+    ...pawn,
+    actionTimerSec: 0
+  });
+}
+
+export function describePawnDebugLabel(pawn: PawnState): string {
+  const goal = pawn.currentGoal?.kind ?? "none";
+  const action = pawn.currentAction?.kind ?? "idle";
+  const targetId = pawn.currentAction?.targetId ?? pawn.currentGoal?.targetId ?? pawn.reservedTargetId;
+  return targetId
+    ? `goal:${goal} action:${action} target:${targetId}`
+    : `goal:${goal} action:${action}`;
 }

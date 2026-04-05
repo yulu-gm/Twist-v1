@@ -1,14 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
-  DEFAULT_WORLD_GRID,
   blockedKeysFromCells,
+  cellCenterWorld,
+  createReservationSnapshot,
+  DEFAULT_WORLD_GRID,
   coordKey,
+  isInteractionPointReservedByOther,
   isCellOccupiedByOthers,
   isInsideGrid,
   isWalkableCell,
   orthogonalNeighbors,
-  cellCenterWorld,
-  pickRandomBlockedCells
+  pickRandomBlockedCells,
+  reserveInteractionPoint
 } from "../../src/game/world-grid";
 
 describe("world-grid", () => {
@@ -16,11 +19,11 @@ describe("world-grid", () => {
     const { defaultSpawnPoints, columns, rows } = DEFAULT_WORLD_GRID;
     expect(defaultSpawnPoints).toHaveLength(5);
     const seen = new Set<string>();
-    for (const c of defaultSpawnPoints) {
-      expect(isInsideGrid(DEFAULT_WORLD_GRID, c)).toBe(true);
-      const k = coordKey(c);
-      expect(seen.has(k)).toBe(false);
-      seen.add(k);
+    for (const cell of defaultSpawnPoints) {
+      expect(isInsideGrid(DEFAULT_WORLD_GRID, cell)).toBe(true);
+      const key = coordKey(cell);
+      expect(seen.has(key)).toBe(false);
+      seen.add(key);
     }
     expect(columns).toBeGreaterThan(0);
     expect(rows).toBeGreaterThan(0);
@@ -72,10 +75,32 @@ describe("world-grid", () => {
     const stones = pickRandomBlockedCells(DEFAULT_WORLD_GRID, 5, exclude, rng);
     expect(stones).toHaveLength(5);
     const keys = new Set(stones.map(coordKey));
-    for (const k of exclude) expect(keys.has(k)).toBe(false);
-    for (const c of stones) expect(isInsideGrid(DEFAULT_WORLD_GRID, c)).toBe(true);
+    for (const key of exclude) expect(keys.has(key)).toBe(false);
+    for (const cell of stones) expect(isInsideGrid(DEFAULT_WORLD_GRID, cell)).toBe(true);
     const tiny = { ...DEFAULT_WORLD_GRID, columns: 2, rows: 1 };
     const few = pickRandomBlockedCells(tiny, 99, new Set(), () => 0.5);
     expect(few).toHaveLength(2);
+  });
+
+  it("provides default interaction points inside the grid", () => {
+    const seen = new Set<string>();
+
+    expect(DEFAULT_WORLD_GRID.interactionPoints.length).toBeGreaterThanOrEqual(5);
+    for (const point of DEFAULT_WORLD_GRID.interactionPoints) {
+      expect(isInsideGrid(DEFAULT_WORLD_GRID, point.cell)).toBe(true);
+      expect(seen.has(point.id)).toBe(false);
+      seen.add(point.id);
+    }
+  });
+
+  it("supports single-slot reservations for interaction points", () => {
+    const [point] = DEFAULT_WORLD_GRID.interactionPoints;
+    const reservations = createReservationSnapshot();
+    const reserved = reserveInteractionPoint(reservations, point!.id, "pawn-a");
+
+    expect(reserved).toBeDefined();
+    expect(isInteractionPointReservedByOther(reserved!, point!.id, "pawn-a")).toBe(false);
+    expect(isInteractionPointReservedByOther(reserved!, point!.id, "pawn-b")).toBe(true);
+    expect(reserveInteractionPoint(reserved!, point!.id, "pawn-b")).toBeUndefined();
   });
 });

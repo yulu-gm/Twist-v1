@@ -2,12 +2,16 @@ import { describe, expect, it } from "vitest";
 import {
   ALT_ENGLISH_NAME_POOL,
   DEFAULT_PAWN_NAMES,
+  advanceNeeds,
   advanceMoveTowardTarget,
+  applyNeedDelta,
   beginMove,
   createDefaultPawnStates,
+  describePawnDebugLabel,
   finishMoveIfComplete,
   pickRandomAltPawnNames,
   pawnDisplayWorldCenter,
+  setPawnIntent,
   smoothstep01
 } from "../../src/game/pawn-state";
 import { DEFAULT_WORLD_GRID, cellCenterWorld } from "../../src/game/world-grid";
@@ -65,5 +69,57 @@ describe("pawn-state", () => {
     const mid = pawnDisplayWorldCenter({ ...p, moveProgress01: 0.5 }, grid, originX, originY);
     const t = smoothstep01(0.5);
     expect(mid.x).toBeCloseTo(fromC.x + (toC.x - fromC.x) * t, 5);
+  });
+
+  it("advances needs over time and clamps them to 100", () => {
+    const [spawn] = DEFAULT_WORLD_GRID.defaultSpawnPoints;
+    const pawn = createDefaultPawnStates([spawn!], ["T"])[0]!;
+    const updated = advanceNeeds(pawn, 20, {
+      hunger: 10,
+      rest: 5,
+      recreation: 6
+    });
+
+    expect(updated.needs).toEqual({
+      hunger: 100,
+      rest: 100,
+      recreation: 100
+    });
+  });
+
+  it("applies need deltas and clamps them to zero", () => {
+    const [spawn] = DEFAULT_WORLD_GRID.defaultSpawnPoints;
+    const pawn = createDefaultPawnStates([spawn!], ["T"])[0]!;
+    const updated = applyNeedDelta(pawn, {
+      hunger: -200,
+      rest: -10,
+      recreation: 5
+    });
+
+    expect(updated.needs).toEqual({
+      hunger: 0,
+      rest: 0,
+      recreation: 25
+    });
+  });
+
+  it("builds a stable debug label from the current goal and action", () => {
+    const [spawn] = DEFAULT_WORLD_GRID.defaultSpawnPoints;
+    const pawn = setPawnIntent(
+      createDefaultPawnStates([spawn!], ["T"])[0]!,
+      {
+        kind: "eat",
+        reason: "hunger-high",
+        targetId: "food-1"
+      },
+      {
+        kind: "move-to-target",
+        targetId: "food-1"
+      },
+      "food-1"
+    );
+
+    expect(describePawnDebugLabel(pawn)).toBe("goal:eat action:move-to-target target:food-1");
+    expect(pawn.debugLabel).toBe("goal:eat action:move-to-target target:food-1");
   });
 });

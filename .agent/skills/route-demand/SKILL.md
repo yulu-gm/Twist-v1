@@ -33,6 +33,15 @@ description: Use when Twist_V1 receives a new gameplay, interaction, rules, or m
 4. **分派 SubAgent**：每个目标系统创建一个 SubAgent，下发内容和返回要求见下方契约。
 5. **汇总**：等所有 aidoc 返回后，主 agent 写主控需求单、集成文档、TDD 顺序、fake-to-real 反推顺序。
 
+## Required References
+
+在执行前必须依次读取：
+
+1. `references/demand-router.md`
+2. `references/system-registry.md`
+3. `references/subagent-contract.md`
+4. `references/skill-tdd.md`
+
 ## 系统注册表
 
 | system | 职责摘要 | 标准文档 | aidoc 路径 | 默认 failing test | 主要依赖 |
