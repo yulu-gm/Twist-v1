@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  ALT_ENGLISH_NAME_POOL,
   DEFAULT_PAWN_NAMES,
   advanceMoveTowardTarget,
   beginMove,
   createDefaultPawnStates,
   finishMoveIfComplete,
+  pickRandomAltPawnNames,
   pawnDisplayWorldCenter,
   smoothstep01
 } from "../../src/game/pawn-state";
@@ -17,6 +19,18 @@ describe("pawn-state", () => {
     expect(pawns.map((p) => p.name)).toEqual([...DEFAULT_PAWN_NAMES]);
     for (let i = 0; i < pawns.length; i++) {
       expect(pawns[i]!.logicalCell).toEqual(DEFAULT_WORLD_GRID.defaultSpawnPoints[i]!);
+    }
+  });
+
+  it("picks distinct alt names with deterministic rng", () => {
+    const seq = [0.91, 0.12, 0.55, 0.03, 0.77, 0.4, 0.22, 0.66, 0.88, 0.01];
+    let k = 0;
+    const rng = () => seq[k++] ?? 0;
+    const names = pickRandomAltPawnNames(5, rng);
+    expect(names).toHaveLength(5);
+    expect(new Set(names).size).toBe(5);
+    for (const n of names) {
+      expect(ALT_ENGLISH_NAME_POOL as readonly string[]).toContain(n);
     }
   });
 

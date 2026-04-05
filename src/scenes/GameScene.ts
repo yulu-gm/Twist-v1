@@ -4,9 +4,11 @@ import {
   advanceMoveTowardTarget,
   beginMove,
   createDefaultPawnStates,
+  DEFAULT_PAWN_NAMES,
   finishMoveIfComplete,
   isMoving,
   logicalCellsByPawnId,
+  pickRandomAltPawnNames,
   pawnDisplayWorldCenter,
   type PawnState
 } from "../game/pawn-state";
@@ -19,14 +21,22 @@ type PawnView = Readonly<{
   label: Phaser.GameObjects.Text;
 }>;
 
+export type GameSceneVariant = "default" | "alt-en";
+
 export class GameScene extends Phaser.Scene {
   private gridOriginX = 0;
   private gridOriginY = 0;
   private pawns: PawnState[] = [];
   private views = new Map<string, PawnView>();
+  private variant: GameSceneVariant = "default";
 
   public constructor() {
     super("game");
+  }
+
+  public init(data: { variant?: string }): void {
+    const v = data.variant;
+    this.variant = v === "alt-en" ? "alt-en" : "default";
   }
 
   public create(): void {
@@ -34,7 +44,11 @@ export class GameScene extends Phaser.Scene {
     this.layoutGrid();
     this.drawGridLines();
 
-    this.pawns = createDefaultPawnStates(DEFAULT_WORLD_GRID.defaultSpawnPoints);
+    const names =
+      this.variant === "alt-en"
+        ? pickRandomAltPawnNames(DEFAULT_PAWN_NAMES.length)
+        : [...DEFAULT_PAWN_NAMES];
+    this.pawns = createDefaultPawnStates(DEFAULT_WORLD_GRID.defaultSpawnPoints, names);
     for (const p of this.pawns) {
       const pos = pawnDisplayWorldCenter(
         p,
@@ -55,6 +69,8 @@ export class GameScene extends Phaser.Scene {
         .setOrigin(0.5, 1);
       this.views.set(p.id, { circle, label });
     }
+
+    this.bindSceneVariantSelect();
   }
 
   public update(_time: number, delta: number): void {
@@ -112,5 +128,15 @@ export class GameScene extends Phaser.Scene {
     }
     g.lineStyle(2, 0x5c5346, 0.55);
     g.strokeRect(ox + 1, oy + 1, gridW - 2, gridH - 2);
+  }
+
+  private bindSceneVariantSelect(): void {
+    const sel = document.getElementById("scene-variant") as HTMLSelectElement | null;
+    if (!sel) return;
+    sel.value = this.variant;
+    sel.onchange = () => {
+      const next = sel.value === "alt-en" ? "alt-en" : "default";
+      this.scene.restart({ variant: next });
+    };
   }
 }

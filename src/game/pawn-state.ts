@@ -11,6 +11,47 @@ export const DEFAULT_PAWN_NAMES = [
   "SG"
 ] as const;
 
+/** 原型「随机英文名」子场景：从此池中无放回抽取，保证与默认五人组不同观感。 */
+export const ALT_ENGLISH_NAME_POOL = [
+  "James",
+  "Emma",
+  "Oliver",
+  "Sophia",
+  "Liam",
+  "Mia",
+  "Noah",
+  "Ava",
+  "Ethan",
+  "Isabella",
+  "Lucas",
+  "Charlotte",
+  "Henry",
+  "Amelia",
+  "Benjamin"
+] as const;
+
+/**
+ * 从 {@link ALT_ENGLISH_NAME_POOL} 中无放回打乱后取前 `count` 个，用于原型场景切换。
+ * @param rng 可选，便于测试注入确定性随机源。
+ */
+export function pickRandomAltPawnNames(
+  count: number,
+  rng: () => number = Math.random
+): string[] {
+  if (count < 0) throw new Error("pawn-state: count must be non-negative");
+  if (count > ALT_ENGLISH_NAME_POOL.length) {
+    throw new Error("pawn-state: count cannot exceed alt name pool size");
+  }
+  const pool = [...ALT_ENGLISH_NAME_POOL];
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    const a = pool[i]!;
+    pool[i] = pool[j]!;
+    pool[j] = a;
+  }
+  return pool.slice(0, count);
+}
+
 export type PawnId = string;
 
 export type PawnState = Readonly<{
