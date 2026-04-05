@@ -35,7 +35,7 @@
 
 - `src/scenes/GameScene.ts`
 
-## 最新/历史人工智能文档
+## 最新/历史 aidoc
 
 - `docs/ai/systems/scene-hud/2026-04-05-gamescene-runtime-refactor.md`
 - `docs/ai/systems/scene-hud/2026-04-05-mock-ground-items.md`

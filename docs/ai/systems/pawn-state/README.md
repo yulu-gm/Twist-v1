@@ -22,7 +22,7 @@
 
 - `src/scenes/renderers/pawn-renderer.ts`
 
-## 最新与历史人工智能文档
+## 最新/历史 aidoc
 
 - `docs/ai/systems/pawn-state/2026-04-05-gamescene-runtime-refactor.md`
 - `docs/ai/systems/pawn-state/2026-04-05-default-grid-wandering-pawns.md`
