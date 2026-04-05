@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   blockedKeysFromCells,
+  cellAtWorldPixel,
   cellCenterWorld,
   createReservationSnapshot,
   DEFAULT_WORLD_GRID,
@@ -44,6 +45,24 @@ describe("world-grid", () => {
     const p = cellCenterWorld(DEFAULT_WORLD_GRID, { col: 0, row: 0 }, 10, 20);
     expect(p.x).toBe(10 + cellSizePx / 2);
     expect(p.y).toBe(20 + cellSizePx / 2);
+  });
+
+  it("maps world pixel to cell inside the grid only", () => {
+    const ox = 100;
+    const oy = 200;
+    const cs = DEFAULT_WORLD_GRID.cellSizePx;
+    expect(cellAtWorldPixel(DEFAULT_WORLD_GRID, ox, oy, ox, oy)).toEqual({
+      col: 0,
+      row: 0
+    });
+    expect(cellAtWorldPixel(DEFAULT_WORLD_GRID, ox, oy, ox + cs - 0.01, oy + cs - 0.01)).toEqual({
+      col: 0,
+      row: 0
+    });
+    expect(
+      cellAtWorldPixel(DEFAULT_WORLD_GRID, ox, oy, ox + DEFAULT_WORLD_GRID.columns * cs, oy)
+    ).toBe(null);
+    expect(cellAtWorldPixel(DEFAULT_WORLD_GRID, ox, oy, ox - 1, oy)).toBe(null);
   });
 
   it("detects occupancy by other pawn logical cells", () => {

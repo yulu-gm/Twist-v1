@@ -26,7 +26,9 @@ import {
 } from "../game/pawn-state";
 import {
   blockedKeysFromCells,
+  cellAtWorldPixel,
   cellCenterWorld,
+  coordKey,
   createReservationSnapshot,
   DEFAULT_WORLD_GRID,
   findInteractionPointById,
@@ -37,6 +39,11 @@ import {
   type ReservationSnapshot,
   type WorldGridConfig
 } from "../game/world-grid";
+import { formatMockGridCellHoverText } from "./mock-grid-cell-info";
+import {
+  MOCK_VILLAGER_TOOLS,
+  MOCK_VILLAGER_TOOL_KEY_CODES
+} from "./mock-villager-tools";
 
 const MOVE_DURATION_SEC = 0.42;
 /** 开局随机散落的石头格数量（不与默认出生点重叠）。 */
@@ -64,6 +71,13 @@ export class GameScene extends Phaser.Scene {
   private reservations: ReservationSnapshot = createReservationSnapshot();
   private interactionGraphics!: Phaser.GameObjects.Graphics;
   private interactionLabels = new Map<string, Phaser.GameObjects.Text>();
+  private hoverHighlightFrame!: Phaser.GameObjects.Rectangle;
+  private lastHoverKey: string | null = "\0";
+  private hoverHudEl: HTMLElement | null = null;
+  private selectedToolIndex = 0;
+  private toolSlotEls: HTMLElement[] = [];
+  private toolKeyObjects: Phaser.Input.Keyboard.Key[] = [];
+  private toolUiAbort: AbortController | null = null;
 
   public constructor() {
     super("game");
@@ -72,11 +86,13 @@ export class GameScene extends Phaser.Scene {
   public init(data: { variant?: string }): void {
     const v = data.variant;
     this.variant = v === "alt-en" ? "alt-en" : "default";
+    this.selectedToolIndex = 0;
   }
 
   public create(): void {
     this.cameras.main.setBackgroundColor("#171411");
     this.layoutGrid();
+    this.setupGridHoverHighlight();
 
     const excludeSpawn = blockedKeysFromCells(DEFAULT_WORLD_GRID.defaultSpawnPoints);
     const stoneCells = pickRandomBlockedCells(
@@ -126,6 +142,8 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.bindSceneVariantSelect();
+    this.hoverHudEl = document.getElementById("grid-hover-info");
+    this.setupVillagerToolBar();
   }
 
   public update(_time: number, delta: number): void {
@@ -296,6 +314,8 @@ export class GameScene extends Phaser.Scene {
       view.label.setPosition(pos.x, pos.y - radius - 10);
       view.label.setText(`${pawn.name}\n${pawn.debugLabel}`);
     }
+
+    this.syncHoverFromPointer();
   }
 
   private layoutGrid(): void {
@@ -336,6 +356,49 @@ export class GameScene extends Phaser.Scene {
     }
     g.lineStyle(2, 0x5c5346, 0.55);
     g.strokeRect(ox + 1, oy + 1, gridW - 2, gridH - 2);
+  }
+
+  private setupGridHoverHighlight(): void {
+    const cs = DEFAULT_WORLD_GRID.cellSizePx;
+    const frame = this.add.rectangle(0, 0, cs - 2, cs - 2, 0x000000, 0);
+    frame.setStrokeStyle(2, 0xe8c547, 1);
+    frame.setDepth(80);
+    frame.setVisible(false);
+    this.hoverHighlightFrame = frame;
+  }
+
+  private pointerToCell(pointer: Phaser.Input.Pointer): GridCoord | null {
+    const cam = this.cameras.main;
+    const w = cam.getWorldPoint(pointer.x, pointer.y);
+    return cellAtWorldPixel(this.worldGrid, this.gridOriginX, this.gridOriginY, w.x, w.y);
+  }
+
+  private syncHoverFromPointer(): void {
+    const ptr = this.input.activePointer;
+    const cell = this.pointerToCell(ptr);
+    const key = cell ? coordKey(cell) : null;
+    if (key === this.lastHoverKey) return;
+    this.lastHoverKey = key;
+
+    if (!cell) {
+      this.hoverHighlightFrame.setVisible(false);
+      const el = this.hoverHudEl;
+      if (el) el.hidden = true;
+      return;
+    }
+
+    const cs = this.worldGrid.cellSizePx;
+    const cx = this.gridOriginX + cell.col * cs + cs / 2;
+    const cy = this.gridOriginY + cell.row * cs + cs / 2;
+    this.hoverHighlightFrame.setPosition(cx, cy);
+    this.hoverHighlightFrame.setSize(cs - 2, cs - 2);
+    this.hoverHighlightFrame.setVisible(true);
+
+    const el = this.hoverHudEl;
+    if (el) {
+      el.hidden = false;
+      el.textContent = formatMockGridCellHoverText(cell, this.worldGrid);
+    }
   }
 
   private drawInteractionPoints(): void {
@@ -404,5 +467,68 @@ export class GameScene extends Phaser.Scene {
       const next = sel.value === "alt-en" ? "alt-en" : "default";
       this.scene.restart({ variant: next });
     };
+  }
+
+  private setupVillagerToolBar(): void {
+    this.teardownVillagerToolBar();
+    const root = document.getElementById("villager-tool-bar");
+    if (!root || !this.input.keyboard) return;
+
+    this.toolUiAbort = new AbortController();
+    const { signal } = this.toolUiAbort;
+
+    for (let i = 0; i < MOCK_VILLAGER_TOOLS.length; i++) {
+      const tool = MOCK_VILLAGER_TOOLS[i];
+      const slot = document.createElement("button");
+      slot.type = "button";
+      slot.className = "tool-slot";
+      slot.dataset.toolId = tool.id;
+      slot.title = `${tool.hint}（${tool.hotkey}）`;
+      slot.setAttribute("aria-label", `${tool.label}，快捷键 ${tool.hotkey}`);
+      slot.innerHTML = `<span class="tool-key">${tool.hotkey}</span><div class="tool-label">${tool.label}</div>`;
+      slot.addEventListener(
+        "click",
+        () => {
+          this.selectVillagerTool(i);
+        },
+        { signal }
+      );
+      root.appendChild(slot);
+      this.toolSlotEls.push(slot);
+    }
+
+    for (let i = 0; i < MOCK_VILLAGER_TOOL_KEY_CODES.length; i++) {
+      const code = MOCK_VILLAGER_TOOL_KEY_CODES[i];
+      const key = this.input.keyboard.addKey(code);
+      this.toolKeyObjects.push(key);
+      key.on("down", () => {
+        this.selectVillagerTool(i);
+      });
+    }
+
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.teardownVillagerToolBar, this);
+    this.selectVillagerTool(this.selectedToolIndex);
+  }
+
+  private selectVillagerTool(index: number): void {
+    if (index < 0 || index >= MOCK_VILLAGER_TOOLS.length) return;
+    this.selectedToolIndex = index;
+    for (let i = 0; i < this.toolSlotEls.length; i++) {
+      const el = this.toolSlotEls[i];
+      const on = i === index;
+      el.classList.toggle("selected", on);
+      el.setAttribute("aria-pressed", on ? "true" : "false");
+    }
+  }
+
+  private teardownVillagerToolBar(): void {
+    this.toolUiAbort?.abort();
+    this.toolUiAbort = null;
+    for (const k of this.toolKeyObjects) {
+      k.destroy();
+    }
+    this.toolKeyObjects = [];
+    this.toolSlotEls = [];
+    this.events.off(Phaser.Scenes.Events.SHUTDOWN, this.teardownVillagerToolBar, this);
   }
 }

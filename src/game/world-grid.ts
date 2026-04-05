@@ -99,6 +99,21 @@ export function cellCenterWorld(
   return { x, y };
 }
 
+/** 世界像素坐标落到哪一格；在网格外则 `null`（用于指针拾取）。 */
+export function cellAtWorldPixel(
+  config: WorldGridConfig,
+  gridOriginXPx: number,
+  gridOriginYPx: number,
+  worldXPx: number,
+  worldYPx: number
+): GridCoord | null {
+  const col = Math.floor((worldXPx - gridOriginXPx) / config.cellSizePx);
+  const row = Math.floor((worldYPx - gridOriginYPx) / config.cellSizePx);
+  const cell: GridCoord = { col, row };
+  if (!isInsideGrid(config, cell)) return null;
+  return cell;
+}
+
 const ORTHO_OFFSETS: readonly GridCoord[] = [
   { col: 1, row: 0 },
   { col: -1, row: 0 },
