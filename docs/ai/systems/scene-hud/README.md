@@ -15,6 +15,7 @@
 - `src/scenes/mock-ground-items.ts`（格子 mock 掉落物堆叠数据与按格查询）
 - `src/scenes/mock-grid-cell-info.ts`（格子悬停文案；可拼接掉落物行）
 - `src/scenes/mock-task-marker-commands.ts`（工具 id → mock 是否视为对该格派工及显示标签）
+- `src/scenes/mock-pawn-profile-data.ts`（小人详情 mock 档案，键对齐 `pawn-0` …）
 
 ## 当前关键测试文件
 
@@ -30,6 +31,7 @@
 - `docs/ai/systems/scene-hud/2026-04-05-mock-ground-items.md`
 - `docs/ai/systems/scene-hud/2026-04-05-villager-tool-bar.md`
 - `docs/ai/systems/scene-hud/2026-04-05-mock-task-markers-on-grid.md`
+- `docs/ai/systems/scene-hud/2026-04-05-pawn-roster-detail-panel.md`
 
 ## 何时必须回填
 

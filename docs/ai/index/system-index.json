@@ -36,7 +36,8 @@
         "src/scenes/mock-villager-tools.ts",
         "src/scenes/mock-ground-items.ts",
         "src/scenes/mock-grid-cell-info.ts",
-        "src/scenes/mock-task-marker-commands.ts"
+        "src/scenes/mock-task-marker-commands.ts",
+        "src/scenes/mock-pawn-profile-data.ts"
       ],
       "testFiles": [
         "tests/component/villager-tool-bar-model.test.ts",
@@ -50,12 +51,14 @@
         "docs/ai/integration/2026-04-05-goal-driven-pawn-ai-prototype.md",
         "docs/ai/integration/2026-04-05-villager-tool-bar.md",
         "docs/ai/integration/2026-04-05-mock-ground-items.md",
-        "docs/ai/integration/2026-04-05-mock-task-markers-on-grid.md"
+        "docs/ai/integration/2026-04-05-mock-task-markers-on-grid.md",
+        "docs/ai/integration/2026-04-05-pawn-roster-detail-panel.md"
       ],
       "latestAidocs": [
         "docs/ai/systems/scene-hud/2026-04-05-mock-ground-items.md",
         "docs/ai/systems/scene-hud/2026-04-05-villager-tool-bar.md",
-        "docs/ai/systems/scene-hud/2026-04-05-mock-task-markers-on-grid.md"
+        "docs/ai/systems/scene-hud/2026-04-05-mock-task-markers-on-grid.md",
+        "docs/ai/systems/scene-hud/2026-04-05-pawn-roster-detail-panel.md"
       ]
     },
     {
