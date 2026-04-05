@@ -1,6 +1,6 @@
 /** sim-config：模拟层集中参数（与 Phaser 无关）。 */
 
-import type { NeedKind } from "./pawn-state";
+import type { NeedKind } from "../pawn-state";
 
 export type SimConfig = Readonly<{
   /** 每格移动耗时（秒）。 */

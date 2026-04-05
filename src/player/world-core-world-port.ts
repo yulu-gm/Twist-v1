@@ -7,6 +7,7 @@ import {
 import { applyDomainCommandToWorldCore } from "./apply-domain-command";
 import type { DomainCommand, MockLineAPort, MockWorldSubmitResult } from "./s0-contract";
 import type { MockWorldPortConfig, PlayerWorldPort } from "./world-port-types";
+import type { OrchestratorWorldBridge } from "../game/orchestrator-world-bridge";
 
 const DEFAULT_CONFIG: MockWorldPortConfig = {
   alwaysAccept: true,
@@ -17,7 +18,7 @@ const DEFAULT_CONFIG: MockWorldPortConfig = {
  * A 线 WorldCore + B 线验收用的「冲突格 / 全局拒绝」规则。
  * 回放时从 {@link resetSession} 记录的基线重放命令序列。
  */
-export class WorldCoreWorldPort implements PlayerWorldPort {
+export class WorldCoreWorldPort implements PlayerWorldPort, OrchestratorWorldBridge {
   private world: WorldCore;
   private sessionBaseline: WorldCore;
   private config: MockWorldPortConfig;

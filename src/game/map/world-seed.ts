@@ -3,7 +3,7 @@
  */
 
 import { parseCoordKey } from "./world-grid";
-import { spawnWorldEntity, type WorldCore } from "./world-core";
+import { spawnWorldEntity, type WorldCore } from "../world-core";
 
 export function seedBlockedCellsAsObstacles(
   world: WorldCore,

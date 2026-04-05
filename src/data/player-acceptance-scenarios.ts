@@ -4,8 +4,7 @@
  */
 
 import type { MockWorldPortConfig } from "../player/world-port-types";
-import type { SimConfig } from "../game/sim-config";
-import { DEFAULT_SIM_CONFIG } from "../game/sim-config";
+import { DEFAULT_SIM_CONFIG, type SimConfig } from "../game/behavior";
 
 /** 数据侧可序列化的网关验收片段（格键为 string[]）。 */
 export type ScenarioMockWorldPort = Readonly<{

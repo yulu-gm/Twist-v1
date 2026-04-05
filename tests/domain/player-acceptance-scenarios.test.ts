@@ -6,7 +6,7 @@ import {
   resolveSimConfigForScenario,
   scenarioToMockWorldPortConfig
 } from "../../src/data/player-acceptance-scenarios";
-import { DEFAULT_SIM_CONFIG } from "../../src/game/sim-config";
+import { DEFAULT_SIM_CONFIG } from "../../src/game/behavior";
 
 describe("player acceptance scenarios", () => {
   it("has unique ids and default id is defined", () => {

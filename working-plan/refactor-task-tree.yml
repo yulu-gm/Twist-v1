@@ -1,0 +1,909 @@
+# 重构任务树：从扁平实现到 9 子系统分层架构
+# 基于 working-plan/review.md 的现状分析与 oh-code-design/ 的目标规范
+task_name: "将当前扁平代码重构为 9 子系统 × 4 层分层架构，补齐缺失实体模型、模块和关键链路"
+created_at: "2026-04-06"
+status: "completed"
+
+# ────────────────────────────────────────────────
+# Phase 0：统一实体模型（基础，所有后续 Phase 依赖）
+# ────────────────────────────────────────────────
+tasks:
+  - id: "T-01"
+    title: "定义实体类型系统与 6 种原型"
+    status: "completed"
+    dependencies: []
+    context:
+      read_files:
+        - "src/game/world-core.ts"            # 现有 WorldEntitySnapshot、WorldEntityKind 等类型
+        - "src/game/pawn-state.ts"            # 现有 PawnState 类型
+      reference_docs:
+        - "oh-code-design/实体系统.yaml"      # 目标：6 种实体原型的完整字段定义
+    action: |
+      1. 创建 `src/game/entity/entity-types.ts`。
+      2. 定义 `EntityId`（品牌类型或 string alias）。
+      3. 定义 `EntityKind` 联合类型：`"pawn" | "resource" | "tree" | "blueprint" | "building" | "zone"`。
+      4. 为每种实体定义类型接口（参照 oh-code-design 核心数据字段）：
+         - `PawnEntity`：位置、行为状态、当前目标、携带物标识、饱食度、精力值、床铺归属
+         - `ResourceEntity`：物资类型、位置、所在容器类型/标识、可拾取标记、当前占用者
+         - `TreeEntity`：位置、伐木标记、是否被占用
+         - `BlueprintEntity`：蓝图类型、覆盖格集合、建造进度、建造状态、关联工作标识
+         - `BuildingEntity`：建筑类型、覆盖格集合、可交互能力、归属信息
+         - `ZoneEntity`：区域类型、覆盖格集合、名称、接受物资类型规则
+      5. 导出统一 `GameEntity` 可辨识联合（discriminated union on `kind`）。
+      6. 导出 `ReadonlyEntitySnapshot` 只读快照类型。
+      7. 创建 `src/game/entity/index.ts` 作为桶文件，重新导出所有类型。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Read: `src/game/entity/entity-types.ts` 必须导出 `EntityId`、`EntityKind`、`PawnEntity`、`ResourceEntity`、`TreeEntity`、`BlueprintEntity`、`BuildingEntity`、`ZoneEntity`、`GameEntity`、`ReadonlyEntitySnapshot`。
+      - [ ] Read: `src/game/entity/index.ts` 必须重新导出上述所有类型。
+      - [ ] Grep: `entity-types.ts` 中 `PawnEntity` 必须包含 `satiety`（饱食度）和 `energy`（精力值）字段。
+
+  - id: "T-02"
+    title: "实现 EntityRegistry（实体目录）"
+    status: "completed"
+    dependencies: ["T-01"]
+    context:
+      read_files:
+        - "src/game/entity/entity-types.ts"   # T-01 产出
+        - "src/game/world-core.ts"            # 现有 entities Map 和 CRUD 函数
+      reference_docs:
+        - "oh-code-design/实体系统.yaml"      # 模块 → 实体目录
+    action: |
+      1. 创建 `src/game/entity/entity-registry.ts`。
+      2. 实现 `EntityRegistry` 类或一组纯函数，提供：
+         - `create(draft): GameEntity` — 分配 EntityId 并注册
+         - `remove(id): void`
+         - `get(id): GameEntity | undefined`
+         - `getByKind(kind): GameEntity[]`
+         - `getByCell(cell): GameEntity[]` — 按位置查询
+         - `getAll(): GameEntity[]`
+         - `snapshot(): ReadonlyEntitySnapshot[]` — 只读投影
+      3. 内部用 `Map<EntityId, GameEntity>` 存储。
+      4. 在 `src/game/entity/index.ts` 中导出。
+      5. 创建 `tests/domain/entity-registry.test.ts`，覆盖 create/remove/get/getByKind/getByCell 至少 5 个用例。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/domain/entity-registry.test.ts` 全部通过。
+      - [ ] Read: `src/game/entity/entity-registry.ts` 必须导出 `EntityRegistry` 或同名工厂函数。
+      - [ ] Grep: `entity-registry.test.ts` 中至少包含 5 个 `it(` 或 `test(` 调用。
+
+  - id: "T-03"
+    title: "实现实体生命周期规则（树→木头、蓝图→建筑、携带/放下）"
+    status: "completed"
+    dependencies: ["T-01", "T-02"]
+    context:
+      read_files:
+        - "src/game/entity/entity-types.ts"
+        - "src/game/entity/entity-registry.ts"
+        - "src/game/world-core.ts"            # 现有 completeDeconstructWork / completeBlueprintWork
+      reference_docs:
+        - "oh-code-design/实体系统.yaml"      # 关键流程：树木转木头、蓝图转建筑、携带与放下
+    action: |
+      1. 创建 `src/game/entity/lifecycle-rules.ts`。
+      2. 实现以下纯函数（输入 EntityRegistry + 触发参数，返回变更结果）：
+         - `transformTreeToResource(registry, treeId)` — 删除树木实体，在原位创建木头物资实体
+         - `transformBlueprintToBuilding(registry, blueprintId)` — 删除蓝图，创建建筑实体，返回建筑 id
+         - `pickUpResource(registry, pawnId, resourceId)` — 将物资位置设为"被小人携带"
+         - `dropResource(registry, pawnId, targetCell)` — 将携带物放置到目标格
+      3. 每个函数返回明确的 outcome 联合类型（成功 / 实体不存在 / 冲突等）。
+      4. 在 `src/game/entity/index.ts` 中导出。
+      5. 创建 `tests/domain/lifecycle-rules.test.ts`，至少覆盖 4 个关键流程各 1 个正向 + 1 个异常用例。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/domain/lifecycle-rules.test.ts` 全部通过。
+      - [ ] Read: `src/game/entity/lifecycle-rules.ts` 必须导出 `transformTreeToResource`、`transformBlueprintToBuilding`、`pickUpResource`、`dropResource`。
+      - [ ] Grep: `lifecycle-rules.test.ts` 中至少包含 8 个 `it(` 或 `test(` 调用。
+
+  - id: "T-04"
+    title: "实现实体关系一致性规则"
+    status: "completed"
+    dependencies: ["T-01", "T-02"]
+    context:
+      read_files:
+        - "src/game/entity/entity-types.ts"
+        - "src/game/entity/entity-registry.ts"
+        - "src/game/world-core.ts"            # 现有 restSpots / ownership 逻辑
+      reference_docs:
+        - "oh-code-design/实体系统.yaml"      # 模块 → 关系一致性规则
+    action: |
+      1. 创建 `src/game/entity/relationship-rules.ts`。
+      2. 实现以下约束检查和维护函数：
+         - `validateBedOwnership(registry)` — 确保一张床只归属一个小人
+         - `validateResourceLocation(registry)` — 确保一份物资只在一个位置/容器
+         - `validateCarrying(registry)` — 确保一个小人最多携带一个物资
+         - `assignBedToPawn(registry, bedId, pawnId)` — 分配床铺并更新双向关系
+         - `unassignBed(registry, bedId)` — 取消归属
+      3. 在 `src/game/entity/index.ts` 中导出。
+      4. 创建 `tests/domain/relationship-rules.test.ts`，覆盖正常分配、重复分配冲突、取消分配等场景。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/domain/relationship-rules.test.ts` 全部通过。
+      - [ ] Read: `src/game/entity/relationship-rules.ts` 必须导出 `validateBedOwnership`、`assignBedToPawn`。
+
+  - id: "T-05"
+    title: "将 PawnState 需求模型桥接为正向刻度（饱食度/精力值）"
+    status: "completed"
+    dependencies: ["T-01"]
+    context:
+      read_files:
+        - "src/game/pawn-state.ts"            # 现有 PawnNeeds (hunger/rest/recreation 0-100 反向)
+        - "src/game/entity/entity-types.ts"   # T-01 定义的 PawnEntity (satiety/energy 正向)
+      reference_docs:
+        - "oh-code-design/需求系统.yaml"      # 需求模型层：正向值，越低越急
+    action: |
+      1. 在 `src/game/pawn-state.ts` 中：
+         - 新增 `satiety: number`（饱食度，满值 100，越低越饿）和 `energy: number`（精力值，满值 100，越低越困）字段到 `PawnState`。
+         - 保留旧 `needs: PawnNeeds` 字段但标记为 `@deprecated`。
+         - 修改 `createDefaultPawnStates` 使新字段初始为 100。
+         - 修改 `advanceNeeds` 使其同时更新新旧字段（新字段递减，旧字段递增，保持双写兼容）。
+      2. 更新 `tests/domain/pawn-state.test.ts` 新增 2 条用例验证 satiety/energy 正向衰减逻辑。
+      3. 不修改其他文件的消费端——后续 Phase 3 统一切换。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/domain/pawn-state.test.ts` 全部通过。
+      - [ ] Grep: `pawn-state.ts` 中必须包含 `satiety` 和 `energy` 字段定义。
+      - [ ] Grep: `pawn-state.ts` 中必须包含 `@deprecated` 标记。
+
+  # ────────────────────────────────────────────────
+  # Phase 1：拆分子系统目录结构
+  # ────────────────────────────────────────────────
+
+  - id: "T-06"
+    title: "创建 entity/ 子系统目录并迁入实体相关代码"
+    status: "completed"
+    dependencies: ["T-01", "T-02", "T-03", "T-04"]
+    context:
+      read_files:
+        - "src/game/world-core.ts"            # WorldEntitySnapshot 等类型需要迁移或关联
+        - "src/game/entity/entity-types.ts"
+        - "src/game/entity/entity-registry.ts"
+        - "src/game/entity/lifecycle-rules.ts"
+        - "src/game/entity/relationship-rules.ts"
+      reference_docs:
+        - "oh-code-design/实体系统.yaml"
+    action: |
+      1. 将 `world-core.ts` 中以下类型迁移到 `src/game/entity/entity-types.ts`（或创建 `legacy-entity-types.ts` 桥接）：
+         - `WorldEntityKind`、`BuildingKind`、`BuildState`、`InteractionCapability`、
+           `AssignmentReason`、`EntityOwnership`、`WorldEntitySnapshot`、`RestSpotSnapshot`
+      2. 在 `world-core.ts` 原位添加 re-export，使现有消费端不受影响。
+      3. 创建 `src/game/entity/entity-projection.ts`，提供 `toReadonlySnapshot(entity: GameEntity): WorldEntitySnapshot` 适配函数。
+      4. 更新 `src/game/entity/index.ts` 导出全部新增内容。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npm test` 全部通过（现有测试不受影响）。
+      - [ ] Read: `src/game/entity/index.ts` 必须导出 `WorldEntitySnapshot`。
+
+  - id: "T-07"
+    title: "创建 map/ 子系统目录，迁入地图与空间代码"
+    status: "completed"
+    dependencies: ["T-06"]
+    context:
+      read_files:
+        - "src/game/world-grid.ts"            # 339行，坐标工具 + Reservation
+        - "src/game/world-core.ts"            # occupancy Map、findBlockingOccupant 等
+        - "src/game/world-core-seed.ts"       # seedBlockedCellsAsObstacles
+        - "src/game/floor-selection.ts"       # 选区逻辑，可能归 interaction/
+      reference_docs:
+        - "oh-code-design/地图系统.yaml"
+    action: |
+      1. 创建 `src/game/map/` 目录。
+      2. 将 `world-grid.ts` 移动到 `src/game/map/world-grid.ts`。
+      3. 在旧位置 `src/game/world-grid.ts` 保留 re-export 桩：`export * from "./map/world-grid";`。
+      4. 将 `world-core-seed.ts` 移动到 `src/game/map/world-seed.ts`，旧位置添加 re-export。
+      5. 创建 `src/game/map/index.ts` 桶文件。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npm test` 全部通过。
+      - [ ] Read: `src/game/map/index.ts` 必须导出 `GridCoord`、`WorldGridConfig`、`coordKey`。
+
+  - id: "T-08"
+    title: "创建 time/ 子系统目录，迁入时间代码"
+    status: "completed"
+    dependencies: []
+    context:
+      read_files:
+        - "src/game/time-of-day.ts"           # 203行，时间模型与推进逻辑
+        - "src/game/world-core.ts"            # WorldTimeSnapshot、advanceWorldClock
+      reference_docs:
+        - "oh-code-design/时间系统.yaml"
+    action: |
+      1. 创建 `src/game/time/` 目录。
+      2. 将 `time-of-day.ts` 移动到 `src/game/time/time-of-day.ts`。
+      3. 在旧位置 `src/game/time-of-day.ts` 保留 re-export 桩。
+      4. 将 `world-core.ts` 中的 `WorldTimeSnapshot` 类型和 `advanceWorldClock` 函数提取到 `src/game/time/world-time.ts`。
+      5. 在 `world-core.ts` 中对提取的内容添加 re-export。
+      6. 创建 `src/game/time/index.ts` 桶文件。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npm test` 全部通过。
+      - [ ] Read: `src/game/time/index.ts` 必须导出 `TimeOfDayState`、`WorldTimeSnapshot`、`advanceTimeOfDay`。
+
+  - id: "T-09"
+    title: "创建 work/ 子系统目录，提取工作相关代码"
+    status: "completed"
+    dependencies: ["T-06"]
+    context:
+      read_files:
+        - "src/game/world-core.ts"            # WorkItemSnapshot、claimWorkItem、failWorkItem、completeWorkItem 等
+      reference_docs:
+        - "oh-code-design/工作系统.yaml"
+    action: |
+      1. 创建 `src/game/work/` 目录。
+      2. 从 `world-core.ts` 中提取以下到 `src/game/work/work-types.ts`：
+         - `WorkItemKind`、`WorkItemStatus`、`WorkItemSnapshot`
+      3. 从 `world-core.ts` 中提取以下到 `src/game/work/work-operations.ts`：
+         - `claimWorkItem`、`failWorkItem`、`completeWorkItem`
+         - `completeDeconstructWork`、`completeBlueprintWork`（内部函数保持可用）
+      4. 在 `world-core.ts` 原位添加 re-export。
+      5. 创建 `src/game/work/index.ts` 桶文件。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npm test` 全部通过。
+      - [ ] Read: `src/game/work/index.ts` 必须导出 `WorkItemSnapshot`、`claimWorkItem`、`completeWorkItem`。
+
+  - id: "T-10"
+    title: "创建 building/ 子系统目录，提取建筑相关代码"
+    status: "completed"
+    dependencies: ["T-06", "T-09"]
+    context:
+      read_files:
+        - "src/game/world-core.ts"            # placeBlueprint、safePlaceBlueprint 等
+        - "src/player/apply-domain-command.ts" # 建筑放置的玩家侧入口
+      reference_docs:
+        - "oh-code-design/建筑系统.yaml"
+    action: |
+      1. 创建 `src/game/building/` 目录。
+      2. 从 `world-core.ts` 中提取蓝图放置逻辑到 `src/game/building/blueprint-placement.ts`：
+         - `safePlaceBlueprint`、`placeBlueprint` 及相关类型
+      3. 在 `world-core.ts` 原位添加 re-export。
+      4. 创建 `src/game/building/index.ts` 桶文件。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npm test` 全部通过。
+      - [ ] Read: `src/game/building/index.ts` 必须导出 `safePlaceBlueprint`。
+
+  - id: "T-11"
+    title: "创建 behavior/ 子系统目录，迁入行为/AI 代码"
+    status: "completed"
+    dependencies: []
+    context:
+      read_files:
+        - "src/game/sim-loop.ts"              # 222行，tickSimulation
+        - "src/game/goal-driven-planning.ts"  # 153行，chooseGoalDecision 等
+        - "src/game/wander-planning.ts"       # 35行，pickWanderTarget
+        - "src/game/sim-config.ts"            # SimConfig
+      reference_docs:
+        - "oh-code-design/行为系统.yaml"
+    action: |
+      1. 创建 `src/game/behavior/` 目录。
+      2. 移动文件（旧位置添加 re-export）：
+         - `sim-loop.ts` → `src/game/behavior/sim-loop.ts`
+         - `goal-driven-planning.ts` → `src/game/behavior/goal-driven-planning.ts`
+         - `wander-planning.ts` → `src/game/behavior/wander-planning.ts`
+         - `sim-config.ts` → `src/game/behavior/sim-config.ts`
+      3. 创建 `src/game/behavior/index.ts` 桶文件。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npm test` 全部通过。
+      - [ ] Read: `src/game/behavior/index.ts` 必须导出 `tickSimulation`、`chooseGoalDecision`。
+
+  - id: "T-12"
+    title: "创建 need/ 子系统目录，迁入需求相关代码"
+    status: "completed"
+    dependencies: []
+    context:
+      read_files:
+        - "src/player/need-signals.ts"        # 需求信号
+        - "src/game/pawn-state.ts"            # PawnNeeds、advanceNeeds、applyNeedDelta
+      reference_docs:
+        - "oh-code-design/需求系统.yaml"
+    action: |
+      1. 创建 `src/game/need/` 目录。
+      2. 移动 `src/player/need-signals.ts` → `src/game/need/need-signals.ts`，旧位置 re-export。
+      3. 从 `pawn-state.ts` 中提取需求相关纯函数到 `src/game/need/need-utils.ts`：
+         - `advanceNeeds`、`applyNeedDelta`、`DEFAULT_PAWN_NEEDS` 等
+      4. 在 `pawn-state.ts` 原位 re-export 提取的内容。
+      5. 创建 `src/game/need/index.ts` 桶文件。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npm test` 全部通过。
+      - [ ] Read: `src/game/need/index.ts` 必须导出 `advanceNeeds`。
+
+  - id: "T-13"
+    title: "创建 interaction/ 子系统目录，整合 player/ 交互代码"
+    status: "completed"
+    dependencies: []
+    context:
+      read_files:
+        - "src/player/apply-domain-command.ts"
+        - "src/player/commit-player-intent.ts"
+        - "src/player/build-domain-command.ts"
+        - "src/player/interaction-mode-presenter.ts"
+        - "src/player/brush-stroke.ts"
+        - "src/player/tool-input-policy.ts"
+        - "src/player/s0-contract.ts"
+        - "src/player/world-port-types.ts"
+        - "src/player/mock-world-port.ts"
+        - "src/player/world-core-world-port.ts"
+        - "src/game/floor-selection.ts"
+      reference_docs:
+        - "oh-code-design/交互系统.yaml"
+    action: |
+      1. 创建 `src/game/interaction/` 目录。
+      2. 将 `src/game/floor-selection.ts` 移动到 `src/game/interaction/floor-selection.ts`，旧位置 re-export。
+      3. 在 `src/player/` 目录下各文件保持不动（已有大量消费端），但在 `src/game/interaction/index.ts` 中创建到 player/ 的统一 re-export 入口，方便后续迁移。
+      4. 将 `s0-contract.ts` 中的领域类型提取到 `src/game/interaction/domain-command-types.ts`，s0-contract.ts re-export。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npm test` 全部通过。
+      - [ ] Read: `src/game/interaction/index.ts` 存在并导出 `DomainCommand`。
+
+  - id: "T-14"
+    title: "创建 ui/ 子系统目录，迁入 HUD 管理代码"
+    status: "completed"
+    dependencies: []
+    context:
+      read_files:
+        - "src/ui/hud-manager.ts"
+      reference_docs:
+        - "oh-code-design/UI系统.yaml"
+    action: |
+      1. `src/ui/` 已存在 `hud-manager.ts`，保持现有位置。
+      2. 创建 `src/ui/index.ts` 桶文件导出现有内容。
+      3. 创建 `src/ui/ui-types.ts` 文件，定义 UI 系统的核心状态类型（菜单模型骨架、工具栏状态等）——仅类型定义。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Read: `src/ui/index.ts` 存在并导出 hud-manager 的内容。
+      - [ ] Read: `src/ui/ui-types.ts` 存在。
+
+  - id: "T-15"
+    title: "清理所有 re-export 桩并更新导入路径"
+    status: "completed"
+    dependencies: ["T-06", "T-07", "T-08", "T-09", "T-10", "T-11", "T-12", "T-13", "T-14"]
+    context:
+      read_files:
+        - "src/scenes/GameScene.ts"
+        - "src/game/world-sim-bridge.ts"
+      reference_docs: []
+    action: |
+      1. 搜索项目中所有 import 语句，将指向旧位置的导入路径更新为新子系统目录路径。
+      2. 删除所有临时 re-export 桩文件（如 `src/game/world-grid.ts` 如果只剩 re-export 则删除）。
+      3. 确保 `src/game/` 顶层仅保留跨子系统的编排代码（如 `world-sim-bridge.ts`）和 `world-core.ts`（瘦身后的剩余部分）。
+      4. 更新 `src/game/README.md` 说明新的子系统目录结构。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npm test` 全部通过。
+      - [ ] Grep: 项目中不应再有 `export * from "./map/world-grid"` 这类桩式 re-export（在 src/game/ 顶层文件中）。
+      - [ ] Shell: `npm run build` 构建成功。
+
+  # ────────────────────────────────────────────────
+  # Phase 2：实现 A 线缺失模块（地图、工作、建筑、时间）
+  # ────────────────────────────────────────────────
+
+  - id: "T-16"
+    title: "实现占用管理器（OccupancyManager）"
+    status: "completed"
+    dependencies: ["T-07"]
+    context:
+      read_files:
+        - "src/game/map/world-grid.ts"
+        - "src/game/world-core.ts"            # 现有 occupancy Map 和 findBlockingOccupant
+      reference_docs:
+        - "oh-code-design/地图系统.yaml"      # 模块 → 占用管理器
+    action: |
+      1. 创建 `src/game/map/occupancy-manager.ts`。
+      2. 实现 OccupancyManager（纯数据结构 + 操作函数）：
+         - `createOccupancyMap(): OccupancyMap`
+         - `occupy(map, cell, entityId): OccupyResult` — 返回成功或冲突
+         - `release(map, cell, entityId): void`
+         - `isOccupied(map, cell): boolean`
+         - `getOccupant(map, cell): EntityId | undefined`
+         - `checkPlacement(map, cells): PlacementCheck` — 批量检查一组格是否可放置
+      3. 替代 `world-core.ts` 中的原始 `occupancy: Map<string, string>` 管理逻辑。
+      4. 创建 `tests/domain/occupancy-manager.test.ts`，覆盖占用、释放、冲突检测、批量检查。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/domain/occupancy-manager.test.ts` 全部通过。
+      - [ ] Read: `src/game/map/occupancy-manager.ts` 必须导出 `occupy`、`release`、`isOccupied`、`checkPlacement`。
+
+  - id: "T-17"
+    title: "实现区域管理器（ZoneManager）"
+    status: "completed"
+    dependencies: ["T-07", "T-01"]
+    context:
+      read_files:
+        - "src/game/map/world-grid.ts"
+        - "src/game/entity/entity-types.ts"   # ZoneEntity
+      reference_docs:
+        - "oh-code-design/地图系统.yaml"      # 模块 → 区域管理器；关键流程 → 创建存储区
+    action: |
+      1. 创建 `src/game/map/zone-manager.ts`。
+      2. 实现：
+         - `createZone(registry, cells, zoneType, name, acceptedResourceTypes): ZoneEntity`
+         - `removeZone(registry, zoneId): void`
+         - `getZoneAtCell(registry, cell): ZoneEntity | undefined`
+         - `getZonesByType(registry, type): ZoneEntity[]`
+         - `validateZoneCells(cells, occupancy): ValidationResult` — 校验格集合合法性
+      3. 创建 `tests/domain/zone-manager.test.ts`，覆盖创建、查询、删除、非法格集合等用例。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/domain/zone-manager.test.ts` 全部通过。
+      - [ ] Read: `src/game/map/zone-manager.ts` 必须导出 `createZone`、`getZoneAtCell`。
+
+  - id: "T-18"
+    title: "实现工作目录（WorkRegistry）与工作生成器（WorkGenerator）"
+    status: "completed"
+    dependencies: ["T-09", "T-01"]
+    context:
+      read_files:
+        - "src/game/work/work-types.ts"       # T-09 产出
+        - "src/game/world-core.ts"            # 现有 workItems Map、MarkerSnapshot
+      reference_docs:
+        - "oh-code-design/工作系统.yaml"      # 模块 → 工作目录、工作生成器
+    action: |
+      1. 扩展 `src/game/work/work-types.ts`：
+         - 新增 `WorkOrderKind`：`"chop" | "pick-up" | "haul" | "construct"` （伐木、拾取、搬运、建造）
+         - 新增 `WorkOrder` 类型，包含：workId、kind、status、targetEntityId、targetCell、priority、sourceReason、steps
+         - 新增 `WorkStep` 类型：stepType、precondition、successResult、failureResult
+      2. 创建 `src/game/work/work-registry.ts`：
+         - `createWorkRegistry(): WorkRegistry`
+         - `addWork(registry, order): void`
+         - `removeWork(registry, workId): void`
+         - `getByStatus(registry, status): WorkOrder[]`
+         - `getByKind(registry, kind): WorkOrder[]`
+         - `getByTarget(registry, entityId): WorkOrder[]`
+      3. 创建 `src/game/work/work-generator.ts`：
+         - `generateChopWork(treeEntityId, cell): WorkOrder`
+         - `generatePickUpWork(resourceEntityId, cell): WorkOrder`
+         - `generateHaulWork(resourceEntityId, fromCell, toZoneId): WorkOrder`
+         - `generateConstructWork(blueprintEntityId, cell): WorkOrder`
+      4. 创建 `tests/domain/work-registry.test.ts`，覆盖 CRUD 和查询。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/domain/work-registry.test.ts` 全部通过。
+      - [ ] Read: `src/game/work/work-registry.ts` 必须导出 `createWorkRegistry`、`addWork`。
+      - [ ] Read: `src/game/work/work-generator.ts` 必须导出 `generateChopWork`、`generatePickUpWork`、`generateHaulWork`、`generateConstructWork`。
+
+  - id: "T-19"
+    title: "实现工作调度器（WorkScheduler）"
+    status: "completed"
+    dependencies: ["T-18"]
+    context:
+      read_files:
+        - "src/game/work/work-registry.ts"
+        - "src/game/work/work-types.ts"
+        - "src/game/world-core.ts"            # 现有 claimWorkItem
+      reference_docs:
+        - "oh-code-design/工作系统.yaml"      # 模块 → 工作领取器
+    action: |
+      1. 创建 `src/game/work/work-scheduler.ts`。
+      2. 实现：
+         - `getAvailableWork(registry, pawnId): WorkOrder[]` — 返回可被该小人领取的工作列表（按优先级排序）
+         - `claimWork(registry, workId, pawnId): ClaimResult` — 锁定工作，防止重复抢占
+         - `releaseWork(registry, workId, pawnId): void` — 释放（因中断等）
+         - `isWorkClaimed(registry, workId): boolean`
+      3. 创建 `tests/domain/work-scheduler.test.ts`，覆盖领取、重复抢占冲突、释放等场景。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/domain/work-scheduler.test.ts` 全部通过。
+      - [ ] Read: `src/game/work/work-scheduler.ts` 必须导出 `getAvailableWork`、`claimWork`、`releaseWork`。
+
+  - id: "T-20"
+    title: "实现工作结算器（WorkSettler）"
+    status: "completed"
+    dependencies: ["T-18", "T-03"]
+    context:
+      read_files:
+        - "src/game/work/work-registry.ts"
+        - "src/game/work/work-generator.ts"
+        - "src/game/entity/lifecycle-rules.ts"
+      reference_docs:
+        - "oh-code-design/工作系统.yaml"      # 模块 → 工作结算器；关键流程 → 伐木链路
+    action: |
+      1. 创建 `src/game/work/work-settler.ts`。
+      2. 实现：
+         - `settleWorkSuccess(registry, workId, entityRegistry): SettleResult` — 根据工作类型触发对应后果：
+           - chop → 调用 lifecycle-rules.transformTreeToResource → 自动生成 pick-up 工作
+           - construct → 调用 lifecycle-rules.transformBlueprintToBuilding
+           - pick-up → 标记物资为已拾取
+           - haul → 标记物资已放下
+         - `settleWorkFailure(registry, workId, reason): void` — 将工作回退为可领取
+      3. 创建 `tests/domain/work-settler.test.ts`，覆盖各类型工作结算和派生工作生成。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/domain/work-settler.test.ts` 全部通过。
+      - [ ] Read: `src/game/work/work-settler.ts` 必须导出 `settleWorkSuccess`、`settleWorkFailure`。
+
+  - id: "T-21"
+    title: "实现建筑规格目录与蓝图管理器"
+    status: "completed"
+    dependencies: ["T-10", "T-01"]
+    context:
+      read_files:
+        - "src/game/building/blueprint-placement.ts"
+        - "src/game/entity/entity-types.ts"
+      reference_docs:
+        - "oh-code-design/建筑系统.yaml"      # 模块 → 建筑规格目录、蓝图管理器、建造校验器
+    action: |
+      1. 创建 `src/game/building/building-spec-catalog.ts`：
+         - 定义 `BuildingSpec` 类型：建筑类型、占用格模式、是否阻挡通行、可交互能力、完成后附加规则
+         - 实现 `BUILDING_SPECS: Record<string, BuildingSpec>`，先定义 "wall" 和 "bed"
+         - 导出 `getBuildingSpec(type): BuildingSpec | undefined`
+      2. 创建 `src/game/building/blueprint-manager.ts`：
+         - `createBlueprint(registry, spec, cells): BlueprintEntity`
+         - `updateBlueprintProgress(registry, blueprintId, delta): void`
+         - `cancelBlueprint(registry, blueprintId): void`
+         - `isBlueprintComplete(registry, blueprintId): boolean`
+      3. 创建 `tests/domain/building-spec.test.ts`，覆盖规格查询与蓝图 CRUD。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/domain/building-spec.test.ts` 全部通过。
+      - [ ] Read: `src/game/building/building-spec-catalog.ts` 必须导出 `BUILDING_SPECS`、`getBuildingSpec`。
+      - [ ] Read: `src/game/building/blueprint-manager.ts` 必须导出 `createBlueprint`。
+
+  - id: "T-22"
+    title: "实现时间事件总线（TimeEventBus）"
+    status: "completed"
+    dependencies: ["T-08"]
+    context:
+      read_files:
+        - "src/game/time/time-of-day.ts"
+        - "src/game/time/world-time.ts"       # T-08 产出（如已提取）
+      reference_docs:
+        - "oh-code-design/时间系统.yaml"      # 模块 → 时间事件总线
+    action: |
+      1. 创建 `src/game/time/time-event-bus.ts`。
+      2. 定义 `TimeEvent` 类型：`{ kind: "day-start" | "night-start" | "new-day"; dayNumber: number; minuteOfDay: number }`。
+      3. 实现：
+         - `createTimeEventBus(): TimeEventBus`
+         - `detectTimeEvents(prevTime, nextTime): TimeEvent[]` — 比较两次时间快照，产生事件列表
+         - `subscribe(bus, handler): Unsubscribe`
+         - `publish(bus, events): void`
+      4. 创建 `tests/domain/time-event-bus.test.ts`，覆盖昼夜切换、跨天、订阅回调等。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/domain/time-event-bus.test.ts` 全部通过。
+      - [ ] Read: `src/game/time/time-event-bus.ts` 必须导出 `TimeEvent`、`detectTimeEvents`、`createTimeEventBus`。
+
+  # ────────────────────────────────────────────────
+  # Phase 3：实现 B 线缺失模块（行为、需求、交互、UI）
+  # ────────────────────────────────────────────────
+
+  - id: "T-23"
+    title: "实现行为状态机（BehaviorStateMachine）"
+    status: "completed"
+    dependencies: ["T-11"]
+    context:
+      read_files:
+        - "src/game/behavior/sim-loop.ts"
+        - "src/game/behavior/goal-driven-planning.ts"
+      reference_docs:
+        - "oh-code-design/行为系统.yaml"      # 模块 → 行为状态机
+    action: |
+      1. 创建 `src/game/behavior/behavior-state-machine.ts`。
+      2. 定义 `BehaviorState` 联合类型：`"idle" | "moving" | "working" | "eating" | "resting" | "wandering"`。
+      3. 定义 `BehaviorTransition` 类型：来源状态、目标状态、触发条件、中断优先级。
+      4. 实现：
+         - `createBehaviorFSM(pawnId): BehaviorFSM`
+         - `canTransition(fsm, targetState): boolean`
+         - `transition(fsm, targetState, context): TransitionResult`
+         - `getCurrentState(fsm): BehaviorState`
+         - `canBeInterrupted(fsm, interruptPriority): boolean`
+      5. 创建 `tests/domain/behavior-state-machine.test.ts`，覆盖合法转换、非法转换、中断判定。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/domain/behavior-state-machine.test.ts` 全部通过。
+      - [ ] Read: `src/game/behavior/behavior-state-machine.ts` 必须导出 `BehaviorState`、`createBehaviorFSM`、`transition`。
+
+  - id: "T-24"
+    title: "实现行为上下文汇总器与行动评分器"
+    status: "completed"
+    dependencies: ["T-23", "T-18", "T-22"]
+    context:
+      read_files:
+        - "src/game/behavior/behavior-state-machine.ts"
+        - "src/game/work/work-registry.ts"
+        - "src/game/time/time-event-bus.ts"
+      reference_docs:
+        - "oh-code-design/行为系统.yaml"      # 模块 → 行为上下文汇总器、行动评分器
+    action: |
+      1. 创建 `src/game/behavior/behavior-context.ts`：
+         - `BehaviorContext` 类型：小人状态、需求压力、候选工作列表、当前时段、地图可达信息
+         - `aggregateBehaviorContext(pawnId, needState, workRegistry, timeSnapshot, mapQuery): BehaviorContext`
+      2. 创建 `src/game/behavior/action-scorer.ts`：
+         - `ActionCandidate` 类型：行动类型、目标对象、分数、原因
+         - `scoreActions(context: BehaviorContext): ActionCandidate[]` — 返回按分数排序的候选列表
+         - 评分规则：需求紧急度 > 工作优先级 > 散步
+      3. 创建 `tests/domain/action-scorer.test.ts`，覆盖需求优先于工作、工作优先于散步等场景。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/domain/action-scorer.test.ts` 全部通过。
+      - [ ] Read: `src/game/behavior/action-scorer.ts` 必须导出 `scoreActions`、`ActionCandidate`。
+
+  - id: "T-25"
+    title: "实现需求档案与阈值规则集"
+    status: "completed"
+    dependencies: ["T-12", "T-05"]
+    context:
+      read_files:
+        - "src/game/need/need-utils.ts"       # T-12 产出
+        - "src/game/pawn-state.ts"            # satiety/energy 字段
+      reference_docs:
+        - "oh-code-design/需求系统.yaml"      # 模块 → 需求档案、阈值规则集
+    action: |
+      1. 创建 `src/game/need/need-profile.ts`：
+         - `NeedSnapshot` 类型：pawnId、satiety、energy、hungerStage、fatigueStage
+         - `NeedStage` 类型：`"normal" | "warning" | "critical"`
+         - `createNeedProfile(pawnId, satiety, energy): NeedSnapshot`
+         - `updateNeedProfile(profile, deltaSatiety, deltaEnergy): NeedSnapshot`
+      2. 创建 `src/game/need/threshold-rules.ts`：
+         - 定义阈值常量：WARNING_THRESHOLD = 40、CRITICAL_THRESHOLD = 20
+         - `evaluateHungerStage(satiety): NeedStage`
+         - `evaluateFatigueStage(energy): NeedStage`
+         - `needActionSuggestion(profile): NeedActionSuggestion` — 输出行动类型 + 紧急程度 + 是否允许打断
+      3. 创建 `tests/domain/need-profile.test.ts`，覆盖阈值分级、行动建议、边界值。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/domain/need-profile.test.ts` 全部通过。
+      - [ ] Read: `src/game/need/need-profile.ts` 必须导出 `NeedSnapshot`、`NeedStage`。
+      - [ ] Read: `src/game/need/threshold-rules.ts` 必须导出 `needActionSuggestion`。
+
+  - id: "T-26"
+    title: "实现需求演化引擎与满足结算器"
+    status: "completed"
+    dependencies: ["T-25", "T-22"]
+    context:
+      read_files:
+        - "src/game/need/need-profile.ts"
+        - "src/game/need/threshold-rules.ts"
+        - "src/game/time/time-event-bus.ts"
+      reference_docs:
+        - "oh-code-design/需求系统.yaml"      # 模块 → 需求演化引擎、需求满足结算器
+    action: |
+      1. 创建 `src/game/need/need-evolution-engine.ts`：
+         - `evolveNeeds(profile, gameDeltaSeconds, behaviorState): NeedSnapshot`
+           — 根据时间流逝和当前行为（工作加速饥饿、休息恢复精力等）更新需求
+         - 使用可配置的下降/恢复速率
+      2. 创建 `src/game/need/satisfaction-settler.ts`：
+         - `settleEating(profile, durationSeconds): NeedSnapshot` — 进食恢复饱食度
+         - `settleResting(profile, durationSeconds): NeedSnapshot` — 休息恢复精力
+         - `isNeedSatisfied(profile, needKind): boolean` — 判断是否恢复到安全水平
+         - `settleInterrupted(profile, needKind): NeedSnapshot` — 被打断时的部分恢复
+      3. 创建 `tests/domain/need-evolution.test.ts`，覆盖时间衰减、进食恢复、休息恢复、打断部分恢复。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/domain/need-evolution.test.ts` 全部通过。
+      - [ ] Read: `src/game/need/need-evolution-engine.ts` 必须导出 `evolveNeeds`。
+      - [ ] Read: `src/game/need/satisfaction-settler.ts` 必须导出 `settleEating`、`settleResting`。
+
+  - id: "T-27"
+    title: "实现交互模式注册表与统一会话管理"
+    status: "completed"
+    dependencies: ["T-13"]
+    context:
+      read_files:
+        - "src/player/interaction-mode-presenter.ts"
+        - "src/player/tool-input-policy.ts"
+        - "src/player/s0-contract.ts"
+      reference_docs:
+        - "oh-code-design/交互系统.yaml"      # 模块 → 交互模式层、交互意图层
+    action: |
+      1. 创建 `src/game/interaction/mode-registry.ts`：
+         - `InteractionMode` 类型：modeId、displayName、解释规则（将输入转为命令的函数签名）
+         - `createModeRegistry(): ModeRegistry`
+         - `registerMode(registry, mode): void`
+         - `getMode(registry, modeId): InteractionMode | undefined`
+         - `listModes(registry): InteractionMode[]`
+         - 预注册模式：`"zone-create" | "chop" | "build-wall" | "build-bed"`
+      2. 创建 `src/game/interaction/session-manager.ts`：
+         - `InteractionSession` 类型：sessionId、modeId、startTime、state（collecting / previewing / committed）
+         - `beginSession(mode): InteractionSession`
+         - `commitSession(session, cells): DomainCommand`
+         - `cancelSession(session): void`
+      3. 创建 `tests/domain/mode-registry.test.ts`，覆盖注册、查询、会话生命周期。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/domain/mode-registry.test.ts` 全部通过。
+      - [ ] Read: `src/game/interaction/mode-registry.ts` 必须导出 `createModeRegistry`、`registerMode`。
+      - [ ] Read: `src/game/interaction/session-manager.ts` 必须导出 `beginSession`、`commitSession`。
+
+  - id: "T-28"
+    title: "实现 UI 菜单模型与状态展示模型"
+    status: "completed"
+    dependencies: ["T-14"]
+    context:
+      read_files:
+        - "src/ui/hud-manager.ts"
+        - "src/ui/ui-types.ts"                # T-14 产出
+        - "src/scenes/villager-tool-bar-config.ts"
+      reference_docs:
+        - "oh-code-design/UI系统.yaml"        # 模块 → 界面结构层、界面状态层
+    action: |
+      1. 创建 `src/ui/menu-model.ts`：
+         - `MenuItem` 类型：id、label、icon、enabled、action
+         - `MenuState` 类型：items、selectedId、visible
+         - `createMenuState(items): MenuState`
+         - `selectMenuItem(state, itemId): MenuState`
+         - `toggleMenuVisibility(state): MenuState`
+      2. 创建 `src/ui/status-display-model.ts`：
+         - `PawnStatusDisplay` 类型：pawnId、name、behaviorLabel、needBars（satiety/energy 百分比）
+         - `TimeStatusDisplay` 类型：dayNumber、timeLabel、period、speed
+         - `WorkStatusDisplay` 类型：totalWork、activeWork、completedWork
+         - `aggregateStatusDisplay(pawns, time, workRegistry): DashboardDisplay`
+      3. 创建 `tests/component/menu-model.test.ts`，覆盖菜单状态切换。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/component/menu-model.test.ts` 全部通过。
+      - [ ] Read: `src/ui/menu-model.ts` 必须导出 `MenuState`、`createMenuState`。
+      - [ ] Read: `src/ui/status-display-model.ts` 必须导出 `PawnStatusDisplay`、`aggregateStatusDisplay`。
+
+  # ────────────────────────────────────────────────
+  # Phase 4：打通关键链路（端到端集成）
+  # ────────────────────────────────────────────────
+
+  - id: "T-29"
+    title: "打通伐木链路：伐木→木头→拾取→搬运"
+    status: "completed"
+    dependencies: ["T-03", "T-18", "T-19", "T-20", "T-16", "T-17", "T-23"]
+    context:
+      read_files:
+        - "src/game/entity/lifecycle-rules.ts"
+        - "src/game/work/work-generator.ts"
+        - "src/game/work/work-settler.ts"
+        - "src/game/work/work-scheduler.ts"
+        - "src/game/map/occupancy-manager.ts"
+        - "src/game/behavior/behavior-state-machine.ts"
+      reference_docs:
+        - "oh-code-design/工作系统.yaml"      # 关键流程 → 伐木链路
+        - "oh-code-design/实体系统.yaml"      # 关键流程 → 树木转木头、携带与放下
+    action: |
+      1. 创建 `src/game/flows/chop-flow.ts`，编排完整伐木链路：
+         - 树木被标记 → 生成伐木工作 → 小人领取 → 移动到树 → 执行伐木读条 → 
+           树变木头 → 自动生成拾取工作 → 小人拾取 → 若有存储区则生成搬运工作 → 搬运放下
+      2. 每个节点调用已有子系统模块（work-generator、lifecycle-rules、work-settler 等），不重复实现逻辑。
+      3. 创建 `tests/domain/chop-flow.test.ts`，用集成测试验证完整链路：
+         - 给定一棵树和一个小人，标记伐木后，断言最终产出木头物资并放入存储区。
+         - 无存储区时木头留在原地。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/domain/chop-flow.test.ts` 全部通过。
+      - [ ] Read: `src/game/flows/chop-flow.ts` 必须导出链路编排函数。
+      - [ ] Grep: `chop-flow.test.ts` 中必须包含 `transformTreeToResource` 的调用或断言。
+
+  - id: "T-30"
+    title: "打通建造链路：蓝图→建造→建筑→床铺分配"
+    status: "completed"
+    dependencies: ["T-03", "T-18", "T-20", "T-21", "T-04"]
+    context:
+      read_files:
+        - "src/game/building/blueprint-manager.ts"
+        - "src/game/building/building-spec-catalog.ts"
+        - "src/game/work/work-settler.ts"
+        - "src/game/entity/lifecycle-rules.ts"
+        - "src/game/entity/relationship-rules.ts"
+      reference_docs:
+        - "oh-code-design/建筑系统.yaml"      # 关键流程 → 建成后床铺分配
+    action: |
+      1. 创建 `src/game/flows/build-flow.ts`，编排完整建造链路：
+         - 玩家放置蓝图 → 生成建造工作 → 小人领取 → 移动到蓝图格 → 
+           执行建造读条 → 蓝图进度推进 → 完成后蓝图转建筑 → 若为床铺则触发自动分配
+      2. 创建 `tests/domain/build-flow.test.ts`，集成测试：
+         - 放置床蓝图 → 建造完成 → 断言建筑实体存在 → 断言无床小人被自动分配。
+         - 放置墙体蓝图 → 建造完成 → 断言不触发床铺分配。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/domain/build-flow.test.ts` 全部通过。
+      - [ ] Read: `src/game/flows/build-flow.ts` 必须导出链路编排函数。
+
+  - id: "T-31"
+    title: "打通需求打断链路：需求→打断→恢复→重评"
+    status: "completed"
+    dependencies: ["T-23", "T-24", "T-25", "T-26", "T-19"]
+    context:
+      read_files:
+        - "src/game/behavior/behavior-state-machine.ts"
+        - "src/game/behavior/action-scorer.ts"
+        - "src/game/need/threshold-rules.ts"
+        - "src/game/need/satisfaction-settler.ts"
+        - "src/game/work/work-scheduler.ts"
+      reference_docs:
+        - "oh-code-design/行为系统.yaml"      # 关键流程 → 工作被需求打断
+        - "oh-code-design/需求系统.yaml"      # 关键流程 → 进食恢复
+    action: |
+      1. 创建 `src/game/flows/need-interrupt-flow.ts`，编排需求打断链路：
+         - 小人正在工作 → 需求降至 critical → 行动评分器重新评分 → 
+           需求行动分数高于工作 → 状态机打断当前工作 → 释放工作锁 → 
+           前往食物/床铺 → 进食/休息 → 恢复到 normal → 重新评估 → 回到工作
+      2. 创建 `tests/domain/need-interrupt-flow.test.ts`，集成测试：
+         - 小人工作中饱食度降至 15 → 断言工作被释放 → 断言进入 eating 状态。
+         - 进食完成后断言重新领取之前的工作。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/domain/need-interrupt-flow.test.ts` 全部通过。
+      - [ ] Grep: `need-interrupt-flow.ts` 中必须调用 `canBeInterrupted` 和 `releaseWork`。
+
+  - id: "T-32"
+    title: "打通夜晚休息链路：夜晚→休息→唤醒"
+    status: "completed"
+    dependencies: ["T-22", "T-23", "T-24", "T-26", "T-04"]
+    context:
+      read_files:
+        - "src/game/time/time-event-bus.ts"
+        - "src/game/behavior/behavior-state-machine.ts"
+        - "src/game/behavior/action-scorer.ts"
+        - "src/game/need/satisfaction-settler.ts"
+        - "src/game/entity/relationship-rules.ts"
+      reference_docs:
+        - "oh-code-design/行为系统.yaml"      # 关键流程 → 夜晚休息
+    action: |
+      1. 创建 `src/game/flows/night-rest-flow.ts`，编排夜晚休息链路：
+         - 时间事件总线发出 night-start → 行为系统重新评估 → 
+           有床铺归属的小人前往床铺 → 进入 resting 状态 → 精力值恢复 → 
+           时间事件 day-start → 唤醒 → 重新评估
+      2. 创建 `tests/domain/night-rest-flow.test.ts`，集成测试：
+         - 发出 night-start 事件 → 断言有床小人进入 resting。
+         - 无床小人不强制休息。
+         - 发出 day-start 事件 → 断言所有 resting 小人醒来。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/domain/night-rest-flow.test.ts` 全部通过。
+      - [ ] Grep: `night-rest-flow.ts` 中必须订阅 `night-start` 和 `day-start` 事件。
+
+  # ────────────────────────────────────────────────
+  # Phase 5：瘦身 GameScene
+  # ────────────────────────────────────────────────
+
+  - id: "T-33"
+    title: "从 GameScene 中提取领域编排到独立协调器"
+    status: "completed"
+    dependencies: ["T-15", "T-29", "T-30", "T-31", "T-32"]
+    context:
+      read_files:
+        - "src/scenes/GameScene.ts"           # 794+ 行，需瘦身
+        - "src/game/world-sim-bridge.ts"
+      reference_docs:
+        - "working-plan/review.md"            # Phase 5 描述
+    action: |
+      1. 创建 `src/game/game-orchestrator.ts`，将 GameScene 中以下职责迁入：
+         - 模拟驱动（当前在 GameScene.update 中调用 tickSimulation）
+         - 世界时钟推进（advanceWorldClock）
+         - 工作调度触发
+         - 需求演化触发
+         - 时间事件检测与广播
+      2. `GameOrchestrator` 暴露 `tick(deltaMs)` 方法，GameScene.update 只调用它。
+      3. 在 GameScene 中删除对应的领域逻辑代码，改为委托给 GameOrchestrator。
+      4. 目标：GameScene 中不再直接 import 任何 `src/game/work/`、`src/game/need/`、`src/game/entity/` 模块。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npm test` 全部通过。
+      - [ ] Read: `src/game/game-orchestrator.ts` 必须导出 `GameOrchestrator` 类或 `createGameOrchestrator` 函数。
+      - [ ] Grep: `GameScene.ts` 中不得直接 import `src/game/work/` 或 `src/game/need/` 或 `src/game/entity/lifecycle`。
+
+  - id: "T-34"
+    title: "将 GameScene 精简为纯渲染编排器"
+    status: "completed"
+    dependencies: ["T-33"]
+    context:
+      read_files:
+        - "src/scenes/GameScene.ts"
+        - "src/game/game-orchestrator.ts"     # T-33 产出
+        - "src/scenes/renderers/grid-renderer.ts"
+        - "src/scenes/renderers/pawn-renderer.ts"
+        - "src/scenes/renderers/selection-renderer.ts"
+      reference_docs:
+        - "working-plan/review.md"
+    action: |
+      1. 审查 GameScene 剩余代码，确保只保留：
+         - Phaser 场景生命周期（preload / create / update）
+         - 输入采集（鼠标/键盘事件转发给交互系统）
+         - 渲染同步（调用 renderers 目录下的渲染器）
+         - HUD/UI 同步（读取 status-display-model 并更新 DOM/Phaser 元素）
+      2. 将残留的任何领域计算或状态管理代码迁移到 game-orchestrator 或对应子系统。
+      3. 目标：GameScene 行数降至 400 行以下。
+      4. 更新 `src/scenes/` 目录下的 mock 文件，使其引用新的子系统模块（如有必要）。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npm test` 全部通过。
+      - [ ] Shell: `npm run build` 构建成功。
+      - [ ] Shell: 验证 GameScene.ts 行数 — `wc -l src/scenes/GameScene.ts` 应小于 400。
+      - [ ] Grep: `GameScene.ts` 中不应包含 `WorldCore` 类型的直接操作（不含 import type）。

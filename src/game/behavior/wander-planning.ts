@@ -1,8 +1,8 @@
 /** task-planning（游荡）：从合法邻格中选下一个目标，随机源可注入。 */
 
-import type { GridCoord, WorldGridConfig } from "./world-grid";
-import { isWalkableCell, isCellOccupiedByOthers, orthogonalNeighbors } from "./world-grid";
-import type { PawnId, PawnState } from "./pawn-state";
+import type { GridCoord, WorldGridConfig } from "../map/world-grid";
+import { isWalkableCell, isCellOccupiedByOthers, orthogonalNeighbors } from "../map/world-grid";
+import type { PawnId, PawnState } from "../pawn-state";
 
 /** 返回 [0, 1) 的伪随机数，便于测试注入固定序列。 */
 export type WanderRng = () => number;

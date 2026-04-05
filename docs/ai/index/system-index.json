@@ -7,7 +7,7 @@
       "aidocDir": "docs/ai/systems/time-of-day",
       "systemReadme": "docs/ai/systems/time-of-day/README.md",
       "sourceFiles": [
-        "src/game/time-of-day.ts",
+        "src/game/time/time-of-day.ts",
         "src/ui/hud-manager.ts",
         "src/scenes/renderers/grid-renderer.ts",
         "src/scenes/renderers/pawn-renderer.ts"
@@ -35,7 +35,7 @@
       "systemReadme": "docs/ai/systems/world-core/README.md",
       "sourceFiles": [
         "src/game/world-core.ts",
-        "src/game/world-core-seed.ts",
+        "src/game/map/world-seed.ts",
         "src/game/world-sim-bridge.ts",
         "src/player/apply-domain-command.ts",
         "src/player/world-core-world-port.ts",
@@ -66,7 +66,7 @@
       "systemReadme": "docs/ai/systems/pawn-state/README.md",
       "sourceFiles": [
         "src/game/pawn-state.ts",
-        "src/game/sim-loop.ts",
+        "src/game/behavior/sim-loop.ts",
         "src/scenes/renderers/pawn-renderer.ts"
       ],
       "testFiles": [
@@ -165,7 +165,7 @@
       "aidocDir": "docs/ai/systems/selection-ui",
       "systemReadme": "docs/ai/systems/selection-ui/README.md",
       "sourceFiles": [
-        "src/game/floor-selection.ts",
+        "src/game/interaction/floor-selection.ts",
         "src/player/brush-stroke.ts",
         "src/player/tool-input-policy.ts",
         "src/scenes/renderers/selection-renderer.ts",
@@ -201,10 +201,10 @@
       "aidocDir": "docs/ai/systems/task-planning",
       "systemReadme": "docs/ai/systems/task-planning/README.md",
       "sourceFiles": [
-        "src/game/wander-planning.ts",
-        "src/game/goal-driven-planning.ts",
-        "src/game/sim-config.ts",
-        "src/game/sim-loop.ts",
+        "src/game/behavior/wander-planning.ts",
+        "src/game/behavior/goal-driven-planning.ts",
+        "src/game/behavior/sim-config.ts",
+        "src/game/behavior/sim-loop.ts",
         "src/game/world-sim-bridge.ts"
       ],
       "testFiles": [
@@ -237,7 +237,7 @@
       "aidocDir": "docs/ai/systems/world-grid",
       "systemReadme": "docs/ai/systems/world-grid/README.md",
       "sourceFiles": [
-        "src/game/world-grid.ts",
+        "src/game/map/world-grid.ts",
         "src/data/grid-cell-info.ts",
         "src/data/ground-items.ts",
         "src/scenes/renderers/grid-renderer.ts",

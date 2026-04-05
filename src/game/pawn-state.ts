@@ -1,8 +1,16 @@
 /** pawn-state：小人逻辑格、移动过渡与显示用派生数据（与 Phaser 无关）。 */
 
-import type { GridCoord, WorldGridConfig } from "./world-grid";
-import { cellCenterWorld } from "./world-grid";
-import type { ActionKind, GoalKind } from "./goal-driven-planning";
+import type { GridCoord, WorldGridConfig } from "./map/world-grid";
+import { cellCenterWorld } from "./map/world-grid";
+import type { ActionKind, GoalKind } from "./behavior/goal-driven-planning";
+import { DEFAULT_PAWN_NEEDS, formatPawnDebugLabel } from "./need/need-utils";
+
+export {
+  advanceNeeds,
+  applyNeedDelta,
+  DEFAULT_PAWN_NEEDS,
+  withPawnNeeds
+} from "./need/need-utils";
 
 export const DEFAULT_PAWN_NAMES = [
   "Alex",
@@ -81,7 +89,14 @@ export type PawnState = Readonly<{
   moveProgress01: number;
   /** 占位圆颜色（十六进制 0xRRGGBB）。 */
   fillColor: number;
-  /** 需求值统一为 0..100，数值越高表示越急迫。 */
+  /** 饱食度 0..100，满为 100，越低越饿（与实体侧 `PawnEntity.satiety` 量纲一致）。 */
+  satiety: number;
+  /** 精力 0..100，满为 100，越低越困（与实体侧 `PawnEntity.energy` 量纲一致）。 */
+  energy: number;
+  /**
+   * 需求值统一为 0..100，数值越高表示越急迫。
+   * @deprecated 请优先使用 `satiety` / `energy`；保留用于过渡期与 `advanceNeeds` 双写。
+   */
   needs: PawnNeeds;
   currentGoal: PawnGoalState | undefined;
   currentAction: PawnActionState | undefined;
@@ -89,12 +104,6 @@ export type PawnState = Readonly<{
   actionTimerSec: number;
   debugLabel: string;
 }>;
-
-export const DEFAULT_PAWN_NEEDS: PawnNeeds = {
-  hunger: 20,
-  rest: 10,
-  recreation: 20
-};
 
 export function createDefaultPawnStates(
   spawnPoints: readonly GridCoord[],
@@ -111,6 +120,8 @@ export function createDefaultPawnStates(
     moveTarget: undefined,
     moveProgress01: 0,
     fillColor: palette[i % palette.length]!,
+    satiety: 100,
+    energy: 100,
     needs: DEFAULT_PAWN_NEEDS,
     currentGoal: undefined,
     currentAction: undefined,
@@ -187,49 +198,11 @@ export function pawnDisplayWorldCenter(
   };
 }
 
-function clampNeedValue(value: number): number {
-  return Math.max(0, Math.min(100, value));
-}
-
 function withDebugLabel(pawn: PawnState): PawnState {
   return {
     ...pawn,
-    debugLabel: describePawnDebugLabel(pawn)
+    debugLabel: formatPawnDebugLabel(pawn)
   };
-}
-
-export function withPawnNeeds(pawn: PawnState, needs: PawnNeeds): PawnState {
-  return withDebugLabel({
-    ...pawn,
-    needs: {
-      hunger: clampNeedValue(needs.hunger),
-      rest: clampNeedValue(needs.rest),
-      recreation: clampNeedValue(needs.recreation)
-    }
-  });
-}
-
-export function advanceNeeds(
-  pawn: PawnState,
-  deltaSeconds: number,
-  ratesPerSecond: Record<NeedKind, number>
-): PawnState {
-  return withPawnNeeds(pawn, {
-    hunger: pawn.needs.hunger + ratesPerSecond.hunger * deltaSeconds,
-    rest: pawn.needs.rest + ratesPerSecond.rest * deltaSeconds,
-    recreation: pawn.needs.recreation + ratesPerSecond.recreation * deltaSeconds
-  });
-}
-
-export function applyNeedDelta(
-  pawn: PawnState,
-  deltas: Partial<Record<NeedKind, number>>
-): PawnState {
-  return withPawnNeeds(pawn, {
-    hunger: pawn.needs.hunger + (deltas.hunger ?? 0),
-    rest: pawn.needs.rest + (deltas.rest ?? 0),
-    recreation: pawn.needs.recreation + (deltas.recreation ?? 0)
-  });
 }
 
 export function setPawnIntent(
@@ -272,10 +245,5 @@ export function resetPawnActionTimer(pawn: PawnState): PawnState {
 }
 
 export function describePawnDebugLabel(pawn: PawnState): string {
-  const goal = pawn.currentGoal?.kind ?? "none";
-  const action = pawn.currentAction?.kind ?? "idle";
-  const targetId = pawn.currentAction?.targetId ?? pawn.currentGoal?.targetId ?? pawn.reservedTargetId;
-  return targetId
-    ? `goal:${goal} action:${action} target:${targetId}`
-    : `goal:${goal} action:${action}`;
+  return formatPawnDebugLabel(pawn);
 }

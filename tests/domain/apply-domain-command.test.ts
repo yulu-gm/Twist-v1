@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { coordKey, DEFAULT_WORLD_GRID } from "../../src/game/world-grid";
 import {
   clearTaskMarkersAtCells,
   createWorldCore,
@@ -7,7 +6,8 @@ import {
   placeTaskMarker,
   spawnWorldEntity
 } from "../../src/game/world-core";
-import { seedBlockedCellsAsObstacles } from "../../src/game/world-core-seed";
+import { coordKey, DEFAULT_WORLD_GRID } from "../../src/game/map/world-grid";
+import { seedBlockedCellsAsObstacles } from "../../src/game/map/world-seed";
 import { applyDomainCommandToWorldCore } from "../../src/player/apply-domain-command";
 import type { DomainCommand } from "../../src/player/s0-contract";
 

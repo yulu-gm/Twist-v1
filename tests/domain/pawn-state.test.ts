@@ -14,7 +14,7 @@ import {
   setPawnIntent,
   smoothstep01
 } from "../../src/game/pawn-state";
-import { DEFAULT_WORLD_GRID, cellCenterWorld } from "../../src/game/world-grid";
+import { DEFAULT_WORLD_GRID, cellCenterWorld } from "../../src/game/map/world-grid";
 
 describe("pawn-state", () => {
   it("creates five named pawns at spawn points", () => {
@@ -85,6 +85,32 @@ describe("pawn-state", () => {
       rest: 100,
       recreation: 100
     });
+    expect(updated.satiety).toBe(0);
+    expect(updated.energy).toBe(0);
+  });
+
+  it("satiety 随饥饿速率递减并与 needs.hunger 同步上升（双写）", () => {
+    const [spawn] = DEFAULT_WORLD_GRID.defaultSpawnPoints;
+    const pawn = createDefaultPawnStates([spawn!], ["T"])[0]!;
+    const updated = advanceNeeds(pawn, 10, {
+      hunger: 2,
+      rest: 0,
+      recreation: 0
+    });
+    expect(updated.satiety).toBe(80);
+    expect(updated.needs.hunger).toBe(40);
+  });
+
+  it("energy 随休息速率递减并与 needs.rest 同步上升（双写）", () => {
+    const [spawn] = DEFAULT_WORLD_GRID.defaultSpawnPoints;
+    const pawn = createDefaultPawnStates([spawn!], ["T"])[0]!;
+    const updated = advanceNeeds(pawn, 10, {
+      hunger: 0,
+      rest: 3,
+      recreation: 0
+    });
+    expect(updated.energy).toBe(70);
+    expect(updated.needs.rest).toBe(40);
   });
 
   it("applies need deltas and clamps them to zero", () => {

@@ -1,0 +1,75 @@
+system_name: "UI系统"
+story_ref: "oh-story/story-1.md"
+gen_doc_ref: "oh-gen-doc/UI系统.yaml"
+code_design_ref: "oh-code-design/UI系统.yaml"
+
+scenarios:
+  - scenario_id: "UI-001"
+    name: "主菜单层级展开与模式切换"
+    type: "happy-path"
+    intent: "验证玩家可以通过层级菜单正确进入特定的交互模式"
+    
+    given:
+      - "游戏处于正常运行状态，未进入任何特殊模式"
+      
+    when: "玩家依次点击菜单：'建造' -> '墙' -> '木墙'"
+    
+    then:
+      domain_state: 
+        - "菜单模型更新当前展开状态"
+        - "界面动作转发层向交互系统发送切换到'蓝图绘制模式'的指令"
+      presentation: 
+        - "子菜单正确展开并高亮当前选中项"
+        - "状态展示区显示模式提示（如：'正在绘制木墙蓝图'）"
+        - "鼠标指针可能变为笔刷样式"
+
+  - scenario_id: "UI-002"
+    name: "地图叠加反馈层展示工作进度"
+    type: "happy-path"
+    intent: "验证小人执行耗时工作时，UI能正确在地图空间渲染进度条"
+    
+    given:
+      - "小人正在树木旁执行伐木工作"
+      
+    when: "行为系统持续输出工作进度数据"
+    
+    then:
+      domain_state: 
+        - "状态展示模型接收只读进度数据并更新界面态"
+      presentation: 
+        - "地图叠加反馈层在目标树木或小人上方渲染进度条"
+        - "进度条随时间平滑填充，直至工作完成时消失"
+
+  - scenario_id: "UI-003"
+    name: "小人状态与需求面板的实时同步"
+    type: "happy-path"
+    intent: "验证UI能准确反映小人的当前行为标签和内在需求状态"
+    
+    given:
+      - "小人因饱食度低而中断工作，正在前往进食"
+      
+    when: "UI系统读取实体系统和需求系统的最新状态"
+    
+    then:
+      domain_state: 
+        - "状态展示模型聚合'移动中'、'寻找食物'、'饱食度低'等标签"
+      presentation: 
+        - "选中该小人时，信息面板显示其饱食度条处于警戒颜色"
+        - "行为文本显示为'前往进食'或'寻找食物'"
+
+  - scenario_id: "UI-004"
+    name: "多层地图反馈的视觉清晰度"
+    type: "edge-case"
+    intent: "验证当同一地块存在多种反馈（如选区框、蓝图虚影、标记图标）时，UI渲染不混乱"
+    
+    given:
+      - "玩家正在使用蓝图笔刷绘制墙体"
+      - "绘制路径经过了带有'可拾取'标记的物资和已有的存储区边界"
+      
+    when: "地图叠加反馈层同时渲染这些元素"
+    
+    then:
+      domain_state: 
+        - "界面呈现层按预定的Z轴层级（Z-Index）排序这些反馈项"
+      presentation: 
+        - "蓝图虚影、标记图标、存储区边界和选区高亮框层次分明，不出现严重的Z-fighting（闪烁）或互相完全遮挡"

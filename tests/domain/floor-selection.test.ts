@@ -7,8 +7,8 @@ import {
   handleOutsidePointerDown,
   resolveSelectionModifier,
   updateFloorSelection
-} from "../../src/game/floor-selection";
-import { DEFAULT_WORLD_GRID } from "../../src/game/world-grid";
+} from "../../src/game/interaction/floor-selection";
+import { DEFAULT_WORLD_GRID } from "../../src/game/map/world-grid";
 
 function sorted(set: ReadonlySet<string>): string[] {
   return [...set].sort();

@@ -7,8 +7,8 @@ import {
   pawnDisplayWorldCenter,
   type PawnState
 } from "../../game/pawn-state";
-import type { WorldGridConfig } from "../../game/world-grid";
-import type { TimeOfDayPalette } from "../../game/time-of-day";
+import type { WorldGridConfig } from "../../game/map/world-grid";
+import type { TimeOfDayPalette } from "../../game/time";
 
 export type PawnView = Readonly<{
   circle: Phaser.GameObjects.Arc;

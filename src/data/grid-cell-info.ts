@@ -8,7 +8,7 @@ import {
   type WorldGridConfig,
   coordKey,
   isWalkableCell
-} from "../game/world-grid";
+} from "../game/map/world-grid";
 import { groundItemAt } from "./ground-items";
 
 const MOCK_BIOME_BY_KEY: Readonly<Record<string, string>> = {

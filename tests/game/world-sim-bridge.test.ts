@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_WORLD_GRID } from "../../src/game/world-grid";
+import { DEFAULT_WORLD_GRID } from "../../src/game/map/world-grid";
 import { createWorldCore, removeWorldEntity, spawnWorldEntity } from "../../src/game/world-core";
 import {
   obstacleBlockedCellKeys,

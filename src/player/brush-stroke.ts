@@ -2,7 +2,7 @@
  * 笔刷会话：拖拽中累积网格线段覆盖格（与 Phaser 解耦）。
  */
 
-import { coordKey, gridLineCells, isInsideGrid, type GridCoord, type WorldGridConfig } from "../game/world-grid";
+import { coordKey, gridLineCells, isInsideGrid, type GridCoord, type WorldGridConfig } from "../game/map/world-grid";
 
 export type BrushStrokeState = Readonly<
   | { active: false }

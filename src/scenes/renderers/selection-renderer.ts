@@ -8,8 +8,8 @@ import {
   parseCoordKey as parseGridCoordKey,
   type GridCoord,
   type WorldGridConfig
-} from "../../game/world-grid";
-import type { FloorSelectionState } from "../../game/floor-selection";
+} from "../../game/map/world-grid";
+import type { FloorSelectionState } from "../../game/interaction/floor-selection";
 
 export function redrawFloorSelection(
   selectionGraphics: Phaser.GameObjects.Graphics,

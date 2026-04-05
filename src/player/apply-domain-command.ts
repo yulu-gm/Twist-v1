@@ -1,4 +1,4 @@
-import { coordKey, parseCoordKey } from "../game/world-grid";
+import { coordKey, parseCoordKey } from "../game/map/world-grid";
 import {
   clearTaskMarkersAtCells,
   placeTaskMarker,

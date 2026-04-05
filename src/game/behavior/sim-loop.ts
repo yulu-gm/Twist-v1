@@ -18,7 +18,7 @@ import {
   resetPawnActionTimer,
   setPawnIntent,
   type PawnState
-} from "./pawn-state";
+} from "../pawn-state";
 import {
   canChooseNewGoal,
   chooseGoalDecision,
@@ -32,7 +32,7 @@ import {
   reserveInteractionPoint,
   type ReservationSnapshot,
   type WorldGridConfig
-} from "./world-grid";
+} from "../map/world-grid";
 import type { SimConfig } from "./sim-config";
 import type { WanderRng } from "./wander-planning";
 

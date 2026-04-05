@@ -9,7 +9,7 @@ import {
   placeTaskMarker,
   spawnWorldEntity
 } from "../../src/game/world-core";
-import { coordKey, DEFAULT_WORLD_GRID } from "../../src/game/world-grid";
+import { coordKey, DEFAULT_WORLD_GRID } from "../../src/game/map/world-grid";
 
 describe("mergeTaskMarkerOverlayWithWorldSnapshot", () => {
   it("removes stale domain-backed labels when snapshot no longer has marker", () => {

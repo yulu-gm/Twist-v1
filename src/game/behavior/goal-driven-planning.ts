@@ -1,13 +1,13 @@
-import type { PawnId, PawnState } from "./pawn-state";
-import { isMoving } from "./pawn-state";
-import type { GridCoord, ReservationSnapshot, WorldGridConfig } from "./world-grid";
+import type { PawnId, PawnState } from "../pawn-state";
+import { isMoving } from "../pawn-state";
+import type { GridCoord, ReservationSnapshot, WorldGridConfig } from "../map/world-grid";
 import {
   findInteractionPointById,
   interactionPointsByKind,
   isCellOccupiedByOthers,
   isInteractionPointReservedByOther,
   orthogonalNeighbors
-} from "./world-grid";
+} from "../map/world-grid";
 import { legalWanderNeighbors, pickWanderTarget, type WanderRng } from "./wander-planning";
 
 export type GoalKind = "eat" | "sleep" | "recreate" | "wander";

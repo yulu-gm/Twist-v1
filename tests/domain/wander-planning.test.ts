@@ -3,9 +3,9 @@ import {
   legalWanderNeighbors,
   pickWanderTarget,
   type WanderRng
-} from "../../src/game/wander-planning";
+} from "../../src/game/behavior/wander-planning";
 import { createDefaultPawnStates, logicalCellsByPawnId } from "../../src/game/pawn-state";
-import { blockedKeysFromCells, coordKey, DEFAULT_WORLD_GRID } from "../../src/game/world-grid";
+import { blockedKeysFromCells, coordKey, DEFAULT_WORLD_GRID } from "../../src/game/map/world-grid";
 
 describe("wander-planning", () => {
   it("picks first candidate when rng always returns 0", () => {

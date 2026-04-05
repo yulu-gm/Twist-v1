@@ -11,8 +11,8 @@ import {
   type InteractionPoint,
   type ReservationSnapshot,
   type WorldGridConfig
-} from "../../game/world-grid";
-import type { TimeOfDayPalette } from "../../game/time-of-day";
+} from "../../game/map/world-grid";
+import type { TimeOfDayPalette } from "../../game/time";
 
 export function drawGridLines(
   g: Phaser.GameObjects.Graphics,

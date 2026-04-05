@@ -3,7 +3,7 @@
  */
 
 import { issuedTaskLabelForToolId } from "../data/task-markers";
-import type { SelectionModifier } from "../game/floor-selection";
+import type { SelectionModifier } from "../game/interaction/floor-selection";
 import type { DomainCommand } from "./s0-contract";
 import { interactionInputShapeForToolId } from "./tool-input-policy";
 

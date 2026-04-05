@@ -15,7 +15,7 @@ import {
   pickRandomBlockedCells,
   reserveInteractionPoint,
   worldPointToCell
-} from "../../src/game/world-grid";
+} from "../../src/game/map/world-grid";
 
 describe("world-grid", () => {
   it("exposes five default spawn points inside the grid", () => {

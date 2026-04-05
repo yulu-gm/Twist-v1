@@ -4,7 +4,7 @@
  */
 
 import { applyTaskMarkersForSelection } from "../data/task-markers";
-import type { SelectionModifier } from "../game/floor-selection";
+import type { SelectionModifier } from "../game/interaction/floor-selection";
 import { buildDomainCommand, toolbarToolIdForDomainCommand } from "./build-domain-command";
 import type { PlayerWorldPort } from "./world-port-types";
 import type { DomainCommand, MockWorldSubmitResult } from "./s0-contract";

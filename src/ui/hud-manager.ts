@@ -4,8 +4,8 @@
  */
 
 import type { PawnState } from "../game/pawn-state";
-import type { TimeControlState, TimeOfDayPalette, TimeSpeed } from "../game/time-of-day";
-import { formatTimeOfDayLabel, type TimeOfDayState } from "../game/time-of-day";
+import type { TimeControlState, TimeOfDayPalette, TimeSpeed } from "../game/time";
+import { formatTimeOfDayLabel, type TimeOfDayState } from "../game/time";
 import { pawnProfileForId } from "../data/pawn-profiles";
 import { VILLAGER_TOOLS, VILLAGER_TOOL_KEY_CODES, type VillagerTool } from "../data/villager-tools";
 import { needSignalsFromNeeds } from "../player/need-signals";

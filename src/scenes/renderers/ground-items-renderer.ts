@@ -3,7 +3,7 @@
  */
 
 import Phaser from "phaser";
-import type { WorldGridConfig } from "../../game/world-grid";
+import type { WorldGridConfig } from "../../game/map/world-grid";
 import { MOCK_SCATTERED_GROUND_ITEMS } from "../../data/ground-items";
 
 export function drawGroundItemStacks(

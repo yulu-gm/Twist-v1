@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_TIME_CONTROL_STATE } from "../../src/game/time-of-day";
-import { coordKey, DEFAULT_WORLD_GRID } from "../../src/game/world-grid";
+import { DEFAULT_TIME_CONTROL_STATE } from "../../src/game/time";
+import { coordKey, DEFAULT_WORLD_GRID } from "../../src/game/map/world-grid";
 import {
   advanceWorldClock,
   claimWorkItem,

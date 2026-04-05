@@ -2,7 +2,7 @@ import {
   rectCellKeysInclusive,
   type GridCoord,
   type WorldGridConfig
-} from "./world-grid";
+} from "../map/world-grid";
 
 export type SelectionModifier = "replace" | "union" | "toggle";
 

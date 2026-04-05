@@ -3,7 +3,7 @@
  * 障碍格来自 obstacle 实体；床位交互点 = 模板床位 + 世界中已落成的 restSpots。
  */
 
-import { coordKey, type InteractionPoint, type WorldGridConfig } from "./world-grid";
+import { coordKey, type InteractionPoint, type WorldGridConfig } from "./map/world-grid";
 import type { WorldCore } from "./world-core";
 
 export function obstacleBlockedCellKeys(world: WorldCore): Set<string> {

@@ -3,13 +3,13 @@ import {
   chooseGoalDecision,
   type GoalDecision,
   type GoalKind
-} from "../../src/game/goal-driven-planning";
+} from "../../src/game/behavior/goal-driven-planning";
 import { createDefaultPawnStates, withPawnNeeds } from "../../src/game/pawn-state";
 import {
   DEFAULT_WORLD_GRID,
   createReservationSnapshot,
   reserveInteractionPoint
-} from "../../src/game/world-grid";
+} from "../../src/game/map/world-grid";
 
 function expectGoalKind(decision: GoalDecision, kind: GoalKind): void {
   expect(decision.goal).toBe(kind);

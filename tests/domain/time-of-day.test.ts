@@ -7,7 +7,7 @@ import {
   effectiveSimulationDeltaSeconds,
   formatTimeOfDayLabel,
   sampleTimeOfDayPalette
-} from "../../src/game/time-of-day";
+} from "../../src/game/time";
 
 describe("time-of-day", () => {
   it("starts at day 1 06:00 and formats zero-padded time labels", () => {

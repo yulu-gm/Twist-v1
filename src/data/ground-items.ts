@@ -3,7 +3,7 @@
  * 未来接入真实库存系统时，只需换掉此文件的实现。
  */
 
-import { coordKey, type GridCoord } from "../game/world-grid";
+import { coordKey, type GridCoord } from "../game/map/world-grid";
 
 export type GroundItemStack = Readonly<{
   cell: GridCoord;

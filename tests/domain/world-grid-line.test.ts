@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { coordKey, gridLineCells, parseCoordKey } from "../../src/game/world-grid";
+import { coordKey, gridLineCells, parseCoordKey } from "../../src/game/map/world-grid";
 
 describe("world-grid grid line + parseCoordKey", () => {
   it("parseCoordKey round-trips coordKey", () => {

@@ -1,0 +1,75 @@
+system_name: "地图系统"
+story_ref: "oh-story/story-1.md"
+gen_doc_ref: "oh-gen-doc/地图系统.yaml"
+code_design_ref: "oh-code-design/地图系统.yaml"
+
+scenarios:
+  - scenario_id: "MAP-001"
+    name: "第一天地图初始状态生成"
+    type: "happy-path"
+    intent: "验证游戏开始时地图上的小人、物资和树木按设计正确分布"
+    
+    given:
+      - "游戏全新启动，进入第一天白天"
+      
+    when: "地图系统执行初始化逻辑"
+    
+    then:
+      domain_state: 
+        - "地图网格生成完毕，所有格子默认可通行"
+        - "初始小人实体生成在有效坐标上，状态为'空闲/醒来'"
+        - "初始物资和树木实体分布在地图上，占用管理器记录了它们的位置"
+      presentation: 
+        - "地图正确渲染，显示出地形、小人、散落物资和树木"
+
+  - scenario_id: "MAP-002"
+    name: "合法选区创建存储区"
+    type: "happy-path"
+    intent: "验证玩家通过选区工具框选合法地块后能成功创建存储区"
+    
+    given:
+      - "玩家处于'存储区创建模式'"
+      - "玩家框选了一片合法的、未被其他区域占用的地图格集合"
+      
+    when: "选区解析器校验通过并提交给区域管理器"
+    
+    then:
+      domain_state: 
+        - "区域管理器创建一个新的存储区对象"
+        - "该存储区记录了被框选的格坐标列表，初始存储物资为空"
+      presentation: 
+        - "被框选的区域在地图上显示出明显的存储区边界或底色"
+
+  - scenario_id: "MAP-003"
+    name: "建筑放置时的占用冲突拦截"
+    type: "edge-case"
+    intent: "验证在已有阻挡实体的地图格上无法放置新建筑"
+    
+    given:
+      - "地图某格上已存在一棵树木或一堵墙（占用管理器标记为阻挡）"
+      
+    when: "建筑系统请求在该格放置新的建筑蓝图"
+    
+    then:
+      domain_state: 
+        - "占用管理器检测到冲突，返回不可放置结果"
+        - "拒绝蓝图覆盖格申请，不生成蓝图实体"
+      presentation: 
+        - "蓝图虚影在该格显示为红色（不可放置状态）"
+
+  - scenario_id: "MAP-004"
+    name: "越界选区的安全过滤"
+    type: "edge-case"
+    intent: "验证玩家拖拽选区超出地图边界时，系统能自动过滤无效坐标"
+    
+    given:
+      - "玩家使用选区工具或蓝图笔刷"
+      
+    when: "玩家拖拽鼠标，选区矩形的一部分超出了地图的最大坐标范围"
+    
+    then:
+      domain_state: 
+        - "选区解析器自动剔除超出边界的坐标"
+        - "仅将合法的地图格坐标提交给后续业务逻辑"
+      presentation: 
+        - "选区高亮框仅在地图有效范围内绘制，越界部分被裁剪"

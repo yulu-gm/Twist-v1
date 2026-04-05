@@ -3,9 +3,9 @@
  * 与 {@link mergeTaskMarkerOverlayWithWorldSnapshot} 配合：领域层标记（拆除工单格、蓝图占用）以 WorldCore 快照为准。
  */
 
-import { type SelectionModifier } from "../game/floor-selection";
+import { type SelectionModifier } from "../game/interaction/floor-selection";
 import type { WorldSnapshot } from "../game/world-core";
-import { coordKey } from "../game/world-grid";
+import { coordKey } from "../game/map/world-grid";
 import { VILLAGER_TOOLS } from "./villager-tools";
 
 export type TaskMarkerSelectionInput = Readonly<{

@@ -1,6 +1,6 @@
 /** world-grid：格子坐标、邻格、边界与默认出生点（与 Phaser 无关）。 */
 
-import type { NeedKind } from "./pawn-state";
+import type { NeedKind } from "../pawn-state";
 
 export type GridCoord = Readonly<{ col: number; row: number }>;
 

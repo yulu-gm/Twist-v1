@@ -125,7 +125,7 @@ describe("aidoc index and push workflow", () => {
 
   it("maps changed files to impacted systems and related document follow-ups", () => {
     const result = analyzeChangedFiles(rootDir, [
-      "src/game/world-grid.ts",
+      "src/game/map/world-grid.ts",
       "src/scenes/GameScene.ts"
     ]);
 
