@@ -8,6 +8,8 @@ import type { TimeControlState, TimeOfDayPalette, TimeSpeed } from "../game/time
 import { formatTimeOfDayLabel, type TimeOfDayState } from "../game/time-of-day";
 import { pawnProfileForId } from "../data/pawn-profiles";
 import { VILLAGER_TOOLS, VILLAGER_TOOL_KEY_CODES, type VillagerTool } from "../data/villager-tools";
+import { needSignalsFromNeeds } from "../player/need-signals";
+import type { PlayerAcceptanceScenario } from "../data/player-acceptance-scenarios";
 
 export type { VillagerTool };
 export { VILLAGER_TOOLS, VILLAGER_TOOL_KEY_CODES };
@@ -23,6 +25,12 @@ export type ToolSelectCallback = (index: number) => void;
 
 /** Pawn 选中回调。 */
 export type PawnSelectCallback = (pawnId: string | null) => void;
+
+/** 右下角 B 线验收切换与回放（切换时应重启场景）。 */
+export type BAcceptanceCallbacks = Readonly<{
+  onScenarioChange: (scenarioId: string) => void;
+  onReplay: () => void;
+}>;
 
 function colorToCss(color: number): string {
   return `#${(color & 0xffffff).toString(16).padStart(6, "0")}`;
@@ -46,6 +54,11 @@ export class HudManager {
   // Hover 信息
   private hoverHudEl: HTMLElement | null;
 
+  // B 线：交互模式提示 + mock 契约脚注
+  private playerChannelModeEl: HTMLElement | null;
+  private playerChannelResultEl: HTMLElement | null;
+  private playerChannelContractEl: HTMLElement | null;
+
   // 工具栏
   private toolBarRoot: HTMLElement | null;
   private toolSlotEls: HTMLElement[] = [];
@@ -57,8 +70,14 @@ export class HudManager {
   private pawnRosterSlotEls: HTMLElement[] = [];
   private pawnRosterAbort: AbortController | null = null;
 
-  // 场景变体
   private variantSelectAbort: AbortController | null = null;
+  private bAcceptanceAbort: AbortController | null = null;
+
+  private bAcceptanceDetailEl: HTMLElement | null;
+  private bAcceptanceSelectEl: HTMLSelectElement | null;
+  private bAcceptanceGoalEl: HTMLElement | null;
+  private bAcceptanceStepsEl: HTMLOListElement | null;
+  private bAcceptanceReplayBtn: HTMLButtonElement | null;
 
   public constructor() {
     this.sceneHudEl = document.getElementById("scene-hud");
@@ -71,9 +90,21 @@ export class HudManager {
       ]).filter((e): e is [TimeSpeed, HTMLButtonElement] => e[1] !== null)
     );
     this.hoverHudEl = document.getElementById("grid-hover-info");
+    this.playerChannelModeEl = document.getElementById("player-channel-mode");
+    this.playerChannelResultEl = document.getElementById("player-channel-result");
+    this.playerChannelContractEl = document.getElementById("player-channel-contract");
     this.toolBarRoot = document.getElementById("villager-tool-bar");
     this.rosterRoot = document.getElementById("pawn-roster");
     this.pawnDetailEl = document.getElementById("pawn-detail-panel");
+    this.bAcceptanceDetailEl = document.getElementById("b-acceptance-detail");
+    this.bAcceptanceSelectEl = document.getElementById(
+      "b-acceptance-scenario-select"
+    ) as HTMLSelectElement | null;
+    this.bAcceptanceGoalEl = document.getElementById("b-acceptance-scenario-goal");
+    this.bAcceptanceStepsEl = document.getElementById("b-acceptance-scenario-steps") as HTMLOListElement | null;
+    this.bAcceptanceReplayBtn = document.getElementById(
+      "b-acceptance-replay-commands"
+    ) as HTMLButtonElement | null;
   }
 
   // ── 时间 HUD ──────────────────────────────────────────────
@@ -157,6 +188,109 @@ export class HudManager {
     }
   }
 
+  // ── B 线：玩家通道提示（模式文案 + mock 网关反馈）────────────────
+
+  public syncPlayerChannelHint(modeLine: string, contractFootnote: string): void {
+    if (this.playerChannelModeEl && this.playerChannelModeEl.textContent !== modeLine) {
+      this.playerChannelModeEl.textContent = modeLine;
+    }
+    if (this.playerChannelContractEl) {
+      this.playerChannelContractEl.textContent = contractFootnote;
+    }
+  }
+
+  public syncPlayerChannelLastResult(line: string | null): void {
+    const el = this.playerChannelResultEl;
+    if (!el) return;
+    if (line === null || line === "") {
+      el.textContent = "";
+      return;
+    }
+    el.textContent = line;
+  }
+
+  // ── 左上角：仅测试场景显示名 ─────────────────────────────
+
+  public bindSceneVariantSelect(
+    currentVariant: string,
+    onChange: (variant: string) => void
+  ): AbortController {
+    this.variantSelectAbort?.abort();
+    const abort = new AbortController();
+    this.variantSelectAbort = abort;
+
+    const sel = document.getElementById("scene-variant") as HTMLSelectElement | null;
+    if (sel) {
+      sel.value = currentVariant === "alt-en" ? "alt-en" : "default";
+      sel.addEventListener(
+        "change",
+        () => onChange(sel.value),
+        { signal: abort.signal }
+      );
+    }
+
+    return abort;
+  }
+
+  // ── 右下角：B 线验收（与测试场景独立）──────────────────────
+
+  public setupBAcceptancePanel(
+    scenarios: readonly PlayerAcceptanceScenario[],
+    currentScenarioId: string,
+    callbacks: BAcceptanceCallbacks
+  ): AbortController {
+    this.teardownBAcceptancePanel();
+    const abort = new AbortController();
+    this.bAcceptanceAbort = abort;
+    const { signal } = abort;
+
+    const sel = this.bAcceptanceSelectEl;
+    if (sel) {
+      sel.replaceChildren();
+      for (const s of scenarios) {
+        const opt = document.createElement("option");
+        opt.value = s.id;
+        opt.textContent = s.title;
+        sel.appendChild(opt);
+      }
+      sel.value = scenarios.some((s) => s.id === currentScenarioId)
+        ? currentScenarioId
+        : scenarios[0]!.id;
+      sel.addEventListener("change", () => callbacks.onScenarioChange(sel.value), { signal });
+    }
+
+    this.bAcceptanceReplayBtn?.addEventListener("click", () => callbacks.onReplay(), { signal });
+    return abort;
+  }
+
+  public syncBAcceptancePanel(scenario: PlayerAcceptanceScenario): void {
+    const detail = this.bAcceptanceDetailEl;
+    if (detail) {
+      detail.hidden = scenario.id === "off";
+    }
+    if (this.bAcceptanceGoalEl) {
+      this.bAcceptanceGoalEl.textContent = scenario.goal;
+    }
+    const list = this.bAcceptanceStepsEl;
+    if (list) {
+      list.replaceChildren();
+      for (const step of scenario.steps) {
+        const li = document.createElement("li");
+        li.textContent = step;
+        list.appendChild(li);
+      }
+    }
+    const replay = this.bAcceptanceReplayBtn;
+    if (replay) {
+      replay.style.display = scenario.showReplayButton ? "block" : "none";
+    }
+  }
+
+  public teardownBAcceptancePanel(): void {
+    this.bAcceptanceAbort?.abort();
+    this.bAcceptanceAbort = null;
+  }
+
   // ── 工具栏 ────────────────────────────────────────────────
 
   public setupToolBar(
@@ -202,29 +336,6 @@ export class HudManager {
     this.toolUiAbort = null;
     this.toolSlotEls = [];
     if (this.toolBarRoot) this.toolBarRoot.replaceChildren();
-  }
-
-  // ── 场景变体选择器 ────────────────────────────────────────
-
-  public bindSceneVariantSelect(
-    currentVariant: string,
-    onChange: (variant: string) => void
-  ): AbortController {
-    this.variantSelectAbort?.abort();
-    const abort = new AbortController();
-    this.variantSelectAbort = abort;
-
-    const sel = document.getElementById("scene-variant") as HTMLSelectElement | null;
-    if (sel) {
-      sel.value = currentVariant;
-      sel.addEventListener(
-        "change",
-        () => onChange(sel.value),
-        { signal: abort.signal }
-      );
-    }
-
-    return abort;
   }
 
   // ── Pawn 名册 ─────────────────────────────────────────────
@@ -305,6 +416,7 @@ export class HudManager {
     const goal = pawn.currentGoal?.kind ?? "—";
     const action = pawn.currentAction?.kind ?? "—";
     const n = pawn.needs;
+    const needSig = needSignalsFromNeeds(n);
 
     panel.innerHTML = `
       <h2>${escapeHtml(pawn.name)}</h2>
@@ -320,6 +432,11 @@ export class HudManager {
       <div class="pawn-detail-section">
         <div class="pawn-detail-label">当前状态</div>
         <div>饥饿 ${n.hunger.toFixed(1)}　休息 ${n.rest.toFixed(1)}　娱乐 ${n.recreation.toFixed(1)}</div>
+        <div style="font-size:11px;color:#c4b8a4;margin-top:4px">需求信号（B-M2 桩）${escapeHtml(needSig.summaryLine)}</div>
+        <div style="font-size:11px;color:#a89878;margin-top:2px">饥饿 ${escapeHtml(
+      needSig.hungerUrgency
+    )} · 疲劳 ${escapeHtml(needSig.restUrgency)} · 打断许可 饥${needSig.allowInterruptWorkForHunger ? "是" : "否"}
+        / 休${needSig.allowInterruptWorkForRest ? "是" : "否"}</div>
         <div>目标 <code style="font-size:12px;color:#d4c4a8">${escapeHtml(String(goal))}</code>
         　行动 <code style="font-size:12px;color:#d4c4a8">${escapeHtml(String(action))}</code></div>
         <div style="font-size:12px;color:#a89878;margin-top:4px">${escapeHtml(pawn.debugLabel)}</div>
@@ -345,6 +462,7 @@ export class HudManager {
     this.teardownToolBar();
     this.teardownPawnRoster();
     this.teardownPawnDetail();
+    this.teardownBAcceptancePanel();
     this.variantSelectAbort?.abort();
     this.variantSelectAbort = null;
   }

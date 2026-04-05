@@ -221,6 +221,48 @@ export function coordKey(cell: GridCoord): string {
   return `${cell.col},${cell.row}`;
 }
 
+/** 解析 {@link coordKey} 格式；失败时返回 `undefined`。 */
+export function parseCoordKey(key: string): GridCoord | undefined {
+  const comma = key.indexOf(",");
+  if (comma <= 0) return undefined;
+  const col = Number(key.slice(0, comma));
+  const row = Number(key.slice(comma + 1));
+  if (!Number.isInteger(col) || !Number.isInteger(row)) return undefined;
+  return { col, row };
+}
+
+/**
+ * 两格之间的 Bresenham 线段（含端点），用于笔刷拖拽覆盖格集合。
+ */
+export function gridLineCells(from: GridCoord, to: GridCoord): GridCoord[] {
+  let x0 = from.col;
+  let y0 = from.row;
+  const x1 = to.col;
+  const y1 = to.row;
+  const out: GridCoord[] = [];
+  const dx = Math.abs(x1 - x0);
+  const dy = Math.abs(y1 - y0);
+  const sx = x0 < x1 ? 1 : -1;
+  const sy = y0 < y1 ? 1 : -1;
+  let err = dx - dy;
+
+  while (true) {
+    out.push({ col: x0, row: y0 });
+    if (x0 === x1 && y0 === y1) break;
+    const e2 = 2 * err;
+    if (e2 > -dy) {
+      err -= dy;
+      x0 += sx;
+    }
+    if (e2 < dx) {
+      err += dx;
+      y0 += sy;
+    }
+  }
+
+  return out;
+}
+
 export function isCellOccupiedByOthers(
   logicalCellsByPawnId: ReadonlyMap<string, GridCoord>,
   cell: GridCoord,
