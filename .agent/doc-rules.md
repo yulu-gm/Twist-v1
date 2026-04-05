@@ -14,6 +14,7 @@
 - 跨系统集成文档放入 `docs/ai/integration/`。
 - 按系统拆分的 aidoc 放入 `docs/ai/systems/<system>/`。
 - 系统级文档规范放入 `docs/ai/system-standards/`。
+- `docs/ai/index/` 作为 aidoc 总入口，维护系统索引、关键实现文件和查询说明。
 - 当项目初始化方式或开发流程变化时，需要同步更新 `README.md`。
 
 重大功能必须具备的文档内容：
@@ -22,6 +23,12 @@
 - 核心数据模型
 - 主要更新循环或规则流
 - 已知限制与待解问题
+
+推送约束：
+
+- 准备推送远端前，必须先走 `.agent/skills/push-with-aidoc/SKILL.md`。
+- `push-with-aidoc` 必须先读取 `docs/ai/index/system-index.json` 判定受影响系统。
+- 通过受控推送流程生成的收尾提交必须使用 `[aidoc-sync]` 前缀和固定 `AIDOC-*` trailer。
 
 写作风格：
 

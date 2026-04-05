@@ -15,7 +15,10 @@
 - 入口：`.agent/skills/route-demand/SKILL.md`
 - 先路由需求，再拆系统 aidoc，再进入各系统 TDD 与实现
 
+**准备推送远端前，必须走 `.agent/skills/push-with-aidoc/SKILL.md`，先校验受影响系统的 aidoc 与索引，再推送**
+
 产品方向、架构目标与近期规格见 `docs/ai/project-overview.md`。
+AI 查询系统实现时，先从 `docs/ai/index/README.md` 和 `docs/ai/index/system-index.json` 进入。
 
 ## 技术栈速查
 

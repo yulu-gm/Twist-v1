@@ -1,0 +1,103 @@
+{
+  "systems": [
+    {
+      "key": "pawn-state",
+      "summary": "维护角色基础状态、名字、移动过渡和供场景读取的派生显示信息。",
+      "standardDoc": "docs/ai/system-standards/pawn-state.md",
+      "aidocDir": "docs/ai/systems/pawn-state",
+      "systemReadme": "docs/ai/systems/pawn-state/README.md",
+      "sourceFiles": [
+        "src/game/pawn-state.ts"
+      ],
+      "testFiles": [
+        "tests/domain/pawn-state.test.ts"
+      ],
+      "sceneEntryFiles": [
+        "src/scenes/GameScene.ts"
+      ],
+      "integrationFiles": [
+        "docs/ai/integration/2026-04-05-default-grid-wandering-pawns.md"
+      ],
+      "latestAidocs": [
+        "docs/ai/systems/pawn-state/2026-04-05-default-grid-wandering-pawns.md"
+      ]
+    },
+    {
+      "key": "scene-hud",
+      "summary": "维护 HUD、状态卡、按钮和场景内信息展示的组织方式。",
+      "standardDoc": "docs/ai/system-standards/scene-hud.md",
+      "aidocDir": "docs/ai/systems/scene-hud",
+      "systemReadme": "docs/ai/systems/scene-hud/README.md",
+      "sourceFiles": [],
+      "testFiles": [],
+      "sceneEntryFiles": [
+        "src/scenes/GameScene.ts"
+      ],
+      "integrationFiles": [
+        "docs/ai/integration/2026-04-05-default-grid-wandering-pawns.md"
+      ],
+      "latestAidocs": []
+    },
+    {
+      "key": "selection-ui",
+      "summary": "维护选中、高亮、焦点切换和目标对象的交互反馈。",
+      "standardDoc": "docs/ai/system-standards/selection-ui.md",
+      "aidocDir": "docs/ai/systems/selection-ui",
+      "systemReadme": "docs/ai/systems/selection-ui/README.md",
+      "sourceFiles": [],
+      "testFiles": [],
+      "sceneEntryFiles": [
+        "src/scenes/GameScene.ts"
+      ],
+      "integrationFiles": [
+        "docs/ai/integration/2026-04-05-default-grid-wandering-pawns.md"
+      ],
+      "latestAidocs": []
+    },
+    {
+      "key": "task-planning",
+      "summary": "维护目标评估、工作选择、游荡决策和可执行动作候选。",
+      "standardDoc": "docs/ai/system-standards/task-planning.md",
+      "aidocDir": "docs/ai/systems/task-planning",
+      "systemReadme": "docs/ai/systems/task-planning/README.md",
+      "sourceFiles": [
+        "src/game/wander-planning.ts"
+      ],
+      "testFiles": [
+        "tests/domain/wander-planning.test.ts"
+      ],
+      "sceneEntryFiles": [
+        "src/scenes/GameScene.ts"
+      ],
+      "integrationFiles": [
+        "docs/ai/integration/2026-04-05-default-grid-wandering-pawns.md"
+      ],
+      "latestAidocs": [
+        "docs/ai/systems/task-planning/2026-04-05-default-grid-wandering-pawns.md"
+      ]
+    },
+    {
+      "key": "world-grid",
+      "summary": "维护格子地图尺寸、格坐标、邻格、边界、出生点和占用查询。",
+      "standardDoc": "docs/ai/system-standards/world-grid.md",
+      "aidocDir": "docs/ai/systems/world-grid",
+      "systemReadme": "docs/ai/systems/world-grid/README.md",
+      "sourceFiles": [
+        "src/game/world-grid.ts"
+      ],
+      "testFiles": [
+        "tests/domain/world-grid.test.ts"
+      ],
+      "sceneEntryFiles": [
+        "src/scenes/GameScene.ts"
+      ],
+      "integrationFiles": [
+        "docs/ai/integration/2026-04-05-default-grid-wandering-pawns.md"
+      ],
+      "latestAidocs": [
+        "docs/ai/systems/world-grid/2026-04-05-default-grid-wandering-pawns.md"
+      ]
+    }
+  ]
+}
+

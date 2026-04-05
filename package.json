@@ -10,6 +10,7 @@
     "build:release": "tsc --noEmit && npx vite build",
     "preview": "npx vite preview",
     "test": "vitest run",
+    "test:docs": "node tools/aidoc/validate-index.mjs && vitest run tests/route-demand-docs.test.ts tests/aidoc-docs.test.ts",
     "test:watch": "vitest"
   },
   "dependencies": {

@@ -26,3 +26,6 @@ Thumbs.db
 
 # 测试覆盖率
 coverage/
+
+# Agent 运行时日志
+.agent/runtime/
