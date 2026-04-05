@@ -1,12 +1,12 @@
 # aidoc 索引入口
 
-`docs/ai/` 是本项目的 aidoc 主目录，供 Agent 在修改代码、补系统规格和准备推送远端前统一查询。
+`docs/ai/` 是本项目的 aidoc 主目录，供 Agent 在修改代码、补充系统规格和准备推送远端前统一查询。
 
 ## 使用方式
 
-- 先看本页，按系统找到标准文档、系统入口页、关键源码文件和关键测试文件。
+- 首先阅读本页，按照系统找到标准文档、系统入口页、关键源码文件和关键测试文件。
 - 需要结构化消费时，读取同目录下的 `system-index.json`。
-- 多系统需求先走 `route-demand`，准备推送远端前再走 `push-with-aidoc`。
+- 多系统需求优先执行 `route-demand`，准备推送远端前再执行 `push-with-aidoc`。
 
 ## 系统总表
 
@@ -17,11 +17,10 @@
 | `scene-hud` | 维护 HUD、状态卡、菜单和场景信息展示 | `docs/ai/system-standards/scene-hud.md` | `docs/ai/systems/scene-hud/` | `src/scenes/villager-tool-bar-config.ts` | `tests/component/villager-tool-bar-model.test.ts` | `src/scenes/GameScene.ts` | `docs/ai/systems/scene-hud/2026-04-05-time-of-day-system.md` |
 | `selection-ui` | 维护选中、高亮、焦点和目标切换反馈 | `docs/ai/system-standards/selection-ui.md` | `docs/ai/systems/selection-ui/` | `src/game/floor-selection.ts` | `tests/domain/floor-selection.test.ts` | `src/scenes/GameScene.ts` | `docs/ai/systems/selection-ui/2026-04-05-floor-area-selection-foundation.md` |
 | `task-planning` | 维护目标评估、工作选择和游荡决策 | `docs/ai/system-standards/task-planning.md` | `docs/ai/systems/task-planning/` | `src/game/wander-planning.ts` | `tests/domain/wander-planning.test.ts` | `src/scenes/GameScene.ts` | `docs/ai/systems/task-planning/2026-04-05-random-stone-obstacles.md` |
-| `world-grid` | 维护格子地图尺寸、邻格、边界和出生点 | `docs/ai/system-standards/world-grid.md` | `docs/ai/systems/world-grid/` | `src/game/world-grid.ts` | `tests/domain/world-grid.test.ts` | `src/scenes/GameScene.ts` | `docs/ai/systems/world-grid/2026-04-05-floor-area-selection-foundation.md` |
+| `world-grid` | 维护格子地图尺寸、相邻格子、边界和出生点 | `docs/ai/system-standards/world-grid.md` | `docs/ai/systems/world-grid/` | `src/game/world-grid.ts` | `tests/domain/world-grid.test.ts` | `src/scenes/GameScene.ts` | `docs/ai/systems/world-grid/2026-04-05-floor-area-selection-foundation.md` |
 
-## push 前检查
+## 推送前检查
 
-- `push-with-aidoc` 必须先读取 `docs/ai/index/system-index.json`。
-- 根据待推送改动映射受影响系统，再回填对应系统 `README.md`、最新 aidoc 和必要的集成文档。
-- 通过受控推送流程推送远端后，最新提交应带有 `[aidoc-sync]` 前缀和固定 `AIDOC-*` trailer。
-
+- `push-with-aidoc` 必须首先读取 `docs/ai/index/system-index.json`。
+- 根据待推送的改动映射受影响的系统，然后再回填对应的系统 `README.md`、最新的 aidoc 和必要的集成文档。
+- 通过受控推送流程推送远端之后，最新的提交应当带有 `[aidoc-sync]` 前缀和固定的 `AIDOC-*` 追踪标签。

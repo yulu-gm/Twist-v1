@@ -18,7 +18,7 @@
 
 ## 当前接入场景文件
 
-- `src/scenes/GameScene.ts`（格上 **工具点格** 的 mock 任务标记为点击反馈，规格见 **scene-hud** `2026-04-05-mock-task-markers-on-grid.md` 与集成 `2026-04-05-mock-task-markers-on-grid.md`）
+- `src/scenes/GameScene.ts`（格子上的 **工具点格子** 的 mock 任务标记为点击反馈，规格见 **scene-hud** `2026-04-05-mock-task-markers-on-grid.md` 与集成 `2026-04-05-mock-task-markers-on-grid.md`）
 
 ## 最新/历史 aidoc
 
@@ -26,7 +26,7 @@
 
 ## 何时必须回填
 
-- 新增选中、高亮、焦点或目标切换交互时，必须先补 routed aidoc。
-- 若实现文件、测试文件或场景接入点出现，必须同步更新 `docs/ai/index/system-index.json`。
-- 若玩家路径发生变化，必须补充 `docs/ai/integration/`。
+- 新增选中、高亮、焦点或者目标切换交互时，必须先补充路由的 aidoc。
+- 如果实现文件、测试文件或者场景接入点出现，必须同步更新 `docs/ai/index/system-index.json`。
+- 如果玩家路径发生变化，必须补充 `docs/ai/integration/`。
 

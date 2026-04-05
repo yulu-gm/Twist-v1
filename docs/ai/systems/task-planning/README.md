@@ -20,7 +20,7 @@
 
 - `src/scenes/GameScene.ts`
 
-## 最新/历史 aidoc
+## 最新与历史人工智能文档
 
 - `docs/ai/systems/task-planning/2026-04-05-random-stone-obstacles.md`
 - `docs/ai/systems/task-planning/2026-04-05-default-grid-wandering-pawns.md`
@@ -28,7 +28,6 @@
 
 ## 何时必须回填
 
-- 修改目标选择、合法候选过滤、等待分支或规划结果格式时，必须同步更新 routed aidoc。
-- 若行为规划影响其他系统的契约或玩家路径，必须补充 `docs/ai/integration/`。
-- 若新增实现文件、测试文件或场景接入点，必须同步更新 `docs/ai/index/system-index.json`。
-
+- 修改目标选择、合法候选过滤、等待分支或规划结果格式时，必须同步更新路由的人工智能文档。
+- 如果行为规划影响其他系统的契约或玩家路径，必须补充 `docs/ai/integration/`。
+- 如果新增实现文件、测试文件或场景接入点，必须同步更新 `docs/ai/index/system-index.json`。

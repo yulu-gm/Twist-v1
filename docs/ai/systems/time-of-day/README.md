@@ -26,6 +26,6 @@
 
 ## 何时必须回填
 
-- 修改一天时长、起始时间、跨天规则或时间格式时，必须同步更新 routed aidoc。
-- 修改调色板字段或场景消费契约时，必须补充 `docs/ai/integration/`。
-- 若新增实现文件、测试文件或场景接入点，必须同步更新 `docs/ai/index/system-index.json`。
+- 修改一天时长、起始时间、跨天规则或者时间格式时，必须同步更新路由的 aidoc。
+- 修改调色板字段或者场景消费契约时，必须补充 `docs/ai/integration/`。
+- 如果新增实现文件、测试文件或者场景接入点，必须同步更新 `docs/ai/index/system-index.json`。
