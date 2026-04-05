@@ -1,5 +1,12 @@
 import Phaser from "phaser";
-import { DEFAULT_WORLD_GRID } from "../game/world-grid";
+import {
+  blockedKeysFromCells,
+  cellCenterWorld,
+  DEFAULT_WORLD_GRID,
+  pickRandomBlockedCells,
+  type GridCoord,
+  type WorldGridConfig
+} from "../game/world-grid";
 import {
   advanceMoveTowardTarget,
   beginMove,
@@ -15,6 +22,8 @@ import {
 import { legalWanderNeighbors, pickWanderTarget } from "../game/wander-planning";
 
 const MOVE_DURATION_SEC = 0.42;
+/** 开局随机散落的石头格数量（不与默认出生点重叠）。 */
+const STONE_CELL_COUNT = 14;
 
 type PawnView = Readonly<{
   circle: Phaser.GameObjects.Arc;
@@ -26,6 +35,7 @@ export type GameSceneVariant = "default" | "alt-en";
 export class GameScene extends Phaser.Scene {
   private gridOriginX = 0;
   private gridOriginY = 0;
+  private worldGrid: WorldGridConfig = DEFAULT_WORLD_GRID;
   private pawns: PawnState[] = [];
   private views = new Map<string, PawnView>();
   private variant: GameSceneVariant = "default";
@@ -44,19 +54,32 @@ export class GameScene extends Phaser.Scene {
     this.layoutGrid();
     this.drawGridLines();
 
+    const excludeSpawn = blockedKeysFromCells(DEFAULT_WORLD_GRID.defaultSpawnPoints);
+    const stoneCells = pickRandomBlockedCells(
+      DEFAULT_WORLD_GRID,
+      STONE_CELL_COUNT,
+      excludeSpawn,
+      () => Math.random()
+    );
+    this.worldGrid = {
+      ...DEFAULT_WORLD_GRID,
+      blockedCellKeys: blockedKeysFromCells(stoneCells)
+    };
+    this.drawStoneCells(stoneCells);
+
     const names =
       this.variant === "alt-en"
         ? pickRandomAltPawnNames(DEFAULT_PAWN_NAMES.length)
         : [...DEFAULT_PAWN_NAMES];
-    this.pawns = createDefaultPawnStates(DEFAULT_WORLD_GRID.defaultSpawnPoints, names);
+    this.pawns = createDefaultPawnStates(this.worldGrid.defaultSpawnPoints, names);
     for (const p of this.pawns) {
       const pos = pawnDisplayWorldCenter(
         p,
-        DEFAULT_WORLD_GRID,
+        this.worldGrid,
         this.gridOriginX,
         this.gridOriginY
       );
-      const cell = DEFAULT_WORLD_GRID.cellSizePx;
+      const cell = this.worldGrid.cellSizePx;
       const r = Math.max(10, cell * 0.32);
       const circle = this.add.circle(pos.x, pos.y, r, p.fillColor, 1);
       circle.setStrokeStyle(2, 0x1a1a1a, 0.85);
@@ -75,7 +98,7 @@ export class GameScene extends Phaser.Scene {
 
   public update(_time: number, delta: number): void {
     const dt = delta / 1000;
-    const grid = DEFAULT_WORLD_GRID;
+    const grid = this.worldGrid;
 
     let next = this.pawns.map((p) =>
       finishMoveIfComplete(advanceMoveTowardTarget(p, dt, MOVE_DURATION_SEC))
@@ -107,6 +130,16 @@ export class GameScene extends Phaser.Scene {
     const gridH = rows * cellSizePx;
     this.gridOriginX = (width - gridW) / 2;
     this.gridOriginY = (height - gridH) / 2;
+  }
+
+  private drawStoneCells(cells: readonly GridCoord[]): void {
+    const cellPx = this.worldGrid.cellSizePx;
+    const side = Math.max(14, cellPx * 0.42);
+    for (const cell of cells) {
+      const pos = cellCenterWorld(this.worldGrid, cell, this.gridOriginX, this.gridOriginY);
+      const r = this.add.rectangle(pos.x, pos.y, side, side * 0.88, 0x6b6560, 1);
+      r.setStrokeStyle(1, 0x3d3830, 0.92);
+    }
   }
 
   private drawGridLines(): void {

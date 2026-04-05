@@ -5,7 +5,7 @@ import {
   type WanderRng
 } from "../../src/game/wander-planning";
 import { createDefaultPawnStates, logicalCellsByPawnId } from "../../src/game/pawn-state";
-import { DEFAULT_WORLD_GRID } from "../../src/game/world-grid";
+import { blockedKeysFromCells, coordKey, DEFAULT_WORLD_GRID } from "../../src/game/world-grid";
 
 describe("wander-planning", () => {
   it("picks first candidate when rng always returns 0", () => {
@@ -21,6 +21,24 @@ describe("wander-planning", () => {
   it("returns wait when no legal neighbors", () => {
     const rng: WanderRng = () => 0.5;
     expect(pickWanderTarget(rng, [])).toEqual({ kind: "wait" });
+  });
+
+  it("excludes blocked neighbor cells for wandering", () => {
+    const base = DEFAULT_WORLD_GRID;
+    const neighbor = {
+      col: base.defaultSpawnPoints[0]!.col + 1,
+      row: base.defaultSpawnPoints[0]!.row
+    };
+    const grid = {
+      ...base,
+      blockedCellKeys: blockedKeysFromCells([neighbor])
+    };
+    const spawns = [...grid.defaultSpawnPoints];
+    const pawns = createDefaultPawnStates(spawns);
+    const pawn0 = pawns[0]!;
+    const occupied = logicalCellsByPawnId(pawns);
+    const legal = legalWanderNeighbors(grid, pawn0, occupied);
+    expect(legal.some((c) => coordKey(c) === coordKey(neighbor))).toBe(false);
   });
 
   it("excludes occupied neighbor cells for wandering", () => {

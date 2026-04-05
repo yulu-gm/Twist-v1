@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_WORLD_GRID,
+  blockedKeysFromCells,
   coordKey,
   isCellOccupiedByOthers,
   isInsideGrid,
+  isWalkableCell,
   orthogonalNeighbors,
-  cellCenterWorld
+  cellCenterWorld,
+  pickRandomBlockedCells
 } from "../../src/game/world-grid";
 
 describe("world-grid", () => {
@@ -47,5 +50,32 @@ describe("world-grid", () => {
     ]);
     expect(isCellOccupiedByOthers(map, { col: 1, row: 1 }, "a")).toBe(false);
     expect(isCellOccupiedByOthers(map, { col: 1, row: 1 }, "b")).toBe(true);
+  });
+
+  it("treats blocked cells as unwalkable", () => {
+    const cell = { col: 3, row: 2 };
+    const grid = {
+      ...DEFAULT_WORLD_GRID,
+      blockedCellKeys: blockedKeysFromCells([cell])
+    };
+    expect(isWalkableCell(grid, cell)).toBe(false);
+    expect(isWalkableCell(grid, { col: 4, row: 2 })).toBe(true);
+  });
+
+  it("pickRandomBlockedCells avoids excluded keys and caps by available space", () => {
+    const exclude = new Set([coordKey({ col: 0, row: 0 }), coordKey({ col: 1, row: 0 })]);
+    let i = 0;
+    const rng = () => {
+      const seq = [0.1, 0.9, 0.2, 0.8, 0.3, 0.7, 0.4, 0.6];
+      return seq[i++ % seq.length]!;
+    };
+    const stones = pickRandomBlockedCells(DEFAULT_WORLD_GRID, 5, exclude, rng);
+    expect(stones).toHaveLength(5);
+    const keys = new Set(stones.map(coordKey));
+    for (const k of exclude) expect(keys.has(k)).toBe(false);
+    for (const c of stones) expect(isInsideGrid(DEFAULT_WORLD_GRID, c)).toBe(true);
+    const tiny = { ...DEFAULT_WORLD_GRID, columns: 2, rows: 1 };
+    const few = pickRandomBlockedCells(tiny, 99, new Set(), () => 0.5);
+    expect(few).toHaveLength(2);
   });
 });

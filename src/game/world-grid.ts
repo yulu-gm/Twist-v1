@@ -9,6 +9,8 @@ export type WorldGridConfig = Readonly<{
   cellSizePx: number;
   /** 默认 5 个小人出生格（已在边界内且互不重复）。 */
   defaultSpawnPoints: readonly GridCoord[];
+  /** 不可行走格（如石头），键格式同 `coordKey`。 */
+  blockedCellKeys?: ReadonlySet<string>;
 }>;
 
 export const DEFAULT_WORLD_GRID: WorldGridConfig = {
@@ -63,9 +65,42 @@ export function orthogonalNeighbors(
   return out;
 }
 
-/** 当前无障碍：格内均可走；后续可接入阻挡表。 */
-export function isWalkableCell(_config: WorldGridConfig, _cell: GridCoord): boolean {
+/** [0,1) 随机数，便于测试注入。 */
+export type GridRand = () => number;
+
+export function isWalkableCell(config: WorldGridConfig, cell: GridCoord): boolean {
+  const blocked = config.blockedCellKeys;
+  if (blocked?.has(coordKey(cell))) return false;
   return true;
+}
+
+/** 在地图内随机挑选若干格作为阻挡（如石头），不与 `excludeKeys` 重叠。 */
+export function pickRandomBlockedCells(
+  config: WorldGridConfig,
+  count: number,
+  excludeKeys: ReadonlySet<string>,
+  rng: GridRand
+): GridCoord[] {
+  const candidates: GridCoord[] = [];
+  for (let row = 0; row < config.rows; row++) {
+    for (let col = 0; col < config.columns; col++) {
+      const cell: GridCoord = { col, row };
+      if (!excludeKeys.has(coordKey(cell))) candidates.push(cell);
+    }
+  }
+  const n = Math.min(Math.max(0, count), candidates.length);
+  for (let i = candidates.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    const a = candidates[i]!;
+    const b = candidates[j]!;
+    candidates[i] = b;
+    candidates[j] = a;
+  }
+  return candidates.slice(0, n);
+}
+
+export function blockedKeysFromCells(cells: readonly GridCoord[]): ReadonlySet<string> {
+  return new Set(cells.map((c) => coordKey(c)));
 }
 
 export function coordKey(cell: GridCoord): string {
