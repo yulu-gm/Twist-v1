@@ -14,10 +14,13 @@
 - `src/game/wander-planning.ts`
 - `src/game/sim-config.ts`
 - `src/game/sim-loop.ts`
+- `src/game/world-sim-bridge.ts`（由 `GameScene` 调用：将 `WorldCore` 障碍与 `restSpots` 写入传入本系统 tick 的 `WorldGridConfig`）
 
 ## 当前关键测试文件
 
 - `tests/domain/wander-planning.test.ts`
+- `tests/domain/goal-driven-planning.test.ts`
+- `tests/game/world-sim-bridge.test.ts`
 
 ## 当前接入场景文件
 

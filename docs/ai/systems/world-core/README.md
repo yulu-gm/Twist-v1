@@ -11,20 +11,26 @@
 ## 当前关键实现文件
 
 - `src/game/world-core.ts`（世界真相源、可序列化投影、时间事件、工作锁定/去重与建造落地的权威实现）
+- `src/game/world-core-seed.ts`（将 `blockedCellKeys` 同步为障碍实体，供与世界网格一致）
+- `src/game/world-sim-bridge.ts`（从世界快照推导模拟用障碍格与床位交互点；由场景调用）
+- `src/player/world-port-types.ts`、`src/player/world-core-world-port.ts`、`src/player/apply-domain-command.ts`（玩家领域命令网关与落地）
 - `src/game/world-grid.ts`（提供格子键与边界语义，供 `world-core` 复用）
 - `src/game/time-of-day.ts`（提供时间推进与暂停/调速语义，供 `world-core` 复用）
 
 ## 当前关键测试文件
 
 - `tests/domain/world-core.test.ts`
+- `tests/domain/apply-domain-command.test.ts`
+- `tests/game/world-sim-bridge.test.ts`
 
 ## 当前接入场景文件
 
-- 暂无；当前先通过 domain tests 和命令回放验证
+- `src/scenes/GameScene.ts`（`WorldCoreWorldPort`、时间推进与每帧网格同步）
 
 ## 最新/历史 aidoc
 
 - `docs/ai/systems/world-core/2026-04-05-a-line-world-core-and-build-loop.md`
+- `docs/ai/systems/world-core/2026-04-05-worldcore-gateway-and-sim-bridge.md`
 
 ## 何时必须回填
 

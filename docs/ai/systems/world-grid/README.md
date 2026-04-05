@@ -10,8 +10,8 @@
 
 ## 当前关键实现文件
 
-- `src/game/world-grid.ts`（地图几何、边界、占用与拾取语义的权威实现；包含 `cellAtWorldPixel`，提供给场景指针悬停等表现层拾取）
-- `src/scenes/renderers/grid-renderer.ts`（格线/网格视觉消费端）
+- `src/game/world-grid.ts`（地图几何、边界、占用与拾取语义的权威实现；包含 `cellAtWorldPixel`、`pruneReservationSnapshot`，提供给场景指针悬停与动态交互点预订清理）
+- `src/scenes/renderers/grid-renderer.ts`（格线/网格视觉消费端；含按 `blockedCellKeys` 绘制的石头格 Graphics、交互点标签回收）
 - `src/scenes/renderers/ground-items-renderer.ts`（地表物件视觉消费端）
 - `src/scenes/renderers/selection-renderer.ts`（选区/交互视觉消费端）
 - `src/data/grid-cell-info.ts`（按格键组织的格子信息消费端）

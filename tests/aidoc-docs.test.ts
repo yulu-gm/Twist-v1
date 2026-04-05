@@ -135,8 +135,10 @@ describe("aidoc index and push workflow", () => {
       "selection-ui",
       "task-planning",
       "time-of-day",
+      "world-core",
       "world-grid"
     ]);
+    expect(result.docPathsToReview).toContain("docs/ai/systems/world-core/README.md");
     expect(result.docPathsToReview).toContain("docs/ai/systems/world-grid/README.md");
     expect(result.docPathsToReview).toContain("docs/ai/systems/pawn-state/README.md");
     expect(result.docPathsToReview).toContain("docs/ai/systems/time-of-day/README.md");

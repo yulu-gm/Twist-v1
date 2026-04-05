@@ -34,17 +34,28 @@
       "aidocDir": "docs/ai/systems/world-core",
       "systemReadme": "docs/ai/systems/world-core/README.md",
       "sourceFiles": [
-        "src/game/world-core.ts"
+        "src/game/world-core.ts",
+        "src/game/world-core-seed.ts",
+        "src/game/world-sim-bridge.ts",
+        "src/player/apply-domain-command.ts",
+        "src/player/world-core-world-port.ts",
+        "src/player/world-port-types.ts"
       ],
       "testFiles": [
-        "tests/domain/world-core.test.ts"
+        "tests/domain/world-core.test.ts",
+        "tests/domain/apply-domain-command.test.ts",
+        "tests/game/world-sim-bridge.test.ts"
       ],
-      "sceneEntryFiles": [],
+      "sceneEntryFiles": [
+        "src/scenes/GameScene.ts"
+      ],
       "integrationFiles": [
-        "docs/ai/integration/2026-04-05-a-line-world-core-and-build-loop.md"
+        "docs/ai/integration/2026-04-05-a-line-world-core-and-build-loop.md",
+        "docs/ai/integration/2026-04-05-worldcore-sim-grid-bridge.md"
       ],
       "latestAidocs": [
-        "docs/ai/systems/world-core/2026-04-05-a-line-world-core-and-build-loop.md"
+        "docs/ai/systems/world-core/2026-04-05-a-line-world-core-and-build-loop.md",
+        "docs/ai/systems/world-core/2026-04-05-worldcore-gateway-and-sim-bridge.md"
       ]
     },
     {
@@ -68,7 +79,8 @@
         "docs/ai/integration/2026-04-05-default-grid-wandering-pawns.md",
         "docs/ai/integration/2026-04-05-goal-driven-pawn-ai-prototype.md",
         "docs/ai/integration/2026-04-05-mock-task-markers-on-grid.md",
-        "docs/ai/integration/2026-04-05-gamescene-runtime-refactor.md"
+        "docs/ai/integration/2026-04-05-gamescene-runtime-refactor.md",
+        "docs/ai/integration/2026-04-05-worldcore-sim-grid-bridge.md"
       ],
       "latestAidocs": [
         "docs/ai/systems/pawn-state/2026-04-05-gamescene-runtime-refactor.md",
@@ -94,7 +106,8 @@
         "docs/ai/integration/2026-04-05-mock-task-markers-on-grid.md",
         "docs/ai/integration/2026-04-05-pawn-roster-detail-panel.md",
         "docs/ai/integration/2026-04-05-gamescene-runtime-refactor.md",
-        "docs/ai/integration/2026-04-05-b-line-player-channel-mock-gateway.md"
+        "docs/ai/integration/2026-04-05-b-line-player-channel-mock-gateway.md",
+        "docs/ai/integration/2026-04-05-worldcore-sim-grid-bridge.md"
       ],
       "latestAidocs": [
         "docs/ai/systems/scene-hud/2026-04-05-gamescene-runtime-refactor.md",
@@ -116,6 +129,9 @@
         "src/player/brush-stroke.ts",
         "src/player/build-domain-command.ts",
         "src/player/commit-player-intent.ts",
+        "src/player/apply-domain-command.ts",
+        "src/player/world-core-world-port.ts",
+        "src/player/world-port-types.ts",
         "src/player/interaction-mode-presenter.ts",
         "src/player/mock-world-port.ts",
         "src/player/need-signals.ts",
@@ -138,7 +154,8 @@
         "tests/domain/mock-world-port.test.ts",
         "tests/domain/need-signals.test.ts",
         "tests/domain/player-acceptance-scenarios.test.ts",
-        "tests/domain/player-channel-domain-command.test.ts"
+        "tests/domain/player-channel-domain-command.test.ts",
+        "tests/domain/apply-domain-command.test.ts"
       ]
     },
     {
@@ -156,7 +173,8 @@
       ],
       "testFiles": [
         "tests/domain/floor-selection.test.ts",
-        "tests/component/mock-task-marker-selection.test.ts"
+        "tests/component/mock-task-marker-selection.test.ts",
+        "tests/data/task-markers-merge.test.ts"
       ],
       "sceneEntryFiles": [
         "src/scenes/GameScene.ts"
@@ -167,7 +185,8 @@
         "docs/ai/integration/2026-04-05-mock-task-markers-on-grid.md",
         "docs/ai/integration/2026-04-05-floor-area-selection-foundation.md",
         "docs/ai/integration/2026-04-05-gamescene-runtime-refactor.md",
-        "docs/ai/integration/2026-04-05-b-line-player-channel-mock-gateway.md"
+        "docs/ai/integration/2026-04-05-b-line-player-channel-mock-gateway.md",
+        "docs/ai/integration/2026-04-05-worldcore-sim-grid-bridge.md"
       ],
       "latestAidocs": [
         "docs/ai/systems/selection-ui/2026-04-05-gamescene-runtime-refactor.md",
@@ -185,11 +204,13 @@
         "src/game/wander-planning.ts",
         "src/game/goal-driven-planning.ts",
         "src/game/sim-config.ts",
-        "src/game/sim-loop.ts"
+        "src/game/sim-loop.ts",
+        "src/game/world-sim-bridge.ts"
       ],
       "testFiles": [
         "tests/domain/wander-planning.test.ts",
-        "tests/domain/goal-driven-planning.test.ts"
+        "tests/domain/goal-driven-planning.test.ts",
+        "tests/game/world-sim-bridge.test.ts"
       ],
       "sceneEntryFiles": [
         "src/scenes/GameScene.ts"
@@ -199,7 +220,8 @@
         "docs/ai/integration/2026-04-05-random-stone-obstacles.md",
         "docs/ai/integration/2026-04-05-goal-driven-pawn-ai-prototype.md",
         "docs/ai/integration/2026-04-05-mock-task-markers-on-grid.md",
-        "docs/ai/integration/2026-04-05-gamescene-runtime-refactor.md"
+        "docs/ai/integration/2026-04-05-gamescene-runtime-refactor.md",
+        "docs/ai/integration/2026-04-05-worldcore-sim-grid-bridge.md"
       ],
       "latestAidocs": [
         "docs/ai/systems/task-planning/2026-04-05-gamescene-runtime-refactor.md",
@@ -236,7 +258,8 @@
         "docs/ai/integration/2026-04-05-mock-task-markers-on-grid.md",
         "docs/ai/integration/2026-04-05-floor-area-selection-foundation.md",
         "docs/ai/integration/2026-04-05-gamescene-runtime-refactor.md",
-        "docs/ai/integration/2026-04-05-b-line-player-channel-mock-gateway.md"
+        "docs/ai/integration/2026-04-05-b-line-player-channel-mock-gateway.md",
+        "docs/ai/integration/2026-04-05-worldcore-sim-grid-bridge.md"
       ],
       "latestAidocs": [
         "docs/ai/systems/world-grid/2026-04-05-gamescene-runtime-refactor.md",

@@ -17,7 +17,8 @@
 
 ## 当前 UI-first fake
 
-- 当前没有接入真实 UI；标记、蓝图和工作执行都由 domain tests 中的命令回放驱动。
+- 场景中玩家选区/工具栏已能生成领域命令并经 `WorldCoreWorldPort` 写入 `world-core`；验收面板仍可注入网关规则（如 `alwaysAccept`）。
+- 自主小人仍通过同步后的 `WorldGridConfig` 消费障碍与床位交互点；完整「领工—做工—完工」仍主要由领域与单测覆盖。
 - `world-core` 暂时只支持有限工作和建筑种类，用来先验证 A 线闭环。
 
 ## TDD 顺序
