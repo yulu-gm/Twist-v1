@@ -14,9 +14,9 @@
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `pawn-state` | 维护角色基础状态、名字、移动过渡和显示派生字段 | `docs/ai/system-standards/pawn-state.md` | `docs/ai/systems/pawn-state/` | `src/game/pawn-state.ts` | `tests/domain/pawn-state.test.ts` | `src/scenes/GameScene.ts` | `docs/ai/systems/pawn-state/2026-04-05-default-grid-wandering-pawns.md` |
 | `scene-hud` | 维护 HUD、状态卡、菜单和场景信息展示 | `docs/ai/system-standards/scene-hud.md` | `docs/ai/systems/scene-hud/` | `src/scenes/villager-tool-bar-config.ts` | `tests/component/villager-tool-bar-model.test.ts` | `src/scenes/GameScene.ts` | `docs/ai/systems/scene-hud/2026-04-05-villager-tool-bar.md` |
-| `selection-ui` | 维护选中、高亮、焦点和目标切换反馈 | `docs/ai/system-standards/selection-ui.md` | `docs/ai/systems/selection-ui/` | 暂无已登记实现文件 | 暂无已登记测试 | `src/scenes/GameScene.ts` | 暂无 routed aidoc |
+| `selection-ui` | 维护选中、高亮、焦点和目标切换反馈 | `docs/ai/system-standards/selection-ui.md` | `docs/ai/systems/selection-ui/` | `src/game/floor-selection.ts` | `tests/domain/floor-selection.test.ts` | `src/scenes/GameScene.ts` | `docs/ai/systems/selection-ui/2026-04-05-floor-area-selection-foundation.md` |
 | `task-planning` | 维护目标评估、工作选择和游荡决策 | `docs/ai/system-standards/task-planning.md` | `docs/ai/systems/task-planning/` | `src/game/wander-planning.ts` | `tests/domain/wander-planning.test.ts` | `src/scenes/GameScene.ts` | `docs/ai/systems/task-planning/2026-04-05-random-stone-obstacles.md` |
-| `world-grid` | 维护格子地图尺寸、邻格、边界和出生点 | `docs/ai/system-standards/world-grid.md` | `docs/ai/systems/world-grid/` | `src/game/world-grid.ts` | `tests/domain/world-grid.test.ts` | `src/scenes/GameScene.ts` | `docs/ai/systems/world-grid/2026-04-05-random-stone-obstacles.md` |
+| `world-grid` | 维护格子地图尺寸、邻格、边界和出生点 | `docs/ai/system-standards/world-grid.md` | `docs/ai/systems/world-grid/` | `src/game/world-grid.ts` | `tests/domain/world-grid.test.ts` | `src/scenes/GameScene.ts` | `docs/ai/systems/world-grid/2026-04-05-floor-area-selection-foundation.md` |
 
 ## push 前检查
 

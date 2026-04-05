@@ -2,7 +2,7 @@
 
 ## 系统职责摘要
 
-`selection-ui` 负责选中、高亮、焦点切换和目标对象切换反馈，目前标准文档已登记，实现仍待后续 routed aidoc 落地。
+`selection-ui` 负责选中、高亮、焦点切换和目标对象切换反馈；当前已落地地板框选底座，用于后续区域类型系统消费。
 
 ## 标准文档
 
@@ -10,11 +10,11 @@
 
 ## 当前关键实现文件
 
-- 暂无已登记实现文件
+- `src/game/floor-selection.ts`
 
 ## 当前关键测试文件
 
-- 暂无已登记测试
+- `tests/domain/floor-selection.test.ts`
 
 ## 当前接入场景文件
 
@@ -22,7 +22,7 @@
 
 ## 最新/历史 aidoc
 
-- 暂无本系统独立 routed aidoc；若将「选中格 / 指令目标」提升为一等选择模型，先补 aidoc 再登记实现文件
+- `docs/ai/systems/selection-ui/2026-04-05-floor-area-selection-foundation.md`
 
 ## 何时必须回填
 

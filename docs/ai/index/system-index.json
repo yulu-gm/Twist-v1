@@ -67,17 +67,24 @@
       "standardDoc": "docs/ai/system-standards/selection-ui.md",
       "aidocDir": "docs/ai/systems/selection-ui",
       "systemReadme": "docs/ai/systems/selection-ui/README.md",
-      "sourceFiles": [],
-      "testFiles": [],
+      "sourceFiles": [
+        "src/game/floor-selection.ts"
+      ],
+      "testFiles": [
+        "tests/domain/floor-selection.test.ts"
+      ],
       "sceneEntryFiles": [
         "src/scenes/GameScene.ts"
       ],
       "integrationFiles": [
         "docs/ai/integration/2026-04-05-default-grid-wandering-pawns.md",
         "docs/ai/integration/2026-04-05-goal-driven-pawn-ai-prototype.md",
-        "docs/ai/integration/2026-04-05-mock-task-markers-on-grid.md"
+        "docs/ai/integration/2026-04-05-mock-task-markers-on-grid.md",
+        "docs/ai/integration/2026-04-05-floor-area-selection-foundation.md"
       ],
-      "latestAidocs": []
+      "latestAidocs": [
+        "docs/ai/systems/selection-ui/2026-04-05-floor-area-selection-foundation.md"
+      ]
     },
     {
       "key": "task-planning",
@@ -127,12 +134,14 @@
         "docs/ai/integration/2026-04-05-default-grid-wandering-pawns.md",
         "docs/ai/integration/2026-04-05-random-stone-obstacles.md",
         "docs/ai/integration/2026-04-05-goal-driven-pawn-ai-prototype.md",
-        "docs/ai/integration/2026-04-05-mock-task-markers-on-grid.md"
+        "docs/ai/integration/2026-04-05-mock-task-markers-on-grid.md",
+        "docs/ai/integration/2026-04-05-floor-area-selection-foundation.md"
       ],
       "latestAidocs": [
         "docs/ai/systems/world-grid/2026-04-05-default-grid-wandering-pawns.md",
         "docs/ai/systems/world-grid/2026-04-05-random-stone-obstacles.md",
-        "docs/ai/systems/world-grid/2026-04-05-goal-driven-pawn-ai-prototype.md"
+        "docs/ai/systems/world-grid/2026-04-05-goal-driven-pawn-ai-prototype.md",
+        "docs/ai/systems/world-grid/2026-04-05-floor-area-selection-foundation.md"
       ]
     }
   ]
