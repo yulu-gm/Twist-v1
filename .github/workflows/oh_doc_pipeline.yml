@@ -1,0 +1,22 @@
+name: Auto Generate System Design Docs
+
+on:
+  push:
+    paths:
+      - 'oh-story/**.md'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          
+      - uses: Alex907795990/openharness-doc-pipeline@main
+        with:
+          api_key: ${{ secrets.OPENHARNESS_API_KEY }}
