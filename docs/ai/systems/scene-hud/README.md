@@ -2,7 +2,7 @@
 
 ## 系统职责摘要
 
-`scene-hud` 负责 HUD、状态卡、按钮和场景内信息展示，目前标准文档已登记，实现仍待后续路由的人工智能文档落地。
+`scene-hud` 负责 HUD、状态卡、按钮和场景内信息展示。当前 GameScene 运行时已拆成场景编排 + 抽出的 HUD/data 模块，玩家可见行为不变。
 
 ## 标准文档
 
@@ -10,17 +10,26 @@
 
 ## 当前关键实现文件
 
-- `src/scenes/villager-tool-bar-config.ts`（模拟数据、键码常量、`validateMockVillagerToolBarConfig`）
-- `src/scenes/mock-villager-tools.ts`（对上述模块的导出入口，兼容旧路径）
-- `src/scenes/mock-ground-items.ts`（格子模拟掉落物堆叠数据与按格查询）
-- `src/scenes/mock-grid-cell-info.ts`（格子悬停文案；可拼接掉落物行）
-- `src/scenes/mock-task-marker-commands.ts`（工具 `id` → 模拟是否视为对该格派发工作及显示标签）
-- `src/scenes/mock-pawn-profile-data.ts`（小人详情模拟档案，键对齐 `pawn-0` …）
+- `src/ui/hud-manager.ts`（time HUD、hover info、tool bar、roster、pawn detail 的 DOM 交互）
+- `src/data/villager-tools.ts`
+- `src/data/ground-items.ts`
+- `src/data/grid-cell-info.ts`
+- `src/data/task-markers.ts`
+- `src/data/pawn-profiles.ts`
+- `src/scenes/GameScene.ts`（仅负责布局、输入和状态 wiring）
+- `src/scenes/villager-tool-bar-config.ts`（已弃用的兼容前向）
+- `src/scenes/mock-villager-tools.ts`（已弃用的兼容前向）
+- `src/scenes/mock-ground-items.ts`（已弃用的兼容前向）
+- `src/scenes/mock-grid-cell-info.ts`（已弃用的兼容前向）
+- `src/scenes/mock-task-marker-commands.ts`（已弃用的兼容前向）
+- `src/scenes/mock-task-marker-selection.ts`（已弃用的兼容前向）
+- `src/scenes/mock-pawn-profile-data.ts`（已弃用的兼容前向）
 
 ## 当前关键测试文件
 
 - `tests/component/villager-tool-bar-model.test.ts`
 - `tests/component/mock-task-marker-commands.test.ts`
+- `tests/component/mock-task-marker-selection.test.ts`
 
 ## 当前接入场景文件
 
@@ -28,6 +37,7 @@
 
 ## 最新/历史人工智能文档
 
+- `docs/ai/systems/scene-hud/2026-04-05-gamescene-runtime-refactor.md`
 - `docs/ai/systems/scene-hud/2026-04-05-mock-ground-items.md`
 - `docs/ai/systems/scene-hud/2026-04-05-villager-tool-bar.md`
 - `docs/ai/systems/scene-hud/2026-04-05-mock-task-markers-on-grid.md`

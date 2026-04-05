@@ -2,7 +2,7 @@
 
 ## 系统职责摘要
 
-`pawn-state` 负责角色基础状态、名字、逻辑格子位置、移动过渡和供场景层读取的显示派生字段。
+`pawn-state` 负责角色基础状态、名字、逻辑格子位置、移动过渡和供场景层读取的显示派生字段。当前它仍是角色状态权威源，tick 级编排由 `sim-loop` 接手，场景消费改为通过渲染器读取显示状态。
 
 ## 标准文档
 
@@ -11,6 +11,8 @@
 ## 当前关键实现文件
 
 - `src/game/pawn-state.ts`
+- `src/game/sim-loop.ts`
+- `src/scenes/renderers/pawn-renderer.ts`
 
 ## 当前关键测试文件
 
@@ -18,10 +20,11 @@
 
 ## 当前接入场景文件
 
-- `src/scenes/GameScene.ts`
+- `src/scenes/renderers/pawn-renderer.ts`
 
 ## 最新与历史人工智能文档
 
+- `docs/ai/systems/pawn-state/2026-04-05-gamescene-runtime-refactor.md`
 - `docs/ai/systems/pawn-state/2026-04-05-default-grid-wandering-pawns.md`
 - `docs/ai/systems/pawn-state/2026-04-05-goal-driven-pawn-ai-prototype.md`
 

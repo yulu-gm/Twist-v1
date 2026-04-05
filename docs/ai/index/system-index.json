@@ -7,7 +7,10 @@
       "aidocDir": "docs/ai/systems/time-of-day",
       "systemReadme": "docs/ai/systems/time-of-day/README.md",
       "sourceFiles": [
-        "src/game/time-of-day.ts"
+        "src/game/time-of-day.ts",
+        "src/ui/hud-manager.ts",
+        "src/scenes/renderers/grid-renderer.ts",
+        "src/scenes/renderers/pawn-renderer.ts"
       ],
       "testFiles": [
         "tests/domain/time-of-day.test.ts"
@@ -16,9 +19,11 @@
         "src/scenes/GameScene.ts"
       ],
       "integrationFiles": [
-        "docs/ai/integration/2026-04-05-time-of-day-system.md"
+        "docs/ai/integration/2026-04-05-time-of-day-system.md",
+        "docs/ai/integration/2026-04-05-gamescene-runtime-refactor.md"
       ],
       "latestAidocs": [
+        "docs/ai/systems/time-of-day/2026-04-05-gamescene-runtime-refactor.md",
         "docs/ai/systems/time-of-day/2026-04-05-time-of-day-system.md"
       ]
     },
@@ -29,7 +34,9 @@
       "aidocDir": "docs/ai/systems/pawn-state",
       "systemReadme": "docs/ai/systems/pawn-state/README.md",
       "sourceFiles": [
-        "src/game/pawn-state.ts"
+        "src/game/pawn-state.ts",
+        "src/game/sim-loop.ts",
+        "src/scenes/renderers/pawn-renderer.ts"
       ],
       "testFiles": [
         "tests/domain/pawn-state.test.ts"
@@ -40,9 +47,11 @@
       "integrationFiles": [
         "docs/ai/integration/2026-04-05-default-grid-wandering-pawns.md",
         "docs/ai/integration/2026-04-05-goal-driven-pawn-ai-prototype.md",
-        "docs/ai/integration/2026-04-05-mock-task-markers-on-grid.md"
+        "docs/ai/integration/2026-04-05-mock-task-markers-on-grid.md",
+        "docs/ai/integration/2026-04-05-gamescene-runtime-refactor.md"
       ],
       "latestAidocs": [
+        "docs/ai/systems/pawn-state/2026-04-05-gamescene-runtime-refactor.md",
         "docs/ai/systems/pawn-state/2026-04-05-default-grid-wandering-pawns.md",
         "docs/ai/systems/pawn-state/2026-04-05-goal-driven-pawn-ai-prototype.md"
       ]
@@ -54,16 +63,24 @@
       "aidocDir": "docs/ai/systems/scene-hud",
       "systemReadme": "docs/ai/systems/scene-hud/README.md",
       "sourceFiles": [
+        "src/ui/hud-manager.ts",
+        "src/data/villager-tools.ts",
+        "src/data/ground-items.ts",
+        "src/data/grid-cell-info.ts",
+        "src/data/task-markers.ts",
+        "src/data/pawn-profiles.ts",
         "src/scenes/villager-tool-bar-config.ts",
         "src/scenes/mock-villager-tools.ts",
         "src/scenes/mock-ground-items.ts",
         "src/scenes/mock-grid-cell-info.ts",
         "src/scenes/mock-task-marker-commands.ts",
+        "src/scenes/mock-task-marker-selection.ts",
         "src/scenes/mock-pawn-profile-data.ts"
       ],
       "testFiles": [
         "tests/component/villager-tool-bar-model.test.ts",
-        "tests/component/mock-task-marker-commands.test.ts"
+        "tests/component/mock-task-marker-commands.test.ts",
+        "tests/component/mock-task-marker-selection.test.ts"
       ],
       "sceneEntryFiles": [
         "src/scenes/GameScene.ts"
@@ -75,9 +92,11 @@
         "docs/ai/integration/2026-04-05-villager-tool-bar.md",
         "docs/ai/integration/2026-04-05-mock-ground-items.md",
         "docs/ai/integration/2026-04-05-mock-task-markers-on-grid.md",
-        "docs/ai/integration/2026-04-05-pawn-roster-detail-panel.md"
+        "docs/ai/integration/2026-04-05-pawn-roster-detail-panel.md",
+        "docs/ai/integration/2026-04-05-gamescene-runtime-refactor.md"
       ],
       "latestAidocs": [
+        "docs/ai/systems/scene-hud/2026-04-05-gamescene-runtime-refactor.md",
         "docs/ai/systems/scene-hud/2026-04-05-mock-ground-items.md",
         "docs/ai/systems/scene-hud/2026-04-05-villager-tool-bar.md",
         "docs/ai/systems/scene-hud/2026-04-05-mock-task-markers-on-grid.md",
@@ -92,10 +111,13 @@
       "aidocDir": "docs/ai/systems/selection-ui",
       "systemReadme": "docs/ai/systems/selection-ui/README.md",
       "sourceFiles": [
-        "src/game/floor-selection.ts"
+        "src/game/floor-selection.ts",
+        "src/scenes/renderers/selection-renderer.ts",
+        "src/data/task-markers.ts"
       ],
       "testFiles": [
-        "tests/domain/floor-selection.test.ts"
+        "tests/domain/floor-selection.test.ts",
+        "tests/component/mock-task-marker-selection.test.ts"
       ],
       "sceneEntryFiles": [
         "src/scenes/GameScene.ts"
@@ -104,9 +126,11 @@
         "docs/ai/integration/2026-04-05-default-grid-wandering-pawns.md",
         "docs/ai/integration/2026-04-05-goal-driven-pawn-ai-prototype.md",
         "docs/ai/integration/2026-04-05-mock-task-markers-on-grid.md",
-        "docs/ai/integration/2026-04-05-floor-area-selection-foundation.md"
+        "docs/ai/integration/2026-04-05-floor-area-selection-foundation.md",
+        "docs/ai/integration/2026-04-05-gamescene-runtime-refactor.md"
       ],
       "latestAidocs": [
+        "docs/ai/systems/selection-ui/2026-04-05-gamescene-runtime-refactor.md",
         "docs/ai/systems/selection-ui/2026-04-05-floor-area-selection-foundation.md"
       ]
     },
@@ -118,7 +142,9 @@
       "systemReadme": "docs/ai/systems/task-planning/README.md",
       "sourceFiles": [
         "src/game/wander-planning.ts",
-        "src/game/goal-driven-planning.ts"
+        "src/game/goal-driven-planning.ts",
+        "src/game/sim-config.ts",
+        "src/game/sim-loop.ts"
       ],
       "testFiles": [
         "tests/domain/wander-planning.test.ts",
@@ -131,9 +157,11 @@
         "docs/ai/integration/2026-04-05-default-grid-wandering-pawns.md",
         "docs/ai/integration/2026-04-05-random-stone-obstacles.md",
         "docs/ai/integration/2026-04-05-goal-driven-pawn-ai-prototype.md",
-        "docs/ai/integration/2026-04-05-mock-task-markers-on-grid.md"
+        "docs/ai/integration/2026-04-05-mock-task-markers-on-grid.md",
+        "docs/ai/integration/2026-04-05-gamescene-runtime-refactor.md"
       ],
       "latestAidocs": [
+        "docs/ai/systems/task-planning/2026-04-05-gamescene-runtime-refactor.md",
         "docs/ai/systems/task-planning/2026-04-05-default-grid-wandering-pawns.md",
         "docs/ai/systems/task-planning/2026-04-05-random-stone-obstacles.md",
         "docs/ai/systems/task-planning/2026-04-05-goal-driven-pawn-ai-prototype.md"
@@ -146,7 +174,12 @@
       "aidocDir": "docs/ai/systems/world-grid",
       "systemReadme": "docs/ai/systems/world-grid/README.md",
       "sourceFiles": [
-        "src/game/world-grid.ts"
+        "src/game/world-grid.ts",
+        "src/data/grid-cell-info.ts",
+        "src/data/ground-items.ts",
+        "src/scenes/renderers/grid-renderer.ts",
+        "src/scenes/renderers/ground-items-renderer.ts",
+        "src/scenes/renderers/selection-renderer.ts"
       ],
       "testFiles": [
         "tests/domain/world-grid.test.ts"
@@ -159,9 +192,11 @@
         "docs/ai/integration/2026-04-05-random-stone-obstacles.md",
         "docs/ai/integration/2026-04-05-goal-driven-pawn-ai-prototype.md",
         "docs/ai/integration/2026-04-05-mock-task-markers-on-grid.md",
-        "docs/ai/integration/2026-04-05-floor-area-selection-foundation.md"
+        "docs/ai/integration/2026-04-05-floor-area-selection-foundation.md",
+        "docs/ai/integration/2026-04-05-gamescene-runtime-refactor.md"
       ],
       "latestAidocs": [
+        "docs/ai/systems/world-grid/2026-04-05-gamescene-runtime-refactor.md",
         "docs/ai/systems/world-grid/2026-04-05-default-grid-wandering-pawns.md",
         "docs/ai/systems/world-grid/2026-04-05-random-stone-obstacles.md",
         "docs/ai/systems/world-grid/2026-04-05-goal-driven-pawn-ai-prototype.md",

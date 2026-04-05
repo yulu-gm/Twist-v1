@@ -2,7 +2,7 @@
 
 ## 系统职责摘要
 
-`task-planning` 负责目标评估、工作选择、游荡决策和可执行动作候选，是当前角色自主行为的规则入口。
+`task-planning` 负责目标评估、工作选择、游荡决策和可执行动作候选，是当前角色自主行为的规则入口。现在目标驱动规划、游荡规划、配置常量和 tick 编排分别由独立模块承载。
 
 ## 标准文档
 
@@ -10,7 +10,10 @@
 
 ## 当前关键实现文件
 
+- `src/game/goal-driven-planning.ts`
 - `src/game/wander-planning.ts`
+- `src/game/sim-config.ts`
+- `src/game/sim-loop.ts`
 
 ## 当前关键测试文件
 
@@ -22,6 +25,7 @@
 
 ## 最新与历史人工智能文档
 
+- `docs/ai/systems/task-planning/2026-04-05-gamescene-runtime-refactor.md`
 - `docs/ai/systems/task-planning/2026-04-05-random-stone-obstacles.md`
 - `docs/ai/systems/task-planning/2026-04-05-default-grid-wandering-pawns.md`
 - `docs/ai/systems/task-planning/2026-04-05-goal-driven-pawn-ai-prototype.md`
