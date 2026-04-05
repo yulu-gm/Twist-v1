@@ -27,7 +27,7 @@
         z-index: 10;
         display: flex;
         flex-direction: row;
-        align-items: end;
+        align-items: flex-end;
         gap: 16px;
         padding: 10px 12px;
         border-radius: 10px;
@@ -118,6 +118,92 @@
         outline-offset: 2px;
       }
 
+      #b-acceptance-panel {
+        position: fixed;
+        right: 12px;
+        bottom: 12px;
+        z-index: 12;
+        width: min(340px, calc(100vw - 24px));
+        max-height: min(52vh, 420px);
+        overflow: auto;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid #5c5346;
+        background: rgba(28, 24, 20, 0.94);
+        color: #f5f1e8;
+        font-size: 12px;
+        line-height: 1.45;
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+        pointer-events: auto;
+      }
+
+      #b-acceptance-panel label {
+        display: block;
+        font-size: 11px;
+        opacity: 0.88;
+        letter-spacing: 0.04em;
+        margin-bottom: 4px;
+      }
+
+      #b-acceptance-scenario-select {
+        width: 100%;
+        padding: 6px 8px;
+        border-radius: 6px;
+        border: 1px solid #5c5346;
+        background: #242019;
+        color: #f5f1e8;
+        font: inherit;
+        cursor: pointer;
+        margin-bottom: 8px;
+      }
+
+      #b-acceptance-scenario-select:focus {
+        outline: 2px solid #81b29a;
+        outline-offset: 2px;
+      }
+
+      #b-acceptance-detail[hidden] {
+        display: none !important;
+      }
+
+      #b-acceptance-scenario-goal {
+        font-size: 11px;
+        color: #d4c4a8;
+        margin: 0 0 8px;
+      }
+
+      #b-acceptance-scenario-steps {
+        margin: 0 0 8px 1.1em;
+        padding: 0;
+        font-size: 11px;
+        color: #eadfcb;
+      }
+
+      #b-acceptance-scenario-steps li {
+        margin-bottom: 5px;
+      }
+
+      #b-acceptance-replay-commands {
+        width: 100%;
+        padding: 6px 10px;
+        border-radius: 6px;
+        border: 1px solid #5c5346;
+        background: #2a241c;
+        color: #f5f1e8;
+        font: inherit;
+        font-size: 11px;
+        cursor: pointer;
+      }
+
+      #b-acceptance-replay-commands:hover {
+        border-color: #e8c547;
+      }
+
+      #b-acceptance-replay-commands:focus-visible {
+        outline: 2px solid #81b29a;
+        outline-offset: 2px;
+      }
+
       #grid-hover-info {
         position: fixed;
         left: 12px;
@@ -138,6 +224,42 @@
 
       #grid-hover-info[hidden] {
         display: none !important;
+      }
+
+      #player-channel-hint {
+        position: fixed;
+        left: 50%;
+        bottom: 96px;
+        transform: translateX(-50%);
+        z-index: 11;
+        max-width: min(560px, calc(100vw - 24px));
+        padding: 8px 12px;
+        border-radius: 8px;
+        border: 1px solid #5c5346;
+        background: rgba(28, 24, 20, 0.92);
+        color: #f5f1e8;
+        font-size: 12px;
+        line-height: 1.4;
+        text-align: center;
+        pointer-events: none;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+      }
+
+      #player-channel-hint .player-channel-mode {
+        font-weight: 600;
+        letter-spacing: 0.02em;
+      }
+
+      #player-channel-hint .player-channel-result {
+        margin-top: 4px;
+        font-size: 11px;
+        color: #d4c4a8;
+      }
+
+      #player-channel-hint .player-channel-contract {
+        margin-top: 4px;
+        font-size: 10px;
+        color: #a89878;
       }
 
       #villager-tool-bar {
@@ -345,13 +467,14 @@
         font-size: 11px;
         color: #eadfcb;
       }
+
     </style>
   </head>
   <body>
     <div id="scene-hud" aria-label="场景菜单栏">
       <div class="scene-hud-group">
         <label for="scene-variant">测试场景</label>
-        <select id="scene-variant" title="切换原型测试场景">
+        <select id="scene-variant" title="仅切换显示名组合（与右下角验收独立）">
           <option value="default">默认（原显示名）</option>
           <option value="alt-en">随机英文名 ×5</option>
         </select>
@@ -378,7 +501,26 @@
         </div>
       </div>
     </div>
+    <aside id="b-acceptance-panel" aria-label="B 线验收（切换将重启场景）">
+      <label for="b-acceptance-scenario-select">B 线验收场景</label>
+      <select
+        id="b-acceptance-scenario-select"
+        title="切换后整场景重新生成；各场景可自带 mock / 模拟桩配置"
+      ></select>
+      <div id="b-acceptance-detail">
+        <p id="b-acceptance-scenario-goal"></p>
+        <ol id="b-acceptance-scenario-steps"></ol>
+        <button id="b-acceptance-replay-commands" type="button" title="将当前会话已记录的领域命令按序再次提交">
+          回放命令日志
+        </button>
+      </div>
+    </aside>
     <div id="grid-hover-info" hidden aria-live="polite"></div>
+    <div id="player-channel-hint" aria-live="polite">
+      <div id="player-channel-mode" class="player-channel-mode"></div>
+      <div id="player-channel-result" class="player-channel-result"></div>
+      <div id="player-channel-contract" class="player-channel-contract"></div>
+    </div>
     <div id="villager-tool-bar" role="toolbar" aria-label="小人指令工具"></div>
     <div id="pawn-roster" role="tablist" aria-label="人物略缩图"></div>
     <aside id="pawn-detail-panel" hidden aria-live="polite"></aside>

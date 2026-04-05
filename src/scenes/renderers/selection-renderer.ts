@@ -3,7 +3,12 @@
  */
 
 import Phaser from "phaser";
-import { coordKey, type GridCoord, type WorldGridConfig } from "../../game/world-grid";
+import {
+  coordKey,
+  parseCoordKey as parseGridCoordKey,
+  type GridCoord,
+  type WorldGridConfig
+} from "../../game/world-grid";
 import type { FloorSelectionState } from "../../game/floor-selection";
 
 export function redrawFloorSelection(
@@ -95,7 +100,7 @@ export function syncTaskMarkerView(
   g.lineStyle(2, 0xd4a84b, 0.92);
 
   for (const [key, taskName] of taskMarkersByCell) {
-    const coord = parseCoordKey(key);
+    const coord = parseGridCoordKey(key);
     if (!coord) continue;
     const cx = ox + coord.col * cs + cs / 2;
     const cy = oy + coord.row * cs + cs / 2;
@@ -103,7 +108,8 @@ export function syncTaskMarkerView(
     g.strokeCircle(cx, cy, radius);
 
     let text = textMap.get(key);
-    if (!text) {
+    if (!text || !text.active) {
+      if (text) textMap.delete(key);
       text = scene.add
         .text(cx, cy, taskName, {
           fontFamily: "Segoe UI, sans-serif",
@@ -123,11 +129,3 @@ export function syncTaskMarkerView(
   }
 }
 
-function parseCoordKey(key: string): GridCoord | null {
-  const comma = key.indexOf(",");
-  if (comma <= 0) return null;
-  const col = Number(key.slice(0, comma));
-  const row = Number(key.slice(comma + 1));
-  if (!Number.isInteger(col) || !Number.isInteger(row)) return null;
-  return { col, row };
-}

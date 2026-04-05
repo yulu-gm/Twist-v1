@@ -79,7 +79,8 @@ export function drawInteractionPoints(
     drawInteractionShape(g, point, pos);
 
     let label = labelMap.get(point.id);
-    if (!label) {
+    if (!label || !label.active) {
+      if (label) labelMap.delete(point.id);
       label = scene.add
         .text(pos.x, pos.y + 18, point.kind.toUpperCase(), {
           fontFamily: "Segoe UI, sans-serif",

@@ -10,8 +10,10 @@
 
 ## 当前关键实现文件
 
-- `src/ui/hud-manager.ts`（time HUD、hover info、tool bar、roster、pawn detail 的 DOM 交互）
+- `src/ui/hud-manager.ts`（time HUD、hover info、tool bar、roster、pawn detail、玩家通道与 B 线验收面板的 DOM 交互）
 - `src/data/villager-tools.ts`
+- `src/data/player-acceptance-scenarios.ts`（验收场景与 mock 网关配置）
+- `src/player/*`（S0 命令、mock 世界网关、提交编排、模式文案、需求信号桩；由 GameScene 编排）
 - `src/data/ground-items.ts`
 - `src/data/grid-cell-info.ts`
 - `src/data/task-markers.ts`
@@ -30,6 +32,8 @@
 - `tests/component/villager-tool-bar-model.test.ts`
 - `tests/component/mock-task-marker-commands.test.ts`
 - `tests/component/mock-task-marker-selection.test.ts`
+- `tests/scene-hud-markup.test.ts`
+- `tests/domain/commit-player-intent.test.ts`、`tests/domain/mock-world-port.test.ts`、`tests/domain/player-channel-domain-command.test.ts`、`tests/domain/need-signals.test.ts`、`tests/domain/player-acceptance-scenarios.test.ts`
 
 ## 当前接入场景文件
 
@@ -43,6 +47,7 @@
 - `docs/ai/systems/scene-hud/2026-04-05-mock-task-markers-on-grid.md`
 - `docs/ai/systems/scene-hud/2026-04-05-pawn-roster-detail-panel.md`
 - `docs/ai/systems/scene-hud/2026-04-05-time-of-day-system.md`
+- `docs/ai/systems/scene-hud/2026-04-05-b-line-player-channel.md`
 
 ## 何时必须回填
 

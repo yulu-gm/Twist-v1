@@ -15,6 +15,15 @@ describe("scene-hud markup", () => {
     expect(html).toContain('id="scene-speed-1"');
     expect(html).toContain('id="scene-speed-2"');
     expect(html).toContain('id="scene-speed-3"');
+    expect(html).toContain('id="scene-variant"');
+    expect(html).toContain('id="player-channel-hint"');
+    expect(html).toContain('id="player-channel-mode"');
+    expect(html).toContain('id="player-channel-result"');
+    expect(html).toContain('id="b-acceptance-panel"');
+    expect(html).toContain('id="b-acceptance-scenario-select"');
+    expect(html).toContain('id="b-acceptance-scenario-goal"');
+    expect(html).toContain('id="b-acceptance-scenario-steps"');
+    expect(html).toContain('id="b-acceptance-replay-commands"');
     expect(html).toContain('aria-live="polite"');
   });
 });
