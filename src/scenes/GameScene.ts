@@ -46,6 +46,7 @@ import {
   MOCK_VILLAGER_TOOLS,
   MOCK_VILLAGER_TOOL_KEY_CODES
 } from "./mock-villager-tools";
+import { mockPawnProfileForId } from "./mock-pawn-profile-data";
 
 const MOVE_DURATION_SEC = 0.42;
 /** 开局随机散落的石头格数量（不与默认出生点重叠）。 */
@@ -80,6 +81,10 @@ export class GameScene extends Phaser.Scene {
   private toolSlotEls: HTMLElement[] = [];
   private toolKeyObjects: Phaser.Input.Keyboard.Key[] = [];
   private toolUiAbort: AbortController | null = null;
+  private pawnRosterAbort: AbortController | null = null;
+  private pawnRosterSlotEls: HTMLElement[] = [];
+  private selectedPawnId: string | null = null;
+  private pawnDetailEl: HTMLElement | null = null;
   /** 各格上的 mock 任务标记文案（键为 `coordKey`）。 */
   private taskMarkersByCell = new Map<string, string>();
   private taskMarkerGraphics!: Phaser.GameObjects.Graphics;
@@ -151,6 +156,7 @@ export class GameScene extends Phaser.Scene {
     this.bindSceneVariantSelect();
     this.hoverHudEl = document.getElementById("grid-hover-info");
     this.setupVillagerToolBar();
+    this.setupPawnRosterUi();
 
     this.taskMarkerGraphics = this.add.graphics();
     this.taskMarkerGraphics.setDepth(35);
@@ -328,6 +334,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.syncHoverFromPointer();
+    this.syncPawnDetailPanel();
   }
 
   private layoutGrid(): void {
@@ -664,5 +671,141 @@ export class GameScene extends Phaser.Scene {
     const toolRoot = document.getElementById("villager-tool-bar");
     if (toolRoot) toolRoot.replaceChildren();
     this.events.off(Phaser.Scenes.Events.SHUTDOWN, this.teardownVillagerToolBar, this);
+  }
+
+  private setupPawnRosterUi(): void {
+    this.teardownPawnRosterUi();
+    const rosterRoot = document.getElementById("pawn-roster");
+    this.pawnDetailEl = document.getElementById("pawn-detail-panel");
+    if (!rosterRoot || !this.pawnDetailEl) return;
+
+    this.pawnRosterAbort = new AbortController();
+    const { signal } = this.pawnRosterAbort;
+
+    for (const pawn of this.pawns) {
+      const slot = document.createElement("button");
+      slot.type = "button";
+      slot.className = "pawn-roster-item";
+      slot.dataset.pawnId = pawn.id;
+      slot.role = "tab";
+      slot.title = `查看 ${pawn.name}`;
+      slot.setAttribute("aria-label", `${pawn.name}，打开人物信息`);
+
+      const thumb = document.createElement("span");
+      thumb.className = "pawn-roster-thumb";
+      thumb.style.backgroundColor = this.phaserFillColorToCss(pawn.fillColor);
+      thumb.setAttribute("aria-hidden", "true");
+
+      const nameEl = document.createElement("span");
+      nameEl.className = "pawn-roster-name";
+      nameEl.textContent = pawn.name;
+
+      slot.append(thumb, nameEl);
+      slot.addEventListener(
+        "click",
+        () => {
+          this.selectPawnForRoster(pawn.id);
+        },
+        { signal }
+      );
+      rosterRoot.appendChild(slot);
+      this.pawnRosterSlotEls.push(slot);
+    }
+
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.teardownPawnRosterUi, this);
+    this.selectPawnForRoster(this.pawns[0]?.id ?? null);
+  }
+
+  private selectPawnForRoster(pawnId: string | null): void {
+    this.selectedPawnId = pawnId;
+    for (const el of this.pawnRosterSlotEls) {
+      const on = el.dataset.pawnId === pawnId;
+      el.classList.toggle("selected", on);
+      el.setAttribute("aria-selected", on ? "true" : "false");
+    }
+    this.syncPawnDetailPanel();
+  }
+
+  private syncPawnDetailPanel(): void {
+    const panel = this.pawnDetailEl;
+    if (!panel) return;
+    const id = this.selectedPawnId;
+    if (!id) {
+      panel.hidden = true;
+      panel.replaceChildren();
+      return;
+    }
+    const pawn = this.pawns.find((p) => p.id === id);
+    if (!pawn) {
+      panel.hidden = true;
+      panel.replaceChildren();
+      return;
+    }
+
+    panel.hidden = false;
+    const profile = mockPawnProfileForId(pawn.id);
+    const tags = profile
+      ? profile.mockTags
+          .map((t) => `<span class="pawn-detail-tag">${this.escapeHtml(t)}</span>`)
+          .join("")
+      : "";
+
+    const goal = pawn.currentGoal?.kind ?? "—";
+    const action = pawn.currentAction?.kind ?? "—";
+    const n = pawn.needs;
+
+    panel.innerHTML = `
+      <h2>${this.escapeHtml(pawn.name)}</h2>
+      <p class="pawn-detail-epithet">${this.escapeHtml(profile?.epithet ?? "（无 mock 档案）")}</p>
+      <div class="pawn-detail-section">
+        <div class="pawn-detail-label">简介（mock）</div>
+        <div>${this.escapeHtml(profile?.bio ?? "暂无。")}</div>
+      </div>
+      <div class="pawn-detail-section">
+        <div class="pawn-detail-label">备注（mock）</div>
+        <div>${this.escapeHtml(profile?.notes ?? "—")}</div>
+      </div>
+      <div class="pawn-detail-section">
+        <div class="pawn-detail-label">当前状态</div>
+        <div>饥饿 ${n.hunger.toFixed(1)}　休息 ${n.rest.toFixed(1)}　娱乐 ${n.recreation.toFixed(1)}</div>
+        <div>目标 <code style="font-size:12px;color:#d4c4a8">${this.escapeHtml(String(goal))}</code>
+        　行动 <code style="font-size:12px;color:#d4c4a8">${this.escapeHtml(String(action))}</code></div>
+        <div style="font-size:12px;color:#a89878;margin-top:4px">${this.escapeHtml(pawn.debugLabel)}</div>
+      </div>
+      ${
+        tags
+          ? `<div class="pawn-detail-section"><div class="pawn-detail-label">标签（mock）</div><div class="pawn-detail-tags">${tags}</div></div>`
+          : ""
+      }
+    `;
+  }
+
+  private phaserFillColorToCss(fillColor: number): string {
+    const rgb = fillColor & 0xffffff;
+    return `#${rgb.toString(16).padStart(6, "0")}`;
+  }
+
+  private escapeHtml(raw: string): string {
+    return raw
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  private teardownPawnRosterUi(): void {
+    this.pawnRosterAbort?.abort();
+    this.pawnRosterAbort = null;
+    this.pawnRosterSlotEls = [];
+    this.selectedPawnId = null;
+    this.pawnDetailEl = null;
+    const roster = document.getElementById("pawn-roster");
+    if (roster) roster.replaceChildren();
+    const panel = document.getElementById("pawn-detail-panel");
+    if (panel) {
+      panel.hidden = true;
+      panel.replaceChildren();
+    }
+    this.events.off(Phaser.Scenes.Events.SHUTDOWN, this.teardownPawnRosterUi, this);
   }
 }
