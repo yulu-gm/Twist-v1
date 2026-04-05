@@ -70,10 +70,12 @@
         "src/scenes/GameScene.ts"
       ],
       "integrationFiles": [
-        "docs/ai/integration/2026-04-05-default-grid-wandering-pawns.md"
+        "docs/ai/integration/2026-04-05-default-grid-wandering-pawns.md",
+        "docs/ai/integration/2026-04-05-random-stone-obstacles.md"
       ],
       "latestAidocs": [
-        "docs/ai/systems/task-planning/2026-04-05-default-grid-wandering-pawns.md"
+        "docs/ai/systems/task-planning/2026-04-05-default-grid-wandering-pawns.md",
+        "docs/ai/systems/task-planning/2026-04-05-random-stone-obstacles.md"
       ]
     },
     {
@@ -92,10 +94,12 @@
         "src/scenes/GameScene.ts"
       ],
       "integrationFiles": [
-        "docs/ai/integration/2026-04-05-default-grid-wandering-pawns.md"
+        "docs/ai/integration/2026-04-05-default-grid-wandering-pawns.md",
+        "docs/ai/integration/2026-04-05-random-stone-obstacles.md"
       ],
       "latestAidocs": [
-        "docs/ai/systems/world-grid/2026-04-05-default-grid-wandering-pawns.md"
+        "docs/ai/systems/world-grid/2026-04-05-default-grid-wandering-pawns.md",
+        "docs/ai/systems/world-grid/2026-04-05-random-stone-obstacles.md"
       ]
     }
   ]

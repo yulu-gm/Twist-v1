@@ -22,6 +22,7 @@
 
 ## 最新/历史 aidoc
 
+- `docs/ai/systems/world-grid/2026-04-05-random-stone-obstacles.md`
 - `docs/ai/systems/world-grid/2026-04-05-default-grid-wandering-pawns.md`
 
 ## 何时必须回填

@@ -7,6 +7,13 @@ description: Use when Twist_V1 receives a new gameplay, interaction, rules, or m
 
 把新增玩法、改交互、扩系统、补规则这类需求先路由成可管理的子系统任务，再进入设计、TDD 和实现。本 Skill 只负责拆分和分派，不直接完成设计或实现。
 
+分拆清单与注册表权威副本：
+
+- `references/demand-router.md`
+- `references/system-registry.md`
+- `references/subagent-contract.md`
+- `references/skill-tdd.md`
+
 ## Trigger
 
 必须先走本 Skill：
