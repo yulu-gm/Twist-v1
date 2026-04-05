@@ -1,0 +1,19 @@
+{
+  "_comment": "角色（Pawn）数据结构示例，用于说明字段约定，非运行时加载文件",
+  "id": "pawn_001",
+  "name": "艾拉",
+  "traits": ["勤劳", "胆小"],
+  "skills": {
+    "construction": 4,
+    "farming": 6,
+    "combat": 2,
+    "medicine": 1
+  },
+  "needs": {
+    "hunger": 0.8,
+    "rest": 0.6,
+    "safety": 0.9
+  },
+  "currentJob": null,
+  "currentGoal": null
+}

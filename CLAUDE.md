@@ -1,0 +1,28 @@
+# Twist_V1 — Claude Code 入口
+
+本仓库由 Agent 主导开发。进行任何有意义的修改前，请按顺序阅读以下文件：
+
+1. `.agent/system-prompt.md` — 行为约束与质量标准
+2. `.agent/repo-rules.md` — 目录结构规则与变更管理
+3. `.agent/coding-standards.md` — 语言、风格与架构指导
+4. `.agent/doc-rules.md` — 文档写作与存放规则
+5. `.agent/task-workflow.md` — 功能开发与缺陷修复工作流
+
+## 技术栈速查
+
+- **运行时**：Phaser 3 + TypeScript
+- **构建**：Vite
+- **测试**：Vitest
+- **启动**：`npm run dev` | **测试**：`npm run test` | **构建**：`npm run build`
+
+## 目录职责速查
+
+| 目录 | 用途 |
+|------|------|
+| `src/game/` | 模拟层：世界状态、实体、目标、工作、行动 |
+| `src/scenes/` | 表现层：Phaser 场景编排与 UI |
+| `data/` | 静态游戏数据与 JSON 配置 |
+| `tests/` | 自动化测试（优先覆盖确定性逻辑） |
+| `tools/` | 校验脚本与开发工具 |
+| `docs/ai/` | 系统规格、架构说明（Agent 消费） |
+| `docs/human/` | 上手指南、协作说明（人类消费） |
