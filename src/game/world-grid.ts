@@ -114,6 +114,23 @@ export function cellAtWorldPixel(
   return cell;
 }
 
+export function worldPointToCell(
+  config: WorldGridConfig,
+  worldXPx: number,
+  worldYPx: number,
+  gridOriginXPx = 0,
+  gridOriginYPx = 0
+): GridCoord | undefined {
+  const localX = worldXPx - gridOriginXPx;
+  const localY = worldYPx - gridOriginYPx;
+  const cell = {
+    col: Math.floor(localX / config.cellSizePx),
+    row: Math.floor(localY / config.cellSizePx)
+  };
+  if (!isInsideGrid(config, cell)) return undefined;
+  return cell;
+}
+
 const ORTHO_OFFSETS: readonly GridCoord[] = [
   { col: 1, row: 0 },
   { col: -1, row: 0 },
@@ -169,6 +186,35 @@ export function pickRandomBlockedCells(
 
 export function blockedKeysFromCells(cells: readonly GridCoord[]): ReadonlySet<string> {
   return new Set(cells.map((cell) => coordKey(cell)));
+}
+
+export function rectCellsInclusive(
+  config: WorldGridConfig,
+  startCell: GridCoord,
+  endCell: GridCoord
+): GridCoord[] {
+  const minCol = Math.min(startCell.col, endCell.col);
+  const maxCol = Math.max(startCell.col, endCell.col);
+  const minRow = Math.min(startCell.row, endCell.row);
+  const maxRow = Math.max(startCell.row, endCell.row);
+  const out: GridCoord[] = [];
+
+  for (let row = minRow; row <= maxRow; row++) {
+    for (let col = minCol; col <= maxCol; col++) {
+      const cell = { col, row };
+      if (isInsideGrid(config, cell)) out.push(cell);
+    }
+  }
+
+  return out;
+}
+
+export function rectCellKeysInclusive(
+  config: WorldGridConfig,
+  startCell: GridCoord,
+  endCell: GridCoord
+): ReadonlySet<string> {
+  return new Set(rectCellsInclusive(config, startCell, endCell).map(coordKey));
 }
 
 export function coordKey(cell: GridCoord): string {

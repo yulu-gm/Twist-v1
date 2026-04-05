@@ -1,5 +1,14 @@
 import Phaser from "phaser";
 import {
+  beginFloorSelection,
+  commitFloorSelection,
+  createFloorSelectionState,
+  handleOutsidePointerDown,
+  resolveSelectionModifier,
+  updateFloorSelection,
+  type FloorSelectionState
+} from "../game/floor-selection";
+import {
   canChooseNewGoal,
   chooseGoalDecision,
   chooseStepTowardCell,
@@ -89,6 +98,10 @@ export class GameScene extends Phaser.Scene {
   private taskMarkersByCell = new Map<string, string>();
   private taskMarkerGraphics!: Phaser.GameObjects.Graphics;
   private taskMarkerTexts = new Map<string, Phaser.GameObjects.Text>();
+  private floorSelectionGraphics!: Phaser.GameObjects.Graphics;
+  private floorSelectionDraftGraphics!: Phaser.GameObjects.Graphics;
+  private floorSelectionState: FloorSelectionState = createFloorSelectionState();
+  private activeSelectionPointerId?: number;
 
   public constructor() {
     super("game");
@@ -122,6 +135,11 @@ export class GameScene extends Phaser.Scene {
     this.interactionGraphics = this.add.graphics();
     this.drawInteractionPoints();
     this.drawGroundItemStacks();
+    this.floorSelectionGraphics = this.add.graphics();
+    this.floorSelectionDraftGraphics = this.add.graphics();
+    this.floorSelectionState = createFloorSelectionState();
+    this.activeSelectionPointerId = undefined;
+    this.redrawFloorSelection();
 
     const names =
       this.variant === "alt-en"
@@ -162,6 +180,7 @@ export class GameScene extends Phaser.Scene {
     this.taskMarkerGraphics.setDepth(35);
     this.bindGridTaskMarkerInput();
     this.syncTaskMarkerView();
+    this.bindFloorSelectionInput();
   }
 
   public update(_time: number, delta: number): void {
@@ -399,6 +418,7 @@ export class GameScene extends Phaser.Scene {
   private bindGridTaskMarkerInput(): void {
     this.input.on(Phaser.Input.Events.POINTER_DOWN, (pointer: Phaser.Input.Pointer) => {
       if (!pointer.leftButtonDown()) return;
+      if (this.shouldUseFloorSelection(pointer)) return;
       const cell = this.pointerToCell(pointer);
       if (!cell) return;
 
@@ -807,5 +827,190 @@ export class GameScene extends Phaser.Scene {
       panel.replaceChildren();
     }
     this.events.off(Phaser.Scenes.Events.SHUTDOWN, this.teardownPawnRosterUi, this);
+  }
+
+  private bindFloorSelectionInput(): void {
+    this.input.off("pointerdown", this.handleFloorPointerDown, this);
+    this.input.off("pointermove", this.handleFloorPointerMove, this);
+    this.input.off("pointerup", this.handleFloorPointerUp, this);
+
+    this.input.on("pointerdown", this.handleFloorPointerDown, this);
+    this.input.on("pointermove", this.handleFloorPointerMove, this);
+    this.input.on("pointerup", this.handleFloorPointerUp, this);
+  }
+
+  private handleFloorPointerDown(pointer: Phaser.Input.Pointer): void {
+    if (!pointer.leftButtonDown()) return;
+    if (!this.shouldUseFloorSelection(pointer)) return;
+
+    const modifier = resolveSelectionModifier(
+      this.pointerHasShift(pointer),
+      this.pointerHasCtrl(pointer)
+    );
+    const cell = this.pointerCell(pointer);
+
+    if (!cell) {
+      this.floorSelectionState = handleOutsidePointerDown(this.floorSelectionState, modifier);
+      this.activeSelectionPointerId = undefined;
+      this.redrawFloorSelection();
+      return;
+    }
+
+    this.floorSelectionState = beginFloorSelection(
+      this.floorSelectionState,
+      this.worldGrid,
+      cell,
+      modifier
+    );
+    this.activeSelectionPointerId = pointer.id;
+    this.redrawFloorSelection();
+  }
+
+  private handleFloorPointerMove(pointer: Phaser.Input.Pointer): void {
+    if (this.activeSelectionPointerId !== pointer.id || !pointer.isDown) return;
+    if (!this.floorSelectionState.draft) return;
+
+    const cell = this.pointerCell(pointer, true);
+    if (!cell) return;
+
+    this.floorSelectionState = updateFloorSelection(
+      this.floorSelectionState,
+      this.worldGrid,
+      cell
+    );
+    this.redrawFloorSelection();
+  }
+
+  private handleFloorPointerUp(pointer: Phaser.Input.Pointer): void {
+    if (this.activeSelectionPointerId !== pointer.id) return;
+
+    const cell = this.pointerCell(pointer, true);
+    if (cell && this.floorSelectionState.draft) {
+      this.floorSelectionState = updateFloorSelection(
+        this.floorSelectionState,
+        this.worldGrid,
+        cell
+      );
+    }
+
+    this.floorSelectionState = commitFloorSelection(this.floorSelectionState);
+    this.activeSelectionPointerId = undefined;
+    this.redrawFloorSelection();
+  }
+
+  private redrawFloorSelection(): void {
+    this.floorSelectionGraphics.clear();
+    this.floorSelectionDraftGraphics.clear();
+
+    this.drawSelectionOverlay(
+      this.floorSelectionGraphics,
+      this.floorSelectionState.selectedCellKeys,
+      0x81b29a,
+      0.18,
+      0xb8e0d2,
+      0.8
+    );
+
+    const draft = this.floorSelectionState.draft;
+    if (!draft) return;
+
+    if (draft.modifier === "toggle") {
+      this.drawSelectionOverlay(
+        this.floorSelectionDraftGraphics,
+        draft.addedCellKeys,
+        0x88c0a8,
+        0.34,
+        0xd8f3dc,
+        0.95
+      );
+      this.drawSelectionOverlay(
+        this.floorSelectionDraftGraphics,
+        draft.removedCellKeys,
+        0xc1666b,
+        0.34,
+        0xffd6d9,
+        0.95
+      );
+      return;
+    }
+
+    this.drawSelectionOverlay(
+      this.floorSelectionDraftGraphics,
+      draft.cellKeys,
+      0xd2b96c,
+      0.2,
+      0xf4e3b2,
+      0.95
+    );
+  }
+
+  private drawSelectionOverlay(
+    graphics: Phaser.GameObjects.Graphics,
+    cellKeys: ReadonlySet<string>,
+    fillColor: number,
+    fillAlpha: number,
+    strokeColor: number,
+    strokeAlpha: number
+  ): void {
+    if (cellKeys.size === 0) return;
+
+    const cellSize = this.worldGrid.cellSizePx;
+
+    for (let row = 0; row < this.worldGrid.rows; row++) {
+      for (let col = 0; col < this.worldGrid.columns; col++) {
+        const cell = { col, row };
+        if (!cellKeys.has(coordKey(cell))) continue;
+
+        const x = this.gridOriginX + col * cellSize;
+        const y = this.gridOriginY + row * cellSize;
+        graphics.fillStyle(fillColor, fillAlpha);
+        graphics.fillRect(x + 2, y + 2, cellSize - 4, cellSize - 4);
+        graphics.lineStyle(2, strokeColor, strokeAlpha);
+        graphics.strokeRect(x + 2, y + 2, cellSize - 4, cellSize - 4);
+      }
+    }
+  }
+
+  private pointerCell(
+    pointer: Phaser.Input.Pointer,
+    clampToGrid = false
+  ): GridCoord | undefined {
+    const direct = this.pointerToCell(pointer);
+    if (direct || !clampToGrid) return direct ?? undefined;
+
+    const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+    const col = Phaser.Math.Clamp(
+      Math.floor((world.x - this.gridOriginX) / this.worldGrid.cellSizePx),
+      0,
+      this.worldGrid.columns - 1
+    );
+    const row = Phaser.Math.Clamp(
+      Math.floor((world.y - this.gridOriginY) / this.worldGrid.cellSizePx),
+      0,
+      this.worldGrid.rows - 1
+    );
+    return { col, row };
+  }
+
+  private pointerHasShift(pointer: Phaser.Input.Pointer): boolean {
+    const event = pointer.event as MouseEvent | PointerEvent | undefined;
+    return event?.shiftKey ?? false;
+  }
+
+  private pointerHasCtrl(pointer: Phaser.Input.Pointer): boolean {
+    const event = pointer.event as MouseEvent | PointerEvent | undefined;
+    return event?.ctrlKey ?? false;
+  }
+
+  private shouldUseFloorSelection(pointer: Phaser.Input.Pointer): boolean {
+    return (
+      this.selectedVillagerToolId() === "idle" ||
+      this.pointerHasShift(pointer) ||
+      this.pointerHasCtrl(pointer)
+    );
+  }
+
+  private selectedVillagerToolId(): string {
+    return MOCK_VILLAGER_TOOLS[this.selectedToolIndex]?.id ?? "idle";
   }
 }

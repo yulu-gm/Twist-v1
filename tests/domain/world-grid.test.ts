@@ -6,13 +6,15 @@ import {
   createReservationSnapshot,
   DEFAULT_WORLD_GRID,
   coordKey,
+  rectCellKeysInclusive,
   isInteractionPointReservedByOther,
   isCellOccupiedByOthers,
   isInsideGrid,
   isWalkableCell,
   orthogonalNeighbors,
   pickRandomBlockedCells,
-  reserveInteractionPoint
+  reserveInteractionPoint,
+  worldPointToCell
 } from "../../src/game/world-grid";
 
 describe("world-grid", () => {
@@ -63,6 +65,56 @@ describe("world-grid", () => {
       cellAtWorldPixel(DEFAULT_WORLD_GRID, ox, oy, ox + DEFAULT_WORLD_GRID.columns * cs, oy)
     ).toBe(null);
     expect(cellAtWorldPixel(DEFAULT_WORLD_GRID, ox, oy, ox - 1, oy)).toBe(null);
+  });
+
+  it("maps world points to in-bounds cells and rejects outside points", () => {
+    const grid = DEFAULT_WORLD_GRID;
+    const originX = 120;
+    const originY = 80;
+    const size = grid.cellSizePx;
+
+    expect(
+      worldPointToCell(grid, originX + size * 0.1, originY + size * 0.9, originX, originY)
+    ).toEqual({
+      col: 0,
+      row: 0
+    });
+    expect(
+      worldPointToCell(grid, originX + size * 1.2, originY + size * 2.1, originX, originY)
+    ).toEqual({
+      col: 1,
+      row: 2
+    });
+    expect(worldPointToCell(grid, originX - 1, originY + size, originX, originY)).toBeUndefined();
+    expect(
+      worldPointToCell(grid, originX + grid.columns * size, originY + size, originX, originY)
+    ).toBeUndefined();
+    expect(
+      worldPointToCell(grid, originX + size, originY + grid.rows * size, originX, originY)
+    ).toBeUndefined();
+  });
+
+  it("expands inclusive rectangle keys between two cells in either drag direction", () => {
+    const forward = rectCellKeysInclusive(
+      DEFAULT_WORLD_GRID,
+      { col: 2, row: 3 },
+      { col: 4, row: 4 }
+    );
+    const reverse = rectCellKeysInclusive(
+      DEFAULT_WORLD_GRID,
+      { col: 4, row: 4 },
+      { col: 2, row: 3 }
+    );
+
+    expect([...forward].sort()).toEqual([
+      "2,3",
+      "2,4",
+      "3,3",
+      "3,4",
+      "4,3",
+      "4,4"
+    ]);
+    expect([...reverse].sort()).toEqual([...forward].sort());
   });
 
   it("detects occupancy by other pawn logical cells", () => {
