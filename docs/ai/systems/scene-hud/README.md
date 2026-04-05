@@ -10,11 +10,12 @@
 
 ## 当前关键实现文件
 
-- 暂无已登记实现文件
+- `src/scenes/villager-tool-bar-config.ts`（mock 数据、键码常量、`validateMockVillagerToolBarConfig`）
+- `src/scenes/mock-villager-tools.ts`（对上述模块的导出入口，兼容旧路径）
 
 ## 当前关键测试文件
 
-- 暂无已登记测试
+- `tests/component/villager-tool-bar-model.test.ts`
 
 ## 当前接入场景文件
 
@@ -22,7 +23,7 @@
 
 ## 最新/历史 aidoc
 
-- 暂无 routed aidoc；新增 HUD 或按钮前先补 routed aidoc
+- `docs/ai/systems/scene-hud/2026-04-05-villager-tool-bar.md`
 
 ## 何时必须回填
 

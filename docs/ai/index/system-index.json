@@ -30,16 +30,24 @@
       "standardDoc": "docs/ai/system-standards/scene-hud.md",
       "aidocDir": "docs/ai/systems/scene-hud",
       "systemReadme": "docs/ai/systems/scene-hud/README.md",
-      "sourceFiles": [],
-      "testFiles": [],
+      "sourceFiles": [
+        "src/scenes/villager-tool-bar-config.ts",
+        "src/scenes/mock-villager-tools.ts"
+      ],
+      "testFiles": [
+        "tests/component/villager-tool-bar-model.test.ts"
+      ],
       "sceneEntryFiles": [
         "src/scenes/GameScene.ts"
       ],
       "integrationFiles": [
         "docs/ai/integration/2026-04-05-default-grid-wandering-pawns.md",
-        "docs/ai/integration/2026-04-05-goal-driven-pawn-ai-prototype.md"
+        "docs/ai/integration/2026-04-05-goal-driven-pawn-ai-prototype.md",
+        "docs/ai/integration/2026-04-05-villager-tool-bar.md"
       ],
-      "latestAidocs": []
+      "latestAidocs": [
+        "docs/ai/systems/scene-hud/2026-04-05-villager-tool-bar.md"
+      ]
     },
     {
       "key": "selection-ui",

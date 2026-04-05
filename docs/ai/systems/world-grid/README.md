@@ -10,7 +10,7 @@
 
 ## 当前关键实现文件
 
-- `src/game/world-grid.ts`
+- `src/game/world-grid.ts`（含 `cellAtWorldPixel`：世界像素 → 格坐标，网格外为 `null`，供场景指针悬停等表现层拾取）
 
 ## 当前关键测试文件
 
