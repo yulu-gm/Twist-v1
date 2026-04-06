@@ -33,7 +33,106 @@ describe("scene-hud markup", () => {
     expect(html).toContain('id="yaml-scenario-manual"');
     expect(html).toContain('id="yaml-scenario-manual-steps"');
     expect(html).toContain('id="yaml-scenario-manual-outcomes"');
+    expect(html).toContain('id="scene-debug-toggle"');
+    expect(html).toContain('id="scene-debug-panel"');
+    expect(html).toContain('id="scene-debug-filter"');
+    expect(html).toContain('id="scene-debug-log-list"');
+    expect(html).toContain('id="scene-debug-detail"');
     expect(html).toContain('aria-live="polite"');
+  });
+});
+
+describe("debug panel hud", () => {
+  it("opens, filters, and shows selected debug log details", () => {
+    document.body.innerHTML = `
+      <div id="scene-hud"><button id="scene-debug-toggle" type="button"></button></div>
+      <aside id="scene-debug-panel" hidden>
+        <button id="scene-debug-clear" type="button"></button>
+        <button id="scene-debug-pause" type="button"></button>
+        <input id="scene-debug-filter" />
+        <div id="scene-debug-count"></div>
+        <div id="scene-debug-log-list"></div>
+        <pre id="scene-debug-detail"></pre>
+      </aside>
+    `;
+    const hud = new HudManager();
+    let filterValue = "";
+    let selectedId: string | null = null;
+    let open = false;
+    let paused = false;
+    let cleared = false;
+    const allEntries = [
+      {
+        id: "entry-1",
+        tick: 12,
+        text: "[tick 12] Alex goal-planner -> eat / move",
+        searchText: "alex eat move goal-planner",
+        detailText: "detail one"
+      },
+      {
+        id: "entry-2",
+        tick: 13,
+        text: "[tick 13] Bo work-released work-2",
+        searchText: "bo work-released work-2",
+        detailText: "detail two"
+      }
+    ];
+
+    const sync = () =>
+      hud.syncDebugPanel({
+        open,
+        paused,
+        filter: filterValue,
+        selectedEntryId: selectedId,
+        entries: allEntries.filter((entry) =>
+          filterValue.trim() === ""
+            ? true
+            : entry.searchText.toLowerCase().includes(filterValue.trim().toLowerCase())
+        )
+      });
+
+    hud.setupDebugPanel({
+      onToggleOpen: () => {
+        open = !open;
+        sync();
+      },
+      onTogglePause: () => {
+        paused = !paused;
+        sync();
+      },
+      onClear: () => {
+        cleared = true;
+      },
+      onFilterChange: (next) => {
+        filterValue = next;
+        sync();
+      },
+      onSelectEntry: (entryId) => {
+        selectedId = entryId;
+        sync();
+      }
+    });
+
+    sync();
+    (document.getElementById("scene-debug-toggle") as HTMLButtonElement).click();
+    expect((document.getElementById("scene-debug-panel") as HTMLElement).hidden).toBe(false);
+
+    const filterInput = document.getElementById("scene-debug-filter") as HTMLInputElement;
+    filterInput.value = "released";
+    filterInput.dispatchEvent(new Event("input"));
+
+    const rows = Array.from(document.querySelectorAll(".scene-debug-log-entry"));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.textContent).toContain("work-released");
+
+    rows[0]?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+    expect(document.getElementById("scene-debug-detail")?.textContent).toContain("detail two");
+
+    (document.getElementById("scene-debug-pause") as HTMLButtonElement).click();
+    expect(paused).toBe(true);
+
+    (document.getElementById("scene-debug-clear") as HTMLButtonElement).click();
+    expect(cleared).toBe(true);
   });
 });
 

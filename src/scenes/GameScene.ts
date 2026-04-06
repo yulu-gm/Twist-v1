@@ -59,6 +59,14 @@ import { GameSceneKeyboardBindings } from "./game-scene-keyboard-bindings";
 import { listAvailableScenarios, loadScenarioIntoGame } from "../player/scenario-loader";
 import { WorldCoreWorldPort } from "../player/world-core-world-port";
 import type { ScenarioDefinition } from "../headless/scenario-types";
+import { getWorldSnapshot } from "../game/world-core";
+import {
+  diffWorkLifecycleEvents,
+  type PawnDecisionTrace,
+  type WorkLifecycleTraceEvent
+} from "../headless/sim-debug-trace";
+import { getRuntimeLogSession } from "../runtime-log/runtime-log-session";
+import { selectRuntimeDebugLogEntries } from "../ui/runtime-debug-log-store";
 
 export type GameSceneVariant = "default" | "alt-en";
 
@@ -107,6 +115,14 @@ export class GameScene extends Phaser.Scene {
   private floorInteraction!: GameSceneFloorInteraction;
 
   private hud!: HudManager;
+  private readonly runtimeLogSession = getRuntimeLogSession();
+  private readonly runtimeDebugLogStore = this.runtimeLogSession.store;
+  private debugPanelOpen = false;
+  private debugLogPaused = false;
+  private debugFilter = "";
+  private debugSelectedEntryId: string | null = null;
+  private debugPausedSeq: number | null = null;
+  private runtimeTickCount = 0;
 
   public constructor() {
     super("game");
@@ -208,6 +224,38 @@ export class GameScene extends Phaser.Scene {
     );
     this.hud.bindSceneVariantSelect(this.variant, (next) => {
       this.scene.restart({ variant: next });
+    });
+    this.hud.setupDebugPanel({
+      onToggleOpen: () => {
+        this.debugPanelOpen = !this.debugPanelOpen;
+        this.syncDebugPanel();
+      },
+      onTogglePause: () => {
+        this.debugLogPaused = !this.debugLogPaused;
+        this.debugPausedSeq = this.debugLogPaused
+          ? (this.runtimeDebugLogStore.getEvents()[this.runtimeDebugLogStore.getEvents().length - 1]?.seq ?? null)
+          : null;
+        this.syncDebugPanel();
+      },
+      onClear: () => {
+        this.runtimeDebugLogStore.clear();
+        this.debugSelectedEntryId = null;
+        this.debugPausedSeq = null;
+        this.syncDebugPanel();
+      },
+      onFilterChange: (value) => {
+        this.debugFilter = value;
+        this.syncDebugPanel();
+      },
+      onFilterFocusChange: (focused) => {
+        if (this.input.keyboard) {
+          this.input.keyboard.enabled = !focused;
+        }
+      },
+      onSelectEntry: (entryId) => {
+        this.debugSelectedEntryId = entryId;
+        this.syncDebugPanel();
+      }
     });
 
     this.hud.setupYamlScenarioPanel(listAvailableScenarios(), (def) => {
@@ -311,13 +359,30 @@ export class GameScene extends Phaser.Scene {
     this.syncTreesAndGroundLayer();
     this.syncPlayerChannelUi();
     this.setupPawnRosterUi();
+    this.syncDebugPanel();
 
     this.keyboard.setupEsc(this, () => this.floorInteraction.cancelGesture());
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.onShutdown, this);
   }
 
   public update(_time: number, delta: number): void {
+    const worldBefore = getWorldSnapshot(
+      (this.orchestrator.getPlayerWorldPort() as OrchestratorWorldBridge).getWorld()
+    );
     this.orchestrator.tick(delta);
+    if (this.orchestrator.didAdvanceSimulationLastTick()) {
+      this.runtimeTickCount += 1;
+      const worldAfter = getWorldSnapshot(
+        (this.orchestrator.getPlayerWorldPort() as OrchestratorWorldBridge).getWorld()
+      );
+      this.captureRuntimeDebugEntries(
+        this.runtimeTickCount,
+        this.orchestrator.getLastAiEvents(),
+        this.orchestrator.getLastPawnDecisionTraces(),
+        diffWorkLifecycleEvents(worldBefore, worldAfter)
+      );
+    }
+    this.syncDebugPanel();
   }
 
   private syncTreesAndGroundLayer(): void {
@@ -468,6 +533,105 @@ export class GameScene extends Phaser.Scene {
     syncPlayerChannelHintLines(this.hud, this.orchestrator, this.selectedToolIndex, this.buildSubTool);
   }
 
+  private captureRuntimeDebugEntries(
+    tick: number,
+    aiEvents: readonly string[],
+    pawnDecisionTraces: readonly PawnDecisionTrace[],
+    workLifecycleEvents: readonly WorkLifecycleTraceEvent[]
+  ): void {
+    const decisions = pawnDecisionTraces;
+    const detailWorkSummary = workLifecycleEvents.map((event) => ({
+      kind: event.kind,
+      workItemId: event.workItemId,
+      pawnId: event.pawnId,
+      reason: event.reason
+    }));
+
+    if (decisions.length === 0 && workLifecycleEvents.length === 0 && aiEvents.length === 0) {
+      return;
+    }
+
+    for (let index = 0; index < decisions.length; index += 1) {
+      const decision = decisions[index]!;
+      const text =
+        aiEvents[index] ??
+        `[tick ${tick}] ${decision.pawnName} ${decision.decisionSource} -> ${decision.selectedCandidate?.goal ?? decision.result.kind}`;
+      const searchText = [
+        text,
+        decision.pawnName,
+        decision.decisionSource,
+        decision.selectedCandidate?.goal,
+        decision.selectedCandidate?.reason,
+        decision.result.kind,
+        decision.result.blockedReason,
+        decision.interruptReason
+      ]
+        .filter((value): value is string => typeof value === "string" && value.length > 0)
+        .join(" ")
+        .toLowerCase();
+      this.runtimeLogSession.log({
+        tick,
+        category: "AI.Decision",
+        verbosity: "Log",
+        message: text,
+        detail: {
+          tick,
+          text,
+          pawnDecision: decision,
+          workLifecycleEvents: detailWorkSummary
+        },
+        searchTextParts: [searchText]
+      });
+    }
+
+    if (decisions.length === 0 || workLifecycleEvents.length > 0) {
+      const text =
+        workLifecycleEvents.length > 0
+          ? `[tick ${tick}] work events: ${workLifecycleEvents.map((event) => `${event.kind}:${event.workItemId}`).join(", ")}`
+          : aiEvents[0] ?? `[tick ${tick}] runtime event`;
+      this.runtimeLogSession.log({
+        tick,
+        category: workLifecycleEvents.length > 0 ? "Work.Lifecycle" : "System",
+        verbosity: "Log",
+        message: text,
+        detail: {
+          tick,
+          text,
+          workLifecycleEvents: detailWorkSummary
+        },
+        searchTextParts: [
+          text,
+          ...detailWorkSummary.flatMap((event) => [event.kind, event.workItemId, event.pawnId, event.reason])
+        ]
+      });
+    }
+  }
+
+  private syncDebugPanel(): void {
+    const pausedSeq = this.debugPausedSeq;
+    const sourceEvents =
+      this.debugLogPaused && pausedSeq !== null
+        ? this.runtimeDebugLogStore.getEvents().filter((event) => event.seq <= pausedSeq)
+        : this.runtimeDebugLogStore.getEvents();
+    const entries = selectRuntimeDebugLogEntries(sourceEvents, this.debugFilter);
+    if (this.debugSelectedEntryId === null && entries.length > 0) {
+      this.debugSelectedEntryId = entries[entries.length - 1]?.id ?? null;
+    }
+    if (
+      this.debugSelectedEntryId !== null &&
+      !entries.some((entry) => entry.id === this.debugSelectedEntryId)
+    ) {
+      this.debugSelectedEntryId = entries[entries.length - 1]?.id ?? null;
+    }
+    this.hud.syncDebugPanel({
+      open: this.debugPanelOpen,
+      paused: this.debugLogPaused,
+      filter: this.debugFilter,
+      selectedEntryId: this.debugSelectedEntryId,
+      entries
+    });
+  }
+
   /**
    * 将 `scenarios/*.scenario.ts` 写入当前 WorldCore 与小人列表（不重启 Phaser 场景）。
    * `expectations` 不会自动判定，仅便于人工对照 Vitest 中的同一定义。
@@ -539,6 +703,21 @@ export class GameScene extends Phaser.Scene {
 
       this.taskMarkersByCell = new Map();
       redrawTaskMarkers(this.taskMarkersByCell, this.getTaskMarkerViewDeps());
+      this.runtimeDebugLogStore.clear();
+      this.debugSelectedEntryId = null;
+      this.debugPausedSeq = null;
+      this.runtimeTickCount = 0;
+      this.runtimeLogSession.log({
+        category: "Scenario",
+        verbosity: "Display",
+        message: `scenario switched: ${def.name}`,
+        detail: {
+          scenarioName: def.name,
+          description: def.description
+        },
+        searchTextParts: [def.name, def.description]
+      });
+      this.syncDebugPanel();
 
       this.hud.setupPawnRoster(this.pawns, (id) => this.selectPawnForRoster(id));
       this.selectPawnForRoster(this.pawns[0]?.id ?? null);
@@ -553,6 +732,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onShutdown(): void {
+    void this.runtimeLogSession.flush();
     this.keyboard.teardownAll(this.hud);
     this.floorInteraction.unbind();
     this.hud.teardownAll();

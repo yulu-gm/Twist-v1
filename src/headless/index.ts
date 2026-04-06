@@ -25,6 +25,21 @@ export {
 } from "./sim-event-log";
 
 export {
+  createEmptySimDebugTrace,
+  diffWorkLifecycleEvents,
+  formatSimDebugTrace,
+  mapSimDebugTickToRuntimeLogEvents,
+  snapshotWorkItem,
+  snapshotWorkItems,
+  type HeadlessDebugTraceOptions,
+  type PawnDecisionTrace,
+  type SimDebugTick,
+  type SimDebugTrace,
+  type WorkItemTraceSnapshot,
+  type WorkLifecycleTraceEvent
+} from "./sim-debug-trace";
+
+export {
   generateReport,
   type AssertionResult,
   type PawnSummary,
