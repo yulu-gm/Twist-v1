@@ -1,0 +1,340 @@
+task_name: "Headless Game Simulation 实施计划（含双模式场景架构）"
+created_at: "2026-04-06"
+status: "completed"
+
+# 任务依赖图:
+#
+# T-01 (Seeded RNG)
+#   └─► T-02 (SimAccess)
+#         └─► T-03 (HeadlessSim 核心)
+#               ├─► T-04 (事件收集器)
+#               │     └─► T-05 (JSON 报告器)
+#               ├─► T-06 (场景定义层 ScenarioDefinition)  ← 新增
+#               │     ├─► T-07 (Headless Scenario Runner)  ← 新增
+#               │     └─► T-08 (Browser Scenario Loader)   ← 新增
+#               └─► T-09 (谓词与断言工具)
+#                     └─► T-10 (示例场景文件 + 自动测试)
+#                           └─► T-11 (npm scripts + 文档)
+
+tasks:
+  # ============================================================
+  #  Phase 1: 基础设施
+  # ============================================================
+
+  - id: "T-01"
+    title: "实现确定性随机数生成器 (Seeded RNG)"
+    status: "completed"
+    dependencies: []
+    context:
+      read_files: []
+      reference_docs:
+        - "docs/human/generic-gathering-rabbit.md"
+    action: |
+      1. 创建 `src/game/util/seeded-rng.ts`，实现基于 mulberry32 算法的 `createSeededRng(seed: number): () => number`。
+      2. 创建 `tests/domain/seeded-rng.test.ts`，编写测试用例：
+         - 相同 seed 调用 100 次，两次序列完全相同。
+         - 不同 seed 生成不同序列。
+         - 输出范围在 [0, 1) 内。
+    acceptance_criteria: |
+      - [ ] Shell: `npx vitest run tests/domain/seeded-rng.test.ts` 通过。
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+
+  - id: "T-02"
+    title: "实现 HeadlessSim 内存状态访问器 (SimAccess)"
+    status: "completed"
+    dependencies:
+      - "T-01"
+    context:
+      read_files:
+        - "src/game/game-orchestrator.ts"
+        - "src/game/pawn-state.ts"
+        - "src/game/map/world-grid.ts"
+      reference_docs:
+        - "docs/human/generic-gathering-rabbit.md"
+    action: |
+      1. 创建 `src/headless/headless-sim-access.ts`。
+      2. 实现 `createHeadlessSimAccess` 函数，返回满足 `GameOrchestratorSimAccess` 接口的内存对象。
+      3. 内部用闭包持有 `pawns`, `reservations`, `timeOfDayState` 等可变状态，并额外暴露 `getPawnsRef()` 和 `getReservationsRef()`。
+    acceptance_criteria: |
+      - [ ] Read: `src/headless/headless-sim-access.ts` 导出 `createHeadlessSimAccess`。
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+
+  - id: "T-03"
+    title: "实现 HeadlessSim 核心逻辑与基础测试"
+    status: "completed"
+    dependencies:
+      - "T-02"
+    context:
+      read_files:
+        - "src/game/game-orchestrator.ts"
+        - "src/game/world-core.ts"
+        - "src/player/world-core-world-port.ts"
+        - "src/headless/headless-sim-access.ts"
+      reference_docs:
+        - "docs/human/generic-gathering-rabbit.md"
+    action: |
+      1. 创建 `src/headless/headless-sim.ts`，定义 `HeadlessSim` 接口及 `HeadlessSimOptions`。
+      2. 实现 `createHeadlessSim`，内部组装 RNG、WorldCore、WorldPort、SimAccess、GameOrchestrator，注入空回调 (NOOP_HOOKS)。
+      3. 创建 `src/headless/index.ts` barrel export。
+      4. 创建 `tests/headless/headless-sim-basic.test.ts`，验证：
+         - `createHeadlessSim()` 不抛异常。
+         - `sim.tick(16)` 后时间有推进。
+         - `sim.spawnPawn(...)` 后 `getPawns().length === 1`。
+         - `sim.runUntil(...)` 正确终止。
+         - 相同 seed 跑 200 tick 后结果一致（确定性）。
+         - import 链不含 `phaser`。
+    acceptance_criteria: |
+      - [ ] Grep: `src/headless/headless-sim.ts` 和测试文件中不包含 `from "phaser"` 或 `from 'phaser'`。
+      - [ ] Shell: `npx vitest run tests/headless/headless-sim-basic.test.ts` 通过。
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+
+  # ============================================================
+  #  Phase 2: 事件与报告
+  # ============================================================
+
+  - id: "T-04"
+    title: "实现结构化事件收集器 (SimEventCollector)"
+    status: "completed"
+    dependencies:
+      - "T-03"
+    context:
+      read_files:
+        - "src/headless/headless-sim.ts"
+        - "src/game/pawn-state.ts"
+        - "src/game/world-core.ts"
+      reference_docs:
+        - "docs/human/generic-gathering-rabbit.md"
+    action: |
+      1. 创建 `src/headless/sim-event-log.ts`，定义 `SimEvent`, `SimEventKind`, `SimEventCollector` 接口。
+      2. 实现 `createSimEventCollector()`，包含：
+         - `recordPawnDiff`: 对比 before/after PawnState[]，检测 moved/goal-changed/action-changed/need-change。
+         - `recordWorldDiff`: 对比 WorldSnapshot，检测 work-created/claimed/completed、entity-spawned/removed。
+         - `getEvents()`, `getEventsByKind()`, `getEventsByPawn()`, `summary()`, `clear()`。
+      3. 修改 `src/headless/headless-sim.ts` 的 `tick` 方法，接入 collector。
+      4. 创建 `tests/headless/sim-event-log.test.ts` 验证事件收集。
+    acceptance_criteria: |
+      - [ ] Shell: `npx vitest run tests/headless/sim-event-log.test.ts` 通过。
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+
+  - id: "T-05"
+    title: "实现 JSON 报告器 (SimReporter)"
+    status: "completed"
+    dependencies:
+      - "T-03"
+      - "T-04"
+    context:
+      read_files:
+        - "src/headless/headless-sim.ts"
+        - "src/headless/sim-event-log.ts"
+      reference_docs:
+        - "docs/human/generic-gathering-rabbit.md"
+    action: |
+      1. 创建 `src/headless/sim-reporter.ts`。
+      2. 定义 `SimReport`, `PawnSummary`, `AssertionResult` 类型。
+      3. 实现纯函数 `generateReport(sim, assertions?)`。
+    acceptance_criteria: |
+      - [ ] Read: `src/headless/sim-reporter.ts` 导出 `generateReport`。
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+
+  # ============================================================
+  #  Phase 3: 场景定义层（核心新增）
+  # ============================================================
+
+  - id: "T-06"
+    title: "定义 ScenarioDefinition 类型与场景文件目录"
+    status: "completed"
+    dependencies:
+      - "T-03"
+    context:
+      read_files:
+        - "src/game/map/world-grid.ts"
+        - "src/game/pawn-state.ts"
+        - "src/game/entity/entity-types.ts"
+        - "src/game/behavior/goal-driven-planning.ts"
+      reference_docs:
+        - "docs/human/generic-gathering-rabbit.md"
+    action: |
+      1. 创建 `src/headless/scenario-types.ts`，定义 `ScenarioDefinition` 类型：
+         ```
+         ScenarioDefinition = {
+           name: string;
+           description: string;
+           seed: number;
+           gridConfig?: WorldGridConfig;
+           pawns: Array<{
+             name: string;
+             cell: GridCoord;
+             overrides?: Partial<Pick<PawnState, "satiety" | "energy">>;
+           }>;
+           blueprints?: Array<{ kind: BuildingKind; cell: GridCoord }>;
+           obstacles?: Array<{ cell: GridCoord; label?: string }>;
+           timeConfig?: { startMinuteOfDay?: number };
+           expectations?: ScenarioExpectation[];
+         }
+         ```
+      2. 定义 `ScenarioExpectation` 类型：
+         ```
+         ScenarioExpectation = {
+           label: string;
+           type: "pawn-reaches-goal" | "event-occurred" | "no-pawn-starved" | "work-item-exists" | "custom";
+           params: Record<string, unknown>;
+           maxTicks?: number;   // 自动模式超时帧数，默认 500
+         }
+         ```
+      3. 创建 `scenarios/` 目录和 `scenarios/index.ts` barrel。
+      4. 在 `src/headless/index.ts` 中 re-export `scenario-types`。
+    acceptance_criteria: |
+      - [ ] Read: `src/headless/scenario-types.ts` 导出 `ScenarioDefinition` 和 `ScenarioExpectation`。
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+
+  - id: "T-07"
+    title: "实现 Headless Scenario Runner（自动测试入口）"
+    status: "completed"
+    dependencies:
+      - "T-04"
+      - "T-05"
+      - "T-06"
+    context:
+      read_files:
+        - "src/headless/scenario-types.ts"
+        - "src/headless/headless-sim.ts"
+        - "src/headless/sim-event-log.ts"
+        - "src/headless/sim-reporter.ts"
+      reference_docs:
+        - "docs/human/generic-gathering-rabbit.md"
+    action: |
+      1. 创建 `src/headless/scenario-runner.ts`。
+      2. 实现 `hydrateScenario(sim: HeadlessSim, def: ScenarioDefinition): void`：
+         - 按 `def.pawns` 调用 `sim.spawnPawn`。
+         - 按 `def.blueprints` 调用 `sim.placeBlueprint`。
+         - 按 `def.obstacles` 调用 `sim.spawnObstacle`。
+      3. 实现 `runScenarioHeadless(def: ScenarioDefinition): { sim, report, results }`：
+         - 创建 HeadlessSim（seed/gridConfig/timeConfig 取自 def）。
+         - 调用 `hydrateScenario` 搭建场景。
+         - 遍历 `def.expectations`，对每个 expectation 执行 `runUntil` 或 `runTicks` 并生成 `AssertionResult`。
+         - 返回 sim + report + results。
+      4. 在 `src/headless/index.ts` 中 re-export。
+      5. 创建 `tests/headless/scenario-runner.test.ts`，用一个最小 ScenarioDefinition 验证 runner 流程。
+    acceptance_criteria: |
+      - [ ] Read: `src/headless/scenario-runner.ts` 导出 `runScenarioHeadless` 和 `hydrateScenario`。
+      - [ ] Shell: `npx vitest run tests/headless/scenario-runner.test.ts` 通过。
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+
+  - id: "T-08"
+    title: "实现 Browser Scenario Loader（人工验收入口）"
+    status: "completed"
+    dependencies:
+      - "T-06"
+    context:
+      read_files:
+        - "src/headless/scenario-types.ts"
+        - "src/game/world-core.ts"
+        - "src/game/game-orchestrator.ts"
+        - "src/player/world-core-world-port.ts"
+      reference_docs:
+        - "docs/human/generic-gathering-rabbit.md"
+    action: |
+      1. 创建 `src/player/scenario-loader.ts`。
+      2. 实现 `loadScenarioIntoGame(world: WorldCore, def: ScenarioDefinition): void`：
+         - 按 `def.pawns` 调用 `spawnWorldEntity` 生成 pawn。
+         - 按 `def.blueprints` 调用 `placeBlueprint`。
+         - 按 `def.obstacles` 调用 `spawnWorldEntity` 生成障碍物。
+         - 忽略 `def.expectations`（人工模式不自动判定）。
+      3. 实现 `listAvailableScenarios(): ScenarioDefinition[]`，从 `scenarios/` 目录收集所有导出的场景定义。
+    acceptance_criteria: |
+      - [ ] Read: `src/player/scenario-loader.ts` 导出 `loadScenarioIntoGame` 和 `listAvailableScenarios`。
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+
+  # ============================================================
+  #  Phase 4: 辅助工具 + 示例场景
+  # ============================================================
+
+  - id: "T-09"
+    title: "实现谓词与断言辅助工具 (Scenario Helpers)"
+    status: "completed"
+    dependencies:
+      - "T-04"
+      - "T-05"
+    context:
+      read_files:
+        - "src/headless/headless-sim.ts"
+        - "src/headless/sim-event-log.ts"
+        - "src/headless/sim-reporter.ts"
+      reference_docs:
+        - "docs/human/generic-gathering-rabbit.md"
+    action: |
+      1. 创建 `src/headless/scenario-helpers.ts`。
+      2. 实现 `runUntil` 谓词工厂函数：
+         - `pawnReachesCell(pawnId, cell)`
+         - `pawnStartsGoal(pawnId, goalKind)`
+         - `anyPawnStartsGoal(goalKind)`
+         - `allWorkCompleted()`
+         - `gameTimeReaches(minuteOfDay)`
+         - `dayReaches(dayNumber)`
+      3. 实现断言函数：
+         - `assertPawnAtCell`, `assertEventOccurred`, `assertWorkItemCompleted`, `assertNoPawnStarved`
+      4. 实现 `spawnDefaultColony(sim, count?)` 快捷函数。
+      5. 在 `src/headless/index.ts` 中 re-export。
+    acceptance_criteria: |
+      - [ ] Read: `src/headless/scenario-helpers.ts` 导出 `pawnReachesCell` 和 `spawnDefaultColony`。
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+
+  - id: "T-10"
+    title: "编写示例场景文件与自动测试"
+    status: "completed"
+    dependencies:
+      - "T-07"
+      - "T-09"
+    context:
+      read_files:
+        - "src/headless/scenario-types.ts"
+        - "src/headless/scenario-runner.ts"
+        - "src/headless/scenario-helpers.ts"
+      reference_docs:
+        - "docs/human/generic-gathering-rabbit.md"
+    action: |
+      1. 创建场景定义文件（纯数据，不含测试逻辑）：
+         - `scenarios/pawn-eats-when-hungry.scenario.ts`：1 pawn, satiety=5, expectation: pawn-reaches-goal "eat" within 500 ticks。
+         - `scenarios/pawn-sleeps-when-tired.scenario.ts`：1 pawn, energy=5, expectation: pawn-reaches-goal "sleep" within 500 ticks。
+         - `scenarios/build-bed-flow.scenario.ts`：放床蓝图, expectation: work-item-exists。
+         - `scenarios/multi-pawn-colony.scenario.ts`：3 pawns, 2000 ticks, expectations: no-pawn-starved + event-occurred "pawn-goal-changed"。
+      2. 更新 `scenarios/index.ts` 导出所有场景。
+      3. 创建自动测试文件（薄包装，调用 runner）：
+         - `tests/headless/pawn-eats-when-hungry.test.ts`
+         - `tests/headless/pawn-sleeps-when-tired.test.ts`
+         - `tests/headless/build-bed-flow.test.ts`
+         - `tests/headless/multi-pawn-colony.test.ts`
+      4. 每个 .test.ts 只需导入场景定义 + 调用 `runScenarioHeadless` + `expect(results.every(r => r.passed)).toBe(true)`。
+      5. 每个文件头部注释说明场景目的。
+    acceptance_criteria: |
+      - [ ] Shell: `npx vitest run tests/headless/` 4 个测试文件全部通过，耗时 < 3 秒。
+      - [ ] Read: 每个 `.test.ts` 文件行数不超过 30 行（确保是薄包装，逻辑在场景定义和 runner 中）。
+
+  # ============================================================
+  #  Phase 5: 收尾
+  # ============================================================
+
+  - id: "T-11"
+    title: "配置 npm scripts 与编写文档"
+    status: "completed"
+    dependencies:
+      - "T-10"
+    context:
+      read_files:
+        - "package.json"
+        - "src/headless/index.ts"
+      reference_docs:
+        - "docs/human/generic-gathering-rabbit.md"
+    action: |
+      1. 修改 `package.json`，在 scripts 中添加 `"test:headless": "vitest run tests/headless/"`。
+      2. 创建 `docs/headless-sim.md`，包含以下章节：
+         - 快速开始（3 行代码跑起 headless sim）
+         - API 参考（HeadlessSim 接口全部方法）
+         - 事件收集（支持的事件类型与查询方法）
+         - 场景定义格式（ScenarioDefinition 字段说明）
+         - 自动测试模板（如何写 .scenario.ts + .test.ts）
+         - 人工验收流程（如何在浏览器加载场景进行人工验收）
+         - Agent 工作流标准步骤
+    acceptance_criteria: |
+      - [ ] Shell: `npm run test:headless` 成功执行。
+      - [ ] Read: `docs/headless-sim.md` 包含 "人工验收" 和 "Agent 工作流标准步骤" 关键词。

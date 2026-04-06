@@ -16,30 +16,34 @@ import {
   type TimeSpeed
 } from "../game/time";
 import { GameOrchestrator } from "../game/game-orchestrator";
+import type { OrchestratorWorldBridge } from "../game/orchestrator-world-bridge";
 import { bootstrapWorldForScene } from "../game/world-bootstrap";
+import { createWorldCore } from "../game/world-core";
 import {
   createReservationSnapshot,
   DEFAULT_WORLD_GRID,
+  seedBlockedCellsAsObstacles,
   type ReservationSnapshot,
   type WorldGridConfig
 } from "../game/map";
 import type { SimGridSyncState } from "../game/world-sim-bridge";
 import { DEFAULT_SIM_CONFIG, type SimConfig } from "../game/behavior";
-import {
-  DEFAULT_PLAYER_ACCEPTANCE_SCENARIO_ID,
-  PLAYER_ACCEPTANCE_SCENARIOS,
-  playerAcceptanceScenarioById,
-  resolveSimConfigForScenario
-} from "../data/player-acceptance-scenarios";
 import { HudManager } from "../ui/hud-manager";
-import { VILLAGER_TOOLS } from "../data/villager-tools";
+import { VILLAGER_TOOLS, type VillagerBuildSubId } from "../data/villager-tools";
 import {
   drawGridLines,
   drawStoneCellsToGraphics,
   drawInteractionPoints
 } from "./renderers/grid-renderer";
-import { createPawnViews, syncPawnViews, type PawnView } from "./renderers/pawn-renderer";
-import { drawGroundItemStacks } from "./renderers/ground-items-renderer";
+import {
+  createPawnViews,
+  destroyPawnViews,
+  syncPawnViews,
+  type PawnView
+} from "./renderers/pawn-renderer";
+import { syncGroundResourceItems } from "./renderers/ground-items-renderer";
+import { drawTreesToGraphics } from "./renderers/tree-renderer";
+import { drawZoneOverlaysToGraphics } from "./renderers/zone-overlay-renderer";
 import { syncTaskMarkerView } from "./renderers/selection-renderer";
 import { GameSceneFloorInteraction } from "./game-scene-floor-interaction";
 import {
@@ -51,10 +55,9 @@ import {
 } from "./game-scene-presentation";
 import { syncPlayerChannelHintLines } from "./game-scene-hud-sync";
 import { GameSceneKeyboardBindings } from "./game-scene-keyboard-bindings";
-import {
-  applyAcceptanceScenarioPresentation,
-  runAcceptanceReplayPresentation
-} from "./game-scene-acceptance-ui";
+import { listAvailableScenarios, loadScenarioIntoGame } from "../player/scenario-loader";
+import { WorldCoreWorldPort } from "../player/world-core-world-port";
+import type { ScenarioDefinition } from "../headless/scenario-types";
 
 export type GameSceneVariant = "default" | "alt-en";
 
@@ -82,15 +85,20 @@ export class GameScene extends Phaser.Scene {
   private floorSelectionDraftGraphics!: Phaser.GameObjects.Graphics;
   private taskMarkerGraphics!: Phaser.GameObjects.Graphics;
   private taskMarkerTexts = new Map<string, Phaser.GameObjects.Text>();
+  private treeGraphics!: Phaser.GameObjects.Graphics;
+  private groundResourceGraphics!: Phaser.GameObjects.Graphics;
+  private zoneOverlayGraphics!: Phaser.GameObjects.Graphics;
+  private groundResourceLabels = new Map<string, Phaser.GameObjects.Text>();
 
   private variant: GameSceneVariant = "default";
   private selectedToolIndex = 0;
+  /** 仅当主工具为 `build` 时有效；选中主槽后须再选木墙/木床。 */
+  private buildSubTool: VillagerBuildSubId | null = null;
   private selectedPawnId: string | null = null;
   private taskMarkersByCell = new Map<string, string>();
 
   private readonly keyboard = new GameSceneKeyboardBindings();
 
-  private acceptanceScenarioId = DEFAULT_PLAYER_ACCEPTANCE_SCENARIO_ID;
   private simConfig: SimConfig = DEFAULT_SIM_CONFIG;
   private simGridSyncState: SimGridSyncState | null = null;
   private orchestrator!: GameOrchestrator;
@@ -102,14 +110,10 @@ export class GameScene extends Phaser.Scene {
     super("game");
   }
 
-  public init(data: { variant?: string; acceptance?: string } = {}): void {
+  public init(data: { variant?: string } = {}): void {
     this.variant = data.variant === "alt-en" ? "alt-en" : "default";
-    const acc = data.acceptance;
-    this.acceptanceScenarioId =
-      typeof acc === "string" && playerAcceptanceScenarioById(acc)
-        ? acc
-        : DEFAULT_PLAYER_ACCEPTANCE_SCENARIO_ID;
     this.selectedToolIndex = 0;
+    this.buildSubTool = null;
     this.timeOfDayState = createInitialTimeOfDayState(DEFAULT_TIME_OF_DAY_CONFIG);
     this.timeOfDayPalette = sampleTimeOfDayPalette(this.timeOfDayState);
     this.timeControlState = DEFAULT_TIME_CONTROL_STATE;
@@ -121,10 +125,8 @@ export class GameScene extends Phaser.Scene {
     this.layoutGrid();
     this.setupGridHoverHighlight();
 
-    const accScenario = playerAcceptanceScenarioById(this.acceptanceScenarioId);
-    this.simConfig = resolveSimConfigForScenario(accScenario);
+    this.simConfig = DEFAULT_SIM_CONFIG;
     const { worldGrid, worldPort } = bootstrapWorldForScene({
-      scenario: accScenario,
       simConfig: this.simConfig,
       timeOfDayState: this.timeOfDayState
     });
@@ -152,7 +154,12 @@ export class GameScene extends Phaser.Scene {
       this.reservations,
       this.timeOfDayPalette
     );
-    drawGroundItemStacks(this, this.worldGrid, this.gridOriginX, this.gridOriginY);
+    this.treeGraphics = this.add.graphics();
+    this.treeGraphics.setDepth(13);
+    this.groundResourceGraphics = this.add.graphics();
+    this.groundResourceGraphics.setDepth(25);
+    this.zoneOverlayGraphics = this.add.graphics();
+    this.zoneOverlayGraphics.setDepth(30);
 
     this.floorSelectionGraphics = this.add.graphics();
     this.floorSelectionDraftGraphics = this.add.graphics();
@@ -187,14 +194,20 @@ export class GameScene extends Phaser.Scene {
     this.hud.syncTimeOfDayHud(this.timeOfDayState, this.timeControlState, this.timeOfDayPalette);
     this.keyboard.setupTimeControls(this, this.hud, () => this.toggleTimePaused(), (s) => this.setTimeSpeed(s));
     this.keyboard.setupVillagerToolBarKeys(this, (i) => this.selectVillagerTool(i));
-    this.hud.setupToolBar((i) => this.selectVillagerTool(i), this.selectedToolIndex);
-    this.setupPawnRosterUi();
+    this.hud.setupToolBar(
+      (i) => this.selectVillagerTool(i),
+      this.selectedToolIndex,
+      {
+        onSelectSub: (sub) => this.selectBuildSubTool(sub),
+        initialSub: this.buildSubTool
+      }
+    );
     this.hud.bindSceneVariantSelect(this.variant, (next) => {
-      this.scene.restart({ variant: next, acceptance: this.acceptanceScenarioId });
+      this.scene.restart({ variant: next });
     });
-    this.hud.setupBAcceptancePanel(PLAYER_ACCEPTANCE_SCENARIOS, this.acceptanceScenarioId, {
-      onScenarioChange: (id) => this.scene.restart({ variant: this.variant, acceptance: id }),
-      onReplay: () => this.runAcceptanceReplay()
+
+    this.hud.setupYamlScenarioPanel(listAvailableScenarios(), (def) => {
+      this.applyHeadlessScenarioDefinition(def);
     });
 
     this.orchestrator = new GameOrchestrator({
@@ -230,6 +243,7 @@ export class GameScene extends Phaser.Scene {
         onPaletteChanged: () => this.applyTimeOfDayPalette(),
         syncTimeHud: () =>
           this.hud.syncTimeOfDayHud(this.timeOfDayState, this.timeControlState, this.timeOfDayPalette),
+        syncTreesAndGroundItems: () => this.syncTreesAndGroundLayer(),
         redrawStoneCells: () =>
           drawStoneCellsToGraphics(
             this.stoneGraphics,
@@ -250,7 +264,14 @@ export class GameScene extends Phaser.Scene {
             this.timeOfDayPalette
           ),
         syncPawnViews: () =>
-          syncPawnViews(this.views, this.pawns, this.worldGrid, this.gridOriginX, this.gridOriginY),
+          syncPawnViews(
+            this.views,
+            this.pawns,
+            this.worldGrid,
+            this.gridOriginX,
+            this.gridOriginY,
+            (this.orchestrator.getPlayerWorldPort() as OrchestratorWorldBridge).getWorld().workItems
+          ),
         syncMarkerOverlay: () => this.syncMarkerOverlayWithWorld(),
         syncHoverFromPointer: () => this.syncHoverFromPointer(),
         syncPawnDetailPanel: () => this.syncPawnDetailPanel()
@@ -271,6 +292,7 @@ export class GameScene extends Phaser.Scene {
         this.taskMarkersByCell = m;
       },
       getSelectedToolIndex: () => this.selectedToolIndex,
+      getBuildSubTool: () => this.buildSubTool,
       onRedrawSelection: () => {
         floor.redrawFloorSelectionAndBrush();
       },
@@ -281,9 +303,10 @@ export class GameScene extends Phaser.Scene {
     this.floorInteraction.redrawFloorSelectionAndBrush();
     this.floorInteraction.bind();
 
-    this.applyAcceptanceScenario(this.acceptanceScenarioId);
     this.orchestrator.bootstrapSimulationGrid();
+    this.syncTreesAndGroundLayer();
     this.syncPlayerChannelUi();
+    this.setupPawnRosterUi();
 
     this.keyboard.setupEsc(this, () => this.floorInteraction.cancelGesture());
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.onShutdown, this);
@@ -291,6 +314,34 @@ export class GameScene extends Phaser.Scene {
 
   public update(_time: number, delta: number): void {
     this.orchestrator.tick(delta);
+  }
+
+  private syncTreesAndGroundLayer(): void {
+    const port = this.orchestrator.getPlayerWorldPort() as OrchestratorWorldBridge;
+    const world = port.getWorld();
+    drawTreesToGraphics(
+      this.treeGraphics,
+      this.worldGrid,
+      this.gridOriginX,
+      this.gridOriginY,
+      world.entities.values()
+    );
+    syncGroundResourceItems(
+      this,
+      this.groundResourceGraphics,
+      this.groundResourceLabels,
+      this.worldGrid,
+      this.gridOriginX,
+      this.gridOriginY,
+      world.entities.values()
+    );
+    drawZoneOverlaysToGraphics(
+      this.zoneOverlayGraphics,
+      this.worldGrid,
+      this.gridOriginX,
+      this.gridOriginY,
+      world.entities.values()
+    );
   }
 
   private getTaskMarkerViewDeps() {
@@ -359,7 +410,8 @@ export class GameScene extends Phaser.Scene {
 
   private syncPawnDetailPanel(): void {
     const pawn = this.selectedPawnId ? this.pawns.find((p) => p.id === this.selectedPawnId) : undefined;
-    this.hud.syncPawnDetail(pawn);
+    const port = this.orchestrator.getPlayerWorldPort() as OrchestratorWorldBridge;
+    this.hud.syncPawnDetail(pawn, port.getWorld().workItems);
   }
 
   private toggleTimePaused(): void {
@@ -375,7 +427,16 @@ export class GameScene extends Phaser.Scene {
   private selectVillagerTool(index: number): void {
     if (index < 0 || index >= VILLAGER_TOOLS.length) return;
     this.selectedToolIndex = index;
-    this.hud.syncToolBarSelection(index);
+    this.buildSubTool = null;
+    this.hud.syncToolBarSelection(index, this.buildSubTool);
+    this.floorInteraction.resetForToolChange();
+    this.syncPlayerChannelUi();
+  }
+
+  private selectBuildSubTool(sub: VillagerBuildSubId): void {
+    if (VILLAGER_TOOLS[this.selectedToolIndex]?.id !== "build") return;
+    this.buildSubTool = sub;
+    this.hud.syncToolBarSelection(this.selectedToolIndex, this.buildSubTool);
     this.floorInteraction.resetForToolChange();
     this.syncPlayerChannelUi();
   }
@@ -393,37 +454,101 @@ export class GameScene extends Phaser.Scene {
   }
 
   private syncPlayerChannelUi(): void {
-    syncPlayerChannelHintLines(this.hud, this.orchestrator, this.selectedToolIndex, this.acceptanceScenarioId);
+    syncPlayerChannelHintLines(this.hud, this.orchestrator, this.selectedToolIndex, this.buildSubTool);
   }
 
-  private applyAcceptanceScenario(scenarioId: string): void {
-    applyAcceptanceScenarioPresentation({
-      scenarioId,
-      orchestrator: this.orchestrator,
-      hud: this.hud,
-      taskMarkersByCell: this.taskMarkersByCell,
-      getTaskMarkerView: () => this.getTaskMarkerViewDeps(),
-      floorInteraction: this.floorInteraction,
-      onScenarioIdCommitted: (id) => {
-        this.acceptanceScenarioId = id;
-      },
-      syncPlayerChannelUi: () => this.syncPlayerChannelUi()
-    });
-  }
+  /**
+   * 将 `scenarios/*.scenario.ts` 写入当前 WorldCore 与小人列表（不重启 Phaser 场景）。
+   * `expectations` 不会自动判定，仅便于人工对照 Vitest 中的同一定义。
+   */
+  private applyHeadlessScenarioDefinition(def: ScenarioDefinition): void {
+    try {
+      const port = this.orchestrator.getPlayerWorldPort();
+      if (!(port instanceof WorldCoreWorldPort)) {
+        window.alert("当前世界端口不是 WorldCoreWorldPort，无法载入测试场景。");
+        return;
+      }
+      /** 不用当前 port 里的世界叠加载入，否则上一场景的实体仍占格会与新 pawn/蓝图冲突。 */
+      const baselineWorld = seedBlockedCellsAsObstacles(
+        createWorldCore({
+          grid: this.worldGrid,
+          timeState: {
+            dayNumber: this.timeOfDayState.dayNumber,
+            minuteOfDay: this.timeOfDayState.minuteOfDay
+          },
+          timeConfig: DEFAULT_TIME_OF_DAY_CONFIG
+        }),
+        this.worldGrid.blockedCellKeys ?? new Set()
+      );
+      const { world, pawnStates } = loadScenarioIntoGame(baselineWorld, def);
+      port.setWorld(world);
+      port.resetSession();
 
-  private runAcceptanceReplay(): void {
-    runAcceptanceReplayPresentation({
-      orchestrator: this.orchestrator,
-      hud: this.hud,
-      taskMarkersByCell: this.taskMarkersByCell,
-      getTaskMarkerView: () => this.getTaskMarkerViewDeps()
-    });
+      destroyPawnViews(this.views);
+
+      this.pawns = pawnStates.map((p) => ({ ...p }));
+      this.reservations = createReservationSnapshot();
+
+      const snap = port.getWorld().time;
+      this.timeOfDayState = { dayNumber: snap.dayNumber, minuteOfDay: snap.minuteOfDay };
+      this.timeOfDayPalette = sampleTimeOfDayPalette(this.timeOfDayState);
+
+      this.orchestrator.bootstrapSimulationGrid();
+
+      this.views = createPawnViews(
+        this,
+        this.pawns,
+        this.worldGrid,
+        this.gridOriginX,
+        this.gridOriginY,
+        this.timeOfDayPalette
+      );
+
+      this.applyTimeOfDayPalette();
+      this.hud.syncTimeOfDayHud(this.timeOfDayState, this.timeControlState, this.timeOfDayPalette);
+
+      drawStoneCellsToGraphics(
+        this.stoneGraphics,
+        this.worldGrid,
+        this.gridOriginX,
+        this.gridOriginY,
+        this.worldGrid.blockedCellKeys ?? new Set()
+      );
+      drawInteractionPoints(
+        this.interactionGraphics,
+        this.interactionLabels,
+        this,
+        this.worldGrid,
+        this.gridOriginX,
+        this.gridOriginY,
+        this.reservations,
+        this.timeOfDayPalette
+      );
+      this.syncTreesAndGroundLayer();
+
+      this.taskMarkersByCell = new Map();
+      redrawTaskMarkers(this.taskMarkersByCell, this.getTaskMarkerViewDeps());
+
+      this.hud.setupPawnRoster(this.pawns, (id) => this.selectPawnForRoster(id));
+      this.selectPawnForRoster(this.pawns[0]?.id ?? null);
+
+      this.floorInteraction.redrawFloorSelectionAndBrush();
+      this.syncPlayerChannelUi();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("applyHeadlessScenarioDefinition:", err);
+      window.alert(`载入测试场景失败：${msg}`);
+    }
   }
 
   private onShutdown(): void {
     this.keyboard.teardownAll(this.hud);
     this.floorInteraction.unbind();
     this.hud.teardownAll();
+    for (const t of this.groundResourceLabels.values()) {
+      t.destroy();
+    }
+    this.groundResourceLabels.clear();
     this.interactionLabels.clear();
     this.taskMarkerTexts.clear();
     this.views.clear();

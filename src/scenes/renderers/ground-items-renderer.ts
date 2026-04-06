@@ -1,53 +1,75 @@
 /**
- * ground-items-renderer：地面掉落物线框 + 名称 + 数量绘制。
+ * ground-items-renderer：从 WorldCore 同步地面散落物资（resource + containerKind ground）线框与标签。
  */
 
 import Phaser from "phaser";
+import type { ResourceMaterialKind, WorldEntitySnapshot } from "../../game/entity/entity-types";
 import type { WorldGridConfig } from "../../game/map/world-grid";
-import { MOCK_SCATTERED_GROUND_ITEMS } from "../../data/ground-items";
 
-export function drawGroundItemStacks(
+const MATERIAL_DISPLAY: Record<ResourceMaterialKind, string> = {
+  wood: "木材",
+  food: "食物",
+  generic: "物资"
+};
+
+export function syncGroundResourceItems(
   scene: Phaser.Scene,
+  g: Phaser.GameObjects.Graphics,
+  labelMap: Map<string, Phaser.GameObjects.Text>,
   grid: WorldGridConfig,
   ox: number,
-  oy: number
+  oy: number,
+  entities: Iterable<WorldEntitySnapshot>
 ): void {
-  const g = scene.add.graphics();
-  g.setDepth(25);
+  g.clear();
   const cs = grid.cellSizePx;
   const pad = 4;
 
-  for (const stack of MOCK_SCATTERED_GROUND_ITEMS) {
-    const { col, row } = stack.cell;
+  const activeIds = new Set<string>();
+  for (const e of entities) {
+    if (e.kind !== "resource") continue;
+    if (e.containerKind !== "ground") continue;
+
+    activeIds.add(e.id);
+
+    const { col, row } = e.cell;
     const left = ox + col * cs + pad;
     const top = oy + row * cs + pad;
-    const w = cs - pad * 2;
-    const h = cs - pad * 2;
+    const wBox = cs - pad * 2;
+    const hBox = cs - pad * 2;
 
-    g.lineStyle(2, 0xc9b87a, 0.95);
-    g.strokeRect(left, top, w, h);
+    const borderColor = e.pickupAllowed !== false ? 0xc9b87a : 0x8a8a8a;
+    g.lineStyle(2, borderColor, 0.95);
+    g.strokeRect(left, top, wBox, hBox);
 
     const cx = ox + (col + 0.5) * cs;
     const cy = oy + (row + 0.5) * cs;
-    scene.add
-      .text(cx, cy, stack.displayName, {
-        fontFamily: "Segoe UI, sans-serif",
-        fontSize: "11px",
-        color: "#e8dcc8",
-        align: "center"
-      })
-      .setOrigin(0.5, 0.5)
-      .setDepth(25);
+    const mat = e.materialKind ?? "generic";
+    const text = e.label?.trim() ? e.label : MATERIAL_DISPLAY[mat] ?? mat;
 
-    const rx = ox + (col + 1) * cs - pad;
-    const ry = oy + (row + 1) * cs - pad;
-    scene.add
-      .text(rx, ry, String(stack.quantity), {
-        fontFamily: "Segoe UI, sans-serif",
-        fontSize: "10px",
-        color: "#f0e6d2"
-      })
-      .setOrigin(1, 1)
-      .setDepth(25);
+    let label = labelMap.get(e.id);
+    if (!label || !label.active) {
+      if (label) labelMap.delete(e.id);
+      label = scene.add
+        .text(cx, cy, text, {
+          fontFamily: "Segoe UI, sans-serif",
+          fontSize: "11px",
+          color: "#e8dcc8",
+          align: "center"
+        })
+        .setOrigin(0.5, 0.5)
+        .setDepth(25);
+      labelMap.set(e.id, label);
+    }
+    label.setText(text);
+    label.setPosition(cx, cy);
+    label.setColor("#e8dcc8");
+  }
+
+  for (const [id, label] of labelMap) {
+    if (!activeIds.has(id)) {
+      label.destroy();
+      labelMap.delete(id);
+    }
   }
 }

@@ -5,6 +5,18 @@ export type NeedStage = "normal" | "warning" | "critical";
 export const WARNING_THRESHOLD = 40;
 export const CRITICAL_THRESHOLD = 20;
 
+/** sim-loop：饥饿需求值超过此阈值时，放弃已认领的走向工单类工作并释放工单（与 needs.hunger 量纲一致）。 */
+export const HUNGER_INTERRUPT_THRESHOLD = 70;
+
+/**
+ * needs.rest 高于此值视为夜间应优先睡眠（与 needs.rest 量纲一致；与 NEED-002 / Phase 6 对齐）。
+ * 用于：日夜边界强制释放走向类工单、夜间睡眠目标得分加权。
+ */
+export const REST_SLEEP_PRIORITY_THRESHOLD = 50;
+
+/** chooseGoalDecision：夜间且 rest 急迫时，睡眠候选得分乘数。 */
+export const NIGHT_SLEEP_GOAL_SCORE_MULTIPLIER = 3;
+
 const STAGE_RANK: Record<NeedStage, number> = {
   normal: 0,
   warning: 1,

@@ -1,11 +1,37 @@
-import { coordKey, parseCoordKey } from "../game/map/world-grid";
+import { coordKey, isInsideGrid, parseCoordKey, type GridCoord } from "../game/map/world-grid";
+import { obstacleBlockedCellKeys } from "../game/world-sim-bridge";
+import type { WorldEntitySnapshot } from "../game/entity/entity-types";
 import {
   clearTaskMarkersAtCells,
   placeTaskMarker,
+  registerChopTreeWork,
+  registerPickUpResourceWork,
   safePlaceBlueprint,
+  spawnWorldEntity,
   type WorldCore
 } from "../game/world-core";
 import type { DomainCommand, MockWorldSubmitResult } from "./s0-contract";
+
+/** 阻挡格：`grid.blockedCellKeys` 与障碍实体占格合并（无头世界常仅后者有值）。 */
+function mergedBlockedCellKeys(world: WorldCore): ReadonlySet<string> {
+  const fromEntities = obstacleBlockedCellKeys(world);
+  const fromGrid = world.grid.blockedCellKeys;
+  if (!fromGrid || fromGrid.size === 0) return fromEntities;
+  const out = new Set(fromEntities);
+  for (const k of fromGrid) {
+    out.add(k);
+  }
+  return out;
+}
+
+function firstBlockedTargetCell(world: WorldCore, keys: readonly string[]): string | undefined {
+  const blocked = mergedBlockedCellKeys(world);
+  if (blocked.size === 0) return undefined;
+  for (const k of keys) {
+    if (blocked.has(k)) return k;
+  }
+  return undefined;
+}
 
 function findObstacleCoveringCell(world: WorldCore, cellKey: string): string | undefined {
   const cell = parseCoordKey(cellKey);
@@ -20,18 +46,38 @@ function findObstacleCoveringCell(world: WorldCore, cellKey: string): string | u
   return undefined;
 }
 
+/** 选中格上未标记待伐的树（占格语义与 `occupiedCells` 一致）。 */
+function findUnmarkedTreeCoveringCell(
+  world: WorldCore,
+  cellKey: string
+): WorldEntitySnapshot | undefined {
+  for (const entity of world.entities.values()) {
+    if (entity.kind !== "tree") continue;
+    if (entity.loggingMarked) continue;
+    if (entity.occupiedCells.some((c) => coordKey(c) === cellKey)) {
+      return entity;
+    }
+  }
+  return undefined;
+}
+
+function findGroundResourceCoveringCell(
+  world: WorldCore,
+  cellKey: string
+): WorldEntitySnapshot | undefined {
+  for (const entity of world.entities.values()) {
+    if (entity.kind !== "resource") continue;
+    if (entity.containerKind !== "ground") continue;
+    if (entity.occupiedCells.some((c) => coordKey(c) === cellKey)) {
+      return entity;
+    }
+  }
+  return undefined;
+}
+
 function toolIdFromVerb(verb: string): string | null {
   if (!verb.startsWith("assign_tool_task:")) return null;
   return verb.slice("assign_tool_task:".length);
-}
-
-function firstBlockedTargetCell(world: WorldCore, keys: readonly string[]): string | undefined {
-  const blocked = world.grid.blockedCellKeys;
-  if (!blocked) return undefined;
-  for (const k of keys) {
-    if (blocked.has(k)) return k;
-  }
-  return undefined;
 }
 
 /** 将 S0 领域命令落到 {@link WorldCore}；尚未映射到工单的.toolbar 工具仍接受但不改世界（保留 UI 标记通道）。 */
@@ -47,6 +93,162 @@ export function applyDomainCommandToWorldCore(
       result: {
         accepted: true,
         messages: [`领域：已清除 ${keys.size} 格任务标记`]
+      }
+    };
+  }
+
+  if (cmd.verb === "zone_create") {
+    const seen = new Set<string>();
+    const coords: GridCoord[] = [];
+    for (const key of cmd.targetCellKeys) {
+      const cell = parseCoordKey(key);
+      if (!cell) {
+        return {
+          world,
+          result: {
+            accepted: false,
+            messages: [`领域：无效格键 ${key}`],
+            conflictCellKeys: [key]
+          }
+        };
+      }
+      if (!isInsideGrid(world.grid, cell)) {
+        return {
+          world,
+          result: {
+            accepted: false,
+            messages: [`领域：格 ${coordKey(cell)} 越界`],
+            conflictCellKeys: [coordKey(cell)]
+          }
+        };
+      }
+      const ck = coordKey(cell);
+      if (seen.has(ck)) continue;
+      seen.add(ck);
+      coords.push({ col: cell.col, row: cell.row });
+    }
+    if (coords.length === 0) {
+      return {
+        world,
+        result: {
+          accepted: false,
+          messages: ["领域：存储区需至少覆盖一格（或全部为重复格键）"]
+        }
+      };
+    }
+    const keys = coords.map((c) => coordKey(c));
+    const blockedHit = firstBlockedTargetCell(world, keys);
+    if (blockedHit) {
+      return {
+        world,
+        result: {
+          accepted: false,
+          messages: [`领域：格 ${blockedHit} 为阻挡格，无法创建存储区`],
+          conflictCellKeys: [blockedHit]
+        }
+      };
+    }
+
+    const anchor = coords[0]!;
+    const spawned = spawnWorldEntity(world, {
+      kind: "zone",
+      cell: anchor,
+      occupiedCells: [],
+      coveredCells: coords,
+      zoneKind: "storage",
+      acceptedMaterialKinds: [],
+      label: "存储区"
+    });
+    if (spawned.outcome.kind !== "created") {
+      const detail =
+        spawned.outcome.kind === "conflict"
+          ? `与 ${spawned.outcome.blockingEntityId} 占格冲突`
+          : `越界 (${spawned.outcome.cell.col},${spawned.outcome.cell.row})`;
+      return {
+        world,
+        result: {
+          accepted: false,
+          messages: [`领域：创建存储区失败（${detail}）`]
+        }
+      };
+    }
+    return {
+      world: spawned.world,
+      result: {
+        accepted: true,
+        messages: [`领域：已创建存储区（storage），覆盖 ${coords.length} 格`]
+      }
+    };
+  }
+
+  if (cmd.verb === "build_wall_blueprint") {
+    let next = world;
+    let placed = 0;
+    let skipped = 0;
+    let lastWorkItemId: string | undefined;
+    for (const key of cmd.targetCellKeys) {
+      const cell = parseCoordKey(key);
+      if (!cell || !isInsideGrid(world.grid, cell)) {
+        skipped += 1;
+        continue;
+      }
+      const r = safePlaceBlueprint(next, { buildingKind: "wall", cell });
+      if (!r.ok) {
+        skipped += 1;
+        continue;
+      }
+      next = r.world;
+      placed += 1;
+      lastWorkItemId = r.workItemId;
+    }
+    const msg =
+      placed > 0
+        ? `领域：已放置墙蓝图 ${placed} 处${skipped > 0 ? `，跳过 ${skipped} 格` : ""}`
+        : skipped > 0
+          ? `领域：未成功放置墙蓝图（跳过/失败 ${skipped} 格）`
+          : "领域：build_wall_blueprint 无目标格";
+    return {
+      world: next,
+      result: {
+        accepted: true,
+        messages: [msg],
+        workOrderId: lastWorkItemId
+      }
+    };
+  }
+
+  if (cmd.verb === "place_furniture:bed") {
+    let next = world;
+    let placed = 0;
+    let skipped = 0;
+    let lastWorkItemId: string | undefined;
+    for (const key of cmd.targetCellKeys) {
+      const cell = parseCoordKey(key);
+      if (!cell || !isInsideGrid(world.grid, cell)) {
+        skipped += 1;
+        continue;
+      }
+      const r = safePlaceBlueprint(next, { buildingKind: "bed", cell });
+      if (!r.ok) {
+        skipped += 1;
+        continue;
+      }
+      next = r.world;
+      placed += 1;
+      lastWorkItemId = r.workItemId;
+    }
+    const msg =
+      placed > 0
+        ? `领域：已放置床铺蓝图 ${placed} 处${skipped > 0 ? `，跳过 ${skipped} 格` : ""}`
+        : skipped > 0
+          ? `领域：未成功放置床铺蓝图（跳过/失败 ${skipped} 格）`
+          : "领域：place_furniture:bed 无目标格";
+    return {
+      world: next,
+      result: {
+        accepted: true,
+        messages: [msg],
+        workOrderId: lastWorkItemId
       }
     };
   }
@@ -98,39 +300,110 @@ export function applyDomainCommandToWorldCore(
 
   if (toolId === "build") {
     let next = world;
-    const workIds: string[] = [];
+    let placed = 0;
+    let skipped = 0;
+    let lastWorkItemId: string | undefined;
     for (const key of cmd.targetCellKeys) {
       const cell = parseCoordKey(key);
-      if (!cell) {
-        return {
-          world,
-          result: {
-            accepted: false,
-            messages: [`领域：无效格键 ${key}`],
-            conflictCellKeys: [key]
-          }
-        };
+      if (!cell || !isInsideGrid(world.grid, cell)) {
+        skipped += 1;
+        continue;
       }
-      const placed = safePlaceBlueprint(next, { buildingKind: "bed", cell });
-      if (!placed.ok) {
-        return {
-          world,
-          result: {
-            accepted: false,
-            messages: [`领域：${key} ${placed.reason}`],
-            conflictCellKeys: [key]
-          }
-        };
+      const r = safePlaceBlueprint(next, { buildingKind: "bed", cell });
+      if (!r.ok) {
+        skipped += 1;
+        continue;
       }
+      next = r.world;
+      placed += 1;
+      lastWorkItemId = r.workItemId;
+    }
+    const msg =
+      placed > 0
+        ? `领域：已放置床铺蓝图 ${placed} 处${skipped > 0 ? `，跳过 ${skipped} 格` : ""}`
+        : skipped > 0
+          ? `领域：未成功放置床铺蓝图（跳过/失败 ${skipped} 格）`
+          : "领域：assign_tool_task:build 无有效目标格";
+    return {
+      world: next,
+      result: {
+        accepted: true,
+        messages: [msg],
+        workOrderId: lastWorkItemId
+      }
+    };
+  }
+
+  if (toolId === "lumber") {
+    const blockedHit = firstBlockedTargetCell(world, cmd.targetCellKeys);
+    if (blockedHit) {
+      return {
+        world,
+        result: {
+          accepted: false,
+          messages: [`领域：格 ${blockedHit} 为障碍格，无法指派 ${toolId}`],
+          conflictCellKeys: [blockedHit]
+        }
+      };
+    }
+    let next = world;
+    const workIds: string[] = [];
+    let marked = 0;
+    for (const key of cmd.targetCellKeys) {
+      const tree = findUnmarkedTreeCoveringCell(next, key);
+      if (!tree) continue;
+      const placed = registerChopTreeWork(next, tree.id);
       next = placed.world;
       workIds.push(placed.workItemId);
+      marked += 1;
     }
     return {
       world: next,
       result: {
         accepted: true,
-        messages: [`领域：已放置床铺蓝图 ${cmd.targetCellKeys.length} 处`],
-        workOrderId: workIds[workIds.length - 1]
+        messages: [
+          marked > 0
+            ? `领域：已登记 ${marked} 处伐木工单（chop-tree）`
+            : "领域：所选格无未标记树木"
+        ],
+        workOrderId: workIds.length > 0 ? workIds[workIds.length - 1] : undefined
+      }
+    };
+  }
+
+  if (toolId === "haul") {
+    const blockedHit = firstBlockedTargetCell(world, cmd.targetCellKeys);
+    if (blockedHit) {
+      return {
+        world,
+        result: {
+          accepted: false,
+          messages: [`领域：格 ${blockedHit} 为障碍格，无法指派 ${toolId}`],
+          conflictCellKeys: [blockedHit]
+        }
+      };
+    }
+    let next = world;
+    const workIds: string[] = [];
+    let marked = 0;
+    for (const key of cmd.targetCellKeys) {
+      const resource = findGroundResourceCoveringCell(next, key);
+      if (!resource) continue;
+      const placed = registerPickUpResourceWork(next, resource.id);
+      next = placed.world;
+      workIds.push(placed.workItemId);
+      marked += 1;
+    }
+    return {
+      world: next,
+      result: {
+        accepted: true,
+        messages: [
+          marked > 0
+            ? `领域：已登记 ${marked} 处拾取工单（pick-up-resource）`
+            : "领域：所选格无地面物资"
+        ],
+        workOrderId: workIds.length > 0 ? workIds[workIds.length - 1] : undefined
       }
     };
   }
@@ -151,7 +424,7 @@ export function applyDomainCommandToWorldCore(
       world,
       result: {
         accepted: true,
-        messages: [`领域：已登记 ${toolId} 意图（暂无对应工单，仅 UI 标记）`]
+        messages: [`领域：工具「${toolId}」暂未接入工单（命令已接受）`]
       }
     };
   }

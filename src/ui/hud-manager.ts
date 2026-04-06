@@ -4,12 +4,19 @@
  */
 
 import type { PawnState } from "../game/pawn-state";
+import type { WorkItemSnapshot } from "../game/work/work-types";
 import type { TimeControlState, TimeOfDayPalette, TimeSpeed } from "../game/time";
 import { formatTimeOfDayLabel, type TimeOfDayState } from "../game/time";
 import { pawnProfileForId } from "../data/pawn-profiles";
-import { VILLAGER_TOOLS, VILLAGER_TOOL_KEY_CODES, type VillagerTool } from "../data/villager-tools";
+import { pawnDetailBehaviorLabelZh } from "./status-display-model";
+import {
+  VILLAGER_TOOLS,
+  VILLAGER_TOOL_KEY_CODES,
+  type VillagerBuildSubId,
+  type VillagerTool
+} from "../data/villager-tools";
 import { needSignalsFromNeeds } from "../player/need-signals";
-import type { PlayerAcceptanceScenario } from "../data/player-acceptance-scenarios";
+import type { ScenarioDefinition } from "../headless/scenario-types";
 
 export type { VillagerTool };
 export { VILLAGER_TOOLS, VILLAGER_TOOL_KEY_CODES };
@@ -23,14 +30,11 @@ export type TimeControlCallbacks = Readonly<{
 /** 工具选中回调。 */
 export type ToolSelectCallback = (index: number) => void;
 
+/** 建造子项选中（木墙 / 木床）。 */
+export type BuildSubSelectCallback = (sub: VillagerBuildSubId) => void;
+
 /** Pawn 选中回调。 */
 export type PawnSelectCallback = (pawnId: string | null) => void;
-
-/** 右下角人工验收场景切换与回放（切换时应重启场景）。 */
-export type BAcceptanceCallbacks = Readonly<{
-  onScenarioChange: (scenarioId: string) => void;
-  onReplay: () => void;
-}>;
 
 function colorToCss(color: number): string {
   return `#${(color & 0xffffff).toString(16).padStart(6, "0")}`;
@@ -63,6 +67,9 @@ export class HudManager {
   private toolBarRoot: HTMLElement | null;
   private toolSlotEls: HTMLElement[] = [];
   private toolUiAbort: AbortController | null = null;
+  /** 建造槽位的子菜单容器（仅 `build` 槽存在此项）。 */
+  private buildSubmenuContainer: HTMLElement | null = null;
+  private buildToolIndex: number | null = null;
 
   // Pawn 名册 + 详情
   private rosterRoot: HTMLElement | null;
@@ -71,13 +78,13 @@ export class HudManager {
   private pawnRosterAbort: AbortController | null = null;
 
   private variantSelectAbort: AbortController | null = null;
-  private bAcceptanceAbort: AbortController | null = null;
+  private yamlScenarioAbort: AbortController | null = null;
 
-  private bAcceptanceDetailEl: HTMLElement | null;
-  private bAcceptanceSelectEl: HTMLSelectElement | null;
-  private bAcceptanceGoalEl: HTMLElement | null;
-  private bAcceptanceStepsEl: HTMLOListElement | null;
-  private bAcceptanceReplayBtn: HTMLButtonElement | null;
+  private yamlScenarioSelectEl: HTMLSelectElement | null;
+  private yamlScenarioDescEl: HTMLElement | null;
+  private yamlScenarioManualEl: HTMLElement | null;
+  private yamlScenarioManualStepsEl: HTMLOListElement | null;
+  private yamlScenarioManualOutcomesEl: HTMLOListElement | null;
 
   public constructor() {
     this.sceneHudEl = document.getElementById("scene-hud");
@@ -96,15 +103,17 @@ export class HudManager {
     this.toolBarRoot = document.getElementById("villager-tool-bar");
     this.rosterRoot = document.getElementById("pawn-roster");
     this.pawnDetailEl = document.getElementById("pawn-detail-panel");
-    this.bAcceptanceDetailEl = document.getElementById("b-acceptance-detail");
-    this.bAcceptanceSelectEl = document.getElementById(
-      "b-acceptance-scenario-select"
+    this.yamlScenarioSelectEl = document.getElementById(
+      "yaml-scenario-select"
     ) as HTMLSelectElement | null;
-    this.bAcceptanceGoalEl = document.getElementById("b-acceptance-scenario-goal");
-    this.bAcceptanceStepsEl = document.getElementById("b-acceptance-scenario-steps") as HTMLOListElement | null;
-    this.bAcceptanceReplayBtn = document.getElementById(
-      "b-acceptance-replay-commands"
-    ) as HTMLButtonElement | null;
+    this.yamlScenarioDescEl = document.getElementById("yaml-scenario-desc");
+    this.yamlScenarioManualEl = document.getElementById("yaml-scenario-manual");
+    this.yamlScenarioManualStepsEl = document.getElementById(
+      "yaml-scenario-manual-steps"
+    ) as HTMLOListElement | null;
+    this.yamlScenarioManualOutcomesEl = document.getElementById(
+      "yaml-scenario-manual-outcomes"
+    ) as HTMLOListElement | null;
   }
 
   // ── 时间 HUD ──────────────────────────────────────────────
@@ -232,70 +241,110 @@ export class HudManager {
     return abort;
   }
 
-  // ── 右下角：B 线验收（与测试场景独立）──────────────────────
+  // ── 右下角：`scenarios/*.scenario.ts` 热切换 ───────────────
 
-  public setupBAcceptancePanel(
-    scenarios: readonly PlayerAcceptanceScenario[],
-    currentScenarioId: string,
-    callbacks: BAcceptanceCallbacks
+  public setupYamlScenarioPanel(
+    scenarios: readonly ScenarioDefinition[],
+    onApply: (def: ScenarioDefinition) => void
   ): AbortController {
-    this.teardownBAcceptancePanel();
+    this.teardownYamlScenarioPanel();
     const abort = new AbortController();
-    this.bAcceptanceAbort = abort;
+    this.yamlScenarioAbort = abort;
     const { signal } = abort;
-
-    const sel = this.bAcceptanceSelectEl;
+    const sel = this.yamlScenarioSelectEl;
     if (sel) {
       sel.replaceChildren();
-      for (const s of scenarios) {
+      const placeholder = document.createElement("option");
+      placeholder.value = "";
+      placeholder.textContent = "— 选择要载入的测试场景 —";
+      sel.appendChild(placeholder);
+      for (let i = 0; i < scenarios.length; i++) {
+        const def = scenarios[i]!;
         const opt = document.createElement("option");
-        opt.value = s.id;
-        opt.textContent = s.title;
+        opt.value = String(i);
+        opt.textContent = def.name;
         sel.appendChild(opt);
       }
-      sel.value = scenarios.some((s) => s.id === currentScenarioId)
-        ? currentScenarioId
-        : scenarios[0]!.id;
-      sel.addEventListener("change", () => callbacks.onScenarioChange(sel.value), { signal });
+      sel.value = "";
+      sel.addEventListener(
+        "change",
+        () => {
+          const v = sel.value;
+          if (v === "") {
+            this.syncYamlScenarioManualHints(null);
+            return;
+          }
+          const idx = Number(v);
+          const def = scenarios[idx];
+          if (!def) return;
+          this.syncYamlScenarioManualHints(def);
+          onApply(def);
+        },
+        { signal }
+      );
     }
-
-    this.bAcceptanceReplayBtn?.addEventListener("click", () => callbacks.onReplay(), { signal });
     return abort;
   }
 
-  public syncBAcceptancePanel(scenario: PlayerAcceptanceScenario): void {
-    const detail = this.bAcceptanceDetailEl;
-    if (detail) {
-      detail.hidden = scenario.id === "off";
+  /** 根据 {@link ScenarioDefinition.manualAcceptance} 更新右下角人工验收文案；`def === null` 时隐藏。 */
+  public syncYamlScenarioManualHints(def: ScenarioDefinition | null): void {
+    const desc = this.yamlScenarioDescEl;
+    const wrap = this.yamlScenarioManualEl;
+    const stepsOl = this.yamlScenarioManualStepsEl;
+    const outOl = this.yamlScenarioManualOutcomesEl;
+    if (!desc || !wrap || !stepsOl || !outOl) return;
+
+    if (!def) {
+      desc.hidden = true;
+      desc.textContent = "";
+      wrap.hidden = true;
+      stepsOl.replaceChildren();
+      outOl.replaceChildren();
+      return;
     }
-    if (this.bAcceptanceGoalEl) {
-      this.bAcceptanceGoalEl.textContent = scenario.goal;
+
+    desc.hidden = false;
+    desc.textContent = def.description;
+
+    const ma = def.manualAcceptance;
+    const defaultSteps = [
+      "从下拉框选择本场景以载入数据。",
+      "用左上时间控制运行模拟，观察地图、名册与小人详情。"
+    ];
+    const steps = ma?.steps ?? defaultSteps;
+    const outcomes =
+      ma?.outcomes ?? (def.expectations?.map((e) => `${e.label}（${e.type}）`) ?? ["（本场景未声明期望，请自行对照玩法）"]);
+
+    stepsOl.replaceChildren();
+    for (const line of steps) {
+      const li = document.createElement("li");
+      li.textContent = line;
+      stepsOl.appendChild(li);
     }
-    const list = this.bAcceptanceStepsEl;
-    if (list) {
-      list.replaceChildren();
-      for (const step of scenario.steps) {
-        const li = document.createElement("li");
-        li.textContent = step;
-        list.appendChild(li);
-      }
+    outOl.replaceChildren();
+    for (const line of outcomes) {
+      const li = document.createElement("li");
+      li.textContent = line;
+      outOl.appendChild(li);
     }
-    const replay = this.bAcceptanceReplayBtn;
-    if (replay) {
-      replay.style.display = scenario.showReplayButton ? "block" : "none";
-    }
+    wrap.hidden = false;
   }
 
-  public teardownBAcceptancePanel(): void {
-    this.bAcceptanceAbort?.abort();
-    this.bAcceptanceAbort = null;
+  public teardownYamlScenarioPanel(): void {
+    this.yamlScenarioAbort?.abort();
+    this.yamlScenarioAbort = null;
+    this.syncYamlScenarioManualHints(null);
   }
 
   // ── 工具栏 ────────────────────────────────────────────────
 
   public setupToolBar(
     onSelect: ToolSelectCallback,
-    initialIndex: number
+    initialIndex: number,
+    build?: Readonly<{
+      onSelectSub: BuildSubSelectCallback;
+      initialSub: VillagerBuildSubId | null;
+    }>
   ): AbortController {
     this.teardownToolBar();
     const abort = new AbortController();
@@ -313,21 +362,75 @@ export class HudManager {
         slot.setAttribute("aria-label", `${tool.label}，快捷键 ${tool.hotkey}`);
         slot.innerHTML = `<span class="tool-key">${tool.hotkey}</span><div class="tool-label">${tool.label}</div>`;
         slot.addEventListener("click", () => onSelect(i), { signal });
-        this.toolBarRoot.appendChild(slot);
+
+        const subs = tool.buildSubmenu;
+        if (subs?.length) {
+          const wrap = document.createElement("div");
+          wrap.className = "tool-slot-with-submenu";
+
+          const subContainer = document.createElement("div");
+          subContainer.className = "build-tool-submenu";
+          subContainer.setAttribute("role", "group");
+          subContainer.setAttribute("aria-label", `${tool.label}子选项`);
+          subContainer.hidden = true;
+
+          for (const sub of subs) {
+            const subBtn = document.createElement("button");
+            subBtn.type = "button";
+            subBtn.className = "build-tool-submenu-item";
+            subBtn.dataset.buildSubId = sub.id;
+            subBtn.textContent = sub.label;
+            subBtn.setAttribute("aria-label", sub.label);
+            subBtn.addEventListener(
+              "click",
+              (ev) => {
+                ev.stopPropagation();
+                build?.onSelectSub(sub.id);
+              },
+              { signal }
+            );
+            subContainer.appendChild(subBtn);
+          }
+
+          wrap.appendChild(slot);
+          wrap.appendChild(subContainer);
+          this.toolBarRoot.appendChild(wrap);
+          this.buildSubmenuContainer = subContainer;
+          this.buildToolIndex = i;
+        } else {
+          this.toolBarRoot.appendChild(slot);
+        }
+
         this.toolSlotEls.push(slot);
       }
     }
 
-    this.syncToolBarSelection(initialIndex);
+    this.syncToolBarSelection(initialIndex, build?.initialSub ?? null);
     return abort;
   }
 
-  public syncToolBarSelection(index: number): void {
+  public syncToolBarSelection(selectedIndex: number, buildSub: VillagerBuildSubId | null): void {
     for (let i = 0; i < this.toolSlotEls.length; i++) {
       const el = this.toolSlotEls[i]!;
-      const on = i === index;
+      const on = i === selectedIndex;
       el.classList.toggle("selected", on);
       el.setAttribute("aria-pressed", on ? "true" : "false");
+    }
+
+    if (this.buildSubmenuContainer && this.buildToolIndex !== null) {
+      const expanded = selectedIndex === this.buildToolIndex;
+      this.buildSubmenuContainer.hidden = !expanded;
+      const buttons = Array.from(
+        this.buildSubmenuContainer.querySelectorAll<HTMLButtonElement>(
+          ".build-tool-submenu-item[data-build-sub-id]"
+        )
+      );
+      for (const subBtn of buttons) {
+        const id = subBtn.dataset.buildSubId as VillagerBuildSubId | undefined;
+        const on = expanded && id !== undefined && id === buildSub;
+        subBtn.classList.toggle("selected", on);
+        subBtn.setAttribute("aria-pressed", on ? "true" : "false");
+      }
     }
   }
 
@@ -335,6 +438,8 @@ export class HudManager {
     this.toolUiAbort?.abort();
     this.toolUiAbort = null;
     this.toolSlotEls = [];
+    this.buildSubmenuContainer = null;
+    this.buildToolIndex = null;
     if (this.toolBarRoot) this.toolBarRoot.replaceChildren();
   }
 
@@ -395,7 +500,10 @@ export class HudManager {
 
   // ── Pawn 详情面板 ─────────────────────────────────────────
 
-  public syncPawnDetail(pawn: PawnState | undefined): void {
+  public syncPawnDetail(
+    pawn: PawnState | undefined,
+    workItems?: ReadonlyMap<string, WorkItemSnapshot>
+  ): void {
     const panel = this.pawnDetailEl;
     if (!panel) return;
 
@@ -413,6 +521,7 @@ export class HudManager {
           .join("")
       : "";
 
+    const behaviorZh = pawnDetailBehaviorLabelZh(pawn, workItems);
     const goal = pawn.currentGoal?.kind ?? "—";
     const action = pawn.currentAction?.kind ?? "—";
     const n = pawn.needs;
@@ -428,6 +537,10 @@ export class HudManager {
       <div class="pawn-detail-section">
         <div class="pawn-detail-label">备注（mock）</div>
         <div>${escapeHtml(profile?.notes ?? "—")}</div>
+      </div>
+      <div class="pawn-detail-section">
+        <div class="pawn-detail-label">当前行为</div>
+        <div class="pawn-detail-behavior">${escapeHtml(behaviorZh)}</div>
       </div>
       <div class="pawn-detail-section">
         <div class="pawn-detail-label">当前状态</div>
@@ -462,7 +575,7 @@ export class HudManager {
     this.teardownToolBar();
     this.teardownPawnRoster();
     this.teardownPawnDetail();
-    this.teardownBAcceptancePanel();
+    this.teardownYamlScenarioPanel();
     this.variantSelectAbort?.abort();
     this.variantSelectAbort = null;
   }

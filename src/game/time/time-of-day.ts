@@ -30,6 +30,9 @@ type PaletteAnchor = Readonly<{
 
 const MINUTES_PER_DAY = 24 * 60;
 
+/** 单帧真实时间步长上限（秒），避免 tab 挂起或调试断点后单 tick 推进过久。 */
+export const MAX_FRAME_DT_SEC = 0.5;
+
 export const DEFAULT_TIME_OF_DAY_CONFIG: TimeOfDayConfig = {
   realSecondsPerDay: 10 * 60,
   startMinuteOfDay: 6 * 60
@@ -175,7 +178,9 @@ export function effectiveSimulationDeltaSeconds(
   deltaSeconds: number,
   controls: TimeControlState = DEFAULT_TIME_CONTROL_STATE
 ): number {
-  return controls.paused ? 0 : deltaSeconds * controls.speed;
+  if (controls.paused) return 0;
+  const clampedReal = Math.min(Math.max(0, deltaSeconds), MAX_FRAME_DT_SEC);
+  return clampedReal * controls.speed;
 }
 
 export function formatTimeOfDayLabel(state: TimeOfDayState): string {

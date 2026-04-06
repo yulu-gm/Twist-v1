@@ -86,6 +86,34 @@ describe("goal-driven-planning", () => {
     expect(decision.goal).not.toBe("eat");
   });
 
+  it("prefers eat over sleep by day when hunger dominates unweighted scores", () => {
+    const pawn = withPawnNeeds(
+      createDefaultPawnStates([DEFAULT_WORLD_GRID.defaultSpawnPoints[0]!], ["T"])[0]!,
+      { hunger: 80, rest: 55, recreation: 10 }
+    );
+    const decision = chooseGoalDecision({
+      grid: DEFAULT_WORLD_GRID,
+      pawn,
+      reservations: createReservationSnapshot(),
+      timePeriod: "day"
+    });
+    expect(decision.goal).toBe("eat");
+  });
+
+  it("prefers sleep at night when rest urgency crosses weighted threshold over eat", () => {
+    const pawn = withPawnNeeds(
+      createDefaultPawnStates([DEFAULT_WORLD_GRID.defaultSpawnPoints[0]!], ["T"])[0]!,
+      { hunger: 80, rest: 55, recreation: 10 }
+    );
+    const decision = chooseGoalDecision({
+      grid: DEFAULT_WORLD_GRID,
+      pawn,
+      reservations: createReservationSnapshot(),
+      timePeriod: "night"
+    });
+    expect(decision.goal).toBe("sleep");
+  });
+
   it("falls back to wander when no interaction target is available", () => {
     const reservations = DEFAULT_WORLD_GRID.interactionPoints.reduce(
       (snapshot, point, index) =>

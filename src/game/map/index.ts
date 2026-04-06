@@ -37,6 +37,7 @@ export {
 } from "./world-grid";
 
 export { seedBlockedCellsAsObstacles } from "./world-seed";
+export { seedInitialTreesAndResources } from "./world-seed-entities";
 
 export type {
   CellPlacementBlocked,

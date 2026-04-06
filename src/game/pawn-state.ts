@@ -102,6 +102,10 @@ export type PawnState = Readonly<{
   currentAction: PawnActionState | undefined;
   reservedTargetId: string | undefined;
   actionTimerSec: number;
+  /** 站在工单锚格上累计的读条时间（秒）。 */
+  workTimerSec: number;
+  /** 当前读条对应的工单 id（与 `workTimerSec` 配对）。 */
+  activeWorkItemId?: string;
   debugLabel: string;
 }>;
 
@@ -127,6 +131,8 @@ export function createDefaultPawnStates(
     currentAction: undefined,
     reservedTargetId: undefined,
     actionTimerSec: 0,
+    workTimerSec: 0,
+    activeWorkItemId: undefined,
     debugLabel: "goal:none action:idle"
   }));
 }

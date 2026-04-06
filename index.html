@@ -118,13 +118,25 @@
         outline-offset: 2px;
       }
 
-      #b-acceptance-panel {
+      #right-dev-stack {
         position: fixed;
         right: 12px;
         bottom: 12px;
         z-index: 12;
         width: min(340px, calc(100vw - 24px));
-        max-height: min(52vh, 420px);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        align-items: stretch;
+        pointer-events: none;
+      }
+
+      #right-dev-stack > aside {
+        pointer-events: auto;
+      }
+
+      #yaml-scenario-panel {
+        max-height: min(58vh, 520px);
         overflow: auto;
         padding: 10px 12px;
         border-radius: 10px;
@@ -134,10 +146,9 @@
         font-size: 12px;
         line-height: 1.45;
         box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
-        pointer-events: auto;
       }
 
-      #b-acceptance-panel label {
+      #yaml-scenario-panel label {
         display: block;
         font-size: 11px;
         opacity: 0.88;
@@ -145,7 +156,7 @@
         margin-bottom: 4px;
       }
 
-      #b-acceptance-scenario-select {
+      #yaml-scenario-select {
         width: 100%;
         padding: 6px 8px;
         border-radius: 6px;
@@ -157,51 +168,52 @@
         margin-bottom: 8px;
       }
 
-      #b-acceptance-scenario-select:focus {
+      #yaml-scenario-select:focus {
         outline: 2px solid #81b29a;
         outline-offset: 2px;
       }
 
-      #b-acceptance-detail[hidden] {
-        display: none !important;
+      #yaml-scenario-hint {
+        margin: 0 0 8px;
+        font-size: 11px;
+        color: #b8a88c;
       }
 
-      #b-acceptance-scenario-goal {
+      #yaml-scenario-desc {
+        margin: 0 0 8px;
         font-size: 11px;
         color: #d4c4a8;
-        margin: 0 0 8px;
       }
 
-      #b-acceptance-scenario-steps {
-        margin: 0 0 8px 1.1em;
-        padding: 0;
+      #yaml-scenario-manual {
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid #4a4238;
+      }
+
+      .yaml-manual-block {
+        margin-bottom: 10px;
+      }
+
+      .yaml-manual-title {
+        display: block;
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        color: #e8c547;
+        margin-bottom: 4px;
+      }
+
+      #yaml-scenario-manual-steps,
+      #yaml-scenario-manual-outcomes {
+        margin: 0;
+        padding-left: 1.15em;
         font-size: 11px;
         color: #eadfcb;
       }
 
-      #b-acceptance-scenario-steps li {
+      #yaml-scenario-manual-steps li,
+      #yaml-scenario-manual-outcomes li {
         margin-bottom: 5px;
-      }
-
-      #b-acceptance-replay-commands {
-        width: 100%;
-        padding: 6px 10px;
-        border-radius: 6px;
-        border: 1px solid #5c5346;
-        background: #2a241c;
-        color: #f5f1e8;
-        font: inherit;
-        font-size: 11px;
-        cursor: pointer;
-      }
-
-      #b-acceptance-replay-commands:hover {
-        border-color: #e8c547;
-      }
-
-      #b-acceptance-replay-commands:focus-visible {
-        outline: 2px solid #81b29a;
-        outline-offset: 2px;
       }
 
       #grid-hover-info {
@@ -501,20 +513,29 @@
         </div>
       </div>
     </div>
-    <aside id="b-acceptance-panel" aria-label="B 线验收（切换将重启场景）">
-      <label for="b-acceptance-scenario-select">B 线验收场景</label>
-      <select
-        id="b-acceptance-scenario-select"
-        title="切换后整场景重新生成；各场景可自带 mock / 模拟桩配置"
-      ></select>
-      <div id="b-acceptance-detail">
-        <p id="b-acceptance-scenario-goal"></p>
-        <ol id="b-acceptance-scenario-steps"></ol>
-        <button id="b-acceptance-replay-commands" type="button" title="将当前会话已记录的领域命令按序再次提交">
-          回放命令日志
-        </button>
-      </div>
-    </aside>
+    <div id="right-dev-stack" aria-label="测试场景面板">
+      <aside id="yaml-scenario-panel" aria-label="测试场景（热切换，不重启场景）">
+        <label for="yaml-scenario-select">测试场景（scenarios/*.scenario.ts）</label>
+        <select
+          id="yaml-scenario-select"
+          title="将 ScenarioDefinition 写入当前 WorldCore 与小人状态；不执行 expectations 自动判定"
+        ></select>
+        <p id="yaml-scenario-hint">
+          载入后可直接游玩观察；与 Vitest 中 `runScenarioHeadless` 共用同一份场景数据。
+        </p>
+        <p id="yaml-scenario-desc" hidden></p>
+        <div id="yaml-scenario-manual" hidden>
+          <div class="yaml-manual-block">
+            <strong class="yaml-manual-title">操作流程</strong>
+            <ol id="yaml-scenario-manual-steps"></ol>
+          </div>
+          <div class="yaml-manual-block">
+            <strong class="yaml-manual-title">期望结果</strong>
+            <ol id="yaml-scenario-manual-outcomes"></ol>
+          </div>
+        </div>
+      </aside>
+    </div>
     <div id="grid-hover-info" hidden aria-live="polite"></div>
     <div id="player-channel-hint" aria-live="polite">
       <div id="player-channel-mode" class="player-channel-mode"></div>

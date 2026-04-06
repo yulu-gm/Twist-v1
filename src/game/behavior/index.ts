@@ -1,7 +1,9 @@
 export {
   tickSimulation,
+  findClaimedWalkWorkIdForPawn,
   type SimTickInput,
-  type SimTickOutput
+  type SimTickOutput,
+  type SimWorkInterruptRequest
 } from "./sim-loop";
 export {
   DEFAULT_BEHAVIOR_TRANSITIONS,
@@ -32,6 +34,7 @@ export {
   chooseWanderStep,
   targetCellForDecision,
   type ActionKind,
+  type ChooseGoalPlannerInput,
   type GoalDecision,
   type GoalKind
 } from "./goal-driven-planning";

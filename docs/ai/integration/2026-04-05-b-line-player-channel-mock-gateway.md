@@ -13,14 +13,14 @@
 
 ## 参与系统
 
-- **scene-hud**：玩家通道文案、右下角 B 线验收场景、`HudManager` 与 DOM。
+- **scene-hud**：玩家通道文案、`HudManager` 与 DOM；~~B 线验收面板~~ 已移除，测试场景见 `scenarios/`。
 - **selection-ui**：框选草稿、笔刷覆盖格叠加、任务标记视图同步。
 - **world-grid**：线段栅格枚举（`gridLineCells`），供笔刷路径去重覆盖格。
 
 ## 测试驱动开发与回归
 
-- 领域：`tests/domain/commit-player-intent.test.ts`、`tests/domain/mock-world-port.test.ts`、`tests/domain/player-channel-domain-command.test.ts`、`tests/domain/need-signals.test.ts`、`tests/domain/player-acceptance-scenarios.test.ts`、`tests/domain/world-grid-line.test.ts`。
-- 组件：`tests/scene-hud-markup.test.ts`（玩家通道与验收面板 DOM 约定）。
+- 领域：`tests/domain/commit-player-intent.test.ts`、`tests/domain/mock-world-port.test.ts`、`tests/domain/player-channel-domain-command.test.ts`、`tests/domain/need-signals.test.ts`、`tests/domain/world-grid-line.test.ts`。
+- 组件：`tests/scene-hud-markup.test.ts`（玩家通道与测试场景面板 DOM 约定）。
 
 ## 伪造到真实反推顺序
 

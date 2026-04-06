@@ -1,6 +1,11 @@
 import type { GridCoord } from "../map/world-grid";
 
-export type WorkItemKind = "deconstruct-obstacle" | "construct-blueprint";
+export type WorkItemKind =
+  | "deconstruct-obstacle"
+  | "construct-blueprint"
+  | "chop-tree"
+  | "pick-up-resource"
+  | "haul-to-zone";
 export type WorkItemStatus = "open" | "claimed" | "completed";
 
 export type WorkItemSnapshot = Readonly<{
@@ -11,6 +16,9 @@ export type WorkItemSnapshot = Readonly<{
   status: WorkItemStatus;
   claimedBy?: string;
   failureCount: number;
+  haulTargetZoneId?: string;
+  haulDropCell?: GridCoord;
+  derivedFromWorkId?: string;
 }>;
 
 /** 任务树工作单类型（伐木、拾取、搬运、建造）；与遗留 {@link WorkItemSnapshot} 并存。 */
