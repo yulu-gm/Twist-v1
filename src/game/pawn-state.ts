@@ -106,6 +106,10 @@ export type PawnState = Readonly<{
   workTimerSec: number;
   /** 当前读条对应的工单 id（与 `workTimerSec` 配对）。 */
   activeWorkItemId?: string;
+  /** 当前缓存路径的目标格。 */
+  pathTarget?: GridCoord;
+  /** 从当前位置出发的剩余路径，不含当前 `logicalCell`。 */
+  pathCells?: readonly GridCoord[];
   debugLabel: string;
 }>;
 
@@ -133,6 +137,8 @@ export function createDefaultPawnStates(
     actionTimerSec: 0,
     workTimerSec: 0,
     activeWorkItemId: undefined,
+    pathTarget: undefined,
+    pathCells: undefined,
     debugLabel: "goal:none action:idle"
   }));
 }
@@ -147,6 +153,52 @@ export function beginMove(pawn: PawnState, target: GridCoord): PawnState {
     moveTarget: target,
     moveProgress01: 0
   });
+}
+
+export function setPawnPath(
+  pawn: PawnState,
+  target: GridCoord,
+  pathCells: readonly GridCoord[]
+): PawnState {
+  return withDebugLabel({
+    ...pawn,
+    pathTarget: { col: target.col, row: target.row },
+    pathCells: pathCells.map((cell) => ({ col: cell.col, row: cell.row }))
+  });
+}
+
+export function clearPawnPath(pawn: PawnState): PawnState {
+  if (!pawn.pathTarget && !pawn.pathCells) return pawn;
+  return withDebugLabel({
+    ...pawn,
+    pathTarget: undefined,
+    pathCells: undefined
+  });
+}
+
+export function consumePawnPathStep(pawn: PawnState, step: GridCoord): PawnState {
+  if (!pawn.pathCells || pawn.pathCells.length === 0) return pawn;
+  const [head, ...rest] = pawn.pathCells;
+  if (!head || head.col !== step.col || head.row !== step.row) return pawn;
+  return withDebugLabel({
+    ...pawn,
+    pathCells: rest,
+    pathTarget:
+      rest.length === 0 && pawn.pathTarget?.col === step.col && pawn.pathTarget?.row === step.row
+        ? undefined
+        : pawn.pathTarget
+  });
+}
+
+export function syncPawnPathToLogicalCell(pawn: PawnState): PawnState {
+  if (!pawn.pathCells || pawn.pathCells.length === 0) return pawn;
+  let next = pawn;
+  while (next.pathCells && next.pathCells.length > 0) {
+    const [head] = next.pathCells;
+    if (!head || head.col !== next.logicalCell.col || head.row !== next.logicalCell.row) break;
+    next = consumePawnPathStep(next, head);
+  }
+  return next;
 }
 
 export function withMoveProgress(pawn: PawnState, progress01: number): PawnState {
@@ -232,6 +284,8 @@ export function clearPawnIntent(pawn: PawnState): PawnState {
     currentGoal: undefined,
     currentAction: undefined,
     reservedTargetId: undefined,
+    pathTarget: undefined,
+    pathCells: undefined,
     actionTimerSec: 0
   });
 }
