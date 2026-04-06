@@ -11,20 +11,24 @@ import {
   advancePawnActionTimer,
   applyNeedDelta,
   beginMove,
+  clearPawnPath,
   clearPawnIntent,
   finishMoveIfComplete,
   isMoving,
   logicalCellsByPawnId,
   resetPawnActionTimer,
+  setPawnPath,
   setPawnIntent,
+  syncPawnPathToLogicalCell,
   type PawnId,
   type PawnState
 } from "../pawn-state";
 import {
-  canChooseNewGoal,
+  collectGoalDecisionCandidates,
   chooseGoalDecision,
-  chooseStepTowardCell,
-  chooseWanderStep,
+  chooseWanderPath,
+  nextStepFromPath,
+  planPathTowardCell,
   targetCellForDecision
 } from "./goal-driven-planning";
 import {
@@ -41,6 +45,11 @@ import { HUNGER_INTERRUPT_THRESHOLD } from "../need/threshold-rules";
 import type { WorkItemSnapshot } from "../work/work-types";
 import { WORK_WALK_KINDS } from "../world-construct-tick";
 import { timePeriodForMinute } from "../time/world-time";
+import {
+  clonePawnDecisionState,
+  type PawnDecisionResult,
+  type PawnDecisionTrace
+} from "../../headless/sim-debug-trace";
 
 export type SimTickInput = Readonly<{
   pawns: readonly PawnState[];
@@ -72,9 +81,30 @@ export type SimTickOutput = Readonly<{
   reservations: ReservationSnapshot;
   /** AI 事件日志，供调用方 console.info 输出。 */
   aiEvents: readonly string[];
+  pawnDecisionTraces: readonly PawnDecisionTrace[];
   /** 本帧因需求中断产生的工单失败请求，由编排器写入 WorldCore。 */
   workInterrupts?: readonly SimWorkInterruptRequest[];
 }>;
+
+function decisionResultFromPawn(pawn: PawnState): PawnDecisionResult {
+  if (pawn.currentAction?.kind === "use-target") {
+    return {
+      kind: "use-target",
+      targetId: pawn.currentAction.targetId ?? pawn.reservedTargetId
+    };
+  }
+  if (pawn.moveTarget) {
+    return {
+      kind: "move",
+      step: { col: pawn.moveTarget.col, row: pawn.moveTarget.row },
+      targetId: pawn.currentAction?.targetId ?? pawn.reservedTargetId
+    };
+  }
+  return {
+    kind: "idle",
+    targetId: pawn.currentAction?.targetId ?? pawn.reservedTargetId
+  };
+}
 
 export function findClaimedWalkWorkIdForPawn(
   pawnId: string,
@@ -99,18 +129,60 @@ function resolveSimTimePeriod(input: SimTickInput): "day" | "night" {
   return "day";
 }
 
+function sameCell(left: GridCoord | undefined, right: GridCoord | undefined): boolean {
+  if (!left || !right) return false;
+  return left.col === right.col && left.row === right.row;
+}
+
+type PlannedStepResult = Readonly<{
+  pawn: PawnState;
+  step?: GridCoord;
+  attemptedStep?: GridCoord;
+  blockedReason?: "step-blocked" | "step-conflict";
+  blockerPawnId?: PawnId;
+  blockerPawnName?: string;
+  blockerCell?: GridCoord;
+}>;
+
+function planNextStepTowardCell(
+  grid: WorldGridConfig,
+  pawn: PawnState,
+  logicalCells: ReadonlyMap<PawnId, GridCoord>,
+  _pawnsById: ReadonlyMap<PawnId, PawnState>,
+  targetCell: GridCoord
+): PlannedStepResult {
+  const cached = nextStepFromPath(grid, pawn, logicalCells, targetCell);
+  if (cached) {
+    return { pawn, step: cached };
+  }
+
+  const replannedPath = planPathTowardCell(grid, pawn, targetCell);
+  if (!replannedPath || replannedPath.length === 0) {
+    return { pawn: clearPawnPath(pawn), blockedReason: "step-blocked" };
+  }
+
+  const repathedPawn = setPawnPath(pawn, targetCell, replannedPath);
+  const [step] = replannedPath;
+  if (!step) {
+    return { pawn: repathedPawn, blockedReason: "step-blocked" };
+  }
+  return { pawn: repathedPawn, step };
+}
+
 export function tickSimulation(input: SimTickInput): SimTickOutput {
   const { grid, simulationDt, config, rng, workWalkTargets, worldWorkItems } = input;
   const timePeriod = resolveSimTimePeriod(input);
   const aiEvents: string[] = [];
+  const pawnDecisionTraces: PawnDecisionTrace[] = [];
   let nextReservations = input.reservations;
   const workInterrupts: SimWorkInterruptRequest[] = [];
+  const interruptReasons = new Map<PawnId, string>();
 
   // --- 阶段 1：推进需求 + 移动 + 使用计时 ---
   let nextPawns = input.pawns.map((pawn) => {
     let updated = advanceNeeds(pawn, simulationDt, config.needGrowthPerSec);
-    updated = finishMoveIfComplete(
-      advanceMoveTowardTarget(updated, simulationDt, config.moveDurationSec)
+    updated = syncPawnPathToLogicalCell(
+      finishMoveIfComplete(advanceMoveTowardTarget(updated, simulationDt, config.moveDurationSec))
     );
 
     if (updated.currentAction?.kind !== "use-target") {
@@ -151,7 +223,7 @@ export function tickSimulation(input: SimTickInput): SimTickOutput {
       pawn.logicalCell.row === point.cell.row
     ) {
       return setPawnIntent(
-        resetPawnActionTimer(pawn),
+        clearPawnPath(resetPawnActionTimer(pawn)),
         pawn.currentGoal,
         { kind: "use-target", targetId: point.id },
         point.id
@@ -173,6 +245,7 @@ export function tickSimulation(input: SimTickInput): SimTickOutput {
       reason: "need-interrupt-hunger"
     });
     hungerInterruptedPawnIds.add(pawn.id);
+    interruptReasons.set(pawn.id, "need-interrupt-hunger");
     aiEvents.push(`[AI] ${pawn.name}: need-interrupt-hunger → release work ${walkWorkId}`);
     return clearPawnIntent({
       ...pawn,
@@ -184,32 +257,78 @@ export function tickSimulation(input: SimTickInput): SimTickOutput {
   });
 
   // --- 阶段 3：目标评估 + 步骤决策 ---
-  const plannedStepTargets = new Set<string>();
-
   nextPawns = nextPawns.map((pawn) => {
-    if (!canChooseNewGoal(pawn)) {
+    const beforeState = clonePawnDecisionState(pawn);
+    const candidateInput = {
+      grid,
+      pawn,
+      reservations: nextReservations,
+      timePeriod
+    } as const;
+    const candidates = collectGoalDecisionCandidates(candidateInput);
+    const previousLabel = pawn.debugLabel;
+    const logicalCells = logicalCellsByPawnId(nextPawns);
+    const pawnsById = new Map(nextPawns.map((candidatePawn) => [candidatePawn.id, candidatePawn] as const));
+
+    if (isMoving(pawn) || pawn.currentAction?.kind === "use-target") {
+      pawnDecisionTraces.push({
+        pawnId: pawn.id,
+        pawnName: pawn.name,
+        decisionSource: "continue-current",
+        before: beforeState,
+        after: clonePawnDecisionState(pawn),
+        candidates,
+        selectedCandidate: candidates[0],
+        result: decisionResultFromPawn(pawn)
+      });
       return pawn;
     }
-
-    const previousLabel = pawn.debugLabel;
     const anchor = workWalkTargets?.get(pawn.id);
     if (anchor && !hungerInterruptedPawnIds.has(pawn.id)) {
-      if (pawn.logicalCell.col === anchor.col && pawn.logicalCell.row === anchor.row) {
-        return pawn;
+      if (sameCell(pawn.logicalCell, anchor)) {
+        const arrived = clearPawnPath(pawn);
+        pawnDecisionTraces.push({
+          pawnId: pawn.id,
+          pawnName: pawn.name,
+          decisionSource: "claimed-work-anchor",
+          before: beforeState,
+          after: clonePawnDecisionState(arrived),
+          candidates,
+          selectedCandidate: candidates[0],
+          result: { kind: "idle" }
+        });
+        return arrived;
       }
-      const logicalCells = logicalCellsByPawnId(nextPawns);
-      const step = chooseStepTowardCell(grid, pawn, logicalCells, anchor);
-      if (!step) {
+      const planned = planNextStepTowardCell(grid, pawn, logicalCells, pawnsById, anchor);
+      if (!planned.step) {
+        const waiting = setPawnIntent(
+          planned.pawn,
+          { kind: "wander", reason: "construct-blueprint" },
+          { kind: "move-to-target" },
+          undefined
+        );
         aiEvents.push(`[AI] ${pawn.name}: construct: no step toward anchor`);
-        return pawn;
+        pawnDecisionTraces.push({
+          pawnId: pawn.id,
+          pawnName: pawn.name,
+          decisionSource: "claimed-work-anchor",
+          before: beforeState,
+          after: clonePawnDecisionState(waiting),
+          candidates,
+          selectedCandidate: candidates[0],
+          result: {
+            kind: "blocked",
+            blockedReason: planned.blockedReason ?? "step-blocked",
+            step: planned.attemptedStep,
+            blockerPawnId: planned.blockerPawnId,
+            blockerPawnName: planned.blockerPawnName,
+            blockerCell: planned.blockerCell
+          }
+        });
+        return waiting;
       }
-      const stepKey = `${step.col},${step.row}`;
-      if (plannedStepTargets.has(stepKey)) {
-        return pawn;
-      }
-      plannedStepTargets.add(stepKey);
       const moving = setPawnIntent(
-        beginMove(pawn, step),
+        beginMove(planned.pawn, planned.step),
         { kind: "wander", reason: "construct-blueprint" },
         { kind: "move-to-target" },
         undefined
@@ -217,28 +336,232 @@ export function tickSimulation(input: SimTickInput): SimTickOutput {
       if (moving.debugLabel !== previousLabel) {
         aiEvents.push(`[AI] ${moving.name}: ${moving.debugLabel} (construct-blueprint)`);
       }
+      pawnDecisionTraces.push({
+        pawnId: pawn.id,
+        pawnName: pawn.name,
+        decisionSource: "claimed-work-anchor",
+        before: beforeState,
+        after: clonePawnDecisionState(moving),
+        candidates,
+        selectedCandidate: candidates[0],
+        result: { kind: "move", step: { col: planned.step.col, row: planned.step.row } }
+      });
       return moving;
     }
 
-    const logicalCells = logicalCellsByPawnId(nextPawns);
-    const decision = chooseGoalDecision({
-      grid,
-      pawn,
-      reservations: nextReservations,
-      timePeriod
-    });
+    const currentMoveTargetId =
+      pawn.currentAction?.kind === "move-to-target"
+        ? pawn.currentAction.targetId ?? pawn.reservedTargetId ?? pawn.currentGoal?.targetId
+        : undefined;
+    const currentMovePoint = currentMoveTargetId
+      ? findInteractionPointById(grid, currentMoveTargetId)
+      : undefined;
+    if (pawn.currentAction?.kind === "move-to-target" && currentMovePoint && pawn.currentGoal) {
+      if (sameCell(pawn.logicalCell, currentMovePoint.cell)) {
+        const using = setPawnIntent(
+          clearPawnPath(resetPawnActionTimer(pawn)),
+          pawn.currentGoal,
+          { kind: "use-target", targetId: currentMovePoint.id },
+          currentMovePoint.id
+        );
+        pawnDecisionTraces.push({
+          pawnId: pawn.id,
+          pawnName: pawn.name,
+          decisionSource: "continue-current",
+          before: beforeState,
+          after: clonePawnDecisionState(using),
+          candidates,
+          selectedCandidate:
+            candidates.find((candidate) => candidate.targetId === currentMovePoint.id) ?? candidates[0],
+          result: { kind: "use-target", targetId: currentMovePoint.id }
+        });
+        return using;
+      }
+
+      const planned = planNextStepTowardCell(grid, pawn, logicalCells, pawnsById, currentMovePoint.cell);
+      if (!planned.step) {
+        const waiting = setPawnIntent(
+          planned.pawn,
+          pawn.currentGoal,
+          { kind: "move-to-target", targetId: currentMovePoint.id },
+          currentMovePoint.id
+        );
+        pawnDecisionTraces.push({
+          pawnId: pawn.id,
+          pawnName: pawn.name,
+          decisionSource: "continue-current",
+          before: beforeState,
+          after: clonePawnDecisionState(waiting),
+          candidates,
+          selectedCandidate:
+            candidates.find((candidate) => candidate.targetId === currentMovePoint.id) ?? candidates[0],
+          result: {
+            kind: "blocked",
+            blockedReason: planned.blockedReason ?? "step-blocked",
+            targetId: currentMovePoint.id,
+            step: planned.attemptedStep,
+            blockerPawnId: planned.blockerPawnId,
+            blockerPawnName: planned.blockerPawnName,
+            blockerCell: planned.blockerCell
+          }
+        });
+        return waiting;
+      }
+
+      const moving = setPawnIntent(
+        beginMove(planned.pawn, planned.step),
+        pawn.currentGoal,
+        { kind: "move-to-target", targetId: currentMovePoint.id },
+        currentMovePoint.id
+      );
+      pawnDecisionTraces.push({
+        pawnId: pawn.id,
+        pawnName: pawn.name,
+        decisionSource: "continue-current",
+        before: beforeState,
+        after: clonePawnDecisionState(moving),
+        candidates,
+        selectedCandidate:
+          candidates.find((candidate) => candidate.targetId === currentMovePoint.id) ?? candidates[0],
+        result: {
+          kind: "move",
+          step: { col: planned.step.col, row: planned.step.row },
+          targetId: currentMovePoint.id
+        }
+      });
+      return moving;
+    }
+
+    if (
+      pawn.currentAction?.kind === "move-to-target" &&
+      pawn.currentGoal?.kind === "wander" &&
+      pawn.pathTarget
+    ) {
+      const planned = planNextStepTowardCell(grid, pawn, logicalCells, pawnsById, pawn.pathTarget);
+      if (!planned.step) {
+        const waiting = setPawnIntent(
+          planned.pawn,
+          pawn.currentGoal,
+          { kind: "move-to-target" },
+          undefined
+        );
+        pawnDecisionTraces.push({
+          pawnId: pawn.id,
+          pawnName: pawn.name,
+          decisionSource: "continue-current",
+          before: beforeState,
+          after: clonePawnDecisionState(waiting),
+          candidates,
+          selectedCandidate: candidates.find((candidate) => candidate.goal === "wander") ?? candidates[0],
+          result: {
+            kind: "blocked",
+            blockedReason: planned.blockedReason ?? "step-blocked",
+            step: planned.attemptedStep,
+            blockerPawnId: planned.blockerPawnId,
+            blockerPawnName: planned.blockerPawnName,
+            blockerCell: planned.blockerCell
+          }
+        });
+        return waiting;
+      }
+
+      const moving = setPawnIntent(
+        beginMove(planned.pawn, planned.step),
+        pawn.currentGoal,
+        { kind: "move-to-target" },
+        undefined
+      );
+      pawnDecisionTraces.push({
+        pawnId: pawn.id,
+        pawnName: pawn.name,
+        decisionSource: "continue-current",
+        before: beforeState,
+        after: clonePawnDecisionState(moving),
+        candidates,
+        selectedCandidate: candidates.find((candidate) => candidate.goal === "wander") ?? candidates[0],
+        result: { kind: "move", step: { col: planned.step.col, row: planned.step.row } }
+      });
+      return moving;
+    }
+
+    const decision = chooseGoalDecision(candidateInput);
+    const selectedCandidate = candidates.find(
+      (candidate) =>
+        candidate.goal === decision.goal &&
+        candidate.reason === decision.reason &&
+        candidate.targetId === decision.targetId
+    ) ?? candidates[0];
+    const decisionSource = interruptReasons.has(pawn.id) ? "need-interrupt" : "goal-planner";
 
     if (decision.goal === "wander") {
-      const step = chooseWanderStep(grid, pawn, logicalCells, rng);
+      const wanderPath = chooseWanderPath(grid, pawn, rng);
+      const target = wanderPath?.[wanderPath.length - 1];
+      if (!wanderPath || !target) {
+        const wandered = setPawnIntent(
+          clearPawnPath(pawn),
+          { kind: "wander", reason: decision.reason },
+          { kind: "idle" },
+          undefined
+        );
+        pawnDecisionTraces.push({
+          pawnId: pawn.id,
+          pawnName: pawn.name,
+          decisionSource,
+          before: beforeState,
+          after: clonePawnDecisionState(wandered),
+          candidates,
+          selectedCandidate,
+          result: { kind: "idle" },
+          interruptReason: interruptReasons.get(pawn.id)
+        });
+        return wandered;
+      }
+
+      const repathed = setPawnPath(pawn, target, wanderPath);
+      const [step] = wanderPath;
+      if (!step) {
+        const wandered = setPawnIntent(
+          repathed,
+          { kind: "wander", reason: decision.reason },
+          { kind: "move-to-target" },
+          undefined
+        );
+        pawnDecisionTraces.push({
+          pawnId: pawn.id,
+          pawnName: pawn.name,
+          decisionSource,
+          before: beforeState,
+          after: clonePawnDecisionState(wandered),
+          candidates,
+          selectedCandidate,
+          result: { kind: "blocked", blockedReason: "step-conflict" },
+          interruptReason: interruptReasons.get(pawn.id)
+        });
+        return wandered;
+      }
+
       const wandered = setPawnIntent(
-        step ? beginMove(pawn, step) : pawn,
+        beginMove(repathed, step),
         { kind: "wander", reason: decision.reason },
-        step ? { kind: "move-to-target" } : { kind: "idle" },
+        { kind: "move-to-target" },
         undefined
       );
       if (wandered.debugLabel !== previousLabel) {
         aiEvents.push(`[AI] ${wandered.name}: ${wandered.debugLabel} (${decision.reason})`);
       }
+      pawnDecisionTraces.push({
+        pawnId: pawn.id,
+        pawnName: pawn.name,
+        decisionSource,
+        before: beforeState,
+        after: clonePawnDecisionState(wandered),
+        candidates,
+        selectedCandidate,
+        result: step
+          ? { kind: "move", step: { col: step.col, row: step.row } }
+          : { kind: "idle" },
+        interruptReason: interruptReasons.get(pawn.id)
+      });
       return wandered;
     }
 
@@ -247,27 +570,48 @@ export function tickSimulation(input: SimTickInput): SimTickOutput {
       ? findInteractionPointById(grid, decision.targetId)
       : undefined;
     if (!targetCell || !point) {
-      return clearPawnIntent(pawn);
+      const cleared = clearPawnIntent(pawn);
+      pawnDecisionTraces.push({
+        pawnId: pawn.id,
+        pawnName: pawn.name,
+        decisionSource,
+        before: beforeState,
+        after: clonePawnDecisionState(cleared),
+        candidates,
+        selectedCandidate,
+        result: { kind: "blocked", blockedReason: "target-missing" },
+        interruptReason: interruptReasons.get(pawn.id)
+      });
+      return cleared;
     }
 
     const reserved = reserveInteractionPoint(nextReservations, point.id, pawn.id);
     if (!reserved) {
       aiEvents.push(`[AI] ${pawn.name}: reserve failed for ${point.id}`);
-      return setPawnIntent(
+      const waiting = setPawnIntent(
         pawn,
         { kind: "wander", reason: "reservation-failed" },
         { kind: "idle" },
         undefined
       );
+      pawnDecisionTraces.push({
+        pawnId: pawn.id,
+        pawnName: pawn.name,
+        decisionSource,
+        before: beforeState,
+        after: clonePawnDecisionState(waiting),
+        candidates,
+        selectedCandidate,
+        result: { kind: "blocked", blockedReason: "reservation-failed" },
+        interruptReason: interruptReasons.get(pawn.id)
+      });
+      return waiting;
     }
     nextReservations = reserved;
 
-    if (
-      pawn.logicalCell.col === targetCell.col &&
-      pawn.logicalCell.row === targetCell.row
-    ) {
+    if (sameCell(pawn.logicalCell, targetCell)) {
       const using = setPawnIntent(
-        resetPawnActionTimer(pawn),
+        clearPawnPath(resetPawnActionTimer(pawn)),
         { kind: decision.goal, reason: decision.reason, targetId: point.id },
         { kind: "use-target", targetId: point.id },
         point.id
@@ -275,35 +619,53 @@ export function tickSimulation(input: SimTickInput): SimTickOutput {
       if (using.debugLabel !== previousLabel) {
         aiEvents.push(`[AI] ${using.name}: ${using.debugLabel} (${decision.reason})`);
       }
+      pawnDecisionTraces.push({
+        pawnId: pawn.id,
+        pawnName: pawn.name,
+        decisionSource,
+        before: beforeState,
+        after: clonePawnDecisionState(using),
+        candidates,
+        selectedCandidate,
+        result: { kind: "use-target", targetId: point.id },
+        interruptReason: interruptReasons.get(pawn.id)
+      });
       return using;
     }
 
-    const step = chooseStepTowardCell(grid, pawn, logicalCells, targetCell);
-    if (!step) {
-      nextReservations = releaseInteractionPoint(nextReservations, point.id, pawn.id);
+    const planned = planNextStepTowardCell(grid, pawn, logicalCells, pawnsById, targetCell);
+    if (!planned.step) {
       aiEvents.push(`[AI] ${pawn.name}: wait: no step toward ${point.id}`);
-      return setPawnIntent(
-        pawn,
+      const waiting = setPawnIntent(
+        planned.pawn,
         { kind: decision.goal, reason: "step-blocked", targetId: point.id },
-        { kind: "idle", targetId: point.id },
-        undefined
+        { kind: "move-to-target", targetId: point.id },
+        point.id
       );
+      pawnDecisionTraces.push({
+        pawnId: pawn.id,
+        pawnName: pawn.name,
+        decisionSource,
+        before: beforeState,
+        after: clonePawnDecisionState(waiting),
+        candidates,
+        selectedCandidate,
+        result: {
+          kind: "blocked",
+          blockedReason: planned.blockedReason ?? "step-blocked",
+          targetId: point.id,
+          step: planned.attemptedStep,
+          blockerPawnId: planned.blockerPawnId,
+          blockerPawnName: planned.blockerPawnName,
+          blockerCell: planned.blockerCell
+        },
+        interruptReason: interruptReasons.get(pawn.id)
+      });
+      return waiting;
     }
 
-    const stepKey = `${step.col},${step.row}`;
-    if (plannedStepTargets.has(stepKey)) {
-      nextReservations = releaseInteractionPoint(nextReservations, point.id, pawn.id);
-      return setPawnIntent(
-        pawn,
-        { kind: decision.goal, reason: "step-conflict", targetId: point.id },
-        { kind: "idle", targetId: point.id },
-        undefined
-      );
-    }
-
-    plannedStepTargets.add(stepKey);
     const moving = setPawnIntent(
-      beginMove(pawn, step),
+      beginMove(planned.pawn, planned.step),
       { kind: decision.goal, reason: decision.reason, targetId: point.id },
       { kind: "move-to-target", targetId: point.id },
       point.id
@@ -311,6 +673,21 @@ export function tickSimulation(input: SimTickInput): SimTickOutput {
     if (moving.debugLabel !== previousLabel) {
       aiEvents.push(`[AI] ${moving.name}: ${moving.debugLabel} (${decision.reason})`);
     }
+    pawnDecisionTraces.push({
+      pawnId: pawn.id,
+      pawnName: pawn.name,
+      decisionSource,
+      before: beforeState,
+      after: clonePawnDecisionState(moving),
+      candidates,
+      selectedCandidate,
+      result: {
+        kind: "move",
+        step: { col: planned.step.col, row: planned.step.row },
+        targetId: point.id
+      },
+      interruptReason: interruptReasons.get(pawn.id)
+    });
     return moving;
   });
 
@@ -318,6 +695,7 @@ export function tickSimulation(input: SimTickInput): SimTickOutput {
     pawns: nextPawns,
     reservations: nextReservations,
     aiEvents,
+    pawnDecisionTraces,
     workInterrupts: workInterrupts.length > 0 ? workInterrupts : undefined
   };
 }

@@ -1,7 +1,7 @@
 /** task-planning（游荡）：从合法邻格中选下一个目标，随机源可注入。 */
 
 import type { GridCoord, WorldGridConfig } from "../map/world-grid";
-import { isWalkableCell, isCellOccupiedByOthers, orthogonalNeighbors } from "../map/world-grid";
+import { isWalkableCell, orthogonalNeighbors } from "../map/world-grid";
 import type { PawnId, PawnState } from "../pawn-state";
 
 /** 返回 [0, 1) 的伪随机数，便于测试注入固定序列。 */
@@ -14,12 +14,11 @@ export type WanderDecision =
 export function legalWanderNeighbors(
   grid: WorldGridConfig,
   pawn: PawnState,
-  logicalCellsByPawnId: ReadonlyMap<PawnId, GridCoord>
+  _logicalCellsByPawnId: ReadonlyMap<PawnId, GridCoord>
 ): GridCoord[] {
   const base = orthogonalNeighbors(grid, pawn.logicalCell);
   return base.filter((cell) => {
     if (!isWalkableCell(grid, cell)) return false;
-    if (isCellOccupiedByOthers(logicalCellsByPawnId, cell, pawn.id)) return false;
     return true;
   });
 }

@@ -8,12 +8,11 @@ import type { GridCoord, ReservationSnapshot, WorldGridConfig } from "../map/wor
 import {
   findInteractionPointById,
   interactionPointsByKind,
-  isCellOccupiedByOthers,
   isInteractionPointReservedByOther,
-  isWalkableCell,
-  orthogonalNeighbors
+  isWalkableCell
 } from "../map/world-grid";
 import { legalWanderNeighbors, pickWanderTarget, type WanderRng } from "./wander-planning";
+import { findPathAStar } from "./a-star-pathfinding";
 
 export type GoalKind = "eat" | "sleep" | "recreate" | "wander";
 export type ActionKind = "reserve-target" | "move-to-target" | "use-target" | "idle";
@@ -24,6 +23,12 @@ export type GoalDecision = Readonly<{
   targetId?: string;
   reason: string;
 }>;
+
+export type GoalDecisionCandidate = GoalDecision &
+  Readonly<{
+    targetAvailable: boolean;
+    blockedReason?: "no-target";
+  }>;
 
 export type ChooseGoalPlannerInput = Readonly<{
   grid: WorldGridConfig;
@@ -65,14 +70,18 @@ function needScoreForGoal(pawn: PawnState, goal: GoalKind): number {
   }
 }
 
-function buildGoalDecision(input: ChooseGoalPlannerInput, goal: GoalKind): GoalDecision {
+function buildGoalDecisionCandidate(
+  input: ChooseGoalPlannerInput,
+  goal: GoalKind
+): GoalDecisionCandidate {
   const baseScore = needScoreForGoal(input.pawn, goal);
   const interactionKind = interactionKindForGoal(goal);
   if (!interactionKind) {
     return {
       goal,
       score: baseScore,
-      reason: "fallback-wander"
+      reason: "fallback-wander",
+      targetAvailable: true
     };
   }
 
@@ -80,6 +89,16 @@ function buildGoalDecision(input: ChooseGoalPlannerInput, goal: GoalKind): GoalD
     .filter(
       (point) => !isInteractionPointReservedByOther(input.reservations, point.id, input.pawn.id)
     )
+    .filter((point) => {
+      if (
+        input.pawn.logicalCell.col === point.cell.col &&
+        input.pawn.logicalCell.row === point.cell.row
+      ) {
+        return true;
+      }
+      const path = planPathTowardCell(input.grid, input.pawn, point.cell);
+      return path !== undefined;
+    })
     .sort(
       (left, right) =>
         manhattanDistance(input.pawn.logicalCell, left.cell) -
@@ -91,7 +110,9 @@ function buildGoalDecision(input: ChooseGoalPlannerInput, goal: GoalKind): GoalD
     return {
       goal,
       score: -1,
-      reason: `${goal}-unavailable`
+      reason: `${goal}-unavailable`,
+      targetAvailable: false,
+      blockedReason: "no-target"
     };
   }
 
@@ -108,14 +129,21 @@ function buildGoalDecision(input: ChooseGoalPlannerInput, goal: GoalKind): GoalD
     goal,
     score,
     targetId: target.id,
-    reason: `${goal}-need-${baseScore}`
+    reason: `${goal}-need-${baseScore}`,
+    targetAvailable: true
   };
 }
 
-export function chooseGoalDecision(input: ChooseGoalPlannerInput): GoalDecision {
-  const candidates = (["eat", "sleep", "recreate", "wander"] as const)
-    .map((goal) => buildGoalDecision(input, goal))
+export function collectGoalDecisionCandidates(
+  input: ChooseGoalPlannerInput
+): readonly GoalDecisionCandidate[] {
+  return (["eat", "sleep", "recreate", "wander"] as const)
+    .map((goal) => buildGoalDecisionCandidate(input, goal))
     .sort((left, right) => right.score - left.score);
+}
+
+export function chooseGoalDecision(input: ChooseGoalPlannerInput): GoalDecision {
+  const candidates = collectGoalDecisionCandidates(input);
 
   return candidates[0] ?? {
     goal: "wander",
@@ -132,28 +160,90 @@ export function targetCellForDecision(
   return findInteractionPointById(grid, decision.targetId)?.cell;
 }
 
+export function planPathTowardCell(
+  grid: WorldGridConfig,
+  pawn: PawnState,
+  targetCell: GridCoord
+): GridCoord[] | undefined {
+  if (
+    pawn.logicalCell.col === targetCell.col &&
+    pawn.logicalCell.row === targetCell.row
+  ) {
+    return [];
+  }
+
+  return findPathAStar(grid, pawn.logicalCell, targetCell);
+}
+
+export function nextStepFromPath(
+  grid: WorldGridConfig,
+  pawn: PawnState,
+  _logicalCellsByPawnId: ReadonlyMap<PawnId, GridCoord>,
+  targetCell: GridCoord
+): GridCoord | undefined {
+  const pathTarget = pawn.pathTarget;
+  const pathCells = pawn.pathCells;
+  if (!pathTarget || !pathCells || pathCells.length === 0) return undefined;
+  if (pathTarget.col !== targetCell.col || pathTarget.row !== targetCell.row) return undefined;
+  const [step] = pathCells;
+  if (!step) return undefined;
+  const isAdjacent = manhattanDistance(pawn.logicalCell, step) === 1;
+  if (!isAdjacent) return undefined;
+  if (!isWalkableCell(grid, step)) return undefined;
+  return step;
+}
+
 export function chooseStepTowardCell(
   grid: WorldGridConfig,
   pawn: PawnState,
   logicalCellsByPawnId: ReadonlyMap<PawnId, GridCoord>,
   targetCell: GridCoord
 ): GridCoord | undefined {
-  if (
-    pawn.logicalCell.col === targetCell.col &&
-    pawn.logicalCell.row === targetCell.row
-  ) {
-    return undefined;
-  }
+  const cached = nextStepFromPath(grid, pawn, logicalCellsByPawnId, targetCell);
+  if (cached) return cached;
+  const path = planPathTowardCell(grid, pawn, targetCell);
+  const [step] = path ?? [];
+  if (!step) return undefined;
+  return step;
+}
 
-  return orthogonalNeighbors(grid, pawn.logicalCell)
-    .filter(
-      (cell) =>
-        isWalkableCell(grid, cell) && !isCellOccupiedByOthers(logicalCellsByPawnId, cell, pawn.id)
-    )
-    .sort(
-      (left, right) =>
-        manhattanDistance(left, targetCell) - manhattanDistance(right, targetCell)
-    )[0];
+function allReachableWanderPaths(
+  grid: WorldGridConfig,
+  pawn: PawnState
+): GridCoord[][] {
+  const paths: GridCoord[][] = [];
+  for (let row = 0; row < grid.rows; row += 1) {
+    for (let col = 0; col < grid.columns; col += 1) {
+      if (col === pawn.logicalCell.col && row === pawn.logicalCell.row) continue;
+      const target = { col, row };
+      if (!isWalkableCell(grid, target)) continue;
+      const path = planPathTowardCell(grid, pawn, target);
+      if (!path || path.length === 0) continue;
+      paths.push(path);
+    }
+  }
+  return paths.sort((left, right) => {
+    const lengthDiff = right.length - left.length;
+    if (lengthDiff !== 0) return lengthDiff;
+    const leftLast = left[left.length - 1]!;
+    const rightLast = right[right.length - 1]!;
+    const rowDiff = leftLast.row - rightLast.row;
+    if (rowDiff !== 0) return rowDiff;
+    return leftLast.col - rightLast.col;
+  });
+}
+
+export function chooseWanderPath(
+  grid: WorldGridConfig,
+  pawn: PawnState,
+  rng: WanderRng
+): GridCoord[] | undefined {
+  const paths = allReachableWanderPaths(grid, pawn);
+  if (paths.length === 0) return undefined;
+  const preferred = paths.filter((path) => path.length > 1);
+  const pool = preferred.length > 0 ? preferred : paths;
+  const idx = Math.floor(rng() * pool.length);
+  return pool[idx];
 }
 
 export function chooseWanderStep(
@@ -162,6 +252,16 @@ export function chooseWanderStep(
   logicalCellsByPawnId: ReadonlyMap<PawnId, GridCoord>,
   rng: WanderRng
 ): GridCoord | undefined {
+  if (pawn.pathCells && pawn.pathCells.length > 0) {
+    return nextStepFromPath(grid, pawn, logicalCellsByPawnId, pawn.pathTarget ?? pawn.pathCells[pawn.pathCells.length - 1]!);
+  }
+  const wanderPath = chooseWanderPath(grid, pawn, rng);
+  if (wanderPath && wanderPath.length > 0) {
+    const [step] = wanderPath;
+    if (step) {
+      return step;
+    }
+  }
   const legal = legalWanderNeighbors(grid, pawn, logicalCellsByPawnId);
   const decision = pickWanderTarget(rng, legal);
   return decision.kind === "move" ? decision.target : undefined;

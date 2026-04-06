@@ -80,7 +80,6 @@ describe("BEHAVIOR-003 need-interrupt-during-work", () => {
     }, { maxTicks: 2_000, deltaMs: 16 });
     expect(interruptedToEat.reachedPredicate).toBe(true);
 
-    /** 中断当 tick 往往已满足 eat+open chop，但 logicalCell 要等走格完成才有 pawn-moved；补跑到首次位移动画或落格。 */
     const steppedTowardFood = sim.runUntil(() => {
       const c = sim.getSimEventCollector();
       return (
@@ -119,5 +118,67 @@ describe("BEHAVIOR-003 need-interrupt-during-work", () => {
       postInterruptCollector.getEventsByKind("pawn-moved").some((e) => e.pawnId === "pawn-0") ||
         postInterruptCollector.getEventsByKind("pawn-motion-changed").some((e) => e.pawnId === "pawn-0")
     ).toBe(true);
+  });
+
+  it("need-interrupt 后的下一帧不会立刻把同一条 work 重新认领回来", () => {
+    const scenarioFull: ScenarioDefinition = {
+      ...NEED_INTERRUPT_DURING_WORK_SCENARIO,
+      expectations: [],
+      pawns: [
+        {
+          name: "HungryLumber",
+          cell: NEED_INTERRUPT_DURING_WORK_SCENARIO.pawns[0]!.cell,
+          overrides: {
+            satiety: 100,
+            energy: 100,
+            needs: { hunger: 15, rest: 10, recreation: 20 }
+          }
+        }
+      ]
+    };
+
+    const sim = createHeadlessSim({
+      seed: NEED_INTERRUPT_DURING_WORK_SCENARIO.seed,
+      debugTrace: {
+        enabled: true,
+        snapshotWorkItemsEachTick: true
+      }
+    });
+    hydrateScenario(sim, scenarioFull);
+
+    const claimed = sim.runUntil(() => {
+      return [...sim.getWorldPort().getWorld().workItems.values()].some(
+        (w) => w.kind === "chop-tree" && w.status === "claimed" && w.claimedBy === "pawn-0"
+      );
+    }, { maxTicks: 4000 });
+    expect(claimed.reachedPredicate).toBe(true);
+
+    const ref = sim.getSimAccess().getPawnsRef();
+    const p = ref[0]!;
+    ref[0] = {
+      ...p,
+      satiety: 5,
+      needs: { hunger: 92, rest: p.needs.rest, recreation: p.needs.recreation }
+    };
+
+    sim.tick(16);
+    const chopAfterInterrupt = [...sim.getWorldPort().getWorld().workItems.values()].find(
+      (w) => w.kind === "chop-tree"
+    );
+    const failureCountAfterInterrupt = chopAfterInterrupt?.failureCount;
+    expect(chopAfterInterrupt?.status).toBe("open");
+    expect(chopAfterInterrupt?.claimedBy).toBeUndefined();
+
+    sim.getSimEventCollector().clear();
+    sim.tick(16);
+    const chopAfterNextTick = [...sim.getWorldPort().getWorld().workItems.values()].find(
+      (w) => w.kind === "chop-tree"
+    );
+    expect(chopAfterNextTick?.status).toBe("open");
+    expect(chopAfterNextTick?.claimedBy).toBeUndefined();
+    expect(chopAfterNextTick?.failureCount).toBe(failureCountAfterInterrupt);
+    expect(
+      sim.getSimEventCollector().getEventsByKind("work-failed").filter((e) => e.workItemId === chopAfterNextTick?.id)
+    ).toHaveLength(0);
   });
 });

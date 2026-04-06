@@ -33,6 +33,8 @@ function pawnHasClaimedWork(world: WorldCore, pawnId: string): boolean {
 function canPawnAutoClaimOpenWork(world: WorldCore, pawn: PawnState): boolean {
   if (pawnHasClaimedWork(world, pawn.id)) return false;
   if (pawn.currentAction?.kind === "use-target") return false;
+  // 恢复中的 need-goal 不应被自动认领工单打断；巡游中的 wander 仍允许认领。
+  if (pawn.currentGoal && pawn.currentGoal.kind !== "wander") return false;
   return true;
 }
 
