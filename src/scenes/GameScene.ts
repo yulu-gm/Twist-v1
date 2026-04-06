@@ -217,7 +217,13 @@ export class GameScene extends Phaser.Scene {
 
     this.hud.setHoverInfoColor(this.timeOfDayPalette);
     this.hud.syncTimeOfDayHud(this.timeOfDayState, this.timeControlState, this.timeOfDayPalette);
-    this.keyboard.setupTimeControls(this, this.hud, () => this.toggleTimePaused(), (s) => this.setTimeSpeed(s));
+    this.keyboard.setupTimeControls(
+      this,
+      this.hud,
+      () => this.toggleTimePaused(),
+      (s) => this.setTimeSpeed(s),
+      () => this.pauseTime()
+    );
     this.keyboard.setupVillagerToolBarKeys(this, (i) => this.selectVillagerTool(i));
     this.hud.setupToolBar(
       (i) => this.selectVillagerTool(i),
@@ -497,6 +503,12 @@ export class GameScene extends Phaser.Scene {
 
   private toggleTimePaused(): void {
     this.timeControlState = { ...this.timeControlState, paused: !this.timeControlState.paused };
+    this.hud.syncTimeOfDayHud(this.timeOfDayState, this.timeControlState, this.timeOfDayPalette);
+  }
+
+  private pauseTime(): void {
+    if (this.timeControlState.paused) return;
+    this.timeControlState = { ...this.timeControlState, paused: true };
     this.hud.syncTimeOfDayHud(this.timeOfDayState, this.timeControlState, this.timeOfDayPalette);
   }
 

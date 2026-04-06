@@ -387,7 +387,7 @@ export function applyDomainCommandToWorldCore(
     const workIds: string[] = [];
     let marked = 0;
     for (const key of cmd.targetCellKeys) {
-      if (blocked.has(key)) {
+      if (blocked.has(key) && !findUnmarkedTreeCoveringCell(next, key)) {
         skippedBlocked += 1;
         continue;
       }

@@ -102,6 +102,19 @@
         background: #2f281c;
       }
 
+      /* 暂停态：与倍速「选中」区分（倍速互斥；暂停为独立开关） */
+      .scene-time-button.time-paused {
+        border-style: dashed;
+        border-color: #887b6a;
+        background: #1a1814;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+      }
+
+      .scene-time-button.time-paused:hover {
+        border-color: #9a8c78;
+        background: #201d18;
+      }
+
       #scene-variant {
         min-width: 200px;
         padding: 6px 8px;
@@ -500,16 +513,16 @@
       <div id="scene-time-controls" class="scene-hud-group">
         <span class="scene-hud-label">时间控制</span>
         <div id="scene-speed-controls">
-          <button id="scene-time-toggle" class="scene-time-button" type="button" title="空格：暂停或继续">
+          <button id="scene-time-toggle" class="scene-time-button" type="button" title="空格：暂停/继续；` 键（主键盘 1 左侧）：暂停">
             暂停
           </button>
-          <button id="scene-speed-1" class="scene-time-button selected" type="button" title="按键 1：1 倍速">
+          <button id="scene-speed-1" class="scene-time-button selected" type="button" title="主键盘 1：1 倍速">
             1x
           </button>
-          <button id="scene-speed-2" class="scene-time-button" type="button" title="按键 2：2 倍速">
+          <button id="scene-speed-2" class="scene-time-button" type="button" title="主键盘 2：2 倍速">
             2x
           </button>
-          <button id="scene-speed-3" class="scene-time-button" type="button" title="按键 3：3 倍速">
+          <button id="scene-speed-3" class="scene-time-button" type="button" title="主键盘 3：3 倍速">
             3x
           </button>
         </div>

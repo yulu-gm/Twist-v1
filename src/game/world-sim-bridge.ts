@@ -18,18 +18,40 @@ export function obstacleBlockedCellKeys(world: WorldCore): Set<string> {
 }
 
 /**
- * 与寻路/游荡共用的不可走格：地形障碍 + **墙体建筑**占格。
+ * 与寻路/游荡共用的不可走格：
+ * - 地形 `obstacle`（含地图石料）；
+ * - **墙体建筑**占格；
+ * - **树**、**蓝图**占格。
+ *
  * 墙格若不写入 {@link WorldGridConfig.blockedCellKeys}，小人离开工地后会随机走回墙格再离开，形成两格振荡，
  * 且移动中无法自动认领新蓝图工单（`world-work-tick` 仅在 idle 时认领）。
  * 床铺等需走近使用的建筑不占此集合（与 `simulationInteractionPoints` 床位一致）。
+ * 地面物资格不入此集合：搬运/拾取工单与进食路径需可走至格心（或当前 A* 以格心为目标）；
+ * 格上实体堆叠仍由 {@link WorldCore.occupancy} 与工单逻辑约束。
  */
 export function simulationImpassableCellKeys(world: WorldCore): Set<string> {
   const out = obstacleBlockedCellKeys(world);
   for (const entity of world.entities.values()) {
-    if (entity.kind !== "building") continue;
-    if (entity.buildingKind !== "wall") continue;
-    for (const c of entity.occupiedCells) {
-      out.add(coordKey(c));
+    switch (entity.kind) {
+      case "building":
+        if (entity.buildingKind === "wall") {
+          for (const c of entity.occupiedCells) {
+            out.add(coordKey(c));
+          }
+        }
+        break;
+      case "tree":
+        for (const c of entity.occupiedCells) {
+          out.add(coordKey(c));
+        }
+        break;
+      case "blueprint":
+        for (const c of entity.occupiedCells) {
+          out.add(coordKey(c));
+        }
+        break;
+      default:
+        break;
     }
   }
   return out;

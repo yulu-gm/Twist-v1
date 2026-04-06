@@ -200,7 +200,7 @@ export class HudManager {
 
     if (this.sceneTimeToggleEl) {
       this.sceneTimeToggleEl.textContent = controls.paused ? "开启" : "暂停";
-      this.sceneTimeToggleEl.classList.toggle("selected", controls.paused);
+      this.sceneTimeToggleEl.classList.toggle("time-paused", controls.paused);
       this.sceneTimeToggleEl.setAttribute(
         "aria-pressed",
         controls.paused ? "true" : "false"

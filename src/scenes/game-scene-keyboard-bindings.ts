@@ -13,7 +13,8 @@ export class GameSceneKeyboardBindings {
     scene: Phaser.Scene,
     hud: HudManager,
     onTogglePause: () => void,
-    onSetSpeed: (s: TimeSpeed) => void
+    onSetSpeed: (s: TimeSpeed) => void,
+    onPause: () => void
   ): void {
     this.teardownTimeControls(hud);
     this.timeControlAbort = hud.setupTimeControls({
@@ -24,6 +25,7 @@ export class GameSceneKeyboardBindings {
     if (scene.input.keyboard) {
       const bindings: ReadonlyArray<readonly [number, () => void]> = [
         [Phaser.Input.Keyboard.KeyCodes.SPACE, onTogglePause],
+        [Phaser.Input.Keyboard.KeyCodes.BACKTICK, onPause],
         [Phaser.Input.Keyboard.KeyCodes.ONE, () => onSetSpeed(1)],
         [Phaser.Input.Keyboard.KeyCodes.TWO, () => onSetSpeed(2)],
         [Phaser.Input.Keyboard.KeyCodes.THREE, () => onSetSpeed(3)]

@@ -9,7 +9,7 @@ import {
 } from "../../src/game/world-sim-bridge";
 
 describe("world-sim-bridge", () => {
-  it("simulationImpassableCellKeys 含 obstacle 与 wall 建筑占格", () => {
+  it("simulationImpassableCellKeys 含 obstacle、wall、树与蓝图占格", () => {
     let w = createWorldCore({ grid: DEFAULT_WORLD_GRID });
     const o = spawnWorldEntity(w, {
       kind: "obstacle",
@@ -25,7 +25,23 @@ describe("world-sim-bridge", () => {
       label: "w"
     });
     w = b.world;
-    expect(simulationImpassableCellKeys(w)).toEqual(new Set(["1,1", "10,5"]));
+    const t = spawnWorldEntity(w, {
+      kind: "tree",
+      cell: { col: 3, row: 3 },
+      occupiedCells: [{ col: 3, row: 3 }],
+      loggingMarked: false
+    });
+    w = t.world;
+    const bp = spawnWorldEntity(w, {
+      kind: "blueprint",
+      cell: { col: 7, row: 2 },
+      occupiedCells: [{ col: 7, row: 2 }, { col: 8, row: 2 }],
+      blueprintKind: "wall",
+      buildProgress01: 0,
+      buildState: "planned"
+    });
+    w = bp.world;
+    expect(simulationImpassableCellKeys(w)).toEqual(new Set(["1,1", "10,5", "3,3", "7,2", "8,2"]));
   });
 
   it("obstacleBlockedCellKeys 收集 obstacle 占用格", () => {
