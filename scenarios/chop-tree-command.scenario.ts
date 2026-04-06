@@ -11,7 +11,7 @@ const LUMBER_ON_TREE: DomainCommand = {
   targetCellKeys: [treeKey],
   targetEntityIds: [],
   sourceMode: {
-    source: { kind: "toolbar", toolId: "lumber" },
+    source: { kind: "menu", menuId: "orders", itemId: "lumber" },
     selectionModifier: "replace",
     inputShape: "rect-selection"
   }
@@ -20,7 +20,7 @@ const LUMBER_ON_TREE: DomainCommand = {
 /** 固定 seed：1 树 + 1 小人；装载后提交 lumber 以生成 chop-tree 工单（供无头期望与浏览器选场景）。 */
 export const CHOP_TREE_COMMAND_SCENARIO: ScenarioDefinition = {
   name: "chop-tree-command",
-  description: "toolbar lumber → 未标记树登记为待伐并生成 chop-tree 开放工单",
+  description: "lumber 命令 → 未标记树登记为待伐并生成 chop-tree 开放工单",
   seed: 0x63_68_6f_70_7472,
   pawns: [{ name: "Lumber", cell: DEFAULT_WORLD_GRID.defaultSpawnPoints[0]! }],
   trees: [{ cell: TREE_CELL }],

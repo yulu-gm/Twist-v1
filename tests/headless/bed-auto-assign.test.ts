@@ -23,7 +23,7 @@ describe("BUILD-002 bed auto assignment", () => {
     sim.spawnPawn("Idle", spawnB!);
 
     const outcome = sim.commitPlayerSelection({
-      toolId: "build",
+      commandId: "place-bed",
       selectionModifier: "replace",
       cellKeys: new Set([coordKey(BED_BLUEPRINT_CELL)]),
       inputShape: "single-cell",

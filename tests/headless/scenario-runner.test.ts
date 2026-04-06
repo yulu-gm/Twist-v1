@@ -79,7 +79,7 @@ describe("runScenarioHeadless", () => {
       playerSelectionAfterHydrate: [
         {
           label: "observe-idle",
-          toolId: "idle",
+          commandId: "idle",
           selectionModifier: "replace",
           cellKeys: [coordKey({ col: 0, row: 0 })],
           inputShape: "single-cell",
@@ -87,7 +87,7 @@ describe("runScenarioHeadless", () => {
         },
         {
           label: "reject-build",
-          toolId: "build",
+          commandId: "place-bed",
           selectionModifier: "replace",
           cellKeys: [blockedKey],
           inputShape: "single-cell"
@@ -205,7 +205,7 @@ describe("visible headless assertions", () => {
     const selectionRecord = recordScenarioPlayerSelection(
       {
         label: "rejected-build",
-        toolId: "build",
+        commandId: "place-bed",
         selectionModifier: "replace",
         cellKeys: [coordKey({ col: 2, row: 2 })],
         inputShape: "single-cell"

@@ -26,7 +26,7 @@ export const TIME_FRAME_GAP_GUARD_SCENARIO: ScenarioDefinition = {
   playerSelectionAfterHydrate: [
     {
       label: "observe-frame-gap",
-      toolId: "idle",
+      commandId: "idle",
       selectionModifier: "replace",
       cellKeys: [coordKey(PAWN_CELL)],
       inputShape: "single-cell",

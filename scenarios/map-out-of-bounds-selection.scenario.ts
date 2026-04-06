@@ -30,7 +30,7 @@ export const MAP_OUT_OF_BOUNDS_SELECTION_SCENARIO: ScenarioDefinition = {
   playerSelectionAfterHydrate: [
     {
       label: "edge-rect-selection",
-      toolId: "haul",
+      commandId: "haul",
       selectionModifier: "replace",
       cellKeys: MAP_OUT_OF_BOUNDS_SELECTION_KEYS,
       inputShape: "rect-selection",

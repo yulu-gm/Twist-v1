@@ -51,7 +51,7 @@ describe("WORK-001 chop-haul-full-chain", () => {
     expect(storageZone).toBeDefined();
 
     const outcome = sim.commitPlayerSelection({
-      toolId: "lumber",
+      commandId: "lumber",
       selectionModifier: "replace",
       cellKeys: new Set([coordKey(treeCell)]),
       inputShape: "rect-selection",

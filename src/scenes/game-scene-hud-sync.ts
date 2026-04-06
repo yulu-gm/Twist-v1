@@ -1,16 +1,14 @@
-import { VILLAGER_TOOLS, type VillagerBuildSubId } from "../data/villager-tools";
 import type { GameOrchestrator } from "../game/game-orchestrator";
-import { presentationForVillagerTool } from "../player/interaction-mode-presenter";
+import { type CommandMenuCommandId } from "../data/command-menu";
+import { presentationForCommandMenuCommand } from "../player/interaction-mode-presenter";
 import type { HudManager } from "../ui/hud-manager";
 
 export function syncPlayerChannelHintLines(
   hud: HudManager,
   orchestrator: GameOrchestrator,
-  selectedToolIndex: number,
-  buildSubTool: VillagerBuildSubId | null
+  activeCommandId: CommandMenuCommandId
 ): void {
-  const tool = VILLAGER_TOOLS[selectedToolIndex]!;
-  const { modeLine } = presentationForVillagerTool(tool, buildSubTool);
+  const { modeLine } = presentationForCommandMenuCommand(activeCommandId);
   const foot = `世界快照：${orchestrator.getPlayerWorldPort().lineA.snapshotLabel}`;
   hud.syncPlayerChannelHint(modeLine, foot);
 }

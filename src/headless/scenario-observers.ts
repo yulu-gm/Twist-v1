@@ -1,3 +1,4 @@
+import { commandMenuDomainSemantics, type CommandMenuCommandId } from "../data/command-menu";
 import { formatTimeOfDayLabel } from "../game/time";
 import type { SelectionModifier } from "../game/interaction/floor-selection";
 import type { GridCoord } from "../game/map";
@@ -13,7 +14,9 @@ import type { AssertionResult } from "./sim-reporter";
 
 export type ScenarioPlayerSelectionRecord = Readonly<{
   label: string;
-  toolId: string;
+  commandId: CommandMenuCommandId;
+  /** 与 {@link commandMenuDomainSemantics} 一致，供任务标记/断言。 */
+  markerToolId: string;
   selectionModifier: SelectionModifier;
   semantic: ScenarioPlayerInputSemantic;
   inputShape: ScenarioPlayerInputShape;
@@ -122,9 +125,12 @@ export function recordScenarioPlayerSelection(
   outcome?: PlayerSelectionCommitOutcome
 ): ScenarioPlayerSelectionRecord {
   const semantic = resolveScenarioPlayerInputSemantic(selection);
+  const commandId = selection.commandId;
+  const markerToolId = commandMenuDomainSemantics(commandId).markerToolId;
   return {
-    label: selection.label ?? `${selection.toolId}:${semantic}`,
-    toolId: selection.toolId,
+    label: selection.label ?? `${selection.commandId}:${semantic}`,
+    commandId,
+    markerToolId,
     selectionModifier: selection.selectionModifier,
     semantic,
     inputShape: selection.inputShape,

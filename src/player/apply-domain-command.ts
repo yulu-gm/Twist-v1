@@ -114,7 +114,7 @@ function toolIdFromVerb(verb: string): string | null {
   return verb.slice("assign_tool_task:".length);
 }
 
-/** 将 S0 领域命令落到 {@link WorldCore}；尚未映射到工单的.toolbar 工具仍接受但不改世界（保留 UI 标记通道）。 */
+/** 将 S0 领域命令落到 {@link WorldCore}；尚未映射到工单的工具类动词仍接受但不改世界（保留 UI 标记通道）。 */
 export function applyDomainCommandToWorldCore(
   world: WorldCore,
   cmd: DomainCommand
@@ -455,21 +455,16 @@ export function applyDomainCommandToWorldCore(
   }
 
   if (toolId === "haul") {
-    const blockedHit = firstBlockedTargetCell(world, cmd.targetCellKeys);
-    if (blockedHit) {
-      return {
-        world,
-        result: {
-          accepted: false,
-          messages: [`领域：格 ${blockedHit} 为障碍格，无法指派 ${toolId}`],
-          conflictCellKeys: [blockedHit]
-        }
-      };
-    }
+    const blocked = mergedBlockedCellKeys(world);
     let next = world;
     const workIds: string[] = [];
     let marked = 0;
+    let skippedBlocked = 0;
     for (const key of cmd.targetCellKeys) {
+      if (blocked.has(key) && !findGroundResourceCoveringCell(next, key)) {
+        skippedBlocked += 1;
+        continue;
+      }
       const resource = findGroundResourceCoveringCell(next, key);
       if (!resource) continue;
       const placed = registerPickUpResourceWork(next, resource.id);
@@ -477,14 +472,17 @@ export function applyDomainCommandToWorldCore(
       workIds.push(placed.workItemId);
       marked += 1;
     }
+    const skipHint = skippedBlocked > 0 ? `，跳过 ${skippedBlocked} 个阻挡格` : "";
     return {
       world: next,
       result: {
         accepted: true,
         messages: [
           marked > 0
-            ? `领域：已登记 ${marked} 处拾取工单（pick-up-resource）`
-            : "领域：所选格无地面物资"
+            ? `领域：已登记 ${marked} 处拾取工单（pick-up-resource）${skipHint}`
+            : skippedBlocked > 0
+              ? `领域：所选格无地面物资（跳过 ${skippedBlocked} 个阻挡格）`
+              : "领域：所选格无地面物资"
         ],
         workOrderId: workIds.length > 0 ? workIds[workIds.length - 1] : undefined
       }

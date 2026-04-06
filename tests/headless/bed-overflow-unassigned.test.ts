@@ -21,7 +21,7 @@ describe("BUILD-004 bed overflow remains unassigned", () => {
     let currentMarkers = new Map<string, string>();
     for (const cell of BED_OVERFLOW_CELLS) {
       const outcome = sim.commitPlayerSelection({
-        toolId: "build",
+        commandId: "place-bed",
         selectionModifier: "replace",
         cellKeys: new Set([coordKey(cell)]),
         inputShape: "single-cell",

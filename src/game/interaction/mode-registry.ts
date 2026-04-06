@@ -31,8 +31,8 @@ export type ModeRegistry = Readonly<{
   modes: Map<string, InteractionMode>;
 }>;
 
-function toolbarSource(toolId: string): InteractionSource {
-  return { kind: "toolbar", toolId };
+function interactionModeSource(itemId: string): InteractionSource {
+  return { kind: "menu", menuId: "interaction-mode", itemId };
 }
 
 function targetKeysFromCells(cells: readonly GridCoord[]): readonly string[] {
@@ -45,13 +45,13 @@ function seedDefaultModes(registry: ModeRegistry): void {
       modeId: "zone-create",
       displayName: "存储区创建",
       inputShape: "rect-selection",
-      interactionSource: toolbarSource("zone-create"),
+      interactionSource: interactionModeSource("zone-create"),
       explainRule: (input) => ({
         verb: "zone_create",
         targetCellKeys: targetKeysFromCells(input.cells),
         targetEntityIds: [],
         sourceMode: {
-          source: toolbarSource("zone-create"),
+          source: interactionModeSource("zone-create"),
           selectionModifier: input.modifier,
           inputShape: "rect-selection"
         }
@@ -61,13 +61,13 @@ function seedDefaultModes(registry: ModeRegistry): void {
       modeId: "chop",
       displayName: "伐木标记",
       inputShape: "rect-selection",
-      interactionSource: toolbarSource("chop"),
+      interactionSource: interactionModeSource("chop"),
       explainRule: (input) => ({
         verb: "assign_tool_task:chop",
         targetCellKeys: targetKeysFromCells(input.cells),
         targetEntityIds: [],
         sourceMode: {
-          source: toolbarSource("chop"),
+          source: interactionModeSource("chop"),
           selectionModifier: input.modifier,
           inputShape: "rect-selection"
         }
@@ -77,13 +77,13 @@ function seedDefaultModes(registry: ModeRegistry): void {
       modeId: "build-wall",
       displayName: "墙体蓝图",
       inputShape: "brush-stroke",
-      interactionSource: toolbarSource("build-wall"),
+      interactionSource: interactionModeSource("build-wall"),
       explainRule: (input) => ({
         verb: "build_wall_blueprint",
         targetCellKeys: targetKeysFromCells(input.cells),
         targetEntityIds: [],
         sourceMode: {
-          source: toolbarSource("build-wall"),
+          source: interactionModeSource("build-wall"),
           selectionModifier: input.modifier,
           inputShape: "brush-stroke"
         }
@@ -93,13 +93,13 @@ function seedDefaultModes(registry: ModeRegistry): void {
       modeId: "build-bed",
       displayName: "床铺放置",
       inputShape: "single-cell",
-      interactionSource: toolbarSource("build-bed"),
+      interactionSource: interactionModeSource("build-bed"),
       explainRule: (input) => ({
         verb: "place_furniture:bed",
         targetCellKeys: targetKeysFromCells(input.cells),
         targetEntityIds: [],
         sourceMode: {
-          source: toolbarSource("build-bed"),
+          source: interactionModeSource("build-bed"),
           selectionModifier: input.modifier,
           inputShape: "single-cell"
         }

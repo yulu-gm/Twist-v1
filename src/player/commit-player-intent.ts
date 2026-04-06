@@ -3,16 +3,18 @@
  * 对齐 oh-code-design 交互系统「交互意图层」与 UI「只消费规则结果」：拒绝不改变已确认的地图标记状态。
  */
 
+import { commandMenuDomainSemantics, type CommandMenuCommandId } from "../data/command-menu";
 import { applyTaskMarkersForSelection } from "../data/task-markers";
 import type { SelectionModifier } from "../game/interaction/floor-selection";
 import type { OrchestratorWorldBridge } from "../game/orchestrator-world-bridge";
-import { buildDomainCommand, toolbarToolIdForDomainCommand } from "./build-domain-command";
+import { buildDomainCommand, taskMarkerToolIdForDomainCommand } from "./build-domain-command";
 import type { PlayerWorldPort } from "./world-port-types";
 import type { DomainCommand, MockWorldSubmitResult } from "./s0-contract";
 import { filterCellKeysForToolbarTaskMarkers } from "./task-marker-target-cells";
 
 export type PlayerSelectionCommitInput = Readonly<{
-  toolId: string;
+  /** 主语义：当前激活的菜单命令。 */
+  commandId: CommandMenuCommandId;
   selectionModifier: SelectionModifier;
   cellKeys: ReadonlySet<string>;
   inputShape: "rect-selection" | "brush-stroke" | "single-cell";
@@ -33,7 +35,7 @@ export function rebuildTaskMarkersFromCommandResults(
   for (let i = 0; i < n; i++) {
     if (!results[i]!.accepted) continue;
     const cmd = log[i]!;
-    const toolId = toolbarToolIdForDomainCommand(cmd);
+    const toolId = taskMarkerToolIdForDomainCommand(cmd);
     markers = applyTaskMarkersForSelection(markers, {
       toolId,
       modifier: cmd.sourceMode.selectionModifier,
@@ -58,11 +60,12 @@ export function commitPlayerSelectionToWorld(
   port: PlayerWorldPort,
   input: PlayerSelectionCommitInput
 ): PlayerSelectionCommitOutcome {
-  const { toolId, selectionModifier, cellKeys, inputShape, currentMarkers, nowMs } = input;
+  const { commandId, selectionModifier, cellKeys, inputShape, currentMarkers, nowMs } = input;
   const frozenMarkers = new Map(currentMarkers);
+  const { markerToolId } = commandMenuDomainSemantics(commandId);
 
   const cmd = buildDomainCommand({
-    toolId,
+    commandId,
     selectionModifier,
     cellKeys,
     inputShape,
@@ -82,8 +85,8 @@ export function commitPlayerSelectionToWorld(
   const bridge = port as Partial<OrchestratorWorldBridge>;
   const markerCellKeys =
     typeof bridge.getWorld === "function"
-      ? filterCellKeysForToolbarTaskMarkers(bridge.getWorld(), toolId, inputShape, cellKeys)
-      : port.filterTaskMarkerTargetCells(toolId, inputShape, cellKeys);
+      ? filterCellKeysForToolbarTaskMarkers(bridge.getWorld(), markerToolId, inputShape, cellKeys)
+      : port.filterTaskMarkerTargetCells(markerToolId, inputShape, cellKeys);
 
   const submitResult = port.submit(cmd, nowMs);
   if (!submitResult.accepted) {
@@ -97,7 +100,7 @@ export function commitPlayerSelectionToWorld(
   }
 
   const layered = applyTaskMarkersForSelection(frozenMarkers, {
-    toolId,
+    toolId: markerToolId,
     modifier: selectionModifier,
     cellKeys: markerCellKeys
   });

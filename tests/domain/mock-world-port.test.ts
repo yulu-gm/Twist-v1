@@ -11,7 +11,7 @@ describe("MockWorldPort", () => {
       targetCellKeys: ["0,1"],
       targetEntityIds: [],
       sourceMode: {
-        source: { kind: "toolbar", toolId: "lumber" },
+        source: { kind: "menu", menuId: "orders", itemId: "lumber" },
         selectionModifier: "replace",
         inputShape: "single-cell"
       }
@@ -30,7 +30,7 @@ describe("MockWorldPort", () => {
       targetCellKeys: ["5,5", "6,6"],
       targetEntityIds: [],
       sourceMode: {
-        source: { kind: "toolbar", toolId: "build" },
+        source: { kind: "menu", menuId: "structures", itemId: "build-wall" },
         selectionModifier: "replace",
         inputShape: "brush-stroke"
       }
@@ -51,7 +51,7 @@ describe("MockWorldPort", () => {
         targetCellKeys: ["0,0"],
         targetEntityIds: [],
         sourceMode: {
-          source: { kind: "toolbar", toolId: "mine" },
+          source: { kind: "menu", menuId: "orders", itemId: "mine" },
           selectionModifier: "replace",
           inputShape: "single-cell"
         }
@@ -69,7 +69,7 @@ describe("MockWorldPort", () => {
         targetCellKeys: ["0,0"],
         targetEntityIds: [],
         sourceMode: {
-          source: { kind: "toolbar", toolId: "mine" },
+          source: { kind: "menu", menuId: "orders", itemId: "mine" },
           selectionModifier: "replace",
           inputShape: "single-cell"
         }
@@ -86,7 +86,7 @@ describe("MockWorldPort", () => {
         targetCellKeys: ["1,1"],
         targetEntityIds: [],
         sourceMode: {
-          source: { kind: "toolbar", toolId: "mine" },
+          source: { kind: "menu", menuId: "orders", itemId: "mine" },
           selectionModifier: "replace",
           inputShape: "single-cell"
         }
@@ -105,7 +105,7 @@ describe("MockWorldPort", () => {
         targetCellKeys: ["0,0"],
         targetEntityIds: [],
         sourceMode: {
-          source: { kind: "toolbar", toolId: "mine" },
+          source: { kind: "menu", menuId: "orders", itemId: "mine" },
           selectionModifier: "replace",
           inputShape: "rect-selection"
         }
@@ -119,7 +119,7 @@ describe("MockWorldPort", () => {
         targetCellKeys: ["1,1"],
         targetEntityIds: [],
         sourceMode: {
-          source: { kind: "toolbar", toolId: "mine" },
+          source: { kind: "menu", menuId: "orders", itemId: "mine" },
           selectionModifier: "replace",
           inputShape: "rect-selection"
         }

@@ -8,11 +8,9 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { VILLAGER_TOOLS, type VillagerBuildSubId } from "../src/data/villager-tools";
 import { createDefaultPawnStates } from "../src/game/pawn-state";
 import type { WorkItemSnapshot } from "../src/game/work/work-types";
 import { HudManager } from "../src/ui/hud-manager";
-import { activeBuildToolState } from "../src/ui/menu-model";
 
 const rootDir = path.resolve(__dirname, "..");
 
@@ -37,11 +35,14 @@ describe("scene-hud markup", () => {
     expect(html).toContain('id="yaml-scenario-manual"');
     expect(html).toContain('id="yaml-scenario-manual-steps"');
     expect(html).toContain('id="yaml-scenario-manual-outcomes"');
+    expect(html).toContain('id="top-left-hud-stack"');
     expect(html).toContain('id="scene-debug-toggle"');
     expect(html).toContain('id="scene-debug-panel"');
     expect(html).toContain('id="scene-debug-filter"');
     expect(html).toContain('id="scene-debug-log-list"');
     expect(html).toContain('id="scene-debug-detail"');
+    expect(html).toContain('id="villager-tool-bar"');
+    expect(html).toContain('aria-label="三层命令菜单"');
     expect(html).toContain('aria-live="polite"');
   });
 });
@@ -140,104 +141,52 @@ describe("debug panel hud", () => {
   });
 });
 
-describe("层级建造菜单", () => {
-  it('选中建造后展开子菜单容器，含「木墙」「木床」', () => {
+describe("三层命令菜单", () => {
+  it("renders the new command menu anchors and swaps command lists by category", () => {
     document.body.innerHTML = `<div id="villager-tool-bar"></div>`;
     const hud = new HudManager();
-    const buildIdx = VILLAGER_TOOLS.findIndex((t) => t.id === "build");
-    expect(buildIdx).toBeGreaterThanOrEqual(0);
+    hud.setupCommandMenu(() => undefined, "mine");
 
-    let selectedIdx = 0;
-    let buildSub: VillagerBuildSubId | null = null;
-    hud.setupToolBar(
-      (i) => {
-        selectedIdx = i;
-        buildSub = null;
-        hud.syncToolBarSelection(selectedIdx, buildSub);
-      },
-      0,
-      {
-        onSelectSub: (s) => {
-          buildSub = s;
-          hud.syncToolBarSelection(selectedIdx, buildSub);
-        },
-        initialSub: null
-      }
+    expect(document.getElementById("villager-command-primary")).not.toBeNull();
+    expect(document.getElementById("villager-command-categories")).not.toBeNull();
+    expect(document.getElementById("villager-command-list")).not.toBeNull();
+    expect(document.querySelector(".build-tool-submenu")).toBeNull();
+
+    const categoryButtons = Array.from(
+      document.querySelectorAll<HTMLButtonElement>("#villager-command-categories button")
     );
+    expect(categoryButtons).toHaveLength(3);
+    expect(categoryButtons.map((button) => button.textContent)).toContain("结构");
+    expect(categoryButtons.map((button) => button.textContent)).toContain("家具");
 
-    const slots = Array.from(document.querySelectorAll(".tool-slot"));
-    (slots[buildIdx] as HTMLButtonElement).click();
+    (categoryButtons.find((button) => button.textContent === "结构") as HTMLButtonElement).click();
 
-    const sub = document.querySelector(".build-tool-submenu");
-    expect(sub).not.toBeNull();
-    expect((sub as HTMLElement).hidden).toBe(false);
-    const labels = Array.from(sub!.querySelectorAll(".build-tool-submenu-item")).map((b) => b.textContent);
-    expect(labels).toContain("木墙");
-    expect(labels).toContain("木床");
+    const commandLabels = Array.from(
+      document.querySelectorAll<HTMLButtonElement>("#villager-command-list .command-item-button")
+    ).map((button) => button.querySelector(".command-item-label")?.textContent);
+    expect(commandLabels).toEqual(["木墙", "储存区"]);
   });
 
-  it('选中「木墙」后 activeBuildToolState 为 brush-stroke + build_wall_blueprint', () => {
+  it("keeps the clicked command highlighted after switching categories", () => {
     document.body.innerHTML = `<div id="villager-tool-bar"></div>`;
     const hud = new HudManager();
-    const buildIdx = VILLAGER_TOOLS.findIndex((t) => t.id === "build");
-    let selectedIdx = 0;
-    let buildSub: VillagerBuildSubId | null = null;
-    hud.setupToolBar(
-      (i) => {
-        selectedIdx = i;
-        buildSub = null;
-        hud.syncToolBarSelection(selectedIdx, buildSub);
-      },
-      0,
-      {
-        onSelectSub: (s) => {
-          buildSub = s;
-          hud.syncToolBarSelection(selectedIdx, buildSub);
-        },
-        initialSub: null
-      }
-    );
-    const slots = Array.from(document.querySelectorAll(".tool-slot"));
-    (slots[buildIdx] as HTMLButtonElement).click();
-    const wallBtn = document.querySelector('[data-build-sub-id="wall"]');
-    expect(wallBtn).not.toBeNull();
-    (wallBtn as HTMLButtonElement).click();
+    hud.setupCommandMenu(() => undefined, "mine");
 
-    const activeToolState = activeBuildToolState(buildSub);
-    expect(activeToolState?.inputShape).toBe("brush-stroke");
-    expect(activeToolState?.verb).toBe("build_wall_blueprint");
-  });
+    const furnitureCategory = Array.from(
+      document.querySelectorAll<HTMLButtonElement>("#villager-command-categories button")
+    ).find((button) => button.textContent === "家具");
+    expect(furnitureCategory).toBeDefined();
+    furnitureCategory!.click();
 
-  it('选中「木床」后 activeBuildToolState 为 single-cell + place_furniture:bed', () => {
-    document.body.innerHTML = `<div id="villager-tool-bar"></div>`;
-    const hud = new HudManager();
-    const buildIdx = VILLAGER_TOOLS.findIndex((t) => t.id === "build");
-    let selectedIdx = 0;
-    let buildSub: VillagerBuildSubId | null = null;
-    hud.setupToolBar(
-      (i) => {
-        selectedIdx = i;
-        buildSub = null;
-        hud.syncToolBarSelection(selectedIdx, buildSub);
-      },
-      0,
-      {
-        onSelectSub: (s) => {
-          buildSub = s;
-          hud.syncToolBarSelection(selectedIdx, buildSub);
-        },
-        initialSub: null
-      }
-    );
-    const slots = Array.from(document.querySelectorAll(".tool-slot"));
-    (slots[buildIdx] as HTMLButtonElement).click();
-    const bedBtn = document.querySelector('[data-build-sub-id="bed"]');
-    expect(bedBtn).not.toBeNull();
-    (bedBtn as HTMLButtonElement).click();
+    const bedButton = Array.from(
+      document.querySelectorAll<HTMLButtonElement>("#villager-command-list .command-item-button")
+    ).find((button) => button.dataset.commandId === "place-bed");
+    expect(bedButton).toBeDefined();
+    bedButton!.click();
 
-    const activeToolState = activeBuildToolState(buildSub);
-    expect(activeToolState?.inputShape).toBe("single-cell");
-    expect(activeToolState?.verb).toBe("place_furniture:bed");
+    const selected = document.querySelector("#villager-command-list .command-item-button.selected");
+    expect(selected?.dataset.commandId).toBe("place-bed");
+    expect(document.getElementById("villager-command-primary")?.textContent).toContain("木床");
   });
 });
 

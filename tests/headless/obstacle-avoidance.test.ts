@@ -96,7 +96,7 @@ describe("obstacle-avoidance headless", () => {
     });
 
     const brush = sim.commitPlayerSelection({
-      toolId: "build",
+      commandId: "build-wall",
       selectionModifier: "replace",
       cellKeys: new Set([coordKey(wallCell)]),
       inputShape: "brush-stroke",

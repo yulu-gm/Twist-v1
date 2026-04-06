@@ -20,7 +20,7 @@ describe("WORK-003 stale-work-cleanup", () => {
 
     const treeCell = CHOP_TREE_COMMAND_SCENARIO.trees![0]!.cell;
     const outcome = sim.commitPlayerSelection({
-      toolId: "lumber",
+      commandId: "lumber",
       selectionModifier: "replace",
       cellKeys: new Set([coordKey(treeCell)]),
       inputShape: "rect-selection",

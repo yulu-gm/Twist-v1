@@ -19,7 +19,7 @@ export const MAP_BLOCKED_PLACEMENT_SCENARIO: ScenarioDefinition = {
   playerSelectionAfterHydrate: [
     {
       label: "blocked-wall-brush",
-      toolId: "build",
+      commandId: "build-wall",
       selectionModifier: "replace",
       cellKeys: [blockedPlacementKey, coordKey(MAP_BLOCKED_PLACEMENT_FREE_CELL)],
       inputShape: "brush-stroke",

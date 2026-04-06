@@ -42,10 +42,10 @@ describe("GameOrchestrator.commitPlayerSelection", () => {
     });
 
     const outcome = orchestrator.commitPlayerSelection({
-      toolId: "lumber",
+      commandId: "lumber",
       selectionModifier: "replace",
       cellKeys: new Set(["4,5"]),
-      inputShape: "single-cell",
+      inputShape: "rect-selection",
       currentMarkers: new Map(),
       nowMs: 123
     });

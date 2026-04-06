@@ -3,6 +3,7 @@ import type { SelectionModifier } from "../game/interaction/floor-selection";
 import type { GridCoord, WorldGridConfig } from "../game/map";
 import type { PawnState } from "../game/pawn-state";
 import type { TimeSpeed } from "../game/time";
+import type { CommandMenuCommandId } from "../data/command-menu";
 import type { DomainCommand } from "../player/s0-contract";
 
 export type ScenarioTreeSpawn = Readonly<{ cell: GridCoord }>;
@@ -35,7 +36,8 @@ export type ScenarioUiObservation = Readonly<{
 }>;
 
 export type ScenarioPlayerSelectionAfterHydrate = Readonly<{
-  toolId: string;
+  /** 与实机 `commitPlayerSelection` 一致。 */
+  commandId: CommandMenuCommandId;
   selectionModifier: SelectionModifier;
   cellKeys: readonly string[];
   inputShape: ScenarioPlayerInputShape;

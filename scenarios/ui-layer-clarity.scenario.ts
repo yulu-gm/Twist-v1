@@ -30,7 +30,7 @@ export const UI_LAYER_CLARITY_SCENARIO: ScenarioDefinition = {
   playerSelectionAfterHydrate: [
     {
       label: "haul-mark-layer-cluster",
-      toolId: "haul",
+      commandId: "haul",
       selectionModifier: "replace",
       cellKeys: UI_LAYER_CLARITY_ZONE_CELLS.map(coordKey),
       inputShape: "rect-selection",

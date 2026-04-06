@@ -18,7 +18,7 @@ export const BUILD_INVALID_PLACEMENT_SCENARIO: ScenarioDefinition = {
   playerSelectionAfterHydrate: [
     {
       label: "invalid-bed-placement",
-      toolId: "build",
+      commandId: "place-bed",
       selectionModifier: "replace",
       cellKeys: [invalidPlacementKey],
       inputShape: "single-cell",

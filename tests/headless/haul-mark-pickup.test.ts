@@ -40,7 +40,7 @@ describe("INTERACT-001 rect-selection haul input", () => {
       coordKey({ col: 12, row: 5 })
     ];
     const outcome = sim.commitPlayerSelection({
-      toolId: "haul",
+      commandId: "haul",
       selectionModifier: "replace",
       cellKeys: new Set(selectedCells),
       inputShape: "rect-selection",
@@ -50,7 +50,7 @@ describe("INTERACT-001 rect-selection haul input", () => {
     const selection = recordScenarioPlayerSelection(
       {
         label: "interact-001-rect-selection",
-        toolId: "haul",
+        commandId: "haul",
         selectionModifier: "replace",
         cellKeys: selectedCells,
         inputShape: "rect-selection"

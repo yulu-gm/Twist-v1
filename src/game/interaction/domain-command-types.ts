@@ -5,10 +5,8 @@
 
 import type { SelectionModifier } from "./floor-selection";
 
-/** 玩家进入交互模式的来源（后续可扩展菜单、快捷键等）。 */
-export type InteractionSource =
-  | Readonly<{ kind: "toolbar"; toolId: string }>
-  | Readonly<{ kind: "menu"; menuId: string; itemId: string }>;
+/** 玩家进入交互模式的来源：`menuId` 为命令分类或注册表命名空间，`itemId` 为命令/模式 id。 */
+export type InteractionSource = Readonly<{ kind: "menu"; menuId: string; itemId: string }>;
 
 /** 统一领域命令，对齐 working-plan 中「交互命令」字段。 */
 export type DomainCommand = Readonly<{

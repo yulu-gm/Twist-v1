@@ -37,7 +37,7 @@ export const STORY_1_DOMAIN_COMMANDS = {
     targetCellKeys: [...zoneKeys],
     targetEntityIds: [],
     sourceMode: {
-      source: { kind: "toolbar", toolId: "zone_create" },
+      source: { kind: "menu", menuId: "interaction-mode", itemId: "zone-create" },
       selectionModifier: "replace",
       inputShape: "rect-selection"
     }
@@ -48,7 +48,7 @@ export const STORY_1_DOMAIN_COMMANDS = {
     targetCellKeys: [...foodKeys],
     targetEntityIds: [],
     sourceMode: {
-      source: { kind: "toolbar", toolId: "haul" },
+      source: { kind: "menu", menuId: "orders", itemId: "haul" },
       selectionModifier: "replace",
       inputShape: "rect-selection"
     }
@@ -59,7 +59,7 @@ export const STORY_1_DOMAIN_COMMANDS = {
     targetCellKeys: [treeKey],
     targetEntityIds: [],
     sourceMode: {
-      source: { kind: "toolbar", toolId: "lumber" },
+      source: { kind: "menu", menuId: "orders", itemId: "lumber" },
       selectionModifier: "replace",
       inputShape: "rect-selection"
     }
@@ -70,7 +70,7 @@ export const STORY_1_DOMAIN_COMMANDS = {
     targetCellKeys: [wallKey],
     targetEntityIds: [],
     sourceMode: {
-      source: { kind: "toolbar", toolId: "build_wall_blueprint" },
+      source: { kind: "menu", menuId: "structures", itemId: "build-wall" },
       selectionModifier: "replace",
       inputShape: "single-cell"
     }
@@ -81,7 +81,7 @@ export const STORY_1_DOMAIN_COMMANDS = {
     targetCellKeys: [bedKey],
     targetEntityIds: [],
     sourceMode: {
-      source: { kind: "toolbar", toolId: "build" },
+      source: { kind: "menu", menuId: "furniture", itemId: "place-bed" },
       selectionModifier: "replace",
       inputShape: "single-cell"
     }
