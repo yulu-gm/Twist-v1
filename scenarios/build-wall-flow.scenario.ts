@@ -38,10 +38,13 @@ export const BUILD_WALL_FLOW_SCENARIO: ScenarioDefinition = {
   ],
   manualAcceptance: {
     steps: [
+      "（UI-001）在实机中打开工具栏，依次点「建造」→「木墙」，确认子菜单展开且「木墙」呈选中高亮。",
+      "（UI-001）查看左上角玩家通道提示，确认文案已进入木墙笔刷模式（与 `presentationForVillagerTool` 的 modeLine 一致）。",
       "选择本场景：出生点 WallBuilder；与实机相同，装载后已在 (11,6) 执行一次「建造→墙笔刷」提交。",
       "与实机一致：装载后不手工认领；下一帧起由 `autoClaimOpenWorkItems` 分配 construct-blueprint。"
     ],
     outcomes: [
+      "层级菜单与通道提示与当前建造子模式一致（UI-001）。",
       "自动认领后小人沿格走向锚格，落成 `buildingKind: wall`（与无头期望一致）。"
     ]
   }

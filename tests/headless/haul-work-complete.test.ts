@@ -1,3 +1,7 @@
+/**
+ * refactor-test：WorldCore 直调工单完成回归；不承担 ENTITY-002 玩家路径主验收。
+ * 主证据：`chop-haul-full-chain.scenario.ts` + `chop-haul-full-chain.test.ts` / `scenario-runner.test.ts`。
+ */
 import { describe, expect, it } from "vitest";
 import { DEFAULT_WORLD_GRID } from "../../src/game/map/world-grid";
 import {

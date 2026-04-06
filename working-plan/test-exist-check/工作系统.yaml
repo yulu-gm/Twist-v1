@@ -1,0 +1,176 @@
+# oh-acceptance / 工作系统 — 无头与玩家可验收存在性审计（契约见 working-plan/module-test-exist-check.schema.yml）
+
+schema_version: "1.0"
+document_role: "oh-acceptance_module_test_existence_audit"
+
+module_id: "工作系统"
+module_name: "工作系统"
+source_acceptance_file: "oh-acceptance/工作系统.yaml"
+
+audit_rules:
+  headless_required: true
+  player_acceptance_required: true
+
+scenarios:
+  - scenario_id: "WORK-001"
+    scenario_name: "伐木工作的生成与完整链路执行"
+    intent: "验证标记树木后能正确生成伐木工作，并在完成后派生拾取与搬运工作"
+    headless:
+      status: exists
+      evidence:
+        test_files:
+          - "tests/headless/chop-haul-full-chain.test.ts"
+          - "tests/headless/chop-tree-full-flow.test.ts"
+        code_hits:
+          - path: "tests/headless/chop-haul-full-chain.test.ts"
+            symbol: "runScenarioHeadless"
+            note: "绑定 CHOP_HAUL_FULL_CHAIN_SCENARIO；期望含 chop-tree / pick-up-resource / haul-to-zone 完成与 resource-in-container"
+          - path: "tests/headless/chop-tree-full-flow.test.ts"
+            symbol: "runScenarioHeadless"
+            note: "绑定 CHOP_TREE_FULL_FLOW_SCENARIO；仅断言伐木完成与地面 resource，属局部链路"
+        scenario_binding:
+          scenario_export: "CHOP_HAUL_FULL_CHAIN_SCENARIO"
+          scenario_file: "scenarios/chop-haul-full-chain.scenario.ts"
+        alignment_note: >
+          验收要求的「伐木完成→派生拾取与搬运」与 chop-haul-full-chain 的 description/expectations 可对读，属完整无头业务链路。
+          chop-tree-full-flow 覆盖 lumber→认领→读条→树移除与木材生成，但未断言派生工单完成，记为补充性局部覆盖。
+        near_misses:
+          - hit_paths:
+              - "tests/headless/chop-work-complete.test.ts"
+            reason: "WorldCore 上 claimWorkItem+completeWorkItem 领域断言，未使用 runScenarioHeadless/createHeadlessSim，按契约不计入 headless.exists"
+    player_acceptance:
+      status: missing
+      evidence:
+        scenario_file: "scenarios/chop-haul-full-chain.scenario.ts"
+        in_all_scenarios: true
+        manual_acceptance_declared:
+          has_steps: false
+          has_outcomes: false
+        hud_entry: "index.html#yaml-scenario-panel；HudManager.syncYamlScenarioManualHints"
+        near_misses:
+          - hit_paths:
+              - "scenarios/chop-tree-full-flow.scenario.ts"
+              - "scenarios/chop-haul-full-chain.scenario.ts"
+              - "scenarios/chop-tree-command.scenario.ts"
+            reason: "上述工作向场景已在 ALL_SCENARIOS 但均无 manualAcceptance（rg scenarios 仅 obstacle/build-bed/… 等含 manualAcceptance）"
+    notes: "headless：以 chop-haul-full-chain 计为完整链路；chop-tree-full-flow 为局部。"
+
+  - scenario_id: "WORK-002"
+    scenario_name: "散落物资的自动拾取与搬运"
+    intent: "验证框选物资标记为可拾取后，小人能将其收集到存储区"
+    headless:
+      status: needs-manual-judgement
+      evidence:
+        test_files:
+          - "tests/headless/haul-mark-pickup.test.ts"
+          - "tests/headless/chop-haul-full-chain.test.ts"
+        code_hits:
+          - path: "tests/headless/haul-mark-pickup.test.ts"
+            symbol: "runScenarioHeadless"
+            note: "HAUL_MARK_PICKUP_SCENARIO；期望仅 work-item-exists pick-up-resource open"
+          - path: "tests/headless/haul-mark-pickup.test.ts"
+            symbol: "createHeadlessSim"
+            note: "hydrate + submit haul / 断言 pickupAllowed 与工单"
+          - path: "tests/headless/chop-haul-full-chain.test.ts"
+            symbol: "runScenarioHeadless"
+            note: "完整 pick-up + haul-to-zone 入库，但入口为 lumber 伐木非散落物资 haul 框选"
+        scenario_binding:
+          scenario_export: null
+          scenario_file: null
+        alignment_note: >
+          无单条场景同时满足「地面散落物资 + haul 标记可拾取 + 拾取完成 + 搬运入存储区」与验收 WORK-002 的一一对应；
+          haul-mark-pickup 为局部（生成开放拾取工单）；chop-haul-full-chain 为完整搬运入库但给定与触发路径不同。
+        near_misses:
+          - hit_paths:
+              - "tests/headless/haul-work-complete.test.ts"
+              - "tests/headless/pickup-work-complete.test.ts"
+            reason: "WorldCore 上直接 claim/complete 工单，未调用 runScenarioHeadless/createHeadlessSim，按契约不计入 headless.exists"
+    player_acceptance:
+      status: missing
+      evidence:
+        scenario_file: "scenarios/haul-mark-pickup.scenario.ts"
+        in_all_scenarios: true
+        manual_acceptance_declared:
+          has_steps: false
+          has_outcomes: false
+        hud_entry: "index.html#yaml-scenario-panel；HudManager.syncYamlScenarioManualHints"
+        near_misses:
+          - hit_paths:
+              - "scenarios/haul-mark-pickup.scenario.ts"
+            reason: "已列入 ALL_SCENARIOS 但未声明 manualAcceptance"
+    notes: "headless：无与 WORK-002 完全同构的完整链路单测，记 needs-manual-judgement。"
+
+  - scenario_id: "WORK-003"
+    scenario_name: "工作目标在执行前消失"
+    intent: "验证当小人前往执行工作的途中，目标实体被销毁或状态改变时的处理"
+    headless:
+      status: exists
+      evidence:
+        test_files:
+          - "tests/headless/stale-work-cleanup.test.ts"
+        code_hits:
+          - path: "tests/headless/stale-work-cleanup.test.ts"
+            symbol: "createHeadlessSim"
+            note: "hydrate CHOP_TREE_COMMAND_SCENARIO + lumber；认领 chop-tree 后从 world 移除树实体并 tick，断言工单清空与 activeWorkItemId 释放"
+        scenario_binding:
+          scenario_export: "CHOP_TREE_COMMAND_SCENARIO"
+          scenario_file: "scenarios/chop-tree-command.scenario.ts"
+        alignment_note: >
+          验收条写「拾取途中物资消失」；本测为「chop-tree 已认领后树目标被删」的失效清理，属同类「目标实体消失→工单移除与锁定释放」域行为，场景常量用于 hydrate 初始世界与 lumber 命令一致。
+        near_misses: []
+    player_acceptance:
+      status: missing
+      evidence:
+        scenario_file: "scenarios/chop-tree-command.scenario.ts"
+        in_all_scenarios: true
+        manual_acceptance_declared:
+          has_steps: false
+          has_outcomes: false
+        hud_entry: "index.html#yaml-scenario-panel；HudManager.syncYamlScenarioManualHints"
+        near_misses:
+          - hit_paths:
+              - "scenarios/chop-tree-command.scenario.ts"
+            reason: "已列入 ALL_SCENARIOS 但无 manualAcceptance"
+    notes: "headless：完整 sim tick 链路验证目标消失后清理；玩家侧无对应 manual 场景。"
+
+  - scenario_id: "WORK-004"
+    scenario_name: "多个小人争抢同一工作目标的互斥锁定"
+    intent: "验证同一个工作目标不会被多个小人重复领取和执行"
+    headless:
+      status: needs-manual-judgement
+      evidence:
+        test_files:
+          - "tests/headless/auto-claim-work.test.ts"
+        code_hits:
+          - path: "tests/headless/auto-claim-work.test.ts"
+            symbol: "createHeadlessSim"
+            note: "2 小人 + 单条 open chop-tree：单 tick 仅 1 次 work-claimed，且无剩余 open chop-tree"
+        scenario_binding:
+          scenario_export: null
+          scenario_file: null
+        alignment_note: >
+          验收给定写「单一建造蓝图工作」与广播认领；本测为双小人互斥认领单条 chop-tree（内联树+registerChopTreeWork），互斥语义对齐但工单种类与场景与验收文案非一一对应。
+        near_misses:
+          - hit_paths:
+              - "tests/headless/multi-pawn-colony.test.ts"
+            reason: "runScenarioHeadless(MULTI_PAWN_COLONY_SCENARIO) 验饱食与 pawn-goal-changed，不验工作互斥"
+    player_acceptance:
+      status: exists
+      evidence:
+        scenario_file: "scenarios/build-bed-flow.scenario.ts"
+        in_all_scenarios: true
+        manual_acceptance_declared:
+          has_steps: true
+          has_outcomes: true
+        hud_entry: "index.html#yaml-scenario-panel；HudManager.syncYamlScenarioManualHints"
+        near_misses:
+          - hit_paths:
+              - "scenarios/index.ts"
+            reason: "manualAcceptance 描述单小人床蓝图认领与落成，未逐步说明多小人争抢同一 construct-blueprint 的互斥表现；意图对齐需结合无头或其它说明"
+    notes: "headless：互斥有 createHeadlessSim 证据但工单类型为 chop-tree；玩家：construct-blueprint 有 manual + ALL_SCENARIOS。"
+
+summary:
+  headless_coverage: "WORK-001 有完整链路（chop-haul-full-chain）；WORK-002、WORK-004 为 needs-manual-judgement；WORK-003 有 sim 级失效清理；多处 WorldCore 直接 complete 单测按契约不计 exists。"
+  player_acceptance_coverage: "仅 WORK-004 绑定具备显式 manualAcceptance 且已列入 ALL_SCENARIOS 的 build-bed-flow；WORK-001～003 对应 chop/haul 场景均无 manual 字段。"
+  last_audited_at: "2026-04-06"
+  auditor_notes: "检索：`rg runScenarioHeadless\\(|createHeadlessSim\\(` tests；`rg manualAcceptance scenarios`；ALL_SCENARIOS 以 scenarios/index.ts 为准。"

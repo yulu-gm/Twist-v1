@@ -1,0 +1,206 @@
+schema_version: "1.0"
+document_role: "refactor_test_design"
+
+module_id: "需求系统"
+module_name: "需求系统测试重构设计"
+source_acceptance_file: "oh-acceptance/需求系统.yaml"
+source_audit_file: "working-plan/test-exist-check/需求系统.yaml"
+
+design_scope: >
+  本文档只设计需求系统的端到端测试重构方案，覆盖 NEED-001 到 NEED-004 全部 scenario_id。
+  重点是把“时间驱动的饥饿下降与进食”“夜晚强制睡眠与疲劳睡眠”“工作被饥饿打断”“极端饥饿/疲劳触底边界”分开，
+  并明确哪些旧 headless 测试保留为底层回归，哪些不再作为主验收证据。
+
+refactor_objectives:
+  - "建立以 scenario 为主、headless 为辅的验收分层，主验收必须能回溯到用户可见行为。"
+  - "把 NEED-001/002 的现有 headless 用例降级为稳定回归，保留其对目标切换与状态变化的底层保护。"
+  - "把 NEED-003 明确定位为“工作被饥饿打断”，避免与“进食过程被打断”混淆。"
+  - "补齐 NEED-004 的触底边界设计，确保数值不会低于 0，且极端状态有明确可见反馈。"
+  - "所有无头测试都只模拟用户操作与场景推进，不允许通过直调 need/domain 规则函数替代真实业务链路。"
+
+global_constraints:
+  - "仅设计，不实现测试。"
+  - "无头测试只模拟用户操作与场景推进，不得以 domain 直调替代真实业务路径。"
+  - "用户验收流程必须包含操作顺序、预期目标、可见反馈。"
+  - "旧 domain/局部无头测试仅作为底层回归，不再充当主业务验收。"
+scenario_redesign:  - scenario_id: "NEED-001"
+    current_status_summary: >
+      现有 headless 测试 pawn-eats-when-hungry 已覆盖低饥饿时目标切换到 eat 的核心回归，
+      且场景文件 pawn-eats-when-hungry.scenario 也已经定义了 manualAcceptance。
+      当前证据能够说明“饥饿下降会触发进食”，但还没有把它提升成以用户可见反馈为中心的主验收叙事。
+    current_mismatch: >
+      现有主证据过于依赖 headless 目标断言，容易把“时间推进导致饥饿下降”与“真正执行进食行为”混成一个断言。
+      这里需要明确：本场景关注的是正常饥饿到进食的业务链路，不是“进食过程被打断”。
+      “进食过程被打断”如果要验证，应当作为单独场景，不应混入 NEED-001。
+    user_acceptance_flow:
+      steps:
+        - "在场景下拉中选择 NEED-001 对应的饥饿进食场景，确认出现名为 Hungry 的小人。"
+        - "启动模拟，让时间自然推进，观察饥饿条逐步下降并触发进食意图。"
+        - "确认小人移动到食物点并开始进食，观察界面上的目标与状态同步变化。"
+      expected_goal: "饥饿降到阈值后，小人应转向进食并最终恢复饱食度。"
+      visible_feedback:
+        - "饥饿条下降到警戒区并出现提醒态。"
+        - "小人的当前目标切换为 eat，路径朝向食物点。"
+        - "进食结束后饥饿条回升，UI 反馈恢复到正常态。"
+    e2e_test_strategy:
+      user_actions:
+        - "选择 NEED-001 场景并启动。"
+        - "仅通过时间推进和场景内交互推动状态变化，不直接写入目标或数值。"
+        - "等待小人完成移动、取食、进食的完整链路。"
+      assertions:
+        - "pawn-0 的 currentGoal.kind 最终为 eat。"
+        - "饥饿相关可见状态发生下降到警戒并在进食后回升。"
+        - "场景推进过程中没有借助 domain 规则函数直调来伪造进食结果。"
+      forbidden_shortcuts:
+        - "禁止直接调用 need/domain 规则函数来设置 eat 目标。"
+        - "禁止在测试里直接修改 satiety/hunger 数值以制造通过结果。"
+        - "禁止绕过场景推进直接断言最终状态。"
+    migration_notes: >
+      pawn-eats-when-hungry.test 继续保留为底层回归，负责稳定守住“低饥饿 -> eat”的规则不退化；
+      它不再作为主验收证据。主验收应回到场景文件和可见反馈链路上，避免把规则正确性误当作完整用户体验。
+
+  - scenario_id: "NEED-002"
+    current_status_summary: >
+      现有 headless 测试 night-forces-sleep 和 pawn-sleeps-when-tired 分别覆盖了夜晚强制睡眠与疲劳睡眠的底层目标切换；
+      场景文件 night-forces-sleep.scenario 已有 manualAcceptance，可以作为主验收的叙事骨架。
+    current_mismatch: >
+      当前证据容易把“夜晚触发睡眠”和“单纯疲劳触发睡眠”混在一起。
+      这里必须明确区分：NEED-002 的主语境是夜晚到来后强制睡眠，同时保留疲劳睡眠作为底层回归；
+      它不是“进食过程被打断”，也不是工作链路中的饥饿中断。
+    user_acceptance_flow:
+      steps:
+        - "在场景下拉中选择夜晚强制睡眠场景，确认起始时间已落在夜晚区间。"
+        - "启动模拟，观察小人从白天活动状态转入夜晚睡眠意图。"
+        - "确认小人移动到床位并进入睡眠，随后精力恢复。"
+      expected_goal: "夜晚到来后，小人应转向睡眠并在睡眠期间恢复精力。"
+      visible_feedback:
+        - "时间显示切换到夜晚区间，界面节奏变慢或出现夜间态提示。"
+        - "小人的当前目标切换为 sleep，并移动到床位。"
+        - "睡眠期间精力条回升，睡醒后回到可行动状态。"
+    e2e_test_strategy:
+      user_actions:
+        - "选择夜晚睡眠场景并启动。"
+        - "仅通过时间推进和场景内行为驱动睡眠，不直接注入 sleep 目标。"
+        - "等待夜晚事件、睡眠动作和恢复结果完整出现。"
+      assertions:
+        - "pawn-0 最终进入 sleep 目标。"
+        - "夜晚条件和低精力共同或分别触发的状态变化在 UI 上可见。"
+        - "测试不依赖直调 night/need 规则函数来制造睡眠结果。"
+      forbidden_shortcuts:
+        - "禁止直接调用 domain 规则函数把目标改成 sleep。"
+        - "禁止通过直接改 energy/rest 数值绕过夜晚推进。"
+        - "禁止把疲劳睡眠与夜晚强制睡眠混写为同一条验收证据。"
+    migration_notes: >
+      night-forces-sleep.test 和 pawn-sleeps-when-tired.test 都保留为底层回归：
+      前者守夜晚边界，后者守疲劳目标切换。但两者都不再单独充当主验收证据，
+      主验收应以夜晚场景的用户可见反馈链路为准。
+
+  - scenario_id: "NEED-003"
+    current_status_summary: >
+      现有 headless 测试 need-interrupt-during-work 已经证明“先领取伐木工作，再因饥饿中断并转向进食”的链路存在。
+      对应场景 need-interrupt-during-work.scenario 也包含 manualAcceptance，但其核心语义是“工作被饥饿打断”，不是“进食过程被打断”。
+    current_mismatch: >
+      这条场景最容易被误读成“进食中断”，但实际验证的是工作中途被更高优先级的饥饿需求抢占。
+      因此必须把两个边界写死：一是“工作被饥饿打断”，二是另一个独立课题“进食过程被打断”。
+      本设计只覆盖前者，不把后者混入 NEED-003。
+    user_acceptance_flow:
+      steps:
+        - "在场景下拉中选择工作中饥饿打断场景，确认小人和树木位置符合预设。"
+        - "启动模拟，让小人先领取 chop-tree 工作。"
+        - "继续推进，当饥饿压力上升到阈值后，观察工作被释放并转向进食。"
+      expected_goal: "小人应先完成工作领取，再在饥饿抢占下释放工作并转向 eat。"
+      visible_feedback:
+        - "chop-tree 工作先进入 claimed 状态，随后回到 open。"
+        - "小人的当前目标从工作切换为 eat。"
+        - "控制台或事件日志出现 need-interrupt-hunger 相关信号。"
+    e2e_test_strategy:
+      user_actions:
+        - "选择 NEED-003 场景并启动。"
+        - "只通过场景推进和自然饥饿上升触发中断，不直接修改工作项状态。"
+        - "观察工作释放、目标切换和后续进食的完整反馈。"
+      assertions:
+        - "chop-tree 工作最终回到 open，且 claimedBy 被清空。"
+        - "pawn-0 的 currentGoal 最终转为 eat。"
+        - "测试不通过直调中断处理函数来制造通过结果。"
+      forbidden_shortcuts:
+        - "禁止直接调用 settleInterrupted 之类内部规则函数替代业务链路。"
+        - "禁止直接写入 work item 的 status 或 claimedBy 来伪造释放。"
+        - "禁止把“工作被饥饿打断”改写成“进食过程被打断”。"
+    migration_notes: >
+      need-interrupt-during-work.test 继续保留为底层回归，用来守住工作中断与目标切换的规则稳定性；
+      但它不应再作为主验收证据，因为当前实现里带有更强的内部状态注入色彩。
+      主验收必须以用户可见的工作释放、目标切换和场景推进为准。
+
+  - scenario_id: "NEED-004"
+    current_status_summary: >
+      当前没有可直接复用的 headless 或 playable 主证据来覆盖“触底边界”。
+      现有相邻检查只能说明某些饥饿/疲劳条件会触发退化或避免死亡，但还没有明确验证“数值锁定在 0”、
+      “不会出现负数”以及“极端状态有足够强的可见反馈”这组边界。
+    current_mismatch: >
+      目前缺的是边界型主验收，而不是普通的需求下降回归。
+      NEED-004 必须明确验证：当饥饿或疲劳降到极限时，系统进入触底处理，并保持数值不低于 0。
+      它既不是“进食过程被打断”，也不是“工作被饥饿打断”，而是数值和反馈的极端边界。
+    user_acceptance_flow:
+      steps:
+        - "在场景下拉中选择极端饥饿/疲劳边界场景，确认小人初始状态接近临界。"
+        - "启动模拟并持续推进时间，观察饥饿或精力下降到 0 的边界瞬间。"
+        - "确认系统给出极端状态反馈，同时不再继续向负数回落。"
+      expected_goal: "饥饿或精力应被锁定在 0，并触发明确的极端状态表现。"
+      visible_feedback:
+        - "相关需求条清空并转为明显的危险态显示。"
+        - "小人出现极度虚弱、停顿或倒地等极端表现。"
+        - "UI 不显示负数，也不出现越界的资源值。"
+    e2e_test_strategy:
+      user_actions:
+        - "选择 NEED-004 场景并启动。"
+        - "只通过时间推进和场景内恢复/无恢复条件制造触底，不直接改数值。"
+        - "观察条形 UI、角色表现和日志事件在 0 边界上的一致性。"
+      assertions:
+        - "satiety 或 energy 最终锁定在 0，不会出现负数。"
+        - "极端状态有明确的可见反馈，且与普通饥饿/疲劳态区分开。"
+        - "测试不通过 direct clamp 或手工赋值伪造 0 边界。"
+      forbidden_shortcuts:
+        - "禁止直接把 satiety/energy 写成 0 来跳过边界过程。"
+        - "禁止调用 domain clamp 函数直接验证结果而不走场景推进。"
+        - "禁止用“没有负数”以外的替代条件混充触底边界验收。"
+    migration_notes: >
+      这一条目前没有现成旧测试可直接升级为主证据，因此需要新建以场景为核心的端到端设计。
+      任何仅能证明“不会饿死”或“还能恢复”的旧检查，都只能算邻近回归，不能替代 NEED-004 的 0 边界验收。
+
+test_architecture:
+  strategy: >
+    采用“三层证据”结构：场景文件承载主验收叙事，headless 用例承载底层回归，
+    旧有 domain 级检查只保留为内部规则防线，不再冒充用户体验证据。
+  layers:
+    - name: "scenario_acceptance"
+      role: "主验收证据"
+      description: "验证用户能看见的流程、目标切换和界面反馈。"
+    - name: "headless_regression"
+      role: "底层回归"
+      description: "验证稳定规则和目标切换，但不直接替代场景验收。"
+    - name: "domain_smoke"
+      role: "辅助防线"
+      description: "仅用于守住纯规则不退化，不用于证明端到端体验。"
+  boundary_policy:
+    - "NEED-001 和 NEED-002 的旧 headless 测试继续保留，但只做 regression。"
+    - "NEED-003 的现有 headless 测试保留为工作中断回归，不再作为“进食中断”证据。"
+    - "NEED-004 需要新设计触底边界主验收，旧相邻检查不能直接替代。"
+  evidence_policy:
+    - "主验收必须至少包含用户动作、可见反馈和最终目标三部分。"
+    - "无头测试只能模拟用户操作与场景推进，不能直调 need/domain 规则函数。"
+    - "任何内部状态注入都只能出现在底层回归思路中，不能作为主验收故事。"
+
+out_of_scope:
+  - "不修改任何测试代码、源码或任务树。"
+  - "不实现新的测试函数或场景执行逻辑。"
+  - "不把进食过程被打断与工作被饥饿打断合并成同一个场景。"
+  - "不把 headless 规则断言当成主验收证据。"
+  - "不使用 domain 规则函数直调替代真实业务链路。"
+
+deliverable_checklist:
+  - "已覆盖 NEED-001 到 NEED-004 全部 scenario_id。"
+  - "每条场景都包含 user_acceptance_flow.steps、expected_goal、visible_feedback。"
+  - "每条场景都包含 e2e_test_strategy.user_actions、assertions、forbidden_shortcuts。"
+  - "已明确区分进食过程被打断、工作被饥饿打断、触底边界三类语义。"
+  - "已标记哪些旧测试保留为底层回归，哪些不再作为主验收证据。"
+  - "已明确本文件只做设计，不实现测试。"

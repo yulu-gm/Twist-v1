@@ -2,6 +2,10 @@
  * Story-1 第一天无头集成：按 T-27 逐步 submit + expectation 组。
  * 场景 ID 注释：MAP-001、MAP-002、WORK-002、WORK-001、BUILD-001、BUILD-002、NEED-002、BEHAVIOR-003。
  */
+/**
+ * refactor-test：保留回归（story-1-day-one 多段编排直连），MAP-001 主证据以 `map-initial-state`/`story-1-day-one`
+ * 注册场景 + `scenario-runner.test.ts` + `map-initial-state.test.ts` 为准。
+ */
 import { describe, expect, it } from "vitest";
 import { describePawnDebugLabel } from "../../src/game/pawn-state";
 import { claimWorkItem } from "../../src/game/world-core";

@@ -1,0 +1,161 @@
+# oh-acceptance / 需求系统 — 无头测试与玩家可验收存在性审计
+# 契约：working-plan/module-test-exist-check.schema.yml
+
+schema_version: "1.0"
+document_role: "oh-acceptance_module_test_existence_audit"
+
+module_id: "需求系统"
+module_name: "需求系统"
+source_acceptance_file: "oh-acceptance/需求系统.yaml"
+
+audit_rules:
+  headless_required: true
+  player_acceptance_required: true
+
+scenarios:
+  - scenario_id: "NEED-001"
+    scenario_name: "饱食度随时间下降并触发进食"
+    intent: "验证时间推进会导致饱食度下降，并在低于阈值时触发进食行为和恢复"
+    headless:
+      status: exists
+      evidence:
+        test_files:
+          - "tests/headless/pawn-eats-when-hungry.test.ts"
+        code_hits:
+          - path: "tests/headless/pawn-eats-when-hungry.test.ts"
+            symbol: "runScenarioHeadless"
+            note: "传入 PAWN_EATS_WHEN_HUNGRY_SCENARIO，期望 pawn-0 达成 eat 目标"
+        scenario_binding:
+          scenario_export: "PAWN_EATS_WHEN_HUNGRY_SCENARIO"
+          scenario_file: "scenarios/pawn-eats-when-hungry.scenario.ts"
+        alignment_note: >
+          无头场景以低饱食/高饥饿初始态直接处于阈值侧，覆盖「低于阈值→进食目标」核心子集；
+          文档中「时间推移导致饱食持续下降」的过程本身由 domain 单测（如 tests/domain/need-evolution.test.ts 的 evolveNeeds）覆盖，非本 headless 场景逐步推演。
+        near_misses: []
+    player_acceptance:
+      status: exists
+      evidence:
+        scenario_file: "scenarios/pawn-eats-when-hungry.scenario.ts"
+        in_all_scenarios: true
+        manual_acceptance_declared:
+          has_steps: true
+          has_outcomes: true
+        hud_entry: "index.html#yaml-scenario-panel；HudManager.syncYamlScenarioManualHints"
+        near_misses: []
+    notes: "PAWN_EATS_WHEN_HUNGRY_SCENARIO 已列入 scenarios/index.ts 的 ALL_SCENARIOS；listAvailableScenarios 可枚举。"
+
+  - scenario_id: "NEED-002"
+    scenario_name: "夜晚疲劳触发睡眠与精力恢复"
+    intent: "验证白天活动消耗精力，夜晚触发睡眠并在睡眠期间恢复精力"
+    headless:
+      status: exists
+      evidence:
+        test_files:
+          - "tests/headless/night-forces-sleep.test.ts"
+          - "tests/headless/pawn-sleeps-when-tired.test.ts"
+        code_hits:
+          - path: "tests/headless/night-forces-sleep.test.ts"
+            symbol: "runScenarioHeadless"
+            note: "NIGHT_FORCES_SLEEP_SCENARIO；timeConfig 18:00 + 低精力/高困意 → sleep 目标"
+          - path: "tests/headless/pawn-sleeps-when-tired.test.ts"
+            symbol: "runScenarioHeadless"
+            note: "PAWN_SLEEPS_WHEN_TIRED_SCENARIO；低精力 → sleep 目标（未绑定昼夜切换事件）"
+        scenario_binding:
+          scenario_export: "NIGHT_FORCES_SLEEP_SCENARIO"
+          scenario_file: "scenarios/night-forces-sleep.scenario.ts"
+        alignment_note: >
+          NIGHT_FORCES_SLEEP 与验收「进入夜晚且精力低于阈值→睡眠」主路径对齐（startMinuteOfDay 夜间 + overrides）；
+          PAWN_SLEEPS_WHEN_TIRED 覆盖「疲劳→睡眠目标」子集。文档中「白天持续活动耗精」未在无头场景中逐步模拟。
+        near_misses: []
+    player_acceptance:
+      status: exists
+      evidence:
+        scenario_file: "scenarios/night-forces-sleep.scenario.ts"
+        in_all_scenarios: true
+        manual_acceptance_declared:
+          has_steps: true
+          has_outcomes: true
+        hud_entry: "index.html#yaml-scenario-panel；HudManager.syncYamlScenarioManualHints"
+        near_misses: []
+    notes: >
+      另有一条同模块相关可玩场景 scenarios/pawn-sleeps-when-tired.scenario.ts（manualAcceptance 完整且已在 ALL_SCENARIOS），
+      主行 evidence 绑定 night-forces 以对应「夜间」条件；下拉框中两者均可用于人工对照 NEED-002 子集。
+
+  - scenario_id: "NEED-003"
+    scenario_name: "进食行为被强行中断"
+    intent: "验证如果进食过程被意外打断，饱食度只恢复部分或不恢复"
+    headless:
+      status: needs-manual-judgement
+      evidence:
+        test_files:
+          - "tests/headless/need-interrupt-during-work.test.ts"
+        code_hits:
+          - path: "tests/headless/need-interrupt-during-work.test.ts"
+            symbol: "runScenarioHeadless"
+            note: "NEED_INTERRUPT_DURING_WORK_SCENARIO；另有一例 createHeadlessSim 验证工单释放与转向 eat"
+          - path: "tests/headless/need-interrupt-during-work.test.ts"
+            symbol: "createHeadlessSim"
+            note: "第二 it：伐木 claimed 后人为压低饱食度，断言 goal 变 eat 且 chop-tree 回到 open"
+        scenario_binding:
+          scenario_export: "NEED_INTERRUPT_DURING_WORK_SCENARIO"
+          scenario_file: "scenarios/need-interrupt-during-work.scenario.ts"
+        alignment_note: >
+          本条验收语义是「进食读条/进食行为在完成前被外力中断→部分结算饱食」。
+          现有无头绑定场景名为 need-interrupt-during-work，验证的是工作中饥饿紧急（释放伐木工单、转向 eat），
+          与「打断进食」不是同一领域事件链；无法建立一一对应，故整体记为需人工裁定是否算部分覆盖。
+        near_misses:
+          - hit_paths:
+              - "tests/headless/need-interrupt-during-work.test.ts"
+              - "scenarios/need-interrupt-during-work.scenario.ts"
+            reason: "覆盖「工作被饥饿中断」而非「进食过程被中断」；settleInterrupted 等单位逻辑在 tests/domain/need-evolution.test.ts，无 runScenarioHeadless 映射到 NEED-003。"
+    player_acceptance:
+      status: missing
+      evidence:
+        scenario_file: null
+        in_all_scenarios: false
+        manual_acceptance_declared:
+          has_steps: false
+          has_outcomes: false
+        hud_entry: "index.html#yaml-scenario-panel；HudManager.syncYamlScenarioManualHints"
+        near_misses:
+          - hit_paths:
+              - "scenarios/need-interrupt-during-work.scenario.ts"
+            reason: "manualAcceptance 描述伐木→饥饿中断→转向食物，与 NEED-003「进食被打断」验收文案不对齐，不能记为 exists。"
+    notes: ""
+
+  - scenario_id: "NEED-004"
+    scenario_name: "极度饥饿/疲劳的惩罚边界"
+    intent: "验证当需求值降至0时系统的兜底处理机制"
+    headless:
+      status: missing
+      evidence:
+        test_files: []
+        code_hits: []
+        scenario_binding:
+          scenario_export: null
+          scenario_file: null
+        alignment_note: >
+          tests/headless 下无 runScenarioHeadless/createHeadlessSim 用例绑定「饱食或精力降至 0、无恢复手段、阈值极度紧急」的 ScenarioDefinition；
+          现有 no-pawn-starved 期望多为 minSatiety≥1，与「触底 0 与表现层」验收方向不一致。
+        near_misses:
+          - hit_paths:
+              - "scenarios/need-interrupt-during-work.scenario.ts"
+              - "tests/headless/need-interrupt-during-work.test.ts"
+            reason: "含 no-pawn-starved(minSatiety:1)，保证不饿死，非 NEED-004 的「数值锁 0 / 极度紧急 UI」边界场景。"
+    player_acceptance:
+      status: missing
+      evidence:
+        scenario_file: null
+        in_all_scenarios: false
+        manual_acceptance_declared:
+          has_steps: false
+          has_outcomes: false
+        hud_entry: "index.html#yaml-scenario-panel；HudManager.syncYamlScenarioManualHints"
+        near_misses: []
+    notes: ""
+
+summary:
+  headless_coverage: "4 条中 2 条 exists（NEED-001、NEED-002），1 条 needs-manual-judgement（NEED-003），1 条 missing（NEED-004）。"
+  player_acceptance_coverage: "4 条中 2 条 exists（NEED-001、NEED-002），2 条 missing（NEED-003、NEED-004）。"
+  last_audited_at: "2026-04-06"
+  auditor_notes: "Schema 1.0 可完整承载本模块；NEED-003 在 headless 与 playable 维度需区分「工单饥饿中断」与「进食被打断」。"

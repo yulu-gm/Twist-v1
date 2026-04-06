@@ -61,7 +61,9 @@ export function createHeadlessSimAccess(
     options.initialTimeOfDayState ?? createInitialTimeOfDayState();
   let timeOfDayPalette: TimeOfDayPalette =
     options.initialTimeOfDayPalette ?? sampleTimeOfDayPalette(timeOfDayState);
-  let timeControlState: TimeControlState = options.initialTimeControl ?? DEFAULT_TIME_CONTROL_STATE;
+  let timeControlState: TimeControlState = options.initialTimeControl
+    ? { ...options.initialTimeControl }
+    : { ...DEFAULT_TIME_CONTROL_STATE };
   let simGridSyncState: SimGridSyncState | null = options.initialSimGridSyncState ?? null;
 
   const pawns: PawnState[] = options.initialPawns ? [...options.initialPawns] : [];

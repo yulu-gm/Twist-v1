@@ -1,0 +1,176 @@
+# oh-acceptance 行为系统 — 无头 / 玩家可验收测试存在性审计（契约见 working-plan/module-test-exist-check.schema.yml）
+schema_version: "1.0"
+document_role: "oh-acceptance_module_test_existence_audit"
+
+module_id: "行为系统"
+module_name: "行为系统"
+source_acceptance_file: "oh-acceptance/行为系统.yaml"
+
+audit_rules:
+  headless_required: true
+  player_acceptance_required: true
+
+scenarios:
+  - scenario_id: "BEHAVIOR-001"
+    scenario_name: "空闲小人的漫无目的散步"
+    intent: "验证小人在无工作且无紧迫需求时会进入空闲状态并随机散步"
+    headless:
+      status: missing
+      evidence:
+        test_files: []
+        code_hits: []
+        scenario_binding:
+          scenario_export: null
+          scenario_file: null
+        alignment_note: >
+          tests/headless 下无任何用例在 runScenarioHeadless/createHeadlessSim 路径上断言
+          currentGoal 为 wander、随机邻格移动或「仅空闲无工单」下的散步轨迹；
+          tests/domain/goal-driven-planning.test.ts 虽有 wander 回退单元测试，但未使用无头入口，按契约不计入 headless.exists。
+        near_misses:
+          - hit_paths:
+              - "tests/headless/multi-pawn-colony.test.ts"
+              - "scenarios/multi-pawn-colony.scenario.ts"
+            reason: >
+              无头仅校验 no-pawn-starved 与 pawn-goal-changed，无法客观对应「无紧迫需求时的漫无目的散步」这一 intent。
+          - hit_paths:
+              - "tests/domain/goal-driven-planning.test.ts"
+            reason: >
+              「无交互点则 wander」为规划单元断言，未驱动 HeadlessSim 演化，不满足 schema 对测试源文件中无头调用的要求。
+    player_acceptance:
+      status: needs-manual-judgement
+      evidence:
+        scenario_file: "scenarios/multi-pawn-colony.scenario.ts"
+        in_all_scenarios: true
+        manual_acceptance_declared:
+          has_steps: true
+          has_outcomes: true
+        hud_entry: "index.html#yaml-scenario-panel；HudManager.syncYamlScenarioManualHints"
+        near_misses: []
+    notes: >
+      证据不足：无头侧缺失。玩家侧存在已注册且含非空 manualAcceptance 的 multi-pawn-colony，
+      人工文案提及闲逛，但场景为三人殖民地而非「单人空闲散步」专测，是否采纳为 BEHAVIOR-001 载体需人工裁定。
+
+  - scenario_id: "BEHAVIOR-002"
+    scenario_name: "空闲状态转为执行工作"
+    intent: "验证小人检测到工作后能中断散步并前往执行"
+    headless:
+      status: exists
+      evidence:
+        test_files:
+          - "tests/headless/chop-tree-full-flow.test.ts"
+          - "tests/headless/auto-claim-work.test.ts"
+        code_hits:
+          - path: "tests/headless/chop-tree-full-flow.test.ts"
+            symbol: "runScenarioHeadless"
+            note: "传入 CHOP_TREE_FULL_FLOW_SCENARIO；断言 work-claimed→work-completed、树移除与木材资源"
+          - path: "tests/headless/auto-claim-work.test.ts"
+            symbol: "createHeadlessSim"
+            note: "CHOP_TREE_COMMAND_SCENARIO + lumber 命令后 runUntil work-claimed"
+        scenario_binding:
+          scenario_export: "CHOP_TREE_FULL_FLOW_SCENARIO"
+          scenario_file: "scenarios/chop-tree-full-flow.scenario.ts"
+        alignment_note: >
+          覆盖「开放伐木工单生成后小人自动认领并走格完成工作」的主链路，与「检测到工作后前往执行」一致；
+          证据不足：场景自 hydrate 起已带工单与邻树布局，未单独刻画「先散步再被新工单打断」的时序。
+        near_misses: []
+    player_acceptance:
+      status: missing
+      evidence:
+        scenario_file: "scenarios/chop-tree-full-flow.scenario.ts"
+        in_all_scenarios: true
+        manual_acceptance_declared:
+          has_steps: false
+          has_outcomes: false
+        hud_entry: "index.html#yaml-scenario-panel；HudManager.syncYamlScenarioManualHints"
+        near_misses:
+          - hit_paths:
+              - "scenarios/chop-tree-command.scenario.ts"
+            reason: "已注册 ALL_SCENARIOS 但无 manualAcceptance 字段，不满足契约。"
+    notes: >
+      证据足够（无头）：chop-tree-full-flow 单测 + 场景期望与工单认领/完成可对读。
+      证据不足（玩家）：chop-tree-full-flow / chop-tree-command 均未声明 manualAcceptance。
+
+  - scenario_id: "BEHAVIOR-003"
+    scenario_name: "工作被紧急生理需求打断"
+    intent: "验证当饱食度或精力值低于阈值时，小人会放弃当前工作优先满足需求"
+    headless:
+      status: exists
+      evidence:
+        test_files:
+          - "tests/headless/need-interrupt-during-work.test.ts"
+        code_hits:
+          - path: "tests/headless/need-interrupt-during-work.test.ts"
+            symbol: runScenarioHeadless
+            note: "NEED_INTERRUPT_DURING_WORK_SCENARIO；期望 eat / no-pawn-starved"
+          - path: "tests/headless/need-interrupt-during-work.test.ts"
+            symbol: createHeadlessSim
+            note: "二段用例：认领 chop-tree 后注入低饱食，断言 pawn-goal-changed 转向 eat 且工单回到 open"
+        scenario_binding:
+          scenario_export: "NEED_INTERRUPT_DURING_WORK_SCENARIO"
+          scenario_file: "scenarios/need-interrupt-during-work.scenario.ts"
+        alignment_note: >
+          与验收「伐木执行中被饥饿打断、释放工单并转向进食」一致；精力类打断未在同场景单独覆盖。
+        near_misses: []
+    player_acceptance:
+      status: exists
+      evidence:
+        scenario_file: "scenarios/need-interrupt-during-work.scenario.ts"
+        in_all_scenarios: true
+        manual_acceptance_declared:
+          has_steps: true
+          has_outcomes: true
+        hud_entry: "index.html#yaml-scenario-panel；HudManager.syncYamlScenarioManualHints"
+        near_misses: []
+    notes: >
+      证据足够：无头与玩家侧均绑定同一已注册场景，且 story-1-day-one 注释亦将 NEED_INTERRUPT 与此链路关联。
+      证据不足：自动化未单独覆盖「低精力打断工作」分支。
+
+  - scenario_id: "BEHAVIOR-004"
+    scenario_name: "无可用资源时的需求打断处理"
+    intent: "验证当产生紧急需求但无法满足时（如无食物/无床），小人的行为表现"
+    headless:
+      status: missing
+      evidence:
+        test_files: []
+        code_hits: []
+        scenario_binding:
+          scenario_export: null
+          scenario_file: null
+        alignment_note: >
+          tests/headless 中无场景在无床位/无睡眠交互点前提下断言「疲劳降级、徘徊或无法形成 sleep 目标」等 then 子句；
+          现有 sleep 类场景均期望 pawn-reaches-goal sleep，与「无床不可满足」语义相反。
+        near_misses:
+          - hit_paths:
+              - "tests/headless/pawn-sleeps-when-tired.test.ts"
+              - "scenarios/pawn-sleeps-when-tired.scenario.ts"
+            reason: "期望困倦小人达成 sleep 目标（有床/交互点前提），不覆盖无可用床铺时的降级表现。"
+          - hit_paths:
+              - "tests/headless/night-forces-sleep.test.ts"
+              - "scenarios/night-forces-sleep.scenario.ts"
+            reason: "同上，为夜间 push sleep 目标，非无资源时的失败/回退行为。"
+          - hit_paths:
+              - "tests/domain/goal-driven-planning.test.ts"
+            reason: "falls back to wander 为单元级，未使用 createHeadlessSim/runScenarioHeadless。"
+    player_acceptance:
+      status: missing
+      evidence:
+        scenario_file: null
+        in_all_scenarios: false
+        manual_acceptance_declared:
+          has_steps: false
+          has_outcomes: false
+        hud_entry: "index.html#yaml-scenario-panel；HudManager.syncYamlScenarioManualHints"
+        near_misses:
+          - hit_paths:
+              - "scenarios/bed-auto-assign.scenario.ts"
+            reason: "manualAcceptance 描述分配结果含「另一人无床」，非「极度疲劳无床铺」的验收步骤与预期现象专条。"
+    notes: >
+      证据不足：无头与玩家均未发现满足契约且 intent 对齐的专测；near_miss 中的 sleep 场景覆盖的是「能睡」而非「无床降级」。
+
+summary:
+  headless_coverage: "4 条中 2 条 exists（BEHAVIOR-002、003），2 条 missing（001 散步、004 无资源降级）。"
+  player_acceptance_coverage: "4 条中 1 条 exists（003），1 条 needs-manual-judgement（001），2 条 missing（002 缺 manualAcceptance、004 无对应场景）。"
+  last_audited_at: "2026-04-06"
+  auditor_notes: >
+    索引已读 docs/ai/index/README.md 与 system-index.json（task-planning 桥接行为系统）；
+    ALL_SCENARIOS 以 scenarios/index.ts 为准校验注册关系。

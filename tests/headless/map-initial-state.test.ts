@@ -1,46 +1,58 @@
+/**
+ * refactor-test：保留回归（day-one 地图 bootstrap 直连），MAP-001 主证据以双场景注册
+ * + `scenario-runner.test.ts` 冒烟为准；本文件断言首屏树/食物/小人可见。
+ */
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SIM_CONFIG } from "../../src/game/behavior";
-import { DEFAULT_WORLD_GRID } from "../../src/game/map/world-grid";
-import { createInitialTimeOfDayState, DEFAULT_TIME_OF_DAY_CONFIG } from "../../src/game/time";
-import { createWorldCore, spawnWorldEntity } from "../../src/game/world-core";
-import { simulationInteractionPoints } from "../../src/game/world-sim-bridge";
-import { bootstrapWorldForScene } from "../../src/game/world-bootstrap";
+import { isInsideGrid } from "../../src/game/map";
+import { captureVisibleState, createHeadlessSim } from "../../src/headless";
+import { hydrateScenario, runAllExpectations } from "../../src/headless/scenario-runner";
+import {
+  STORY_1_DAY_ONE_BOOTSTRAP_EXPECTATIONS,
+  STORY_1_DAY_ONE_SCENARIO,
+  STORY_1_FOOD_CELLS,
+  STORY_1_TREE_CELL
+} from "../../scenarios/story-1-day-one.scenario";
 
-describe("map initial state (bootstrap seeding)", () => {
-  it("bootstrapWorldForScene 后存在足够树木与地面食物资源", () => {
-    const { worldPort } = bootstrapWorldForScene({
-      simConfig: DEFAULT_SIM_CONFIG,
-      timeOfDayState: createInitialTimeOfDayState(DEFAULT_TIME_OF_DAY_CONFIG),
-      terrainDecorationSeed: 0x6d61_7000
+describe("MAP-001 map initial state", () => {
+  it("hydrates the first-screen day-one map with visible pawns, tree, and ground food", () => {
+    const sim = createHeadlessSim({
+      seed: STORY_1_DAY_ONE_SCENARIO.seed,
+      worldGrid: STORY_1_DAY_ONE_SCENARIO.gridConfig
     });
-    const entities = [...worldPort.getWorld().entities.values()];
-    const trees = entities.filter((e) => e.kind === "tree");
-    const foods = entities.filter((e) => e.kind === "resource" && e.materialKind === "food");
-    expect(trees.length).toBeGreaterThanOrEqual(8);
-    expect(foods.length).toBeGreaterThanOrEqual(3);
-    for (const t of trees) {
-      expect(t.loggingMarked).toBe(false);
-      expect(t.occupiedCells.length).toBe(0);
-    }
-    for (const r of foods) {
-      expect(r.containerKind).toBe("ground");
-      expect(r.pickupAllowed).toBe(false);
-    }
-  });
+    const hydration = hydrateScenario(sim, STORY_1_DAY_ONE_SCENARIO);
+    const world = sim.getWorldPort().getWorld();
 
-  it("手动生成可拾取地面食物后 simulationInteractionPoints 含 world-food- 交互点", () => {
-    let w = createWorldCore({ grid: DEFAULT_WORLD_GRID });
-    const spawned = spawnWorldEntity(w, {
-      kind: "resource",
-      cell: { col: 11, row: 5 },
-      materialKind: "food",
-      containerKind: "ground",
-      pickupAllowed: true
-    });
-    expect(spawned.outcome.kind).toBe("created");
-    w = spawned.world;
-    const pts = simulationInteractionPoints(DEFAULT_WORLD_GRID, w);
-    const prefix = "world-food-";
-    expect(pts.some((p) => p.id.startsWith(prefix))).toBe(true);
+    const results = runAllExpectations(sim, STORY_1_DAY_ONE_BOOTSTRAP_EXPECTATIONS);
+    expect(results.every((result) => result.passed)).toBe(true);
+    expect(hydration.playerSelections).toEqual([]);
+
+    expect(sim.getPawns()).toHaveLength(3);
+    expect(sim.getPawns().every((pawn) => isInsideGrid(world.grid, pawn.logicalCell))).toBe(true);
+
+    const tree = [...world.entities.values()].find(
+      (entity) =>
+        entity.kind === "tree" &&
+        entity.cell.col === STORY_1_TREE_CELL.col &&
+        entity.cell.row === STORY_1_TREE_CELL.row
+    );
+    expect(tree).toBeDefined();
+    expect(tree?.loggingMarked).toBe(false);
+
+    const foods = STORY_1_FOOD_CELLS.map((cell) =>
+      [...world.entities.values()].find(
+        (entity) =>
+          entity.kind === "resource" &&
+          entity.materialKind === "food" &&
+          entity.containerKind === "ground" &&
+          entity.cell.col === cell.col &&
+          entity.cell.row === cell.row
+      )
+    );
+    expect(foods.every((food) => food !== undefined)).toBe(true);
+    expect(foods.every((food) => food?.pickupAllowed === false)).toBe(true);
+
+    const visible = captureVisibleState(sim, { playerSelections: hydration.playerSelections });
+    expect(visible.failures).toEqual([]);
+    expect(visible.workItems).toEqual([]);
   });
 });

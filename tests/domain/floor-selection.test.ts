@@ -1,3 +1,6 @@
+/**
+ * refactor-test：框选纯函数域回归；MAP-004 主证据以 `tests/headless/map-out-of-bounds-selection.test.ts` 为准。
+ */
 import { describe, expect, it } from "vitest";
 import {
   beginFloorSelection,

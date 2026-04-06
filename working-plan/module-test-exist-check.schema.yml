@@ -1,0 +1,208 @@
+# =============================================================================
+# oh-acceptance 模块「无头测试 / 玩家可验收测试」存在性审计 — 统一结果契约（Schema + 模板）
+# =============================================================================
+# 用途：单模块审计结果放在 `working-plan/test-exist-check/{模块名}.yaml`（该目录仅 9 份模块结果，不含本契约文件）。
+#       本契约固定位置：`working-plan/module-test-exist-check.schema.yml`（与模块结果目录分离，便于 `rg --files` 验收）。
+#       复制最小结构时仅替换 module_*、source_acceptance_file、scenarios、summary；不得删减字段键名。
+# schema_version： bump 时须同步更新所有已生成的模块文件（由主 Agent 协调）。
+# =============================================================================
+
+schema_version: "1.0"
+document_role: "oh-acceptance_module_test_existence_audit"
+
+# -----------------------------------------------------------------------------
+# 仓库锚点（审计检索入口；与 T-00 阅读清单一致，便于跨 Agent 对齐）
+# -----------------------------------------------------------------------------
+repository_anchors:
+  package_scripts:
+    test: "npm test -> vitest run"
+    test_headless: "npm run test:headless -> vitest run tests/headless/"
+  scenario_definition_type: src/headless/scenario-types.ts
+  scenario_registry: scenarios/index.ts
+  all_scenarios_export: ALL_SCENARIOS
+  headless_runner: src/headless/scenario-runner.ts
+  headless_sim_factory: src/headless/headless-sim.ts
+  player_scenario_loader: src/player/scenario-loader.ts
+  manual_acceptance_ui: src/ui/hud-manager.ts
+  dev_entry_html: index.html
+  planning_reference: working-plan/headless-sim.yml
+  recommended_grep_patterns:
+    headless_calls:
+      - "runScenarioHeadless("
+      - "createHeadlessSim("
+    player_acceptance_and_registry:
+      - "manualAcceptance"
+      - "ALL_SCENARIOS"
+
+# -----------------------------------------------------------------------------
+# 判定规则（硬性；写入本文件即为后续模块审计的单一事实来源）
+# -----------------------------------------------------------------------------
+judgement_rules:
+  headless_exists:
+    mandatory_code_signals:
+      description: >
+        在 **测试源文件**（例如 `tests/**/*.test.ts`，由 Vitest 执行）中，必须能检索到
+        字面调用子串 `runScenarioHeadless(` **或** `createHeadlessSim(`。
+        仅有生产代码或其它目录命中、或仅在注释/字符串中出现但不构成真实调用，均不得记为 exists。
+    alignment_required:
+      description: >
+        在命中上述调用之一的前提下，还必须能说明该测试覆盖的 `ScenarioDefinition` 与当前
+        `scenario_id` 所描述的验收意图（intent / given-when-then）之间的一一对应或明确子集关系：
+        典型证据为测试文件传入 `scenarios/*.scenario.ts` 导出的 `*_SCENARIO` 常量，且该场景
+        的 `name`/`description`/`expectations` 与验收文档可对读对齐。
+      if_only_loose_match:
+        status: needs-manual-judgement
+        requirement: >
+          若只能找到「相近」的 headless 测试（例如同目录其它场景、或自建内联 def），但无法证明与
+          本条 `scenario_id` 一一对应，则 `headless.status` **必须**为 `needs-manual-judgement`，
+          并在 `headless.evidence.near_misses` 中列出命中文件路径与原因。
+
+  player_acceptance_exists:
+    mandatory_scenario_fields:
+      description: >
+        对应 playable 场景在 `scenarios/*.scenario.ts` 所导出的 `ScenarioDefinition` 上，必须**显式**
+        存在非空的 `manualAcceptance.steps` **与** `manualAcceptance.outcomes`（TypeScript 字段名
+        与源码一致）。
+      explicit_non_empty:
+        description: >
+          二者均须为非空只读数组（长度 ≥ 1）。仅依赖 `HudManager.syncYamlScenarioManualHints` 在
+          运行时生成的默认 steps / 由 `expectations` 映射的 outcomes **不算** exists。
+    registry_required:
+      description: >
+        该 `ScenarioDefinition` 必须已加入 `scenarios/index.ts` 中的 `ALL_SCENARIOS` 数组，
+        从而被 `listAvailableScenarios()` 与右下角「测试场景」下拉枚举（见 `index.html` 与
+        `HudManager.setupYamlScenarioPanel`）实际列出。
+      if_partial_only:
+        status: needs-manual-judgement
+        requirement: >
+          若场景文件存在且含 `manualAcceptance`，但未进入 `ALL_SCENARIOS`，或只能找到 UI 面板但无法
+          绑定到具体 `scenario_id`，记 `needs-manual-judgement` 并写明路径与阻塞原因。
+
+  status_not_applicable:
+    description: >
+      当 `audit_rules.headless_required` 为 false 时，对应维度的 `status` 使用 `not-applicable`，
+      并在 `evidence` 中简短说明「本模块验收包未要求无头覆盖」。`player_acceptance` 同理。
+
+# -----------------------------------------------------------------------------
+# 状态词表（禁止自由文案；summary 中的覆盖率短语不受此枚举限制）
+# -----------------------------------------------------------------------------
+status_vocab:
+  headless:
+    - exists
+    - missing
+    - needs-manual-judgement
+    - not-applicable
+  player_acceptance:
+    - exists
+    - missing
+    - needs-manual-judgement
+    - not-applicable
+
+# -----------------------------------------------------------------------------
+# evidence 字段编码约定（headless / player_acceptance 共用模式）
+# -----------------------------------------------------------------------------
+evidence_field_contract:
+  headless:
+    description: >
+      `evidence` 为对象，须可独立复盘：他人仅凭路径与文字即可复跑 grep/阅读验证。
+    required_keys:
+      - test_files
+      - code_hits
+      - scenario_binding
+      - alignment_note
+      - near_misses
+    code_hits_item_shape:
+      path: "相对仓库根路径"
+      symbol: "runScenarioHeadless | createHeadlessSim"
+      note: "可选：导入的 SCENARIO 名、断言形式等"
+    scenario_binding_shape:
+      scenario_export: "如 PAWN_EATS_WHEN_HUNGRY_SCENARIO；无法确定则 null"
+      scenario_file: "scenarios/....scenario.ts；无法确定则 null"
+    near_misses_item_shape:
+      hit_paths: ["若干路径"]
+      reason: "为何无法一一对齐到本 scenario_id"
+
+  player_acceptance:
+    required_keys:
+      - scenario_file
+      - in_all_scenarios
+      - manual_acceptance_declared
+      - hud_entry
+      - near_misses
+    manual_acceptance_declared_shape:
+      has_steps: "boolean"
+      has_outcomes: "boolean"
+    hud_entry: "固定可写：index.html#yaml-scenario-panel + HudManager.syncYamlScenarioManualHints"
+
+# =============================================================================
+# 以下：单模块结果文件须具备的最小顶层结构（复制后逐项填写）
+# =============================================================================
+
+module_id: ""
+module_name: ""
+source_acceptance_file: ""
+
+audit_rules:
+  headless_required: true
+  player_acceptance_required: true
+
+scenarios:
+  - scenario_id: ""
+    scenario_name: ""
+    intent: ""
+    headless:
+      status: missing
+      evidence:
+        test_files: []
+        code_hits: []
+        scenario_binding:
+          scenario_export: null
+          scenario_file: null
+        alignment_note: ""
+        near_misses: []
+    player_acceptance:
+      status: missing
+      evidence:
+        scenario_file: null
+        in_all_scenarios: false
+        manual_acceptance_declared:
+          has_steps: false
+          has_outcomes: false
+        hud_entry: "index.html#yaml-scenario-panel；HudManager.syncYamlScenarioManualHints"
+        near_misses: []
+    notes: ""
+
+summary:
+  headless_coverage: ""
+  player_acceptance_coverage: ""
+  last_audited_at: ""
+  auditor_notes: ""
+
+# -----------------------------------------------------------------------------
+# 最小合法示例（结构演示；复制到新文件时请删除本 `_example` 块以免混淆）
+# -----------------------------------------------------------------------------
+_example_minimal_row:
+  scenario_id: "BEHAVIOR-001"
+  scenario_name: "空闲小人的漫无目的散步"
+  intent: "验证小人在无工作且无紧迫需求时会进入空闲状态并随机散步"
+  headless:
+    status: missing
+    evidence:
+      test_files: []
+      code_hits: []
+      scenario_binding:
+        scenario_export: null
+        scenario_file: null
+      alignment_note: "尚未检索 tests/headless 与场景常量映射。"
+      near_misses: []
+  player_acceptance:
+    status: missing
+    evidence:
+      scenario_file: null
+      in_all_scenarios: false
+      manual_acceptance_declared:
+        has_steps: false
+        has_outcomes: false
+      hud_entry: "index.html#yaml-scenario-panel；HudManager.syncYamlScenarioManualHints"
+      near_misses: []
+  notes: ""

@@ -1,3 +1,7 @@
+/**
+ * refactor-test：WorldCore 直调 pick-up 完成回归；不承担 ENTITY-002 主验收。
+ * 主证据：`chop-haul-full-chain` 场景链 + `scenario-runner.test.ts`。
+ */
 import { describe, expect, it } from "vitest";
 import { DEFAULT_WORLD_GRID } from "../../src/game/map/world-grid";
 import {

@@ -1,6 +1,10 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+/**
+ * refactor-test：保留回归（命令/工单直连），WORK-003 主证据以 `chop-tree-command.scenario.ts` expectations
+ * + `scenario-runner.test.ts` 为准。
+ */
 import { describe, expect, it } from "vitest";
 import { coordKey } from "../../src/game/map";
 import { CHOP_TREE_COMMAND_SCENARIO } from "../../scenarios/chop-tree-command.scenario";

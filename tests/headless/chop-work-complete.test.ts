@@ -1,3 +1,6 @@
+/**
+ * refactor-test：WorldCore 直调砍树工单完成回归；邻近 ENTITY-001/002，非场景级主证据。
+ */
 import { describe, expect, it } from "vitest";
 import { DEFAULT_WORLD_GRID } from "../../src/game/map/world-grid";
 import {

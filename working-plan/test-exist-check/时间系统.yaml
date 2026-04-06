@@ -1,0 +1,161 @@
+schema_version: "1.0"
+document_role: "oh-acceptance_module_test_existence_audit"
+
+module_id: "时间系统"
+module_name: "时间系统"
+source_acceptance_file: "oh-acceptance/时间系统.yaml"
+
+audit_rules:
+  headless_required: true
+  player_acceptance_required: true
+
+scenarios:
+  - scenario_id: "TIME-001"
+    scenario_name: "游戏时间的实时推进与昼夜切换"
+    intent: "验证现实时间能正确转换为游戏时间，并触发昼夜时段的自然切换"
+    headless:
+      status: needs-manual-judgement
+      evidence:
+        test_files:
+          - "tests/headless/night-forces-sleep.test.ts"
+          - "tests/headless/headless-sim-basic.test.ts"
+        code_hits:
+          - path: "tests/headless/night-forces-sleep.test.ts"
+            symbol: "runScenarioHeadless"
+            note: "传入 NIGHT_FORCES_SLEEP_SCENARIO"
+          - path: "tests/headless/headless-sim-basic.test.ts"
+            symbol: "createHeadlessSim"
+            note: "tick(16) 验证世界时间 minuteOfDay 变化，属时间推进但无昼夜阈值穿越断言"
+        scenario_binding:
+          scenario_export: "NIGHT_FORCES_SLEEP_SCENARIO"
+          scenario_file: "scenarios/night-forces-sleep.scenario.ts"
+        alignment_note: >
+          NIGHT_FORCES_SLEEP 以 timeConfig 静态落在 18:00 夜晚，期望的是夜间 sleep 目标，并未验收「接近夜晚阈值 → 主循环增量 → 跨过阈值 → 时段变为夜晚 → night-start」；
+          tests/domain/time-event-bus.test.ts 覆盖 night-start 检测但不符合契约要求的无头调用子串。
+        near_misses:
+          - hit_paths:
+              - "tests/domain/time-event-bus.test.ts"
+            reason: "detectTimeEvents 含 night-start，但无 runScenarioHeadless/createHeadlessSim，按 schema 不计入 headless exists"
+          - hit_paths:
+              - "scenarios/night-forces-sleep.scenario.ts"
+            reason: "hydrate 即夜晚，无模拟从昼到夜的连续推进与事件广播链路"
+    player_acceptance:
+      status: needs-manual-judgement
+      evidence:
+        scenario_file: "scenarios/night-forces-sleep.scenario.ts"
+        in_all_scenarios: true
+        manual_acceptance_declared:
+          has_steps: true
+          has_outcomes: true
+        hud_entry: "index.html#yaml-scenario-panel；HudManager.syncYamlScenarioManualHints"
+        near_misses:
+          - hit_paths:
+              - "scenarios/night-forces-sleep.scenario.ts"
+            reason: >
+              manualAcceptance 强调起始于 18:00 与睡眠目标，未要求观察「时间走动跨过黄昏阈值、UI 时钟连续走动、天空/光照由昼入夜」等 TIME-001 全文 presentation 条目，无法唯一等同 TIME-001。
+    notes: ""
+
+  - scenario_id: "TIME-002"
+    scenario_name: "跨天归一化处理"
+    intent: "验证当一天的时间走完后，天数正确增加且日内进度重置"
+    headless:
+      status: missing
+      evidence:
+        test_files: []
+        code_hits: []
+        scenario_binding:
+          scenario_export: null
+          scenario_file: null
+        alignment_note: >
+          tests/headless 下无 runScenarioHeadless/createHeadlessSim 用例断言 dayNumber 递增、minuteOfDay 余数归一或 new-day/day-start 在仿真主循环中的集成表现。
+        near_misses:
+          - hit_paths:
+              - "tests/domain/time-of-day.test.ts"
+            reason: "advanceTimeOfDay 跨午夜 rollover 为域单元测，未使用契约规定的无头调用"
+          - hit_paths:
+              - "tests/domain/time-event-bus.test.ts"
+            reason: "new-day/day-start 事件序列为快照差分单测，非无头场景驱动"
+    player_acceptance:
+      status: missing
+      evidence:
+        scenario_file: null
+        in_all_scenarios: false
+        manual_acceptance_declared:
+          has_steps: false
+          has_outcomes: false
+        hud_entry: "index.html#yaml-scenario-panel；HudManager.syncYamlScenarioManualHints"
+        near_misses:
+          - hit_paths:
+              - "scenarios/index.ts"
+            reason: "ALL_SCENARIOS 内无场景的 manualAcceptance 描述「第 N 天→第 N+1 天」与 UI 日期/清晨光照回切"
+    notes: ""
+
+  - scenario_id: "TIME-003"
+    scenario_name: "游戏暂停时的时间冻结"
+    intent: "验证暂停指令能彻底冻结时间流逝，阻止一切基于时间推进的逻辑"
+    headless:
+      status: missing
+      evidence:
+        test_files: []
+        code_hits: []
+        scenario_binding:
+          scenario_export: null
+          scenario_file: null
+        alignment_note: "无头测试目录未检索到针对 paused 时世界时间增量为 0 或小人/读条冻结的 runScenarioHeadless/createHeadlessSim 用例。"
+        near_misses:
+          - hit_paths:
+              - "tests/domain/time-of-day.test.ts"
+            reason: "effectiveSimulationDeltaSeconds(..., { paused: true }) 期望为 0，属域测且未进入无头 runner"
+    player_acceptance:
+      status: missing
+      evidence:
+        scenario_file: null
+        in_all_scenarios: false
+        manual_acceptance_declared:
+          has_steps: false
+          has_outcomes: false
+        hud_entry: "index.html#yaml-scenario-panel；HudManager.syncYamlScenarioManualHints"
+        near_misses:
+          - hit_paths:
+              - "scenarios"
+            reason: "无任何 scenario 的显式 manualAcceptance 覆盖暂停后时钟与动作冻结验收"
+    notes: ""
+
+  - scenario_id: "TIME-004"
+    scenario_name: "极端帧间隔下的时间上限保护"
+    intent: "验证当系统卡顿导致单帧现实时间增量过大时，游戏时间不会发生破坏性跳跃"
+    headless:
+      status: exists
+      evidence:
+        test_files:
+          - "tests/headless/headless-sim-basic.test.ts"
+        code_hits:
+          - path: "tests/headless/headless-sim-basic.test.ts"
+            symbol: "createHeadlessSim"
+            note: "sim.tick(10_000) 后世界时间总增量受 MAX_FRAME_DT_SEC×speed 与 realSecondsPerDay 换算约束"
+        scenario_binding:
+          scenario_export: null
+          scenario_file: null
+        alignment_note: >
+          内联 HeadlessSim 单测直接断言超大 deltaMs 下单 tick 世界时间推进上界，与「单帧现实增量过大时截断安全阈值」一致；未绑定独立 scenarios/*.scenario.ts 常量。
+        near_misses: []
+    player_acceptance:
+      status: missing
+      evidence:
+        scenario_file: null
+        in_all_scenarios: false
+        manual_acceptance_declared:
+          has_steps: false
+          has_outcomes: false
+        hud_entry: "index.html#yaml-scenario-panel；HudManager.syncYamlScenarioManualHints"
+        near_misses:
+          - hit_paths:
+              - "scenarios"
+            reason: "无带 manualAcceptance 的可玩场景要求玩家验证卡顿恢复后的时间/UI 未跳变"
+    notes: ""
+
+summary:
+  headless_coverage: "TIME-004 有无头 exists；TIME-001 为 needs-manual-judgement；TIME-002、TIME-003 为 missing（域测有相近逻辑但不符合无头调用契约）。"
+  player_acceptance_coverage: "仅 night-forces-sleep 与 TIME-001 部分重叠且需裁定；TIME-002~004 无满足 manualAcceptance+ALL_SCENARIOS 的对应场景。"
+  last_audited_at: "2026-04-06"
+  auditor_notes: "域测证据：tests/domain/time-of-day.test.ts、tests/domain/time-event-bus.test.ts；注册与装载：scenarios/index.ts 中 ALL_SCENARIOS、src/player/scenario-loader.ts 引用 ALL_SCENARIOS。"

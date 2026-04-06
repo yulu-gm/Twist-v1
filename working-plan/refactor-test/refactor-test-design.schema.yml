@@ -1,0 +1,195 @@
+schema_version: "1.0"
+document_role: "refactor_test_design_contract"
+
+# -----------------------------------------------------------------------------
+# 输出约束
+# -----------------------------------------------------------------------------
+output_path_pattern: "working-plan/refactor-test/{模块名}.yaml"
+scope: "仅设计，不实现测试；仅用于模块级端到端测试重构设计稿契约，不包含任何测试实现或源码修改。"
+
+# -----------------------------------------------------------------------------
+# 全局约束
+# -----------------------------------------------------------------------------
+global_constraints:
+  - "仅设计，不实现测试。"
+  - "这次工作只设计测试，不实现测试、不改测试代码。"
+  - "无头测试必须只模拟用户操作与场景推进，不得以 domain 直调替代真实业务路径。"
+  - "每个场景都必须补齐操作顺序、预期目标、可见反馈三类信息。"
+  - "必须区分已有可复用测试、需要废弃的 domain/局部无头测试、需要新增的端到端测试设计。"
+
+# -----------------------------------------------------------------------------
+# 模块设计稿统一字段
+# -----------------------------------------------------------------------------
+module_design_contract:
+  required_top_level_fields:
+    - module_id
+    - module_name
+    - source_acceptance_file
+    - source_audit_file
+    - design_scope
+    - refactor_objectives
+    - global_constraints
+    - scenario_redesign
+    - test_architecture
+    - out_of_scope
+    - deliverable_checklist
+
+  field_requirements:
+    module_id:
+      type: string
+      required: true
+      description: "模块唯一标识，必须与任务树和模块设计稿保持一致。"
+    module_name:
+      type: string
+      required: true
+      description: "模块对外名称，用于文件名与阅读标识。"
+    source_acceptance_file:
+      type: string
+      required: true
+      description: "该模块对应的验收来源文件。"
+    source_audit_file:
+      type: string
+      required: true
+      description: "该模块对应的 test-exist-check 审计来源文件。"
+    design_scope:
+      type: string
+      required: true
+      description: "本模块本次设计覆盖的场景边界与重构范围。"
+    refactor_objectives:
+      type: array
+      required: true
+      items:
+        type: string
+      description: "本模块测试重构要达成的目标列表。"
+    global_constraints:
+      type: array
+      required: true
+      items:
+        type: string
+      description: "必须直接复用本契约中的全局约束。"
+    scenario_redesign:
+      type: array
+      required: true
+      min_items: 1
+      description: "按场景输出重构设计；每条记录必须可独立评审。"
+      items:
+        type: object
+        required_fields:
+          - scenario_id
+          - current_status_summary
+          - current_mismatch
+          - user_acceptance_flow
+          - e2e_test_strategy
+          - migration_notes
+        field_requirements:
+          scenario_id:
+            type: string
+            required: true
+            description: "场景唯一标识，需与 source_audit_file 中的场景绑定一致。"
+          current_status_summary:
+            type: string
+            required: true
+            description: "当前测试、验收、场景定义的现状摘要。"
+          current_mismatch:
+            type: string
+            required: true
+            description: "现有测试与真实业务路径、验收意图或 UI 反馈之间的差异。"
+          user_acceptance_flow:
+            type: object
+            required: true
+            required_fields:
+              - steps
+              - expected_goal
+              - visible_feedback
+            field_requirements:
+              steps:
+                type: array
+                required: true
+                min_items: 1
+                items:
+                  type: string
+                description: "用户从开始到结束的操作顺序。"
+              expected_goal:
+                type: string
+                required: true
+                description: "该场景希望用户最终达成的目标。"
+              visible_feedback:
+                type: array
+                required: true
+                min_items: 1
+                items:
+                  type: string
+                description: "用户可直接观察到的界面或状态反馈。"
+          e2e_test_strategy:
+            type: object
+            required: true
+            required_fields:
+              - user_actions
+              - assertions
+              - forbidden_shortcuts
+            field_requirements:
+              user_actions:
+                type: array
+                required: true
+                min_items: 1
+                items:
+                  type: string
+                description: "端到端测试中要真实执行的用户操作。"
+              assertions:
+                type: array
+                required: true
+                min_items: 1
+                items:
+                  type: string
+                description: "测试应断言的结果、状态变化或可见反馈。"
+              forbidden_shortcuts:
+                type: array
+                required: true
+                min_items: 1
+                items:
+                  type: string
+                description: "明确禁止的实现捷径，例如 domain 直调、跳过 UI 操作、伪造场景推进等。"
+          migration_notes:
+            type: string
+            required: true
+            description: "从旧测试到新端到端设计的迁移说明。"
+    test_architecture:
+      type: object
+      required: true
+      description: "本模块建议的测试架构、分层方式与复用边界。"
+    out_of_scope:
+      type: array
+      required: true
+      items:
+        type: string
+      description: "本模块明确不做的内容。"
+    deliverable_checklist:
+      type: array
+      required: true
+      min_items: 1
+      items:
+        type: string
+      description: "交付前检查清单。"
+
+# -----------------------------------------------------------------------------
+# 设计稿结构建议
+# -----------------------------------------------------------------------------
+module_yaml_shape:
+  description: "每个模块的设计稿应按下列结构组织，且所有必填字段必须显式出现。"
+  canonical_order:
+    - module_id
+    - module_name
+    - source_acceptance_file
+    - source_audit_file
+    - design_scope
+    - refactor_objectives
+    - global_constraints
+    - scenario_redesign
+    - test_architecture
+    - out_of_scope
+    - deliverable_checklist
+  notes:
+    - "允许增加补充字段，但不得缺失上述必填字段。"
+    - "scenario_redesign 下的每条记录都必须完整展开 user_acceptance_flow 与 e2e_test_strategy。"
+    - "若某场景当前无需保留，应在 migration_notes 和 out_of_scope 中说明处理方式。"
+    - "如果现有测试可复用，必须在 current_status_summary 或 migration_notes 中明确标注复用边界。"

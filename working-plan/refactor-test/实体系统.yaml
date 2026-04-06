@@ -1,0 +1,205 @@
+schema_version: "1.0"
+document_role: "refactor_test_design"
+
+module_id: "实体系统"
+module_name: "实体系统"
+source_acceptance_file: "oh-acceptance/实体系统.yaml"
+source_audit_file: "working-plan/test-exist-check/实体系统.yaml"
+
+design_scope: >
+  本稿仅覆盖实体系统相关的端到端测试重构设计，不实现任何测试代码，不修改任何源码。
+  设计范围聚焦四类场景：树变木头、携带与放下、蓝图转建筑、一致性保护。
+  其中既保留现有可复用的无头场景路径，也补齐 ENTITY-004 的冲突场景设计。
+  所有无头测试只能模拟用户操作与场景推进，不得用 domain 规则函数替代端到端链路。
+
+refactor_objectives:
+  - "把 ENTITY-001 的树变木头收敛为用户可见的砍树完整链路，而不是直接调用 transformTreeToResource。"
+  - "把 ENTITY-002 的携带与放下收敛为拾取、搬运、放置的端到端链路，而不是直接调用 pickUpResource、dropResource、validateCarrying。"
+  - "把 ENTITY-003 的蓝图转建筑收敛为从玩家选区建造到蓝图完成、建筑落地的端到端链路，而不是直接调用 transformBlueprintToBuilding。"
+  - "为 ENTITY-004 设计一致性保护冲突场景，明确用户触发、系统拒绝、可见反馈三段式结果。"
+  - "统一所有场景的用户视角步骤、观察点与断言口径，确保 headless 仅模拟操作与场景推进。"
+
+global_constraints:
+  - "仅设计，不实现测试。"
+  - "无头测试只模拟用户操作与场景推进，不得以 domain 直调替代真实业务路径。"
+  - "用户验收流程必须包含操作顺序、预期目标、可见反馈。"
+  - "旧 domain/局部无头测试仅作为底层回归，不再充当主业务验收。"
+scenario_redesign:  - scenario_id: "ENTITY-001"
+    current_status_summary: >
+      现有验收与 headless 覆盖已经能证明树会在砍伐完成后消失并生成木头资源。
+      相关 headless 测试文件为 tests/headless/chop-tree-full-flow.test.ts，当前更像在验证结果状态，而不是完整描述玩家如何发起砍树并观察反馈。
+    current_mismatch: >
+      现有方向容易被理解为用 transformTreeToResource 这类生命周期规则直接验证实体转换。
+      设计上需要把重点放回玩家视角：玩家下达砍树动作、工作推进完成、树消失、木头落地，而不是直接调用实体转换函数。
+    user_acceptance_flow:
+      steps:
+        - "玩家将小人移动到树旁并发起砍树动作。"
+        - "系统推进砍树工作直到完成，玩家持续观察树的状态变化。"
+        - "工作完成后，玩家在原树位置确认树模型消失，并出现木头资源。"
+      expected_goal: "树最终转化为原位置的木头资源，玩家可以直接在场景里看到砍树结果。"
+      visible_feedback:
+        - "树从地图上消失。"
+        - "原位置出现木头资源。"
+        - "木头处于地面可拾取状态。"
+    e2e_test_strategy:
+      user_actions:
+        - "通过无头场景模拟玩家发起砍树而不是调用生命周期规则。"
+        - "推进场景 tick，等待工作项完成。"
+        - "从世界快照里检查树实体与木头资源的最终状态。"
+      assertions:
+        - "世界中不再存在被砍伐的树实体。"
+        - "至少生成一个 wood 资源，并且位于树原本所在的位置。"
+        - "该资源的 containerKind 为 ground，符合落地而非携带状态。"
+      forbidden_shortcuts:
+        - "禁止直接调用 transformTreeToResource。"
+        - "禁止直接改 registry 或 world 来伪造树消失与木头生成。"
+        - "禁止绕过 headless scenario runner，用局部 domain 测试冒充端到端测试。"
+    migration_notes: >
+      这条场景可以沿用现有 chop-tree-full-flow 的无头结构，但重心要从规则断言迁移到玩家路径断言。
+      旧的 domain/lifecycle-rules 测试保留为底层守护，不承担本场景的端到端职责。
+
+  - scenario_id: "ENTITY-002"
+    current_status_summary: >
+      现有 headless 已覆盖从砍伐、拾取到搬运和放下的完整链路，测试文件为 tests/headless/chop-haul-full-chain.test.ts。
+      当前表现更偏向验证链式结果是否正确，但用户操作路径和可见反馈还需要在设计稿里说清楚。
+    current_mismatch: >
+      relationship-rules 与 lifecycle-rules 里的 pickUpResource、dropResource、validateCarrying、validateResourceLocation 能证明关系一致性，
+      但它们不能替代玩家先拾取再搬运再放下的端到端体验。
+    user_acceptance_flow:
+      steps:
+        - "玩家让小人到达地面木头旁并发起拾取。"
+        - "玩家继续引导小人搬运木头到指定存储区。"
+        - "玩家执行放下动作，确认木头进入存储区。"
+      expected_goal: "木头从地面被带到存储区，并在放下后以存储状态稳定存在。"
+      visible_feedback:
+        - "拾取后木头从地面消失并跟随小人。"
+        - "搬运过程中木头显示为被携带状态。"
+        - "放下后木头出现在存储区覆盖范围内。"
+    e2e_test_strategy:
+      user_actions:
+        - "用无头场景先完成拾取，再推进到搬运，再推进到放下。"
+        - "只用玩家操作和场景推进模拟链路，不直接触碰规则函数。"
+        - "检查资源在每个阶段的容器与位置变化。"
+      assertions:
+        - "拾取后资源 containerKind 变为 pawn，且与小人关系一致。"
+        - "放下后资源 containerKind 变为 zone，containerEntityId 指向存储区。"
+        - "资源最终位于存储区覆盖范围内，没有留在地面，也没有丢失。"
+      forbidden_shortcuts:
+        - "禁止直接调用 pickUpResource。"
+        - "禁止直接调用 dropResource。"
+        - "禁止直接调用 validateCarrying 或 validateResourceLocation 来充当主流程验证。"
+        - "禁止跳过搬运过程，直接把资源写进存储区。"
+    migration_notes: >
+      这条场景应保留现有 headless 链路作为设计模板，但断言重心要放在用户触发后的可见变化。
+      domain 层的携带与位置规则测试只保留作一致性护栏，不应成为本场景的主验证方式。
+
+  - scenario_id: "ENTITY-003"
+    current_status_summary: >
+      现有 headless 已覆盖蓝图建造到建筑落地的流程，测试文件为 tests/headless/build-wall-flow.test.ts。
+      现有 domain/lifecycle-rules 里也有 transformBlueprintToBuilding 的局部验证，但它是以 bed 为例的单元级守护，不是玩家造墙的完整链路。
+    current_mismatch: >
+      当前容易把蓝图转建筑理解成单点实体转换，而不是玩家用 build 工具在地图上画出蓝图、系统创建建造工作、再将蓝图落成墙体。
+      端到端设计必须把蓝图创建、工作推进和建筑出现串成一个用户可观察的过程。
+    user_acceptance_flow:
+      steps:
+        - "玩家选择 build 工具并在地图上刷出墙体蓝图区域。"
+        - "玩家观察蓝图对应的建造工作被系统接管并逐步完成。"
+        - "当进度到达完成时，玩家确认蓝图消失、墙体建筑出现。"
+      expected_goal: "墙体蓝图最终转化为真实墙体建筑，并保持占用范围与地图位置一致。"
+      visible_feedback:
+        - "地图上先显示半透明蓝图。"
+        - "蓝图对应的 construct 工作项逐步完成。"
+        - "蓝图消失后出现真实墙体模型。"
+    e2e_test_strategy:
+      user_actions:
+        - "通过玩家选区操作发起建造，而不是直接制造蓝图实体。"
+        - "推进场景直到所有 construct-blueprint 工作完成。"
+        - "从世界实体中确认墙体建筑落在预期格子。"
+      assertions:
+        - "蓝图实体最终消失，且对应墙体建筑出现在相同覆盖格。"
+        - "构建工作项从 open 走到 completed。"
+        - "建筑类型和占用范围与 wall 预期一致。"
+      forbidden_shortcuts:
+        - "禁止直接调用 transformBlueprintToBuilding。"
+        - "禁止直接调用 claimWorkItem 或修改工作项状态来伪造完成。"
+        - "禁止用 bed 之类的局部单元案例替代 wall 的端到端场景。"
+        - "禁止跳过玩家选区与 build 工具步骤。"
+    migration_notes: >
+      这条场景可以复用现有 build-wall-flow 的无头测试结构，但设计稿必须强调“玩家刷蓝图 -> 工作推进 -> 墙体出现”的完整链路。
+      lifecycle-rules 中的 transformBlueprintToBuilding 仅作为底层规则护栏，不作为主路径验证。
+
+  - scenario_id: "ENTITY-004"
+    current_status_summary: >
+      现有审计显示 ENTITY-004 没有完整 headless 场景，只能在 relationship-rules 与 lifecycle-rules 中看到携带、位置和归属一致性的单元约束。
+      也就是说，系统知道“不该错”，但还没有一条用户可见的冲突场景来证明它会在真实操作里拒绝错误状态。
+    current_mismatch: >
+      现有局部规则测试只能说明 validateCarrying、validateResourceLocation、床归属等约束会报错或通过，
+      但不能证明玩家在真实操作里触发冲突时，系统会拒绝非法转移并给出可见反馈。
+      这条设计必须明确：用户触发冲突、系统拒绝、界面反馈三段都要出现。
+    user_acceptance_flow:
+      steps:
+        - "玩家先让小人 A 正常拾取一份资源，确保该资源已经归属到 A。"
+        - "玩家再尝试让小人 B 对同一资源发起拾取、接管或入库动作。"
+        - "系统拒绝这次非法变更，玩家继续观察资源仍然只属于 A。"
+      expected_goal: "任何非法冲突都不会破坏实体归属一致性，资源不会同时归属两个小人，也不会在未放下时被重复入库。"
+      visible_feedback:
+        - "系统显示拒绝或无法执行的反馈。"
+        - "资源仍然跟随小人 A，没有出现在小人 B 身上。"
+        - "资源不会凭空出现在存储区，也不会发生分身或瞬移。"
+    e2e_test_strategy:
+      user_actions:
+        - "先用正常玩家操作制造一个已携带资源的前置状态。"
+        - "再发起第二个冲突操作，让另一个小人或存储动作试图争夺同一资源。"
+        - "读取世界快照与可见提示，确认系统拒绝了非法变更。"
+      assertions:
+        - "第二次冲突操作被明确拒绝，而不是静默成功。"
+        - "资源的 containerEntityId 仍然保持在小人 A 身上。"
+        - "小人 B 没有获得该资源，存储区也没有出现重复副本。"
+        - "世界状态保持破坏前后的一致性，没有出现半更新或脏数据。"
+      forbidden_shortcuts:
+        - "禁止直接调用 validateCarrying、validateResourceLocation 或其他规则函数来代替冲突场景。"
+        - "禁止直接改 entity/container 字段伪造‘拒绝后仍一致’的结果。"
+        - "禁止跳过用户触发步骤，直接断言最终状态。"
+        - "禁止把单元级关系检查冒充成一条完整的端到端冲突测试。"
+    migration_notes: >
+      这条场景需要新增为真正的无头端到端设计，而不是复用现有单元测试。
+      设计时应把冲突点写成可触发的玩家操作，尤其要让系统拒绝和可见反馈成为第一等公民。
+
+test_architecture:
+  harness_style: >
+    采用 scenario-driven 的 headless 端到端架构，输入只来自玩家操作与场景推进，输出只从 world snapshot、work item 状态和 HUD/提示反馈读取。
+  reuse_boundary:
+    - "tests/domain/* 只保留为底层规则守护，不承担端到端职责。"
+    - "tests/headless/* 承担真实玩家路径验证，但只能通过场景 runner 和玩家操作 API 驱动。"
+    - "新设计禁止用 domain 直调函数替代玩家输入。"
+  verification_surface:
+    - "实体存在与消失。"
+    - "资源容器归属与位置变化。"
+    - "工作项推进与完成状态。"
+    - "HUD 或可见提示中的拒绝反馈。"
+  shared_tools:
+    - "runScenarioHeadless"
+    - "createHeadlessSim"
+    - "hydrateScenario"
+    - "commitPlayerSelection"
+    - "runUntil"
+  layering_notes: >
+    上层用无头场景描述用户行为与观察点，中层用工作项和世界状态断言，底层用 domain 测试兜住规则正确性。
+    端到端设计不重复实现底层规则校验，而是验证规则在真实玩家链路中的表现。
+
+out_of_scope:
+  - "不修改任何测试代码。"
+  - "不修改任何源码。"
+  - "不修改任务树或任务分配。"
+  - "不在本稿里实现新的 scenario 或 runner。"
+  - "不把单元级 domain 规则测试写成端到端替代品。"
+  - "不新增与实体系统无关的模块设计。"
+
+deliverable_checklist:
+  - "已完整覆盖 ENTITY-001 到 ENTITY-004。"
+  - "已明确树变木头、携带与放下、蓝图转建筑、一致性保护四类场景目标。"
+  - "每条场景都包含用户视角步骤、预期目标、可见反馈。"
+  - "每条场景都明确了端到端 user_actions、assertions、forbidden_shortcuts。"
+  - "已明确禁止用 transformTreeToResource、pickUpResource、validateCarrying 等规则函数替代端到端测试。"
+  - "已补齐 ENTITY-004 的用户触发、系统拒绝、可见反馈三段式冲突设计。"
+  - "已遵循契约，仅输出设计文档，不包含实现内容。"

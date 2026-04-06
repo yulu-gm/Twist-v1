@@ -1,5 +1,9 @@
 /**
  * @vitest-environment happy-dom
+ *
+ * 本文件为 HUD 结构与绑定点、建造子菜单 DOM、以及 `HudManager` 直驱面板的局部回归。
+ * 不承担 UI-001~UI-004 主验收；场景级玩家可见断言见 `tests/headless/ui-*.test.ts`。
+ * refactor-test：映射见 `working-plan/refactor-test-execution-matrix.md`（UI 模块「旧测试处理」列）。
  */
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";

@@ -49,5 +49,16 @@ export const CHOP_TREE_FULL_FLOW_SCENARIO: ScenarioDefinition = {
       type: "entity-kind-exists",
       params: { entityKind: "resource" }
     }
-  ]
+  ],
+  manualAcceptance: {
+    steps: [
+      "（UI-002）载入后观察 Chopper 走向树格并开始伐木，确认小人头顶进度条出现。",
+      "（UI-002）在读条过程中观察进度条填充；完成后条消失，树格变为地面木材。",
+      "（UI-002）打开小人详情/状态面板，确认「当前行为」与伐木阶段一致（伐木中 → 完成后随 goal 变化）。"
+    ],
+    outcomes: [
+      "进度条可见性与 `pawn-renderer` 规则一致：认领工单、锚格读条中显示，完成后隐藏（UI-002）。",
+      "世界结果与无头期望一致：树移除、原格 wood 可拾取。"
+    ]
+  }
 };

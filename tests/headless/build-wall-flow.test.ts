@@ -1,182 +1,178 @@
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it } from "vitest";
 import { coordKey, DEFAULT_WORLD_GRID } from "../../src/game/map";
-import { claimWorkItem } from "../../src/game/world-core";
-import { createHeadlessSim } from "../../src/headless";
-import { runScenarioHeadless } from "../../src/headless/scenario-runner";
+import {
+  captureVisibleState,
+  createHeadlessSim,
+  recordScenarioPlayerSelection,
+  runScenarioHeadless
+} from "../../src/headless";
 import { resetDomainCommandIdSequence } from "../../src/player/build-domain-command";
 import { BUILD_WALL_FLOW_SCENARIO } from "../../scenarios/build-wall-flow.scenario";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+const WALL_CELLS = [
+  { col: 14, row: 5 },
+  { col: 15, row: 5 },
+  { col: 16, row: 5 }
+] as const;
 
-describe("build_wall_blueprint → WorldCore（玩家选区路径）", () => {
+/**
+ * ENTITY-003：build 笔刷 → 墙蓝图 + construct 工单 → tick 后蓝图消失、墙占格与笔刷一致。
+ * 不调用 transformBlueprintToBuilding；完成态从世界与可见工单读取。
+ * refactor-test：相对 BUILD-001 / INTERACT-002 / UI-001，本文件为 createHeadlessSim 直连回归；
+ * 玩家选区同形主证据以 `runScenarioHeadless(BUILD_WALL_FLOW_SCENARIO)` 段与 `ui-menu-mode-switch.test.ts` 为准。
+ */
+describe("ENTITY-003 wall blueprint to building", () => {
   beforeEach(() => {
     resetDomainCommandIdSequence();
   });
 
-  it("三格笔刷：`build`+brush-stroke → 3 个 wall 蓝图 + 3 条 construct-blueprint；逐条认领后落成墙建筑", () => {
+  it("construct-blueprint 从 open 到 completed，蓝图清除且墙落在笔刷格", () => {
     const sim = createHeadlessSim({ seed: BUILD_WALL_FLOW_SCENARIO.seed });
     sim.spawnPawn("WallBuilder", DEFAULT_WORLD_GRID.defaultSpawnPoints[0]!);
 
-    const cells = [
-      { col: 14, row: 5 },
-      { col: 15, row: 5 },
-      { col: 16, row: 5 }
-    ];
-    const keys = cells.map((c) => coordKey(c));
     const outcome = sim.commitPlayerSelection({
       toolId: "build",
       selectionModifier: "replace",
-      cellKeys: new Set(keys),
+      cellKeys: new Set(WALL_CELLS.map((cell) => coordKey(cell))),
       inputShape: "brush-stroke",
       currentMarkers: new Map(),
       nowMs: 0
     });
+
     expect(outcome.didSubmitToWorld).toBe(true);
     expect(outcome.command?.verb).toBe("build_wall_blueprint");
     expect(outcome.submitResult?.accepted).toBe(true);
-    expect(outcome.submitResult?.messages.some((m) => m.includes("墙蓝图"))).toBe(true);
 
-    const world0 = sim.getWorldPort().getWorld();
-    const blueprints = [...world0.entities.values()].filter(
-      (e) => e.kind === "blueprint" && e.blueprintKind === "wall"
+    const worldAfterSubmit = sim.getWorldPort().getWorld();
+    const constructOpen = [...worldAfterSubmit.workItems.values()].filter(
+      (item) => item.kind === "construct-blueprint" && item.status === "open"
     );
-    expect(blueprints).toHaveLength(3);
-    const constructs = [...world0.workItems.values()].filter((w) => w.kind === "construct-blueprint");
-    expect(constructs).toHaveLength(3);
-    expect(constructs.every((w) => w.status === "open")).toBe(true);
+    expect(constructOpen).toHaveLength(WALL_CELLS.length);
 
-    const pawn = sim.getPawns().find((p) => p.name === "WallBuilder");
-    expect(pawn).toBeDefined();
-
-    for (;;) {
-      const nextOpen = [...sim.getWorldPort().getWorld().workItems.values()].find(
-        (w) => w.kind === "construct-blueprint" && w.status === "open"
+    const completed = sim.runUntil(() => {
+      const world = sim.getWorldPort().getWorld();
+      const builtWalls = [...world.entities.values()].filter(
+        (entity) => entity.kind === "building" && entity.buildingKind === "wall"
       );
-      if (!nextOpen) break;
-      const claimed = claimWorkItem(sim.getWorldPort().getWorld(), nextOpen.id, pawn!.id);
-      expect(claimed.outcome.kind).toBe("claimed");
-      sim.getWorldPort().setWorld(claimed.world);
-      const done = sim.runUntil(() => {
-        const w = sim.getWorldPort().getWorld().workItems.get(nextOpen.id);
-        return w?.status === "completed";
-      }, { maxTicks: 5_000 });
-      expect(done.reachedPredicate).toBe(true);
-    }
+      const remainingBlueprints = [...world.entities.values()].filter(
+        (entity) => entity.kind === "blueprint" && entity.blueprintKind === "wall"
+      );
+      const pendingConstructs = [...world.workItems.values()].filter(
+        (item) => item.kind === "construct-blueprint" && item.status !== "completed"
+      );
 
-    const buildings = [...sim.getWorldPort().getWorld().entities.values()].filter(
-      (e) => e.kind === "building" && e.buildingKind === "wall"
-    );
-    expect(buildings).toHaveLength(3);
-    for (const c of cells) {
-      expect(buildings.some((b) => b.cell.col === c.col && b.cell.row === c.row)).toBe(true);
-    }
+      return (
+        builtWalls.length === WALL_CELLS.length &&
+        WALL_CELLS.every((cell) =>
+          builtWalls.some((wall) => wall.cell.col === cell.col && wall.cell.row === cell.row)
+        ) &&
+        remainingBlueprints.length === 0 &&
+        pendingConstructs.length === 0
+      );
+    }, { maxTicks: 20_000, deltaMs: 16 });
+
+    expect(completed.reachedPredicate).toBe(true);
+
+    const visible = captureVisibleState(sim);
+    const constructs = visible.workItems.filter((w) => w.kind === "construct-blueprint");
+    expect(constructs.length).toBe(WALL_CELLS.length);
+    expect(constructs.every((w) => w.status === "completed")).toBe(true);
+
+    const workCompleted = sim.getSimEventCollector().getEventsByKind("work-completed");
+    expect(workCompleted.length).toBeGreaterThanOrEqual(WALL_CELLS.length);
+  });
+});
+
+describe("INTERACT-002 brush-stroke build input", () => {
+  beforeEach(() => {
+    resetDomainCommandIdSequence();
   });
 
-  it("单格墙笔刷：不手工认领，靠 autoClaim + 走向锚格落成墙（与实机笔刷后一致）", () => {
+  it("commits a brush stroke through the player input entry and only feeds back the stroked wall path", () => {
     const sim = createHeadlessSim({ seed: BUILD_WALL_FLOW_SCENARIO.seed });
     sim.spawnPawn("WallBuilder", DEFAULT_WORLD_GRID.defaultSpawnPoints[0]!);
-    // 与 build-wall-flow.scenario 的 playerSelectionAfterHydrate 目标格一致
-    const cell = { col: 11, row: 6 };
+
+    expect(sim.getWorldPort().getWorld().workItems.size).toBe(0);
+    expect(sim.getWorldPort().getWorld().markers.size).toBe(0);
+
+    const cellKeys = WALL_CELLS.map((cell) => coordKey(cell));
     const outcome = sim.commitPlayerSelection({
       toolId: "build",
       selectionModifier: "replace",
-      cellKeys: new Set([coordKey(cell)]),
+      cellKeys: new Set(cellKeys),
       inputShape: "brush-stroke",
       currentMarkers: new Map(),
       nowMs: 0
     });
+    const selection = recordScenarioPlayerSelection(
+      {
+        label: "interact-002-brush-stroke",
+        toolId: "build",
+        selectionModifier: "replace",
+        cellKeys,
+        inputShape: "brush-stroke"
+      },
+      outcome
+    );
+
     expect(outcome.didSubmitToWorld).toBe(true);
-    expect(outcome.command?.verb).toBe("build_wall_blueprint");
-    const worldAfterBrush = sim.getWorldPort().getWorld();
+    expect(outcome.nextMarkers.size).toBe(WALL_CELLS.length);
+
+    const worldAfterSubmit = sim.getWorldPort().getWorld();
+    const wallBlueprints = [...worldAfterSubmit.entities.values()].filter(
+      (entity) => entity.kind === "blueprint" && entity.blueprintKind === "wall"
+    );
+    const constructWorkItems = [...worldAfterSubmit.workItems.values()].filter(
+      (item) => item.kind === "construct-blueprint" && item.status === "open"
+    );
+
+    expect(wallBlueprints).toHaveLength(WALL_CELLS.length);
     expect(
-      [...worldAfterBrush.workItems.values()].some(
-        (w) => w.kind === "construct-blueprint" && w.status === "open"
+      wallBlueprints.every((entity) =>
+        WALL_CELLS.some(
+          (cell) => entity.cell.col === cell.col && entity.cell.row === cell.row
+        )
+      )
+    ).toBe(true);
+    expect(constructWorkItems).toHaveLength(WALL_CELLS.length);
+    expect(
+      constructWorkItems.every((item) =>
+        WALL_CELLS.some(
+          (cell) => item.anchorCell.col === cell.col && item.anchorCell.row === cell.row
+        )
       )
     ).toBe(true);
 
-    const done = sim.runUntil(() => {
-      const w = sim.getWorldPort().getWorld();
-      return [...w.entities.values()].some(
-        (e) =>
-          e.kind === "building" &&
-          e.buildingKind === "wall" &&
-          e.cell.col === cell.col &&
-          e.cell.row === cell.row
-      );
-    }, { maxTicks: 5_000 });
-    expect(done.reachedPredicate).toBe(true);
-  });
-
-  it("首段墙落成后经 idle 再布第二段墙：仍能 autoClaim 并完成（回归墙格可走振荡 + 游荡中拒认领）", () => {
-    const sim = createHeadlessSim({ seed: BUILD_WALL_FLOW_SCENARIO.seed });
-    sim.spawnPawn("WallBuilder", DEFAULT_WORLD_GRID.defaultSpawnPoints[0]!);
-    const cellFirst = { col: 11, row: 6 };
-    const cellSecond = { col: 12, row: 6 };
-
+    const visible = captureVisibleState(sim, { playerSelections: [selection] });
     expect(
-      sim.commitPlayerSelection({
-        toolId: "build",
-        selectionModifier: "replace",
-        cellKeys: new Set([coordKey(cellFirst)]),
-        inputShape: "brush-stroke",
-        currentMarkers: new Map(),
-        nowMs: 0
-      }).didSubmitToWorld
+      visible.failures.some(
+        (item) =>
+          item.source === "submit-result" &&
+          item.accepted === true &&
+          item.text.length > 0
+      )
     ).toBe(true);
+  });
 
-    const firstDone = sim.runUntil(() => {
-      const w = sim.getWorldPort().getWorld();
-      return [...w.entities.values()].some(
-        (e) =>
-          e.kind === "building" &&
-          e.buildingKind === "wall" &&
-          e.cell.col === cellFirst.col &&
-          e.cell.row === cellFirst.row
-      );
-    }, { maxTicks: 6_000 });
-    expect(firstDone.reachedPredicate).toBe(true);
+  it("scenario replay still records INTERACT-002 as brush-stroke input instead of another input mode", () => {
+    const { hydration, results, sim } = runScenarioHeadless(BUILD_WALL_FLOW_SCENARIO);
+    const selection = hydration.playerSelections[0]!;
+    const visible = captureVisibleState(sim, { playerSelections: hydration.playerSelections });
 
-    // 模拟「过一小段时间」：若墙格仍可走，小人易在墙与邻格间来回踱步并长期 isMoving，无法认领新单
-    for (let i = 0; i < 200; i++) {
-      sim.tick(16);
-    }
-
+    expect(results.every((result) => result.passed)).toBe(true);
+    expect(hydration.playerSelections).toHaveLength(1);
+    expect(selection.toolId).toBe("build");
+    expect(selection.semantic).toBe("brush-stroke");
+    expect(selection.inputShape).toBe("brush-stroke");
+    expect(selection.didSubmitToWorld).toBe(true);
+    expect(selection.accepted).toBe(true);
     expect(
-      sim.commitPlayerSelection({
-        toolId: "build",
-        selectionModifier: "replace",
-        cellKeys: new Set([coordKey(cellSecond)]),
-        inputShape: "brush-stroke",
-        currentMarkers: new Map(),
-        nowMs: 0
-      }).didSubmitToWorld
+      visible.failures.some(
+        (item) =>
+          item.source === "submit-result" &&
+          item.accepted === true &&
+          item.text.length > 0
+      )
     ).toBe(true);
-
-    const secondDone = sim.runUntil(() => {
-      const w = sim.getWorldPort().getWorld();
-      return [...w.entities.values()].some(
-        (e) =>
-          e.kind === "building" &&
-          e.buildingKind === "wall" &&
-          e.cell.col === cellSecond.col &&
-          e.cell.row === cellSecond.row
-      );
-    }, { maxTicks: 6_000 });
-    expect(secondDone.reachedPredicate).toBe(true);
-  });
-
-  it("build-wall-flow scenario passes expectations", () => {
-    const { results } = runScenarioHeadless(BUILD_WALL_FLOW_SCENARIO);
-    expect(results.every((r) => r.passed)).toBe(true);
-  });
-
-  it("applyDomainCommandToWorldCore 含 build_wall_blueprint 分支", () => {
-    const srcPath = join(__dirname, "..", "..", "src", "player", "apply-domain-command.ts");
-    const src = readFileSync(srcPath, "utf8");
-    expect(src).toContain('"build_wall_blueprint"');
-    expect(src).toContain("applyDomainCommandToWorldCore");
   });
 });

@@ -1,0 +1,217 @@
+schema_version: "1.0"
+document_role: "refactor_test_design"
+
+module_id: "建筑系统"
+module_name: "建筑系统"
+source_acceptance_file: "oh-acceptance/建筑系统.yaml"
+source_audit_file: "working-plan/test-exist-check/建筑系统.yaml"
+
+design_scope: >
+  本设计仅覆盖建筑系统的端到端测试重构方案，不实现测试、不修改源码、不改任务树。
+  范围聚焦 BUILD-001 到 BUILD-004 四个场景，分别对应墙体蓝图、木床自动分配、非法位置拦截、以及多余床铺无归属。
+  所有无头测试都必须只模拟用户操作与场景推进，不得把 domain 直调当作主入口。
+
+refactor_objectives:
+  - "把现有建筑系统的测试入口统一到场景级 end-to-end 设计，主路径以玩家操作链路为中心。"
+  - "明确区分可复用的已有测试、需要废弃的 domain 直调捷径、以及需要新增的场景设计。"
+  - "让 BUILD-001 与 BUILD-002 同时保留 tool selection、绘制/放置、蓝图落成、归属变化的可观察链路。"
+  - "补齐 BUILD-003 与 BUILD-004 的负路径与边界路径设计，使失败反馈和无归属反馈都可被验证。"
+  - "为后续重构提供统一的场景描述口径，保证 headless、scenario、manual acceptance 三层语义一致。"
+
+global_constraints:
+  - "仅设计，不实现测试。"
+  - "无头测试只模拟用户操作与场景推进，不得以 domain 直调替代真实业务路径。"
+  - "用户验收流程必须包含操作顺序、预期目标、可见反馈。"
+  - "旧 domain/局部无头测试仅作为底层回归，不再充当主业务验收。"
+scenario_redesign:  - scenario_id: "BUILD-001"
+    current_status_summary: >
+      现有头less 测试已覆盖墙体蓝图到墙体建筑落成的主链路，`tests/headless/build-wall-flow.test.ts`
+      与 `scenarios/build-wall-flow.scenario.ts` 共同描述了 build 工具、brush-stroke 选择、construct-blueprint
+      工单、以及 wall building 出现的过程。
+    current_mismatch: >
+      目前实现里仍混有直接 `claimWorkItem`、循环 `runUntil` 之类的推进方式，虽然能验证结果，
+      但没有把“工具选择 -> 绘制墙体蓝图 -> 蓝图落成 -> 小人接单 -> 墙体实体出现”的顺序在设计层面完整固定下来。
+      另外，失败反馈并不是这个场景的主目标，需要在设计里明确它是合法输入下的无失败路径。
+    user_acceptance_flow:
+      steps:
+        - "玩家选择建造工具 `build`，并切到墙体蓝图模式。"
+        - "玩家在空地上用 brush-stroke 方式绘制连续墙体格子。"
+        - "系统提交墙体蓝图，地图上出现蓝图虚影，并生成对应的建造工单。"
+        - "小人接单并完成施工，蓝图逐步转化为真实墙体建筑。"
+        - "若输入合法，整个过程不应出现失败拦截；最终以墙体落成为结束状态。"
+      expected_goal: "验证墙体蓝图从玩家绘制到墙体实体落成的完整 E2E 链路。"
+      visible_feedback:
+        - "地图上先显示墙体蓝图虚影。"
+        - "生成可观察的 construct-blueprint 工单。"
+        - "施工完成后蓝图消失，墙体实体出现在目标格子。"
+        - "合法路径下不出现红色不可放置提示。"
+    e2e_test_strategy:
+      user_actions:
+        - "选择 `build` 工具。"
+        - "以 brush-stroke 方式在目标格子集合上提交选择。"
+        - "推进场景直到工单完成并检查墙体是否落成。"
+      assertions:
+        - "提交结果应被接受，并产生墙体蓝图相关消息。"
+        - "世界中应存在与蓝图数量匹配的 construct-blueprint 工单。"
+        - "工单完成后，目标坐标上应出现 wall building 实体。"
+        - "测试只验证玩家操作导致的状态变化，不直接把底层建造函数当作主断言入口。"
+      forbidden_shortcuts:
+        - "禁止把 `placeBlueprint`、`claimWorkItem`、直接 world mutate 当作主端到端入口。"
+        - "禁止跳过玩家工具选择，直接注入墙体实体或工单。"
+        - "禁止把 `runUntil` 当成业务路径本身，它只能用于推进已发生的玩家操作。"
+    migration_notes: >
+      该场景可沿用现有 `build-wall-flow.scenario.ts` 作为场景级骨架，但重构设计应把玩家操作顺序固定为主语义。
+      旧测试中的局部 world 操作可作为辅助验证，不应成为主入口。
+
+  - scenario_id: "BUILD-002"
+    current_status_summary: >
+      现有建筑系统里既有 `tests/headless/bed-auto-assign.test.ts` 关注木床落成后的自动分配，
+      也有 `tests/headless/build-bed-flow.test.ts` 关注 build 工具单格放置木床蓝图的玩家链路。
+      `bed-auto-assign.scenario.ts` 当前更偏向“预置蓝图后验证归属”，而不是完整的玩家放置链路。
+    current_mismatch: >
+      当前 `bed-auto-assign` 侧重结果态，使用预先存在的蓝图和 `claimConstructBlueprintAsPawnName`，容易跳过工具选择和放置动作。
+      这会让“木床自动分配”与“木床蓝图如何由玩家放置出来”两个意图混在一起。
+      设计上应明确：玩家放置链路由 `build-bed-flow` 承担，自动分配语义由 `bed-auto-assign` 承担，二者共同覆盖 BUILD-002。
+    user_acceptance_flow:
+      steps:
+        - "玩家选择 `build` 工具并切到木床放置模式。"
+        - "玩家在合法空地上放置木床蓝图，系统生成 construct-blueprint 工单。"
+        - "场景推进到木床建成，蓝图转化为床铺实体。"
+        - "系统自动为尚未拥有床铺的小人绑定该床的归属。"
+        - "当玩家选中床铺时，UI 应能显示该床的归属对象。"
+      expected_goal: "验证木床从玩家放置到建成，再到自动分配给无床小人的完整链路。"
+      visible_feedback:
+        - "床铺蓝图放置后可见。"
+        - "建造工单出现并完成。"
+        - "床铺落成后，归属信息同步更新。"
+        - "选中床铺时，界面应显示其所有者或归属小人。"
+    e2e_test_strategy:
+      user_actions:
+        - "选择 `build` 工具。"
+        - "在目标格子放置木床蓝图。"
+        - "推进场景到建造完成。"
+        - "检查归属规则是否把床分配给无床小人。"
+      assertions:
+        - "木床蓝图应产生对应的 construct-blueprint 工单。"
+        - "建成后应出现 bed building 实体。"
+        - "至少一条 restSpot 归属应被写入，且与无床小人的状态一致。"
+        - "若使用 `bed-auto-assign`，应验证自动分配结果；若使用 `build-bed-flow`，应验证玩家放置入口。"
+      forbidden_shortcuts:
+        - "禁止只靠预置蓝图断言自动分配结果，而不经过玩家建造入口。"
+        - "禁止用 `placeBlueprint` 直接铺床来替代玩家选择工具和提交动作。"
+        - "禁止把归属断言写成纯 domain 规则测试，必须保留 E2E 场景推进。"
+    migration_notes: >
+      该场景建议拆成“玩家放置木床”与“自动分配验证”两个互补视角。
+      当前已有 `build-bed-flow.scenario.ts` 可承接工具选择与放置部分，`bed-auto-assign.scenario.ts` 则承接建成后的归属变化验证。
+      设计稿应同时保留两者的职责边界，避免把自动分配误写成纯预置状态测试。
+
+  - scenario_id: "BUILD-003"
+    current_status_summary: >
+      该场景在现有无头与玩家验收里都属于缺失项，审计结果显示没有绑定到明确的 scenario export。
+      这意味着当前没有一条正式的端到端设计去覆盖“非法位置放置被拦截”的用户路径。
+    current_mismatch: >
+      现有测试没有把“选中建造工具 -> 尝试在被阻挡或非法格子放置 -> 系统拦截 -> 不生成蓝图/工单 -> 给出可见失败反馈”
+      这一整套负路径串起来。缺少这个场景会让 placement 校验只能靠局部单元或 domain 断言，无法验证玩家层面的失败体验。
+    user_acceptance_flow:
+      steps:
+        - "玩家选择 `build` 工具，准备放置建筑蓝图。"
+        - "玩家把光标/拖拽落到被阻挡或非法的格子上。"
+        - "系统即时给出不可放置反馈，并阻止提交。"
+        - "玩家释放鼠标或确认放置时，蓝图不会落成，工单也不会生成。"
+        - "场景结束时，世界状态保持不变，非法位置仍然不可用。"
+      expected_goal: "验证非法位置不会生成任何建筑蓝图或施工工单，同时玩家能看到明确的失败反馈。"
+      visible_feedback:
+        - "蓝图虚影应变红或显示不可放置状态。"
+        - "点击/拖拽时应有失败提示或失败音效。"
+        - "地图上不应出现新的蓝图实体。"
+        - "工单列表不应新增 construct-blueprint。"
+    e2e_test_strategy:
+      user_actions:
+        - "选择建造工具。"
+        - "在非法/被阻挡位置做放置尝试。"
+        - "观察系统是否阻止提交并保留失败反馈。"
+      assertions:
+        - "提交应被拒绝，或至少不产生可执行的蓝图落点。"
+        - "世界里不能新增墙体/床铺蓝图实体。"
+        - "世界里不能新增 construct-blueprint 工单。"
+        - "拒绝消息、颜色、音效或状态提示中必须能看到不可放置语义。"
+      forbidden_shortcuts:
+        - "禁止通过直接创建蓝图或工单来伪造失败路径。"
+        - "禁止跳过非法位置校验，直接断言最终 world 状态。"
+        - "禁止用 `placeBlueprint` 先成功再补一个断言说它失败，这会失去场景意义。"
+    migration_notes: >
+      需要新增一条正式的 scenario 设计，建议以“blocked placement / invalid placement”作为主题。
+      该新 scenario 必须显式写出失败反馈是什么，并明确不产生蓝图、不产生工单、不进入归属变化阶段。
+      这是对玩家体验最重要的可见负路径，不能只靠 domain 规则测试替代。
+
+  - scenario_id: "BUILD-004"
+    current_status_summary: >
+      该场景当前只在 `tests/headless/bed-auto-assign.test.ts` 中以手工 `placeBlueprint` 方式拼接出来，
+      没有独立的 scenario export。现有实现能够验证“多出的一张床不会自动分配给不存在的空闲小人”，
+      但还没有完整表达玩家放置、蓝图落成、归属变化与最后的空床反馈。
+    current_mismatch: >
+      当前测试直接调用 `placeBlueprint` 三次，绕过了玩家工具选择和放置动作，所以它更像 world-core 结果拼装，
+      而不是建筑系统的端到端用户路径。设计上应把“多余床铺无归属”写成场景级边界条件，
+      并把可见反馈落到“床已建成但归属仍为空”这一 UI/状态表现上。
+    user_acceptance_flow:
+      steps:
+        - "玩家选择 `build` 工具并连续放置多张木床蓝图。"
+        - "场景推进到所有床铺都建成，系统对可分配对象执行自动归属。"
+        - "前两张床被分配给已有的无床小人。"
+        - "第三张多余床铺在没有可分配对象时保持空归属。"
+        - "玩家选中这张多余床时，界面应明确显示没有所有者。"
+      expected_goal: "验证木床数量超过无床小人数量时，多余床铺保持无归属状态。"
+      visible_feedback:
+        - "三张床都应能在地图上看到建成结果。"
+        - "前两张床对应的归属信息应已更新。"
+        - "多余床铺的归属字段应保持空值或无所有者展示。"
+        - "该场景不以失败弹窗为主，而以“无归属”状态作为可见反馈。"
+    e2e_test_strategy:
+      user_actions:
+        - "选择 `build` 工具。"
+        - "连续放置多张木床蓝图。"
+        - "推进场景直到所有可建床铺完成。"
+        - "检查床铺数量与小人数量不匹配时的归属结果。"
+      assertions:
+        - "建成后的床铺数量应满足场景设计。"
+        - "已能分配的床铺应绑定到具体小人。"
+        - "多余床铺的 `ownerPawnId` 必须保持为空。"
+        - "不要把多余床铺错误地分配给任意一个已占床小人。"
+      forbidden_shortcuts:
+        - "禁止用 `placeBlueprint` 直接灌入结果态来替代玩家放置链路。"
+        - "禁止只断言空归属，不验证建造完成与自动分配过程。"
+        - "禁止把该场景写成纯数据回填测试。"
+    migration_notes: >
+      需要新增一条独立 scenario 设计来承接“床铺溢出但无可分配对象”的边界条件。
+      设计里要同时说明：床铺会正常建成，但归属不会凭空生成；UI 应显示无所有者，而不是隐藏该床或伪造占用状态。
+      这条 scenario 与 BUILD-002 共同构成自动分配的完整边界。
+
+test_architecture:
+  layering:
+    - "scenario.ts 负责描述玩家选择、放置、推进与预期结果。"
+    - "headless test 只做场景回放和结果校验，不写业务实现。"
+    - "manual acceptance 负责把 UI 可见反馈翻译成可执行的场景步骤。"
+  reuse_boundaries:
+    - "BUILD-001 可以复用现有墙体场景骨架，但必须维持玩家操作链路为主。"
+    - "BUILD-002 应拆分为放置入口与归属结果两个视角，避免把自动分配写成预置状态测试。"
+    - "BUILD-003 与 BUILD-004 都需要新增或显式补齐 scenario 设计，不可继续停留在缺失状态。"
+  verification_policy:
+    - "所有断言都要围绕玩家可观察到的状态变化展开。"
+    - "无头测试只模拟用户操作与场景推进，不得直接调用底层 placeBlueprint 作为主入口。"
+    - "失败路径必须写出拒绝原因或失败提示，成功路径必须写出最终落成或归属变化。"
+
+out_of_scope:
+  - "不修改 tests/headless 里的实现代码。"
+  - "不修改 scenarios 里的源码实现。"
+  - "不修改 src 下的业务代码。"
+  - "不把 domain 直调改造成新的端到端主入口。"
+  - "不新增非建筑系统范围的场景设计。"
+
+deliverable_checklist:
+  - "YAML 结构符合统一契约，且包含 module_id、module_name、source_acceptance_file、source_audit_file 等必填字段。"
+  - "scenario_redesign 覆盖 BUILD-001 到 BUILD-004，且没有遗漏。"
+  - "文档明确写出墙体蓝图、木床自动分配、非法位置拦截、多余床铺无归属四个主题。"
+  - "每条场景都描述了工具选择、绘制/放置、蓝图落成、归属变化、失败反馈中的相关顺序。"
+  - "BUILD-003 与 BUILD-004 已单独给出需要新增 scenario 的设计方向和可见反馈说明。"
+  - "文档明确禁止把 `placeBlueprint` 一类底层调用当作主端到端测试入口。"
+

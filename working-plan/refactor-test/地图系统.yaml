@@ -1,0 +1,166 @@
+schema_version: "1.0"
+document_role: "refactor_test_design"
+
+module_id: "地图系统"
+module_name: "地图系统"
+source_acceptance_file: "oh-acceptance/地图系统.yaml"
+source_audit_file: "working-plan/test-exist-check/地图系统.yaml"
+
+design_scope: "覆盖 MAP-001 到 MAP-004 的地图系统端到端测试重构设计，聚焦地图初始态、合法选区、占用冲突拦截、越界过滤四类玩家验收路径；本文件仅做设计，不实现测试，也不修改源码或现有测试。无头测试必须只模拟用户操作与场景推进，不允许以 domain 直调代替真实业务路径。"
+
+refactor_objectives:
+  - "把地图系统从‘内部状态断言’重构为‘玩家可见、可操作、可验收’的端到端场景设计。"
+  - "为 MAP-001 到 MAP-004 分别定义清晰的玩家验收流程、地图反馈和最终目标。"
+  - "明确新主证据必须来自场景驱动的 headless E2E，禁止只用 floor-selection 或 occupancy 级测试充当主验收。"
+  - "保留必要的几何与规则回归测试，但将其降级为辅助证据，不再承担主验收职责。"
+  - "让旧测试迁移边界清晰：哪些需要被新 E2E 取代，哪些只适合继续作为回归守门。"
+
+global_constraints:
+  - "仅设计，不实现测试。"
+  - "无头测试只模拟用户操作与场景推进，不得以 domain 直调替代真实业务路径。"
+  - "用户验收流程必须包含操作顺序、预期目标、可见反馈。"
+  - "旧 domain/局部无头测试仅作为底层回归，不再充当主业务验收。"
+scenario_redesign:  - scenario_id: "MAP-001"
+    current_status_summary: "现有 `tests/headless/story-1-day-one.test.ts` 已覆盖 MAP-001 对应的地图初始态校验，但当前做法偏向场景注入后直接断言内部世界状态；`working-plan/test-exist-check/地图系统.yaml` 也明确指出玩家可验收部分仍缺失。"
+    current_mismatch: "现在的证据链更像 bootstrap 回归，而不是完整的玩家验收链路；缺少从‘开始新游戏/进入首日场景’到‘看到地图生成完成’的显式用户流程，也没有把地图反馈写成可读的验收结果。"
+    user_acceptance_flow:
+      steps:
+        - "启动新游戏并进入首日场景，让地图系统完成初始生成。"
+        - "等待场景稳定，确认地图、地形、树木、散落资源和角色都已经渲染出来。"
+        - "以玩家视角检查首屏地图布局是否符合预期。"
+      expected_goal: "玩家能够在第一眼确认地图初始态正确，且所有首日关键实体都出现在合法位置。"
+      visible_feedback:
+        - "地图网格完成生成，场景可进入并可见。"
+        - "小人出现在有效格子上，状态为可等待或醒来。"
+        - "树木和地面资源显示在预期坐标。"
+        - "界面能明确表达‘地图初始化完成’而不是仅有内部对象已创建。"
+    e2e_test_strategy:
+      user_actions:
+        - "通过场景启动进入首日地图，不直接调用 world core 或 domain 命令。"
+        - "让 headless 场景按用户可见流程推进到地图稳定态。"
+        - "仅在玩家可观察阶段读取结果，不在中途借助内部 bootstrap 断言代替验收。"
+      assertions:
+        - "地图初始态包含预期的小人、树木和地面资源。"
+        - "所有实体都位于合法格子中，且首屏布局与场景定义一致。"
+        - "场景完成后存在明确的地图初始化反馈。"
+      forbidden_shortcuts:
+        - "禁止只靠 `tests/headless/story-1-day-one.test.ts` 中的内部实体计数充当主验收。"
+        - "禁止把 `tests/domain/*` 的几何断言当作 MAP-001 的主要证据。"
+        - "禁止跳过场景推进流程，直接读取世界状态做结论。"
+    migration_notes: "`tests/headless/story-1-day-one.test.ts` 可继续保留为首日地图 bootstrap 回归，但它需要被新的端到端场景测试取代为 MAP-001 主证据；`tests/domain/floor-selection.test.ts` 与 `tests/headless/zone-create.test.ts` 不承担此场景职责。"
+
+  - scenario_id: "MAP-002"
+    current_status_summary: "现有 `tests/headless/zone-create.test.ts` 已验证 `zone_create` 命令能创建 storage zone，`tests/headless/story-1-day-one.test.ts` 也串起了 zone 创建后的后续流程；但这些都偏命令级或链式集成级，仍不是完整的玩家选区验收。"
+    current_mismatch: "目前能证明‘命令成功’，但不能完整证明‘玩家在地图上合法框选后，看到选区预览并成功生成存储区’；缺少对地图边界、选区高亮、确认反馈的玩家视角描述。"
+    user_acceptance_flow:
+      steps:
+        - "玩家切换到存储区创建工具。"
+        - "在地图上拖拽出一块合法且未被占用的矩形选区。"
+        - "确认创建后，观察选区被落为存储区实体。"
+      expected_goal: "玩家能够通过合法框选在地图上创建一个存储区，并得到清晰的创建成功反馈。"
+      visible_feedback:
+        - "拖拽时显示正确的选区高亮。"
+        - "释放/确认后，选区边界或底色变为存储区反馈。"
+        - "地图上新增一个 storage zone，覆盖所选格子。"
+        - "未占用格子保持可见且不会产生多余占用痕迹。"
+    e2e_test_strategy:
+      user_actions:
+        - "通过工具栏进入 zone_create 模式。"
+        - "模拟玩家在地图上拖拽合法矩形选区。"
+        - "提交创建动作并等待场景反馈完成。"
+      assertions:
+        - "存储区实体被创建，且记录的覆盖格子与玩家选区一致。"
+        - "创建过程带有可观察的选区预览和成功反馈。"
+        - "地图反馈显示的是区块边界或底色，而不是仅靠内部集合断言。"
+      forbidden_shortcuts:
+        - "禁止把 `tests/headless/zone-create.test.ts` 的 `submit zone_create` 结果当作主验收。"
+        - "禁止仅依赖 occupancy 是否为空来证明选区创建成功。"
+        - "禁止跳过拖拽/确认步骤，直接断言 zone 对象存在。"
+    migration_notes: "`tests/headless/zone-create.test.ts` 仅适合作为 zone_create 规则回归，主证据应由新的端到端场景测试承担；`tests/headless/story-1-day-one.test.ts` 中关于 MAP-002 的串联断言也应降级为辅助链路。"
+
+  - scenario_id: "MAP-003"
+    current_status_summary: "现有审计明确指出，当前只有占用层或邻近构建流的局部测试，缺少‘玩家试图在树木/墙/障碍物上放置建筑并被地图反馈拦截’的无头场景。"
+    current_mismatch: "现在能证明规则存在，却不能证明玩家在真实放置流程里会被正确拦截；没有把红色不可放置态、冲突提示、以及蓝图未生成这些可见反馈串成主验收。"
+    user_acceptance_flow:
+      steps:
+        - "玩家进入建筑放置模式并选择一个会与现有实体冲突的格子。"
+        - "尝试在该格子上放置蓝图或建筑。"
+        - "观察系统拒绝该次放置请求。"
+      expected_goal: "玩家明确看到占用冲突被拦截，且该位置不会生成新的建筑实体。"
+      visible_feedback:
+        - "冲突格子出现不可放置提示，通常是红色或错误态高亮。"
+        - "蓝图不会生成，或在确认后立即被拒绝。"
+        - "地图保持原有阻挡实体不变，不出现错误覆盖。"
+        - "必要时有清晰的冲突消息或阻挡提示。"
+    e2e_test_strategy:
+      user_actions:
+        - "通过玩家可见流程进入建筑放置。"
+        - "在已被树木、墙或障碍物占用的位置执行放置。"
+        - "确认系统对该位置的拒绝反馈。"
+      assertions:
+        - "放置请求被拒绝，且冲突位置的原实体保持不变。"
+        - "不会生成新的蓝图实体或建筑实体。"
+        - "地图反馈中包含可观察的冲突/不可放置信号。"
+      forbidden_shortcuts:
+        - "禁止仅用 occupancy-manager 级测试证明冲突存在。"
+        - "禁止只验证规则函数返回 false，而不走玩家放置流程。"
+        - "禁止用 domain 直调绕开建筑放置交互。"
+    migration_notes: "`tests/domain/occupancy-manager.test.ts`、`tests/domain/lifecycle-rules.test.ts` 这类局部测试只保留为几何/规则回归；MAP-003 的主证据必须由新的端到端场景来取代。"
+
+  - scenario_id: "MAP-004"
+    current_status_summary: "现有 `tests/domain/floor-selection.test.ts` 已证明选区算法可以处理矩形、union、toggle 与越界裁切，但审计明确说明它只是实现层几何回归，不是玩家拖拽选区的验收。"
+    current_mismatch: "当前缺少从玩家拖拽到地图边界外，再到系统自动过滤无效坐标的完整验收；也缺少‘只高亮合法范围’的可视化反馈描述。"
+    user_acceptance_flow:
+      steps:
+        - "玩家在地图边缘发起选区拖拽。"
+        - "拖拽过程中让矩形部分超出地图边界。"
+        - "松开鼠标并确认选区结果。"
+      expected_goal: "系统自动过滤越界格子，只保留地图内的合法选区。"
+      visible_feedback:
+        - "拖拽高亮在边界处被裁切，不会延伸到地图外。"
+        - "越界部分不显示为有效选区。"
+        - "最终提交的选区只包含有效格子。"
+        - "玩家能够从地图反馈直接看出裁切已经发生。"
+    e2e_test_strategy:
+      user_actions:
+        - "通过玩家的选区工具拖拽到边界外。"
+        - "完成松开/确认，触发最终选区提交。"
+        - "检查界面和最终选区是否只保留合法坐标。"
+      assertions:
+        - "最终选区不包含任何越界坐标。"
+        - "地图上的高亮/高光框只出现在有效范围内。"
+        - "越界部分被裁切而不是被当作合法格子提交。"
+      forbidden_shortcuts:
+        - "禁止把 `tests/domain/floor-selection.test.ts` 直接当作 MAP-004 主验收。"
+        - "禁止只验证 `rectCellKeysInclusive` 或 `isInsideGrid` 之类实现细节。"
+        - "禁止绕过拖拽交互，直接构造最终选区结果。"
+    migration_notes: "`tests/domain/floor-selection.test.ts` 仅保留为几何/规则回归，不再承担主验收职责；MAP-004 必须由新的端到端场景测试取代为主证据。"
+
+test_architecture:
+  primary_evidence_layer: "新增场景驱动的 headless E2E 设计，入口必须是用户可见的工具切换、拖拽、确认与场景推进，而不是 domain 直调。"
+  retained_regression_layer: "保留 `tests/domain/floor-selection.test.ts`、`tests/headless/zone-create.test.ts`、以及必要的世界网格/占用规则回归，只用于保护几何与规则实现，不作为玩家验收主证据。"
+  evidence_hierarchy:
+    - "第一层：MAP-001 到 MAP-004 的端到端场景验收。"
+    - "第二层：几何、占用、冲突、边界裁切等局部回归。"
+    - "第三层：实现细节级断言，仅在回归测试中使用。"
+  reuse_boundaries:
+    - "可以复用场景数据、网格配置和基础实体分布。"
+    - "不能复用‘只看内部状态’的断言逻辑作为主验收。"
+    - "不能让 floor-selection 或 occupancy 单测替代玩家路径。"
+  scenario_runner_notes:
+    - "无头测试只模拟玩家操作和场景推进。"
+    - "验收点必须能映射到地图反馈、选区反馈、冲突反馈或裁切反馈。"
+
+out_of_scope:
+  - "不修改任何测试代码、源码或任务树。"
+  - "不在本文件中实现新的测试场景。"
+  - "不把 domain 直调、内部集合断言或实现函数单测当作主验收。"
+  - "不调整地图系统的玩法规则，只设计测试重构方案。"
+  - "不覆盖与地图选区、地图初始态、冲突拦截、越界过滤无关的其他模块。"
+
+deliverable_checklist:
+  - "已覆盖 MAP-001 到 MAP-004，且没有遗漏任何 scenario_id。"
+  - "每个场景都写明了玩家验收流程、预期目标和地图反馈。"
+  - "已明确禁止只用 floor-selection 或 occupancy 级测试充当主验收。"
+  - "已区分哪些旧测试仅保留为几何/规则回归，哪些需要由新的端到端测试取代为主证据。"
+  - "文件只包含设计文档内容，不包含任何测试实现或源码修改。"

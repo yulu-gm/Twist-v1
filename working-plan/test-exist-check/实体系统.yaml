@@ -1,0 +1,162 @@
+# oh-acceptance「实体系统」模块：无头 / 玩家可验收测试存在性审计（契约见 working-plan/module-test-exist-check.schema.yml）
+schema_version: "1.0"
+document_role: "oh-acceptance_module_test_existence_audit"
+
+module_id: "实体系统"
+module_name: "实体系统"
+source_acceptance_file: "oh-acceptance/实体系统.yaml"
+
+audit_rules:
+  headless_required: true
+  player_acceptance_required: true
+
+scenarios:
+  - scenario_id: "ENTITY-001"
+    scenario_name: "树木被伐木完成转为木头物资"
+    intent: "验证实体生命周期转换：树木实体在伐木完成后被销毁并生成新的木头物资实体"
+    headless:
+      status: exists
+      evidence:
+        test_files:
+          - "tests/headless/chop-tree-full-flow.test.ts"
+        code_hits:
+          - path: "tests/headless/chop-tree-full-flow.test.ts"
+            symbol: "runScenarioHeadless"
+            note: "传入 CHOP_TREE_FULL_FLOW_SCENARIO；断言树消失且存在 materialKind=wood 的 resource"
+        scenario_binding:
+          scenario_export: "CHOP_TREE_FULL_FLOW_SCENARIO"
+          scenario_file: "scenarios/chop-tree-full-flow.scenario.ts"
+        alignment_note: >
+          完整场景 headless：lumber 工单闭环后期望 entity-kind-absent(tree) 且存在 resource，与验收「树移除、原格生成木头」一致。
+          验收文档 then 写木头「散落、未被标记可拾取」；当前实现与 tests/headless/chop-work-complete.test.ts 显示 completeWorkItem 后 wood 的 pickupAllowed 为 true，属文档/实现差异，未改变无头场景与 ENTITY-001 的主干对齐。
+          局部规则（不计 schema 之 headless.exists）：tests/domain/lifecycle-rules.test.ts 中 transformTreeToResource（entity 注册表层）；
+          tests/headless/chop-work-complete.test.ts 仅 createWorldCore + completeWorkItem，无 runScenarioHeadless/createHeadlessSim，依契约不计入无头 exists。
+        near_misses: []
+    player_acceptance:
+      status: missing
+      evidence:
+        scenario_file: "scenarios/chop-tree-full-flow.scenario.ts"
+        in_all_scenarios: true
+        manual_acceptance_declared:
+          has_steps: false
+          has_outcomes: false
+        hud_entry: "index.html#yaml-scenario-panel；HudManager.syncYamlScenarioManualHints"
+        near_misses: []
+    notes: >
+      局部规则补充：tests/domain/lifecycle-rules.test.ts（transformTreeToResource）；
+      WorldCore 直连工单：tests/headless/chop-work-complete.test.ts。
+
+  - scenario_id: "ENTITY-002"
+    scenario_name: "物资被拾取、携带与放下"
+    intent: "验证物资实体在散落、携带、存储状态之间的转换及关系一致性"
+    headless:
+      status: exists
+      evidence:
+        test_files:
+          - "tests/headless/chop-haul-full-chain.test.ts"
+        code_hits:
+          - path: "tests/headless/chop-haul-full-chain.test.ts"
+            symbol: "runScenarioHeadless"
+            note: "CHOP_HAUL_FULL_CHAIN_SCENARIO；含 createHeadlessSim 于第二用例"
+          - path: "tests/headless/chop-haul-full-chain.test.ts"
+            symbol: "createHeadlessSim"
+            note: "hydrate + submit lumber 后 runAllExpectations"
+        scenario_binding:
+          scenario_export: "CHOP_HAUL_FULL_CHAIN_SCENARIO"
+          scenario_file: "scenarios/chop-haul-full-chain.scenario.ts"
+        alignment_note: >
+          完整场景 headless：伐木 → pick-up-resource → haul-to-zone 全链路与期望 work-item-completed-kind、resource-in-container(zone)，覆盖拾取、携带、放入存储区（放下入库）。
+          局部规则 / 工单单测（非完整 scenario headless）：tests/domain/lifecycle-rules.test.ts（pickUpResource、dropResource 于 entity 注册表）；
+          tests/headless/pickup-work-complete.test.ts、tests/headless/haul-work-complete.test.ts 仅 WorldCore claim/completeWorkItem，无 runScenarioHeadless/createHeadlessSim。
+        near_misses: []
+    player_acceptance:
+      status: missing
+      evidence:
+        scenario_file: "scenarios/chop-haul-full-chain.scenario.ts"
+        in_all_scenarios: true
+        manual_acceptance_declared:
+          has_steps: false
+          has_outcomes: false
+        hud_entry: "index.html#yaml-scenario-panel；HudManager.syncYamlScenarioManualHints"
+        near_misses: []
+    notes: >
+      局部规则：tests/domain/lifecycle-rules.test.ts；WorldCore 工单：tests/headless/pickup-work-complete.test.ts、tests/headless/haul-work-complete.test.ts。
+
+  - scenario_id: "ENTITY-003"
+    scenario_name: "蓝图建造完成转为建筑实体"
+    intent: "验证建筑蓝图实体在进度达到100%后转化为真实的建筑实体"
+    headless:
+      status: exists
+      evidence:
+        test_files:
+          - "tests/headless/build-wall-flow.test.ts"
+        code_hits:
+          - path: "tests/headless/build-wall-flow.test.ts"
+            symbol: "runScenarioHeadless"
+            note: "BUILD_WALL_FLOW_SCENARIO；期望 construct-blueprint 完成且 building-present(wall)"
+          - path: "tests/headless/build-wall-flow.test.ts"
+            symbol: "createHeadlessSim"
+            note: "多例笔刷/autoClaim 回归与场景 seed 一致"
+        scenario_binding:
+          scenario_export: "BUILD_WALL_FLOW_SCENARIO"
+          scenario_file: "scenarios/build-wall-flow.scenario.ts"
+        alignment_note: >
+          完整场景 headless：玩家路径 build+墙笔刷 → construct-blueprint 工单完成 → 木墙建筑实体，与验收「蓝图落成木墙」一致。
+          局部规则：tests/domain/lifecycle-rules.test.ts 中 transformBlueprintToBuilding 以 bed 为例，非木墙，仅验证同类生命周期 API。
+        near_misses: []
+    player_acceptance:
+      status: exists
+      evidence:
+        scenario_file: "scenarios/build-wall-flow.scenario.ts"
+        in_all_scenarios: true
+        manual_acceptance_declared:
+          has_steps: true
+          has_outcomes: true
+        hud_entry: "index.html#yaml-scenario-panel；HudManager.syncYamlScenarioManualHints"
+        near_misses: []
+    notes: "ALL_SCENARIOS 注册见 scenarios/index.ts 中的 BUILD_WALL_FLOW_SCENARIO。"
+
+  - scenario_id: "ENTITY-004"
+    scenario_name: "实体归属关系的一致性保护"
+    intent: "验证一个物资不能同时被两个小人携带，或同时处于散落和存储状态"
+    headless:
+      status: missing
+      evidence:
+        test_files: []
+        code_hits: []
+        scenario_binding:
+          scenario_export: null
+          scenario_file: null
+        alignment_note: >
+          tests/headless 下无 runScenarioHeadless/createHeadlessSim 绑定「非法双重携带 / 非法状态迁移被拦截」的 ScenarioDefinition；
+          仅有领域层校验与单元断言，不构成完整无头场景证据。
+        near_misses:
+          - hit_paths:
+              - "tests/domain/relationship-rules.test.ts"
+              - "tests/domain/lifecycle-rules.test.ts"
+            reason: >
+              含 validateCarrying、validateResourceLocation、pickUpResource 的 pawn-already-carrying 等，覆盖关系/位置一致性的一部分，
+              但未通过无头 runner 模拟「小人 A 携带时系统尝试分配给 B 或入库」的端到端场景，无法按契约记为 headless exists。
+    player_acceptance:
+      status: missing
+      evidence:
+        scenario_file: null
+        in_all_scenarios: false
+        manual_acceptance_declared:
+          has_steps: false
+          has_outcomes: false
+        hud_entry: "index.html#yaml-scenario-panel；HudManager.syncYamlScenarioManualHints"
+        near_misses: []
+    notes: >
+      局部规则测试证据：tests/domain/relationship-rules.test.ts（validateCarrying、validateResourceLocation、床归属等）；
+      tests/domain/lifecycle-rules.test.ts（pickUpResource 拒绝已携带另一物资等）。
+      与 ENTITY-004 验收「双小人争夺携带」的叙述未逐字对齐，故 headless 记 missing 而非 needs-manual-judgement。
+
+summary:
+  headless_coverage: "4 条中 3 条有完整场景 headless（ENTITY-001/002/003）；ENTITY-004 仅有领域层关系/携带规则单测，无 runScenarioHeadless/createHeadlessSim。"
+  player_acceptance_coverage: "仅 ENTITY-003 在 scenarios 源码中声明非空 manualAcceptance 且已注册 ALL_SCENARIOS；ENTITY-001/002 场景已注册但无 manualAcceptance；ENTITY-004 无对应可玩场景。"
+  last_audited_at: "2026-04-06"
+  auditor_notes: >
+    区分说明：完整场景 headless 以 tests 内 runScenarioHeadless/createHeadlessSim + 导出 SCENARIO 对齐为准；
+    tests/headless/chop-work-complete、pickup-work-complete、haul-work-complete 虽在 headless 目录，但属 WorldCore 工单直连单测，依 T-00 契约不计入 headless.exists。
+    docs/ai/index 中 world-core 与实体相关测试索引见 docs/ai/index/README.md、system-index.json（legacy）。

@@ -1,3 +1,7 @@
+/**
+ * refactor-test：无头模拟器与帧步进底层回归；不承担 TIME-004 场景语义主验收。
+ * TIME-004 主证据：`tests/headless/time-frame-gap-guard.test.ts` + `time-frame-gap-guard.scenario.ts`。
+ */
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";

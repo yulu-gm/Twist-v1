@@ -3,6 +3,7 @@
  * - `obstacle-avoidance-eat`：面板 / runScenarioHeadless 与 Vitest 对齐。
  * - 进食绕行：`hydrate` 后继续模拟，直至小人离开起点；复盘 `pawn-moved` 不落石格。
  * - 建造：`build_wall_blueprint` 链路与 `build-wall-flow` 一致，另在远距格放石验证「不踩该格」。
+ * refactor-test：本场景不在 36 个 `scenario_id` 清单内；作为 ALL_SCENARIOS 扩展回归，由 `scenario-runner.test.ts` 冒烟覆盖。
  */
 import { describe, expect, it } from "vitest";
 import { DEFAULT_SIM_CONFIG } from "../../src/game/behavior";

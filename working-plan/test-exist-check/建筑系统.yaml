@@ -1,0 +1,158 @@
+schema_version: "1.0"
+document_role: "oh-acceptance_module_test_existence_audit"
+
+module_id: "建筑系统"
+module_name: "建筑系统"
+source_acceptance_file: "oh-acceptance/建筑系统.yaml"
+
+audit_rules:
+  headless_required: true
+  player_acceptance_required: true
+
+scenarios:
+  - scenario_id: "BUILD-001"
+    scenario_name: "基础墙体蓝图放置与建造"
+    intent: "验证玩家可以通过拖拽绘制墙体蓝图，并且小人能完成建造将其转化为实体"
+    headless:
+      status: exists
+      evidence:
+        test_files:
+          - "tests/headless/build-wall-flow.test.ts"
+          - "tests/headless/story-1-day-one.test.ts"
+        code_hits:
+          - path: "tests/headless/build-wall-flow.test.ts"
+            symbol: "createHeadlessSim"
+            note: "commitPlayerSelection(build+brush-stroke) → 蓝图与 construct-blueprint；亦含 runScenarioHeadless(BUILD_WALL_FLOW_SCENARIO)"
+          - path: "tests/headless/build-wall-flow.test.ts"
+            symbol: "runScenarioHeadless"
+            note: "BUILD_WALL_FLOW_SCENARIO 期望工单与 building-present(wall)"
+          - path: "tests/headless/story-1-day-one.test.ts"
+            symbol: "createHeadlessSim"
+            note: "T-27 集成段 e：domain submit 墙蓝图 → 认领 → 落成 wall（注释标 BUILD-001）"
+        scenario_binding:
+          scenario_export: "BUILD_WALL_FLOW_SCENARIO"
+          scenario_file: "scenarios/build-wall-flow.scenario.ts"
+        alignment_note: >
+          领域侧：多格/单格笔刷提交、`construct-blueprint` 工单与落成 `buildingKind: wall` 与验收 domain_state 对齐。
+          未在无头中断言验收 then 的 presentation：蓝图虚影、建造动作/读条 UI、木墙模型表现。
+        near_misses: []
+    player_acceptance:
+      status: exists
+      evidence:
+        scenario_file: "scenarios/build-wall-flow.scenario.ts"
+        in_all_scenarios: true
+        manual_acceptance_declared:
+          has_steps: true
+          has_outcomes: true
+        hud_entry: "index.html#yaml-scenario-panel；HudManager.syncYamlScenarioManualHints"
+        near_misses: []
+    notes: ""
+
+  - scenario_id: "BUILD-002"
+    scenario_name: "木床建造完成后的自动分配"
+    intent: "验证木床建成后会自动分配给没有床铺的小人"
+    headless:
+      status: exists
+      evidence:
+        test_files:
+          - "tests/headless/bed-auto-assign.test.ts"
+          - "tests/headless/story-1-day-one.test.ts"
+        code_hits:
+          - path: "tests/headless/bed-auto-assign.test.ts"
+            symbol: "runScenarioHeadless"
+            note: "BED_AUTO_ASSIGN_SCENARIO；通过后断言 restSpots 中该床 ownerPawnId 已定义"
+          - path: "tests/headless/story-1-day-one.test.ts"
+            symbol: "createHeadlessSim"
+            note: "集成段 f：床落成后 restSpot 归属（注释标 BUILD-002）"
+        scenario_binding:
+          scenario_export: "BED_AUTO_ASSIGN_SCENARIO"
+          scenario_file: "scenarios/bed-auto-assign.scenario.ts"
+        alignment_note: >
+          领域侧：落成床实体且 restSpot 与无床小人绑定，与验收 domain_state 一致。
+          未在无头中断言 presentation「选中床铺时 UI 显示所有者为该小人」。
+          tests/domain/build-flow.test.ts 走 entity-registry 流程且未调用 runScenarioHeadless/createHeadlessSim，按统一契约不计入无头存在性主证据。
+        near_misses: []
+    player_acceptance:
+      status: exists
+      evidence:
+        scenario_file: "scenarios/bed-auto-assign.scenario.ts"
+        in_all_scenarios: true
+        manual_acceptance_declared:
+          has_steps: true
+          has_outcomes: true
+        hud_entry: "index.html#yaml-scenario-panel；HudManager.syncYamlScenarioManualHints"
+        near_misses: []
+    notes: >
+      另有 scenarios/build-bed-flow.scenario.ts（BUILD_BED_FLOW_SCENARIO）侧重蓝图认领至落成，manualAcceptance 说明浏览器内需认领路径；
+      与「建成即自动分配」的 BUILD-002 主路径相比，自动分配叙事以 bed-auto-assign 更贴切。
+
+  - scenario_id: "BUILD-003"
+    scenario_name: "非法位置的蓝图放置拦截"
+    intent: "验证在被阻挡或非法的地块上无法放置建筑蓝图"
+    headless:
+      status: missing
+      evidence:
+        test_files: []
+        code_hits: []
+        scenario_binding:
+          scenario_export: null
+          scenario_file: null
+        alignment_note: >
+          tests/headless 下未检索到对「在已被阻挡格提交 build_wall_blueprint / place_furniture:bed」并断言
+          不产生蓝图实体、不产生 construct-blueprint 工单的用例；领域实现上对失败格为 skip 汇总消息且 result.accepted 仍为 true，
+          与验收文「返回空间不合法」的表述是否一致亦无无头锁定。
+        near_misses:
+          - hit_paths:
+              - "tests/headless/zone-create.test.ts"
+            reason: "阻挡格上拒绝的是 zone_create，非建筑蓝图放置链路"
+          - hit_paths:
+              - "tests/domain/apply-domain-command.test.ts"
+            reason: "generic intent 对 blocked 格拒绝，非 build_wall_blueprint/place_furniture:bed 专用断言"
+    player_acceptance:
+      status: missing
+      evidence:
+        scenario_file: null
+        in_all_scenarios: false
+        manual_acceptance_declared:
+          has_steps: false
+          has_outcomes: false
+        hud_entry: "index.html#yaml-scenario-panel；HudManager.syncYamlScenarioManualHints"
+        near_misses: []
+    notes: ""
+
+  - scenario_id: "BUILD-004"
+    scenario_name: "床铺数量多于无床小人时的分配"
+    intent: "验证当建成的床铺多于需要的小人时，多余的床铺保持无归属状态"
+    headless:
+      status: exists
+      evidence:
+        test_files:
+          - "tests/headless/bed-auto-assign.test.ts"
+        code_hits:
+          - path: "tests/headless/bed-auto-assign.test.ts"
+            symbol: "createHeadlessSim"
+            note: "用例名「BUILD-004：全员有床时…」；placeBlueprint×3 + runUntil 后断言 restSpots 中恰 1 个 ownerPawnId 为空"
+        scenario_binding:
+          scenario_export: null
+          scenario_file: null
+        alignment_note: >
+          无导出的 ScenarioDefinition 常量；内联种子与多床落成路径与 BUILD-004 domain_state（多余床无 owner）对齐。
+          未覆盖 presentation「选中该木床时 UI 显示无所有者」。
+        near_misses: []
+    player_acceptance:
+      status: missing
+      evidence:
+        scenario_file: null
+        in_all_scenarios: false
+        manual_acceptance_declared:
+          has_steps: false
+          has_outcomes: false
+        hud_entry: "index.html#yaml-scenario-panel；HudManager.syncYamlScenarioManualHints"
+        near_misses: []
+    notes: ""
+
+summary:
+  headless_coverage: "共 4 条场景：无头 exists 为 BUILD-001、BUILD-002、BUILD-004，missing 为 BUILD-003。其中 headless 与 player_acceptance 同时为 exists 的场景数量：2（BUILD-001、BUILD-002）。"
+  player_acceptance_coverage: "共 4 条场景：玩家验收 exists 为 BUILD-001、BUILD-002，missing 为 BUILD-003、BUILD-004。双模式（无头 + 玩家验收）均具备的场景数量：2，与 headless_coverage 计数一致。"
+  last_audited_at: "2026-04-06"
+  auditor_notes: "registry 以 scenarios/index.ts 的 ALL_SCENARIOS 为准；docs/ai/index 仅作 legacy 桥接参考。全模块 4 条中，双模式均为 exists 计 2 条。"

@@ -50,9 +50,13 @@ export {
 export type {
   ScenarioDefinition,
   ScenarioExpectation,
+  ScenarioPlayerInputSemantic,
+  ScenarioPlayerInputShape,
   ScenarioPlayerSelectionAfterHydrate,
   ScenarioResourceSpawn,
   ScenarioTreeSpawn,
+  ScenarioUiObservation,
+  ScenarioWorldPortConfig,
   ScenarioZoneSpawn
 } from "./scenario-types";
 
@@ -63,11 +67,30 @@ export {
 } from "./scenario-runner";
 
 export {
+  assertPlayerInputSemantic,
+  assertVisibleFailureFeedback,
+  assertVisibleHudTime,
+  assertVisibleOwnership,
+  assertVisibleWorkItemState,
+  captureVisibleState,
+  recordScenarioPlayerSelection,
+  resolveScenarioPlayerInputSemantic,
+  type ScenarioHydrationResult,
+  type ScenarioPlayerSelectionRecord,
+  type VisibleFeedbackSnapshot,
+  type VisibleHudSnapshot,
+  type VisibleOwnershipSnapshot,
+  type VisibleStateSnapshot,
+  type VisibleWorkItemSnapshot
+} from "./scenario-observers";
+
+export {
   allWorkCompleted,
   anyPawnStartsGoal,
   assertEntityKindAbsent,
   assertEntityKindExists,
   assertEventOccurred,
+  assertEventSequence,
   assertNoPawnStarved,
   assertPawnAtCell,
   assertResourceInContainer,

@@ -1,3 +1,6 @@
+/**
+ * refactor-test：占用栅格域回归；MAP-003 主证据以 `tests/headless/map-blocked-placement.test.ts` 为准。
+ */
 import { describe, expect, it } from "vitest";
 
 import {

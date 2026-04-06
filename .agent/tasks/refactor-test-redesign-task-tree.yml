@@ -1,0 +1,366 @@
+# 测试重构设计任务树
+# 范围：仅输出设计文档，不实现、不修改任何测试代码
+# 输出：working-plan/refactor-test/{模块名}.yaml
+
+task_name: "基于 test-exist-check 为 9 个模块设计端到端测试重构方案，并按模块输出 YAML 设计稿"
+created_at: "2026-04-06"
+status: "completed"
+
+tasks:
+  - id: "T-00"
+    title: "建立 refactor-test 设计契约与统一输出结构"
+    status: "completed"
+    dependencies: []
+    context:
+      read_files:
+        - "working-plan/module-test-exist-check.schema.yml"
+        - "working-plan/headless-sim.yml"
+        - "src/headless/scenario-types.ts"
+        - "scenarios/index.ts"
+        - ".agent/skills/generate-task-tree/SKILL.md"
+      reference_docs:
+        - "working-plan/test-exist-check/需求系统.yaml"
+        - "working-plan/test-exist-check/UI系统.yaml"
+    action: |
+      1. 创建目录 `working-plan/refactor-test/`，并新增契约文件 `working-plan/refactor-test/refactor-test-design.schema.yml`。
+      2. 在契约中定义所有模块设计稿必须统一包含的字段，至少包括：
+         - `module_id`、`module_name`、`source_acceptance_file`、`source_audit_file`
+         - `design_scope`
+         - `refactor_objectives`
+         - `global_constraints`
+         - `scenario_redesign[]`
+         - `test_architecture`
+         - `out_of_scope`
+         - `deliverable_checklist`
+      3. 在 `scenario_redesign[]` 的每条记录中，明确要求包含：
+         - `scenario_id`、`current_status_summary`
+         - `current_mismatch`
+         - `user_acceptance_flow.steps`
+         - `user_acceptance_flow.expected_goal`
+         - `user_acceptance_flow.visible_feedback`
+         - `e2e_test_strategy.user_actions`
+         - `e2e_test_strategy.assertions`
+         - `e2e_test_strategy.forbidden_shortcuts`
+         - `migration_notes`
+      4. 在契约中明确以下全局约束：
+         - 这次工作只设计测试，不实现测试、不改测试代码。
+         - 无头测试必须只模拟用户操作与场景推进，不得以 domain 直调替代真实业务路径。
+         - 每个场景都必须补齐“操作顺序、预期目标、可见反馈”三类信息。
+         - 需要区分“已有可复用测试”、“需要废弃的 domain/局部无头测试”、“需要新增的端到端测试设计”。
+    acceptance_criteria: |
+      - [ ] Read: `working-plan/refactor-test/refactor-test-design.schema.yml` 存在，且包含 `scenario_redesign`、`user_acceptance_flow`、`e2e_test_strategy`、`forbidden_shortcuts`、`out_of_scope` 字段。
+      - [ ] Grep: 契约文件中必须明确出现 `仅设计，不实现测试` 与 `无头测试必须只模拟用户操作` 两条约束。
+      - [ ] Grep: 契约文件中必须明确要求输出路径为 `working-plan/refactor-test/{模块名}.yaml`。
+
+  - id: "T-01"
+    title: "设计需求系统的测试重构方案"
+    status: "completed"
+    dependencies: ["T-00"]
+    context:
+      read_files:
+        - "oh-acceptance/需求系统.yaml"
+        - "working-plan/test-exist-check/需求系统.yaml"
+        - "tests/headless/pawn-eats-when-hungry.test.ts"
+        - "tests/headless/pawn-sleeps-when-tired.test.ts"
+        - "tests/headless/need-interrupt-during-work.test.ts"
+      reference_docs:
+        - "scenarios/pawn-eats-when-hungry.scenario.ts"
+        - "scenarios/night-forces-sleep.scenario.ts"
+    action: |
+      1. 创建 `working-plan/refactor-test/需求系统.yaml`，遵循 T-00 契约。
+      2. 按 `NEED-001` 至 `NEED-004` 逐条记录当前问题，重点写清：
+         - 现有用例哪些只是阈值侧的局部切片，未真实模拟“时间推进导致需求变化”。
+         - `NEED-003` 当前是“工作被饥饿打断”，并不是“进食过程被打断”。
+         - `NEED-004` 当前缺少触底边界与用户可见反馈设计。
+      3. 为每条场景重新设计用户验收流程，明确：
+         - 玩家如何加载场景、等待时间推进或触发操作。
+         - 玩家应看到的小人行为变化、需求条/提示变化、结果完成条件。
+      4. 为每条场景重新设计端到端无头测试方案，要求只通过场景加载、用户输入、时间推进、观察结果完成断言，不得直接调用 need/domain 规则函数代替业务链路。
+      5. 标记哪些旧测试保留为底层回归参考，哪些不再作为主验收证据。
+    acceptance_criteria: |
+      - [ ] Read: `working-plan/refactor-test/需求系统.yaml` 存在，且包含 `NEED-001`、`NEED-002`、`NEED-003`、`NEED-004`。
+      - [ ] Grep: 文件中必须明确出现 `进食过程被打断`、`工作被饥饿打断`、`触底边界` 三个区分点。
+      - [ ] Grep: 每条场景都必须包含 `user_acceptance_flow`、`visible_feedback`、`forbidden_shortcuts`。
+
+  - id: "T-02"
+    title: "设计时间系统的测试重构方案"
+    status: "completed"
+    dependencies: ["T-00"]
+    context:
+      read_files:
+        - "oh-acceptance/时间系统.yaml"
+        - "working-plan/test-exist-check/时间系统.yaml"
+        - "tests/headless/headless-sim-basic.test.ts"
+        - "tests/headless/night-forces-sleep.test.ts"
+        - "tests/domain/time-of-day.test.ts"
+      reference_docs:
+        - "scenarios/night-forces-sleep.scenario.ts"
+        - "tests/domain/time-event-bus.test.ts"
+    action: |
+      1. 创建 `working-plan/refactor-test/时间系统.yaml`，遵循 T-00 契约。
+      2. 按 `TIME-001` 至 `TIME-004` 逐条记录当前缺口，重点写清：
+         - 现有测试多数停留在 domain 级或静态夜晚起始态，缺少“跨阈值推进”的端到端过程。
+         - 缺少跨天归一化、暂停冻结、极端帧间隔保护的可玩验收流程。
+      3. 为每条场景设计真实用户视角的验收步骤，明确：
+         - 玩家先看到什么时间状态。
+         - 玩家等待、暂停、恢复或观察到的时钟/昼夜/日期变化。
+         - 可见反馈如何证明该场景通过。
+      4. 为每条场景设计新的无头端到端策略，必须以“加载场景 -> 推进时间/触发暂停 -> 观察时间与行为结果”为主链路，不得用单独调用时间纯函数代替。
+      5. 补充需要新建的 playable scenario 设计点，特别是 TIME-002、TIME-003、TIME-004。
+    acceptance_criteria: |
+      - [ ] Read: `working-plan/refactor-test/时间系统.yaml` 存在，且包含 `TIME-001`、`TIME-002`、`TIME-003`、`TIME-004`。
+      - [ ] Grep: 文件中必须明确出现 `跨阈值推进`、`跨天归一化`、`暂停冻结`、`极端帧间隔保护`。
+      - [ ] Grep: 每条场景都必须包含基于 `加载场景 -> 推进时间/触发暂停 -> 观察结果` 的端到端描述。
+
+  - id: "T-03"
+    title: "设计行为系统的测试重构方案"
+    status: "completed"
+    dependencies: ["T-00"]
+    context:
+      read_files:
+        - "oh-acceptance/行为系统.yaml"
+        - "working-plan/test-exist-check/行为系统.yaml"
+        - "tests/headless/auto-claim-work.test.ts"
+        - "tests/headless/need-interrupt-during-work.test.ts"
+        - "tests/domain/goal-driven-planning.test.ts"
+      reference_docs:
+        - "scenarios/multi-pawn-colony.scenario.ts"
+        - "scenarios/need-interrupt-during-work.scenario.ts"
+    action: |
+      1. 创建 `working-plan/refactor-test/行为系统.yaml`，遵循 T-00 契约。
+      2. 按 `BEHAVIOR-001` 至 `BEHAVIOR-004` 逐条记录当前问题，重点写清：
+         - 散步、无资源降级仍主要停留在 domain/近似场景，缺少可直接对应用户观察的端到端流程。
+         - 工作转执行、需求打断工作已有部分 headless，但操作顺序和玩家可见反馈仍不完整。
+      3. 为每条场景重建设计：
+         - 玩家从何种初始局面进入。
+         - 玩家不做或只做哪些触发动作。
+         - 小人目标、移动、放弃工作、降级行为等如何被可见反馈证明。
+      4. 设计新的无头测试路线，必须让测试只模拟场景推进和用户输入，不得通过直接调用 planner/state-machine 函数替代。
+      5. 单独列出 `BEHAVIOR-001` 的散步场景与 `BEHAVIOR-004` 的无资源降级场景应新增哪些 scenario 设计。
+    acceptance_criteria: |
+      - [ ] Read: `working-plan/refactor-test/行为系统.yaml` 存在，且包含 `BEHAVIOR-001`、`BEHAVIOR-002`、`BEHAVIOR-003`、`BEHAVIOR-004`。
+      - [ ] Grep: 文件中必须明确出现 `散步`、`工作转执行`、`需求打断`、`无资源降级` 四类重构焦点。
+      - [ ] Grep: 文件中必须明确禁止用 `planner/state-machine` 直调代替端到端测试。
+
+  - id: "T-04"
+    title: "设计工作系统的测试重构方案"
+    status: "completed"
+    dependencies: ["T-00"]
+    context:
+      read_files:
+        - "oh-acceptance/工作系统.yaml"
+        - "working-plan/test-exist-check/工作系统.yaml"
+        - "tests/headless/chop-haul-full-chain.test.ts"
+        - "tests/headless/haul-mark-pickup.test.ts"
+        - "tests/headless/stale-work-cleanup.test.ts"
+      reference_docs:
+        - "scenarios/chop-haul-full-chain.scenario.ts"
+        - "scenarios/haul-mark-pickup.scenario.ts"
+        - "scenarios/build-bed-flow.scenario.ts"
+    action: |
+      1. 创建 `working-plan/refactor-test/工作系统.yaml`，遵循 T-00 契约。
+      2. 按 `WORK-001` 至 `WORK-004` 逐条记录当前问题，重点写清：
+         - 哪些已有测试是完整链路，哪些只是局部链路或不同触发路径的近似覆盖。
+         - 多人争抢、散落物资搬运、目标消失清理目前与用户视角流程的差距。
+      3. 为每条场景设计新的用户验收流程，必须明确：
+         - 玩家先做什么标记/建造/选择操作。
+         - 小人如何认领、执行、失败回退或互斥。
+         - 玩家能看到哪些工单、实体、结果反馈。
+      4. 为每条场景设计新的无头端到端方案，要求只通过用户命令入口和仿真推进来驱动，不得通过直接 claim/complete work 等底层调用替代。
+      5. 明确哪些旧的 WorldCore 直连测试仅保留为底层回归，不再承担主验收职责。
+    acceptance_criteria: |
+      - [ ] Read: `working-plan/refactor-test/工作系统.yaml` 存在，且包含 `WORK-001`、`WORK-002`、`WORK-003`、`WORK-004`。
+      - [ ] Grep: 文件中必须明确出现 `完整链路`、`局部链路`、`多人争抢`、`目标消失清理`。
+      - [ ] Grep: 文件中必须明确禁止 `claimWorkItem`、`completeWorkItem` 一类直连调用作为主验收路径。
+
+  - id: "T-05"
+    title: "设计实体系统的测试重构方案"
+    status: "completed"
+    dependencies: ["T-00"]
+    context:
+      read_files:
+        - "oh-acceptance/实体系统.yaml"
+        - "working-plan/test-exist-check/实体系统.yaml"
+        - "tests/headless/chop-tree-full-flow.test.ts"
+        - "tests/headless/chop-haul-full-chain.test.ts"
+        - "tests/headless/build-wall-flow.test.ts"
+      reference_docs:
+        - "tests/domain/lifecycle-rules.test.ts"
+        - "tests/domain/relationship-rules.test.ts"
+    action: |
+      1. 创建 `working-plan/refactor-test/实体系统.yaml`，遵循 T-00 契约。
+      2. 按 `ENTITY-001` 至 `ENTITY-004` 逐条记录当前问题，重点写清：
+         - 生命周期转换类已有 headless 证据，但用户验收流程和可见反馈不完整。
+         - 关系一致性保护仍停留在规则级测试，缺少双小人争夺/非法状态迁移的端到端设计。
+      3. 为每条场景设计用户操作与观察路径，明确树变木头、物资携带放下、蓝图转建筑、归属冲突保护分别如何被用户看见。
+      4. 为每条场景设计新的无头端到端策略，只允许通过真实的业务触发路径产生实体状态迁移，不得用 lifecycle/relationship 纯函数直接代替。
+      5. 特别补齐 `ENTITY-004` 的冲突场景设计，要求包含用户触发、系统拒绝、可见反馈三部分。
+    acceptance_criteria: |
+      - [ ] Read: `working-plan/refactor-test/实体系统.yaml` 存在，且包含 `ENTITY-001`、`ENTITY-002`、`ENTITY-003`、`ENTITY-004`。
+      - [ ] Grep: 文件中必须明确出现 `树变木头`、`携带与放下`、`蓝图转建筑`、`一致性保护`。
+      - [ ] Grep: 文件中必须明确禁止用 `transformTreeToResource`、`pickUpResource`、`validateCarrying` 一类规则函数代替端到端测试。
+
+  - id: "T-06"
+    title: "设计地图系统的测试重构方案"
+    status: "completed"
+    dependencies: ["T-00"]
+    context:
+      read_files:
+        - "oh-acceptance/地图系统.yaml"
+        - "working-plan/test-exist-check/地图系统.yaml"
+        - "tests/headless/story-1-day-one.test.ts"
+        - "tests/headless/zone-create.test.ts"
+        - "tests/domain/floor-selection.test.ts"
+      reference_docs:
+        - "scenarios/story-1-day-one.scenario.ts"
+        - "scenarios/zone-create.scenario.ts"
+    action: |
+      1. 创建 `working-plan/refactor-test/地图系统.yaml`，遵循 T-00 契约。
+      2. 按 `MAP-001` 至 `MAP-004` 逐条记录当前问题，重点写清：
+         - 地图初始态与存储区创建已有部分无头，但玩家验收脚本缺失。
+         - 建筑占用冲突拦截与越界选区过滤仍缺少真正从用户操作出发的端到端设计。
+      3. 为每条场景设计用户验收流程，明确：
+         - 首帧地图应看到哪些实体。
+         - 拖拽合法区域、拖拽越界区域、尝试在阻挡格放置时的操作顺序。
+         - 成功/失败时应看到的地图反馈。
+      4. 为每条场景设计新的无头测试方案，要求从场景加载、选区拖拽、建造/区域命令提交出发，不得只验证几何函数或 occupancy 纯规则。
+      5. 明确哪些旧测试仅保留为几何/规则回归，哪些需要被新的端到端测试取代为主证据。
+    acceptance_criteria: |
+      - [ ] Read: `working-plan/refactor-test/地图系统.yaml` 存在，且包含 `MAP-001`、`MAP-002`、`MAP-003`、`MAP-004`。
+      - [ ] Grep: 文件中必须明确出现 `地图初始态`、`合法选区`、`占用冲突拦截`、`越界过滤`。
+      - [ ] Grep: 文件中必须明确禁止只用 `floor-selection` 或 `occupancy` 级测试充当主验收。
+
+  - id: "T-07"
+    title: "设计建筑系统的测试重构方案"
+    status: "completed"
+    dependencies: ["T-00"]
+    context:
+      read_files:
+        - "oh-acceptance/建筑系统.yaml"
+        - "working-plan/test-exist-check/建筑系统.yaml"
+        - "tests/headless/build-wall-flow.test.ts"
+        - "tests/headless/bed-auto-assign.test.ts"
+        - "tests/headless/build-bed-flow.test.ts"
+      reference_docs:
+        - "scenarios/build-wall-flow.scenario.ts"
+        - "scenarios/bed-auto-assign.scenario.ts"
+        - "scenarios/build-bed-flow.scenario.ts"
+    action: |
+      1. 创建 `working-plan/refactor-test/建筑系统.yaml`，遵循 T-00 契约。
+      2. 按 `BUILD-001` 至 `BUILD-004` 逐条记录当前问题，重点写清：
+         - 正向建墙、建床、自动分配已有部分覆盖，但可见反馈与玩家操作链仍需标准化。
+         - 非法位置拦截、多余床铺无归属缺少完整玩家流程和统一端到端设计。
+      3. 为每条场景设计用户验收流程，明确从工具选择、绘制或单点放置，到蓝图落成、归属变化、失败反馈的完整顺序。
+      4. 为每条场景设计新的无头端到端测试策略，只允许通过 build 工具和真实提交路径驱动，不得直接 placeBlueprint 或调用 build-flow 级底层函数代替。
+      5. 对 `BUILD-003`、`BUILD-004` 单独补充需要新增的 scenario 设计与可见反馈说明。
+    acceptance_criteria: |
+      - [ ] Read: `working-plan/refactor-test/建筑系统.yaml` 存在，且包含 `BUILD-001`、`BUILD-002`、`BUILD-003`、`BUILD-004`。
+      - [ ] Grep: 文件中必须明确出现 `墙体蓝图`、`木床自动分配`、`非法位置拦截`、`多余床铺无归属`。
+      - [ ] Grep: 文件中必须明确禁止把 `placeBlueprint` 一类底层调用当作主端到端测试入口。
+
+  - id: "T-08"
+    title: "设计交互系统的测试重构方案"
+    status: "completed"
+    dependencies: ["T-00"]
+    context:
+      read_files:
+        - "oh-acceptance/交互系统.yaml"
+        - "working-plan/test-exist-check/交互系统.yaml"
+        - "tests/headless/haul-mark-pickup.test.ts"
+        - "tests/headless/build-wall-flow.test.ts"
+        - "tests/headless/build-bed-flow.test.ts"
+      reference_docs:
+        - "scenarios/haul-mark-pickup.scenario.ts"
+        - "scenarios/build-wall-flow.scenario.ts"
+        - "scenarios/build-bed-flow.scenario.ts"
+    action: |
+      1. 创建 `working-plan/refactor-test/交互系统.yaml`，遵循 T-00 契约。
+      2. 按 `INTERACT-001` 至 `INTERACT-004` 逐条记录当前问题，重点写清：
+         - 矩形拖拽、笔刷拖拽、单点放置已有 headless，但玩家验收步骤和反馈标准不一致。
+         - 无效交互模式输入屏蔽仍缺少真正从用户操作出发的端到端设计。
+      3. 为每条场景设计用户验收流程，明确工具切换、拖拽/点击顺序、预览、提交、成功/无效反馈。
+      4. 为每条场景设计新的无头端到端方案，要求以 `commitPlayerSelection` 或等价用户输入通道为主，不得仅验证 command builder/null 返回。
+      5. 明确 `rect-selection`、`brush-stroke`、`single-cell`、`no-tool/observe` 四种输入模式各自的断言边界。
+    acceptance_criteria: |
+      - [ ] Read: `working-plan/refactor-test/交互系统.yaml` 存在，且包含 `INTERACT-001`、`INTERACT-002`、`INTERACT-003`、`INTERACT-004`。
+      - [ ] Grep: 文件中必须明确出现 `rect-selection`、`brush-stroke`、`single-cell`、`no-tool`。
+      - [ ] Grep: 文件中必须明确禁止只用 command builder 或空返回断言来替代端到端交互测试。
+
+  - id: "T-09"
+    title: "设计 UI 系统的测试重构方案"
+    status: "completed"
+    dependencies: ["T-00"]
+    context:
+      read_files:
+        - "oh-acceptance/UI系统.yaml"
+        - "working-plan/test-exist-check/UI系统.yaml"
+        - "tests/scene-hud-markup.test.ts"
+        - "tests/headless/build-wall-flow.test.ts"
+        - "tests/headless/chop-tree-full-flow.test.ts"
+      reference_docs:
+        - "src/ui/hud-manager.ts"
+        - "src/scenes/GameScene.ts"
+        - "scenarios/build-wall-flow.scenario.ts"
+    action: |
+      1. 创建 `working-plan/refactor-test/UI系统.yaml`，遵循 T-00 契约。
+      2. 按 `UI-001` 至 `UI-004` 逐条记录当前问题，重点写清：
+         - 现有 UI 证据大多是组件/DOM 结构测试，不能替代玩家在真实流程中的验收。
+         - 主菜单层级、进度条叠加、状态面板同步、分层清晰度都需要重新设计用户操作和可见反馈。
+      3. 为每条场景设计新的用户验收流程，明确玩家如何打开菜单、触发工作、查看信息面板、观察地图多层反馈。
+      4. 为每条场景设计新的端到端测试策略，强调：
+         - 无头只负责模拟用户操作与业务推进。
+         - UI 断言要落在玩家可见状态，而不是单独调用 HUD 同步函数。
+      5. 明确哪些组件测试继续保留为局部回归，哪些 UI 场景需要新增 playable/manual 设计来补齐真机验收。
+    acceptance_criteria: |
+      - [ ] Read: `working-plan/refactor-test/UI系统.yaml` 存在，且包含 `UI-001`、`UI-002`、`UI-003`、`UI-004`。
+      - [ ] Grep: 文件中必须明确出现 `层级菜单`、`进度条`、`状态面板`、`分层清晰度`。
+      - [ ] Grep: 文件中必须明确禁止把 `scene-hud-markup` 或 `HudManager.sync*` 一类组件级调用当作主验收路径。
+
+  - id: "T-10"
+    title: "校验 9 个模块设计稿齐全且重构原则一致"
+    status: "completed"
+    dependencies:
+      - "T-01"
+      - "T-02"
+      - "T-03"
+      - "T-04"
+      - "T-05"
+      - "T-06"
+      - "T-07"
+      - "T-08"
+      - "T-09"
+    context:
+      read_files:
+        - "working-plan/refactor-test/refactor-test-design.schema.yml"
+        - "working-plan/refactor-test/需求系统.yaml"
+        - "working-plan/refactor-test/时间系统.yaml"
+        - "working-plan/refactor-test/行为系统.yaml"
+        - "working-plan/refactor-test/工作系统.yaml"
+        - "working-plan/refactor-test/实体系统.yaml"
+        - "working-plan/refactor-test/地图系统.yaml"
+        - "working-plan/refactor-test/建筑系统.yaml"
+        - "working-plan/refactor-test/交互系统.yaml"
+        - "working-plan/refactor-test/UI系统.yaml"
+      reference_docs:
+        - "working-plan/test-exist-check/需求系统.yaml"
+        - "working-plan/test-exist-check/时间系统.yaml"
+        - "working-plan/test-exist-check/行为系统.yaml"
+        - "working-plan/test-exist-check/工作系统.yaml"
+        - "working-plan/test-exist-check/实体系统.yaml"
+        - "working-plan/test-exist-check/地图系统.yaml"
+        - "working-plan/test-exist-check/建筑系统.yaml"
+        - "working-plan/test-exist-check/交互系统.yaml"
+        - "working-plan/test-exist-check/UI系统.yaml"
+    action: |
+      1. 校验 `working-plan/refactor-test/` 下 9 个模块 YAML 与 1 个契约文件全部存在。
+      2. 校验每个模块设计稿都遵循 T-00 契约，并对其 `oh-acceptance` 文件中的全部 `scenario_id` 逐条给出重构设计。
+      3. 校验所有模块都明确写出了以下共同原则：
+         - 只设计测试，不实现测试。
+         - 无头测试只模拟用户操作与场景推进。
+         - 用户验收流程必须包含操作顺序、预期目标、可见反馈。
+         - 旧 domain/局部无头测试仅作为底层回归，不再充当主业务验收。
+      4. 如果发现字段缺失、原则不一致、遗漏 scenario_id，回退并修正文档，直到 9 个模块的设计口径一致。
+    acceptance_criteria: |
+      - [ ] Shell: `rg --files "working-plan/refactor-test"` 能看到且仅看到 10 个文件：1 个 schema + 9 个模块 YAML。
+      - [ ] Read: 9 个模块设计稿均覆盖对应 `oh-acceptance/*.yaml` 中的全部 `scenario_id`。
+      - [ ] Grep: 9 个模块 YAML 中都出现 `仅设计，不实现测试`、`只模拟用户操作`、`visible_feedback`、`forbidden_shortcuts`。

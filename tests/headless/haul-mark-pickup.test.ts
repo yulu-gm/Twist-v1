@@ -1,94 +1,92 @@
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+/**
+ * refactor-test：保留回归（认领/拾取直连），WORK-002 / INTERACT-001 主证据以 `haul-mark-pickup.scenario.ts`
+ * expectations + `scenario-runner.test.ts` 为准。
+ */
 import { describe, expect, it } from "vitest";
 import { coordKey } from "../../src/game/map";
+import {
+  captureVisibleState,
+  createHeadlessSim,
+  recordScenarioPlayerSelection
+} from "../../src/headless";
+import { hydrateScenario } from "../../src/headless/scenario-runner";
 import { HAUL_MARK_PICKUP_SCENARIO } from "../../scenarios/haul-mark-pickup.scenario";
-import { createHeadlessSim } from "../../src/headless";
-import { hydrateScenario, runScenarioHeadless } from "../../src/headless/scenario-runner";
-import type { DomainCommand } from "../../src/player/s0-contract";
-import type { ScenarioDefinition } from "../../src/headless/scenario-types";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-
-function makeHaulCommand(targetCellKeys: readonly string[]): DomainCommand {
-  return {
-    commandId: `cmd-haul-${targetCellKeys.join("-")}`,
-    verb: "assign_tool_task:haul",
-    targetCellKeys: [...targetCellKeys],
-    targetEntityIds: [],
-    sourceMode: {
-      source: { kind: "toolbar", toolId: "haul" },
-      selectionModifier: "replace",
-      inputShape: "rect-selection"
-    }
-  };
+function groundFoodResources(sim: ReturnType<typeof createHeadlessSim>) {
+  return [...sim.getWorldPort().getWorld().entities.values()].filter(
+    (entity) =>
+      entity.kind === "resource" &&
+      entity.materialKind === "food" &&
+      entity.containerKind === "ground"
+  );
 }
 
-describe("haul-mark-pickup（haul → pick-up-resource）", () => {
-  it("runScenarioHeadless：expectation work-item-exists 通过", () => {
-    const { report } = runScenarioHeadless(HAUL_MARK_PICKUP_SCENARIO);
-    const results = report.assertionResults ?? [];
-    expect(results.length).toBeGreaterThan(0);
-    expect(results.every((r) => r.passed)).toBe(true);
-  });
-
-  it("hydrate 后物资可拾取且存在 open 的 pick-up-resource 工单", () => {
+describe("INTERACT-001 rect-selection haul input", () => {
+  it("commits a rect-selection through the player input entry and only feeds back covered pickup targets", () => {
     const sim = createHeadlessSim({ seed: HAUL_MARK_PICKUP_SCENARIO.seed });
-    hydrateScenario(sim, HAUL_MARK_PICKUP_SCENARIO);
-
-    const foodResources = [...sim.getWorldPort().getWorld().entities.values()].filter(
-      (e) => e.kind === "resource" && e.materialKind === "food" && e.containerKind === "ground"
-    );
-    expect(foodResources).toHaveLength(2);
-    expect(foodResources.every((e) => e.pickupAllowed === true)).toBe(true);
-
-    const pickups = [...sim.getWorldPort().getWorld().workItems.values()].filter(
-      (w) => w.kind === "pick-up-resource"
-    );
-    expect(pickups.some((w) => w.status === "open")).toBe(true);
-    for (const res of foodResources) {
-      expect(
-        pickups.some((w) => w.targetEntityId === res.id && w.anchorCell.col === res.cell.col)
-      ).toBe(true);
-    }
-  });
-
-  it("submit haul：pickupAllowed 从 false 变为 true", () => {
-    const sim = createHeadlessSim({ seed: HAUL_MARK_PICKUP_SCENARIO.seed });
-    const def: ScenarioDefinition = {
+    hydrateScenario(sim, {
       ...HAUL_MARK_PICKUP_SCENARIO,
       domainCommandsAfterHydrate: undefined,
       expectations: undefined
-    };
-    hydrateScenario(sim, def);
+    });
 
-    const keys = HAUL_MARK_PICKUP_SCENARIO.resources!.map((r) => coordKey(r.cell));
-    let foodResources = [...sim.getWorldPort().getWorld().entities.values()].filter(
-      (e) => e.kind === "resource" && e.materialKind === "food"
+    expect(groundFoodResources(sim)).toHaveLength(2);
+    expect(groundFoodResources(sim).every((entity) => entity.pickupAllowed === false)).toBe(true);
+    expect(sim.getWorldPort().getWorld().workItems.size).toBe(0);
+    expect(sim.getWorldPort().getWorld().markers.size).toBe(0);
+
+    const selectedCells = [
+      ...HAUL_MARK_PICKUP_SCENARIO.resources!.map((resource) => coordKey(resource.cell)),
+      coordKey({ col: 12, row: 5 })
+    ];
+    const outcome = sim.commitPlayerSelection({
+      toolId: "haul",
+      selectionModifier: "replace",
+      cellKeys: new Set(selectedCells),
+      inputShape: "rect-selection",
+      currentMarkers: new Map(),
+      nowMs: 0
+    });
+    const selection = recordScenarioPlayerSelection(
+      {
+        label: "interact-001-rect-selection",
+        toolId: "haul",
+        selectionModifier: "replace",
+        cellKeys: selectedCells,
+        inputShape: "rect-selection"
+      },
+      outcome
     );
-    expect(foodResources).toHaveLength(2);
-    expect(foodResources.every((e) => e.pickupAllowed === false)).toBe(true);
 
-    const result = sim.getWorldPort().submit(makeHaulCommand(keys), 1);
-    expect(result.accepted).toBe(true);
-    expect(result.messages.some((m) => m.includes("pick-up-resource"))).toBe(true);
+    expect(outcome.didSubmitToWorld).toBe(true);
+    expect(outcome.nextMarkers.size).toBe(2);
+    expect(outcome.nextMarkers.has(coordKey({ col: 12, row: 5 }))).toBe(false);
 
-    foodResources = [...sim.getWorldPort().getWorld().entities.values()].filter(
-      (e) => e.kind === "resource" && e.materialKind === "food"
+    const resources = groundFoodResources(sim);
+    expect(resources).toHaveLength(2);
+    expect(resources.every((entity) => entity.pickupAllowed === true)).toBe(true);
+
+    const visible = captureVisibleState(sim, { playerSelections: [selection] });
+    const openPickupItems = visible.workItems.filter(
+      (item) => item.kind === "pick-up-resource" && item.status === "open"
     );
-    expect(foodResources.every((e) => e.pickupAllowed === true)).toBe(true);
+
+    expect(openPickupItems).toHaveLength(2);
     expect(
-      [...sim.getWorldPort().getWorld().workItems.values()].some(
-        (w) => w.kind === "pick-up-resource" && w.status === "open"
+      openPickupItems.every((item) =>
+        HAUL_MARK_PICKUP_SCENARIO.resources!.some(
+          (resource) =>
+            item.anchorCell.col === resource.cell.col && item.anchorCell.row === resource.cell.row
+        )
       )
     ).toBe(true);
-  });
-
-  it("applyDomainCommandToWorldCore 含 haul 与 pick-up-resource 分支", () => {
-    const srcPath = join(__dirname, "..", "..", "src", "player", "apply-domain-command.ts");
-    const src = readFileSync(srcPath, "utf8");
-    expect(src).toContain('toolId === "haul"');
-    expect(src).toContain("pick-up-resource");
+    expect(
+      visible.failures.some(
+        (item) =>
+          item.source === "submit-result" &&
+          item.accepted === true &&
+          item.text.length > 0
+      )
+    ).toBe(true);
   });
 });

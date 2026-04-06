@@ -1,0 +1,240 @@
+schema_version: "1.0"
+
+module_id: "交互系统"
+module_name: "交互系统"
+source_acceptance_file: "oh-acceptance/交互系统.yaml"
+source_audit_file: "working-plan/test-exist-check/交互系统.yaml"
+
+design_scope: >
+  本稿仅覆盖交互系统的端到端测试重构设计，不实现任何测试代码，不修改任何源码，也不改任务树。
+  范围聚焦 INTERACT-001 到 INTERACT-004 四个 scenario_id，分别覆盖 rect-selection、brush-stroke、
+  single-cell、no-tool 四种输入模式。所有设计都必须以玩家输入、场景推进与可见反馈为主，
+  无头测试只能模拟用户操作与场景推进，不得用 command builder、domain 直调或 null 返回断言替代真实交互链路。
+
+refactor_objectives:
+  - "把 INTERACT-001 收敛为 rect-selection 的端到端交互设计，明确工具切换、拖拽框选、预览、提交与成功反馈链路。"
+  - "把 INTERACT-002 收敛为 brush-stroke 的端到端交互设计，明确工具切换、连续拖拽、蓝图预览、提交与成功反馈链路。"
+  - "把 INTERACT-003 收敛为 single-cell 的端到端交互设计，明确工具切换、单击点选、单格预览、提交与成功反馈链路。"
+  - "把 INTERACT-004 收敛为 no-tool 的端到端交互设计，明确无工具状态下的拖拽/点击应保持无效，并给出可见拒绝或无操作反馈。"
+  - "统一四个场景的断言边界：输入模式只断言其应有的交互粒度，不用更细的 command builder 结构或更粗的空返回结果替代交互验证。"
+  - "确保每条场景都覆盖工具切换、拖拽或点击、预览、提交、成功或无效反馈，并且主路径以 commitPlayerSelection 或等价用户输入通道驱动。"
+
+global_constraints:
+  - "仅设计，不实现测试。"
+  - "无头测试只模拟用户操作与场景推进，不得以 domain 直调替代真实业务路径。"
+  - "用户验收流程必须包含操作顺序、预期目标、可见反馈。"
+  - "旧 domain/局部无头测试仅作为底层回归，不再充当主业务验收。"
+scenario_redesign:  - scenario_id: "INTERACT-001"
+    current_status_summary: >
+      现有验收与无头资料已经指向资源拾取标记链路，参考 tests/headless/haul-mark-pickup.test.ts
+      与 scenarios/haul-mark-pickup.scenario.ts。当前实现更像是在验证 haul 工具提交后会出现可拾取资源与 open 工单，
+      但对 rect-selection 的玩家拖拽过程、预览范围和提交后的可见反馈表达仍不够完整。
+    current_mismatch: >
+      现状容易被理解成“构造一个 haul 命令并检查 pickupAllowed / work item”，而不是“玩家切换到 haul 工具，
+      在地图上拖拽出矩形选区，看到覆盖预览，再提交并观察资源变为可拾取”。这会弱化 rect-selection 的交互粒度，
+      也会把端到端验证压缩成命令结果检查。
+    user_acceptance_flow:
+      steps:
+        - "玩家先从观察态切换到 haul 工具，确认当前处于资源标记模式。"
+        - "玩家在地图上拖拽出一个矩形选区，覆盖多处地面资源，并在松开前观察选区预览。"
+        - "玩家提交本次选择，系统将选区内资源标记为可拾取，并生成对应工单。"
+        - "玩家继续观察成功反馈，确认被框中的资源可被后续小人拾取。"
+      expected_goal: "玩家通过一次矩形拖拽，把选区内资源推进到可拾取并生成工单的状态。"
+      visible_feedback:
+        - "拖拽过程中显示半透明矩形选区预览。"
+        - "选区内资源在提交后切换为可拾取状态。"
+        - "界面出现 open 的 pick-up-resource 相关反馈或工单提示。"
+    e2e_test_strategy:
+      user_actions:
+        - "通过 commitPlayerSelection 或等价玩家输入通道，先完成 haul 工具切换，再执行 rect-selection 拖拽。"
+        - "在松开鼠标前观察选区覆盖的预览范围，再提交本次交互。"
+        - "让场景继续推进，确认资源状态与工单状态都被真实更新。"
+      assertions:
+        - "只断言矩形拖拽覆盖的目标格被纳入选区，不要求逐像素的拖拽轨迹复刻。"
+        - "只断言选区内资源的 pickupAllowed 由 false 变为 true，并且生成 open 的 pick-up-resource 工单。"
+        - "只断言提交后存在成功反馈，不把 command builder 的原始结构当成主验收对象。"
+        - "若拖拽范围覆盖到无资源格，也应保持其无害，不因空格扩张而制造额外工单。"
+      forbidden_shortcuts:
+        - "禁止直接用 command builder 构造 haul 命令后只断言 accepted 或 null。"
+        - "禁止用 domain 直调替代玩家拖拽与提交。"
+        - "禁止只检查 work item 数量，不检查工具切换、选区预览和成功反馈。"
+        - "禁止把 rect-selection 退化成单点点击或命令注入。"
+    migration_notes: >
+      这条场景可以复用现有 haul-mark-pickup 的无头骨架，但设计重心要从命令断言迁移为矩形拖拽交互断言。
+      旧的局部规则测试只保留为底层守护，不承担 rect-selection 的主验收职责。
+
+  - scenario_id: "INTERACT-002"
+    current_status_summary: >
+      现有无头资料已经覆盖连续涂刷造墙链路，参考 tests/headless/build-wall-flow.test.ts
+      与 scenarios/build-wall-flow.scenario.ts。当前测试能证明 brush-stroke 会产生多格墙体蓝图和后续建造工作，
+      但需要在设计层面更明确地表达工具切换、连续拖拽预览、提交与成功反馈的交互边界。
+    current_mismatch: >
+      现状仍偏向“提交一个 brush-stroke 命令后检查蓝图和工单”，而不是“玩家选择 build 工具后沿路径拖拽，
+      看到刷痕预览，松开后提交，再观察蓝图与建造工作被系统接管”。如果只看命令结果，会弱化 brush-stroke 的连续性，
+      也会让连续路径与单点放置混在一起。
+    user_acceptance_flow:
+      steps:
+        - "玩家从观察态切换到 build 工具，并选定墙体建造模式。"
+        - "玩家按住鼠标沿路径拖拽，形成连续刷痕，并在拖拽时观察蓝图预览。"
+        - "玩家松开鼠标提交本次 brush-stroke，系统生成墙体蓝图与建造工单。"
+        - "玩家继续等待场景推进，确认蓝图转为可建造目标并最终落成墙体。"
+      expected_goal: "玩家用一条连续刷线，生成一串墙体蓝图并推动后续建造完成。"
+      visible_feedback:
+        - "拖拽过程中显示连续的蓝图预览轨迹。"
+        - "提交后对应格子出现墙体蓝图与 construct-blueprint 工单。"
+        - "建造完成后蓝图消失，墙体实体落地。"
+    e2e_test_strategy:
+      user_actions:
+        - "通过 commitPlayerSelection 或等价输入通道完成 build 工具切换，再执行 brush-stroke 拖拽。"
+        - "沿一段连续路径拖动鼠标，确认预览与最终刷线方向一致。"
+        - "提交后推进场景，观察蓝图、工单和墙体实体的逐步变化。"
+      assertions:
+        - "只断言 brush-stroke 代表连续路径的输入模式，不要求对每个 pointer sample 做像素级比较。"
+        - "只断言路径覆盖格子生成墙体蓝图和 construct-blueprint 工单，而不是把蓝图创建拆成内部函数断言。"
+        - "只断言成功提交后出现可见建造反馈，不用 command builder 的结构充当主结论。"
+        - "若刷线穿过边界或空格，断言应聚焦于合法覆盖范围和无害空段，而不是扩展为路径规划测试。"
+      forbidden_shortcuts:
+        - "禁止直接依赖 command builder 的返回对象替代交互测试。"
+        - "禁止绕过拖拽过程，直接写入蓝图或工单。"
+        - "禁止把 brush-stroke 退化成单点点击或一次性批量注入。"
+        - "禁止只看最终墙体数量，不验证预览与提交反馈。"
+    migration_notes: >
+      这条场景可以复用现有 build-wall-flow 的无头结构，但设计必须强调“连续刷线 -> 蓝图预览 -> 提交 -> 建造完成”的用户链路。
+      旧的 command-level 断言只作为底层守护，不作为主验收。
+
+  - scenario_id: "INTERACT-003"
+    current_status_summary: >
+      现有无头资料已经覆盖建床放置链路，参考 tests/headless/build-bed-flow.test.ts
+      与 scenarios/build-bed-flow.scenario.ts。当前测试能证明 single-cell 点击会生成床蓝图与建造工单，
+      但设计上还需要把“单击点选、单格预览、提交和成功反馈”与 brush-stroke、rect-selection 明确区分开。
+    current_mismatch: >
+      现状虽然能说明单格放置有效，但容易被理解成“给定一个单元格后直接生成 place_furniture:bed 命令”。
+      设计必须明确 single-cell 的主行为是单点点击，而不是拖拽、框选或多格刷线；
+      同时也要写清如果用户误拖成多格，系统应给出不同反馈而不是静默吸收。
+    user_acceptance_flow:
+      steps:
+        - "玩家从观察态切换到 build 工具，并选择床铺放置模式。"
+        - "玩家在目标格上单击，看到单格预览或悬停提示。"
+        - "玩家确认提交后，系统只在这一格生成床蓝图和对应建造工单。"
+        - "玩家继续观察场景推进，确认床蓝图被认领并最终落成。"
+      expected_goal: "玩家通过一次单点操作，把一个目标格推进到床蓝图与建造完成状态。"
+      visible_feedback:
+        - "鼠标悬停时只显示单格预览。"
+        - "点击后仅目标单格出现床蓝图。"
+        - "界面出现单个 construct-blueprint 工单或等价成功提示。"
+    e2e_test_strategy:
+      user_actions:
+        - "通过 commitPlayerSelection 或等价输入通道先切换到 build 工具，再执行 single-cell 点击。"
+        - "用一次明确的单击提交床铺放置，而不是拖拽或框选。"
+        - "推进场景并等待该单格上的建造工作完成。"
+      assertions:
+        - "只断言 single-cell 输入模式对应的是单格粒度，不要求多格路径覆盖。"
+        - "只断言目标格生成一个 bed 蓝图与一个 construct-blueprint 工单。"
+        - "只断言提交后存在成功反馈，并且成功反馈与单格放置语义一致。"
+        - "若用户误用拖拽或框选，断言应落在无效反馈或范围拒绝上，不应被误判为 single-cell 成功。"
+      forbidden_shortcuts:
+        - "禁止把单点点击测试写成 brush-stroke 或 rect-selection 的子集替代品。"
+        - "禁止直接调用 domain 命令构造器来伪造 place_furniture:bed。"
+        - "禁止只看床实体最终出现，而不验证单击、预览和提交反馈。"
+        - "禁止用 null 返回或空命令来覆盖单格交互的主路径。"
+    migration_notes: >
+      这条场景可以沿用现有 build-bed-flow 的无头骨架，但要把焦点放在单击交互和单格预览边界上。
+      旧的局部命令断言仅作为回归护栏，不承担 single-cell 的主验收职责。
+
+  - scenario_id: "INTERACT-004"
+    current_status_summary: >
+      现有 audit 显示没有一条专门覆盖 no-tool 的无头场景，当前只有局部 domain 或 UI 规则层的无效输入检查。
+      这意味着系统知道“没工具时不该生成命令”，但还没有一条用户可见的端到端设计来证明：
+      当玩家停留在 no-tool 状态时，点击或拖拽不会产生命令、不会落地预览，也不会污染世界状态。
+    current_mismatch: >
+      当前容易把 no-tool 理解为“返回 null 就算完成”，但这不足以构成交互设计。
+      设计上必须明确：玩家在未选择工具时的拖拽/点击，只能得到无操作或提示类反馈，不能生成选区、蓝图或工单；
+      同时也不能把 command builder 的空结果当作主断言。
+    user_acceptance_flow:
+      steps:
+        - "玩家回到观察态或主动切换到 no-tool 状态，确保当前没有激活任何建造或标记工具。"
+        - "玩家在地图上尝试点击或拖拽，但没有工具接管这次输入。"
+        - "系统保持无操作状态，只给出提示、游标变化或其他无害反馈。"
+        - "玩家确认世界没有出现新的选区、蓝图、工单或实体变更。"
+      expected_goal: "在 no-tool 状态下，所有输入都应保持惰性，不产生任何业务命令或世界副作用。"
+      visible_feedback:
+        - "界面处于观察态或提示玩家先选择工具。"
+        - "点击、拖拽不会出现选区、刷痕或蓝图预览。"
+        - "世界状态保持不变，没有新的工单或实体生成。"
+    e2e_test_strategy:
+      user_actions:
+        - "通过 commitPlayerSelection 或等价输入通道显式切换到 no-tool，或回到观察态。"
+        - "在未激活任何工具时进行点击与拖拽，模拟玩家误操作。"
+        - "继续推进场景，确认系统没有因为这些输入而生成业务结果。"
+      assertions:
+        - "只断言 no-tool 状态下不会提交业务命令，不要求把 null 返回当作唯一证据。"
+        - "只断言没有出现选区预览、刷痕预览、蓝图或工单，不把 UI 外壳的细碎事件当作主验收。"
+        - "只断言世界状态没有副作用，且提示/拒绝反馈保持无害。"
+        - "若存在仅支持视角平移之类的惰性输入，也应视为无业务作用，不应误判为交互成功。"
+      forbidden_shortcuts:
+        - "禁止用 command builder 的空结果或 null 返回直接充当测试结论。"
+        - "禁止把 no-tool 设计成‘什么都不测’的空场景。"
+        - "禁止把任何成功生成命令的行为归因到 no-tool。"
+        - "禁止通过手工改世界状态来证明无副作用。"
+    migration_notes: >
+      这条场景需要新增为真正的无头端到端设计，而不是复用现有局部规则测试。
+      设计中应明确 no-tool 的无效输入边界，保证它既能覆盖误操作，也不会把无命令结果误当作主验收证据。
+
+test_architecture:
+  approach: >
+    采用 scenario-driven 的无头端到端设计，上层只验证玩家输入、场景推进和可见反馈，
+    下层才保留少量命令构造或规则级回归作为护栏。主路径必须通过 commitPlayerSelection
+    或等价用户输入通道驱动，不能以 command builder/null 返回替代真实交互。
+  layers:
+    - "场景级主验收：INTERACT-001 到 INTERACT-004 全部以玩家动作驱动，检查工具切换、预览、提交与反馈。"
+    - "无头回归层：仅用于模拟真实场景推进，不把 domain 直调当作主路径。"
+    - "底层机制回归：少量命令生成或状态转换测试只作为稳定性防线，不替代端到端交互。"
+  reuse_boundary:
+    - "可复用：tests/headless/haul-mark-pickup.test.ts、tests/headless/build-wall-flow.test.ts、tests/headless/build-bed-flow.test.ts 的场景骨架。"
+    - "需要降级：只做 command builder、null 返回或内部状态断言的局部测试。"
+    - "需要新增：围绕工具切换、拖拽/点击、预览、提交与无效反馈的场景级设计稿。"
+  input_mode_boundary:
+    rect-selection: >
+      断言边界是“拖拽选区覆盖的目标格集合”与“提交后资源/工单变化”；
+      不要求逐点 pointer 轨迹，也不把矩形之外的空格扩张成业务断言。
+    brush-stroke: >
+      断言边界是“连续刷线形成的路径覆盖格”与“蓝图/建造工作生成”；
+      不要求像素级笔触采样，也不把它退化成单点或全图刷写。
+    single-cell: >
+      断言边界是“单一目标格点击”与“单格蓝图/工单生成”；
+      不允许把拖拽、框选或多格路径混入主路径断言。
+    no-tool: >
+      断言边界是“输入无业务作用”与“无选区、无蓝图、无工单、无世界副作用”；
+      不把 null 返回、空命令或仅有提示文本当成完整验收。
+  verification_surface:
+    - "工具切换状态。"
+    - "选区 / 刷线 / 单格预览。"
+    - "提交结果与成功或拒绝反馈。"
+    - "世界实体、工单与可拾取 / 可建造状态变化。"
+  shared_tools:
+    - "commitPlayerSelection"
+    - "runScenarioHeadless"
+    - "createHeadlessSim"
+    - "hydrateScenario"
+    - "runUntil"
+  layering_notes: >
+    上层用无头场景描述用户行为与观察点，中层用世界状态和工单状态断言，
+    底层只保留少量规则级回归去守住输入解析与状态转换边界。端到端设计不重复实现底层规则校验，
+    只验证这些规则在真实玩家链路中的表现。
+
+out_of_scope:
+  - "不修改任何测试代码。"
+  - "不修改任何源码。"
+  - "不修改任务树或任务分配。"
+  - "不在本稿里实现新的 scenario 或 runner。"
+  - "不把 command builder、null 返回或 domain 直调写成主验收替代品。"
+  - "不新增与交互系统无关的模块设计。"
+
+deliverable_checklist:
+  - "已完整覆盖 INTERACT-001 到 INTERACT-004。"
+  - "已明确 rect-selection、brush-stroke、single-cell、no-tool 四种输入模式。"
+  - "每条场景都包含用户视角步骤、预期目标、可见反馈。"
+  - "每条场景都明确了端到端 user_actions、assertions、forbidden_shortcuts。"
+  - "已明确禁止用 command builder、null 返回或 domain 直调替代端到端测试。"
+  - "已把 commitPlayerSelection 或等价用户输入通道写成主入口。"
+  - "已遵循契约，仅输出设计文档，不包含实现内容。"

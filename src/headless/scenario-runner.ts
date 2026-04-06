@@ -14,6 +14,12 @@ import { createHeadlessSim, type HeadlessSim } from "./headless-sim";
 import type { AssertionResult, SimReport } from "./sim-reporter";
 import { generateReport } from "./sim-reporter";
 import type { ScenarioDefinition, ScenarioExpectation } from "./scenario-types";
+import {
+  recordScenarioPlayerSelection,
+  resolveScenarioPlayerInputSemantic,
+  type ScenarioHydrationResult,
+  type ScenarioPlayerSelectionRecord
+} from "./scenario-observers";
 
 const DEFAULT_EXPECTATION_MAX_TICKS = 500;
 
@@ -65,6 +71,8 @@ function throwUnlessSpawnCreated(kind: string, outcome: SpawnOutcome, detail: st
 
 function isSimEventKind(value: string): value is SimEventKind {
   return (
+    value === "day-start" ||
+    value === "night-start" ||
     value === "pawn-moved" ||
     value === "pawn-motion-changed" ||
     value === "pawn-goal-changed" ||
@@ -79,12 +87,27 @@ function isSimEventKind(value: string): value is SimEventKind {
 }
 
 function applyScenarioTime(sim: HeadlessSim, timeConfig: ScenarioDefinition["timeConfig"]): void {
-  if (timeConfig?.startMinuteOfDay === undefined) return;
+  if (timeConfig === undefined) return;
+  const controls = sim.getSimAccess().getTimeControlState() as {
+    paused: boolean;
+    speed: 1 | 2 | 3;
+  };
+  if (timeConfig.paused !== undefined) {
+    controls.paused = timeConfig.paused;
+  }
+  if (timeConfig.speed !== undefined) {
+    controls.speed = timeConfig.speed;
+  }
   const world = sim.getWorldPort().getWorld();
-  world.timeConfig = { ...world.timeConfig, startMinuteOfDay: timeConfig.startMinuteOfDay };
+  if (timeConfig.startMinuteOfDay !== undefined) {
+    world.timeConfig = { ...world.timeConfig, startMinuteOfDay: timeConfig.startMinuteOfDay };
+  }
   world.time = toWorldTimeSnapshot(
-    { dayNumber: world.time.dayNumber, minuteOfDay: timeConfig.startMinuteOfDay },
-    { paused: world.time.paused, speed: world.time.speed }
+    {
+      dayNumber: world.time.dayNumber,
+      minuteOfDay: timeConfig.startMinuteOfDay ?? world.time.minuteOfDay
+    },
+    { paused: controls.paused, speed: controls.speed }
   );
 }
 
@@ -221,9 +244,19 @@ export function runAllExpectations(
 /**
  * 将场景定义写入现有模拟：时间、pawns、蓝图、障碍物。
  */
-export function hydrateScenario(sim: HeadlessSim, def: ScenarioDefinition): void {
+export function hydrateScenario(sim: HeadlessSim, def: ScenarioDefinition): ScenarioHydrationResult {
   const grid = sim.getWorldPort().getWorld().grid;
   applyScenarioTime(sim, def.timeConfig);
+  if (def.worldPortConfig) {
+    sim.getWorldPort().applyMockConfig({
+      alwaysAccept: def.worldPortConfig.alwaysAccept,
+      rejectIfTouchesCellKeys:
+        def.worldPortConfig.rejectIfTouchesCellKeys !== undefined
+          ? new Set(def.worldPortConfig.rejectIfTouchesCellKeys)
+          : undefined
+    });
+  }
+  const playerSelections: ScenarioPlayerSelectionRecord[] = [];
 
   let world = sim.getWorldPort().getWorld();
   for (const obs of def.obstacles ?? []) {
@@ -347,15 +380,23 @@ export function hydrateScenario(sim: HeadlessSim, def: ScenarioDefinition): void
   }
 
   if (def.playerSelectionAfterHydrate) {
+    let currentMarkers = new Map<string, string>();
     for (const sel of def.playerSelectionAfterHydrate) {
-      sim.commitPlayerSelection({
+      const semantic = resolveScenarioPlayerInputSemantic(sel);
+      if (semantic === "no-tool") {
+        playerSelections.push(recordScenarioPlayerSelection(sel));
+        continue;
+      }
+      const outcome = sim.commitPlayerSelection({
         toolId: sel.toolId,
         selectionModifier: sel.selectionModifier,
         cellKeys: new Set(sel.cellKeys),
         inputShape: sel.inputShape,
-        currentMarkers: new Map(),
+        currentMarkers,
         nowMs: 0
       });
+      currentMarkers = outcome.nextMarkers;
+      playerSelections.push(recordScenarioPlayerSelection(sel, outcome));
     }
   }
 
@@ -372,12 +413,17 @@ export function hydrateScenario(sim: HeadlessSim, def: ScenarioDefinition): void
       }
     }
   }
+
+  return {
+    playerSelections
+  };
 }
 
 export type ScenarioHeadlessRunResult = Readonly<{
   sim: HeadlessSim;
   report: SimReport;
   results: readonly AssertionResult[];
+  hydration: ScenarioHydrationResult;
 }>;
 
 /**
@@ -388,9 +434,12 @@ export function runScenarioHeadless(def: ScenarioDefinition): ScenarioHeadlessRu
     seed: def.seed,
     worldGrid: def.gridConfig
   });
-  hydrateScenario(sim, def);
+  const hydration = hydrateScenario(sim, def);
+  for (const deltaMs of def.tickScheduleAfterHydrate ?? []) {
+    sim.tick(deltaMs);
+  }
   const results = runAllExpectations(sim, def.expectations ?? []);
   const baseReport = generateReport(sim);
   const report: SimReport = { ...baseReport, assertionResults: results };
-  return { sim, report, results };
+  return { sim, report, results, hydration };
 }

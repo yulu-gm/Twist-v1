@@ -1,68 +1,123 @@
+/**
+ * refactor-test：保留回归（需求打断工单直连），NEED-003 / BEHAVIOR-003 主证据以场景 expectations
+ * + `scenario-runner.test.ts` 为准；本文件覆盖饥饿阈值调参后的中断时序。
+ */
 import { describe, expect, it } from "vitest";
-import { describePawnDebugLabel } from "../../src/game/pawn-state";
 import {
+  captureVisibleState,
   createHeadlessSim,
-  hydrateScenario,
-  runScenarioHeadless
+  hydrateScenario
 } from "../../src/headless";
-import { DEFAULT_WORLD_GRID } from "../../src/game/map";
 import type { ScenarioDefinition } from "../../src/headless/scenario-types";
 import { NEED_INTERRUPT_DURING_WORK_SCENARIO } from "../../scenarios/need-interrupt-during-work.scenario";
 
-describe("need-interrupt-during-work", () => {
-  it("headless scenario 满足 eat / 不饿死期望", () => {
-    const { results } = runScenarioHeadless(NEED_INTERRUPT_DURING_WORK_SCENARIO);
-    expect(results.every((r) => r.passed)).toBe(true);
-  });
+const NATURAL_HUNGER_INTERRUPT_SCENARIO: ScenarioDefinition = {
+  ...NEED_INTERRUPT_DURING_WORK_SCENARIO,
+  pawns: [
+    {
+      name: "HungryLumber",
+      cell: NEED_INTERRUPT_DURING_WORK_SCENARIO.pawns[0]!.cell,
+      overrides: {
+        satiety: 35,
+        energy: 100,
+        /**
+         * 路上增长约 +8.7：须 <70 才能走到锚点并开始读条；锚点后须在 3s 读条完成前涨到 >70 触发中断。
+         * 50 过低会先完工单；58 落在 (~66→70) 与 (<70 抵锚) 之间的稳定窗内。
+         */
+        needs: { hunger: 58, rest: 10, recreation: 20 }
+      }
+    }
+  ],
+  expectations: []
+};
 
-  it("伐木进行中压低饱食度后出现 pawn-goal-changed 转向 eat，且工单回到 open", () => {
-    const scenarioFull: ScenarioDefinition = {
-      ...NEED_INTERRUPT_DURING_WORK_SCENARIO,
-      expectations: [],
-      pawns: [
-        {
-          name: "HungryLumber",
-          cell: DEFAULT_WORLD_GRID.defaultSpawnPoints[0]!,
-          overrides: {
-            satiety: 100,
-            energy: 100,
-            needs: { hunger: 15, rest: 10, recreation: 20 }
-          }
-        }
-      ]
-    };
+describe("BEHAVIOR-003 need-interrupt-during-work", () => {
+  it("releases claimed work after a hunger interrupt and retargets the pawn to food", () => {
+    const sim = createHeadlessSim({
+      seed: NATURAL_HUNGER_INTERRUPT_SCENARIO.seed,
+      worldGrid: NATURAL_HUNGER_INTERRUPT_SCENARIO.gridConfig
+    });
+    hydrateScenario(sim, NATURAL_HUNGER_INTERRUPT_SCENARIO);
 
-    const sim = createHeadlessSim({ seed: NEED_INTERRUPT_DURING_WORK_SCENARIO.seed });
-    hydrateScenario(sim, scenarioFull);
-
-    const claimed = sim.runUntil(() => {
-      return [...sim.getWorldPort().getWorld().workItems.values()].some(
-        (w) => w.kind === "chop-tree" && w.status === "claimed" && w.claimedBy === "pawn-0"
+    const claimedWork = sim.runUntil(() => {
+      return captureVisibleState(sim).workItems.some(
+        (item) => item.kind === "chop-tree" && item.status === "claimed" && item.claimedBy === "pawn-0"
       );
-    }, { maxTicks: 4000 });
-    expect(claimed.reachedPredicate).toBe(true);
+    }, { maxTicks: 400, deltaMs: 16 });
+    expect(claimedWork.reachedPredicate).toBe(true);
 
-    const ref = sim.getSimAccess().getPawnsRef();
-    const p = ref[0]!;
-    const starved = {
-      ...p,
-      satiety: 5,
-      needs: { hunger: 92, rest: p.needs.rest, recreation: p.needs.recreation }
-    };
-    ref[0] = { ...starved, debugLabel: describePawnDebugLabel(starved) };
+    const claimedSnapshot = captureVisibleState(sim).workItems.find((item) => item.kind === "chop-tree");
+    expect(claimedSnapshot).toMatchObject({
+      kind: "chop-tree",
+      status: "claimed",
+      claimedBy: "pawn-0",
+      failureCount: 0
+    });
+
+    const startedAnchoredWork = sim.runUntil(() => {
+      const pawn = sim.getPawns()[0];
+      return pawn?.activeWorkItemId === claimedSnapshot?.id && pawn.workTimerSec > 0;
+    }, { maxTicks: 4_000, deltaMs: 16 });
+    expect(startedAnchoredWork.reachedPredicate).toBe(true);
+
+    const claimEvent = sim
+      .getSimEventCollector()
+      .getEventsByKind("work-claimed")
+      .find((event) => event.workItemId === claimedSnapshot?.id && event.claimedBy === "pawn-0");
+    expect(claimEvent).toBeDefined();
 
     sim.getSimEventCollector().clear();
 
-    sim.runUntil(() => sim.getPawns()[0]?.currentGoal?.kind === "eat", { maxTicks: 4000 });
+    const interruptedToEat = sim.runUntil(() => {
+      const pawn = sim.getPawns()[0];
+      const chop = captureVisibleState(sim).workItems.find((item) => item.kind === "chop-tree");
+      return Boolean(
+        pawn?.currentGoal?.kind === "eat" &&
+          pawn.currentGoal.targetId === "food-1" &&
+          chop?.status === "open" &&
+          chop.claimedBy === undefined
+      );
+    }, { maxTicks: 2_000, deltaMs: 16 });
+    expect(interruptedToEat.reachedPredicate).toBe(true);
 
-    const goalEvents = sim.getSimEventCollector().getEventsByKind("pawn-goal-changed");
-    const toEat = goalEvents.find((e) => e.after?.kind === "eat" && e.before?.kind !== "eat");
-    expect(toEat).toBeDefined();
+    /** 中断当 tick 往往已满足 eat+open chop，但 logicalCell 要等走格完成才有 pawn-moved；补跑到首次位移动画或落格。 */
+    const steppedTowardFood = sim.runUntil(() => {
+      const c = sim.getSimEventCollector();
+      return (
+        c.getEventsByKind("pawn-moved").some((e) => e.pawnId === "pawn-0") ||
+        c.getEventsByKind("pawn-motion-changed").some((e) => e.pawnId === "pawn-0")
+      );
+    }, { maxTicks: 2_500, deltaMs: 16 });
+    expect(steppedTowardFood.reachedPredicate).toBe(true);
 
-    const chop = [...sim.getWorldPort().getWorld().workItems.values()].find(
-      (w) => w.kind === "chop-tree"
+    const finalPawn = sim.getPawns()[0]!;
+    const finalChop = captureVisibleState(sim).workItems.find((item) => item.kind === "chop-tree");
+    const postInterruptCollector = sim.getSimEventCollector();
+    const goalEvents = postInterruptCollector.getEventsByKind("pawn-goal-changed");
+    const eatGoalEvent = goalEvents.find(
+      (event) => event.pawnId === "pawn-0" && event.after?.kind === "eat" && event.after.targetId === "food-1"
     );
-    expect(chop?.status).toBe("open");
-    expect(chop?.claimedBy).toBeUndefined();
+
+    expect(finalChop).toMatchObject({
+      kind: "chop-tree",
+      status: "open"
+    });
+    expect(finalChop?.claimedBy).toBeUndefined();
+    expect(finalChop?.failureCount).toBeGreaterThanOrEqual(1);
+    expect(finalPawn.activeWorkItemId).toBeUndefined();
+    expect(finalPawn.workTimerSec).toBe(0);
+    expect(finalPawn.currentGoal).toMatchObject({
+      kind: "eat",
+      targetId: "food-1"
+    });
+    expect(finalPawn.currentAction?.kind === "move-to-target" || finalPawn.currentAction?.kind === "use-target").toBe(
+      true
+    );
+    expect(eatGoalEvent).toBeDefined();
+    expect(eatGoalEvent!.tick).toBeGreaterThan(claimEvent!.tick);
+    expect(
+      postInterruptCollector.getEventsByKind("pawn-moved").some((e) => e.pawnId === "pawn-0") ||
+        postInterruptCollector.getEventsByKind("pawn-motion-changed").some((e) => e.pawnId === "pawn-0")
+    ).toBe(true);
   });
 });

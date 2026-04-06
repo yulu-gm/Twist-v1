@@ -1,86 +1,121 @@
+/**
+ * refactor-test：保留回归（砍树工单认领直连），不作为 WORK-003/004 或 BEHAVIOR-002 的主验收唯一来源。
+ * 主证据：对应场景的 `runScenarioHeadless` 专用用例 + `scenario-runner.test.ts`。
+ */
 import { describe, expect, it } from "vitest";
 import { coordKey } from "../../src/game/map";
-import { registerChopTreeWork, spawnWorldEntity } from "../../src/game/world-core";
+import {
+  captureVisibleState,
+  createHeadlessSim,
+  hydrateScenario
+} from "../../src/headless";
 import { CHOP_TREE_COMMAND_SCENARIO } from "../../scenarios/chop-tree-command.scenario";
-import { createHeadlessSim } from "../../src/headless";
-import { hydrateScenario } from "../../src/headless/scenario-runner";
-import type { DomainCommand } from "../../src/player/s0-contract";
 
-function makeLumberCommand(targetCellKeys: readonly string[]): DomainCommand {
-  return {
-    commandId: `cmd-lumber-${targetCellKeys.join("-")}`,
-    verb: "assign_tool_task:lumber",
-    targetCellKeys: [...targetCellKeys],
-    targetEntityIds: [],
-    sourceMode: {
-      source: { kind: "toolbar", toolId: "lumber" },
-      selectionModifier: "replace",
-      inputShape: "rect-selection"
-    }
-  };
+function findChopTreeWork(sim: ReturnType<typeof createHeadlessSim>) {
+  return [...sim.getWorldPort().getWorld().workItems.values()].find(
+    (item) => item.kind === "chop-tree"
+  );
 }
 
-describe("auto-claim-work（tickSimulation 前自动认领工单）", () => {
-  it("1 小人 + lumber → headless tick 后出现 work-claimed", () => {
-    const sim = createHeadlessSim({ seed: CHOP_TREE_COMMAND_SCENARIO.seed });
+describe("BEHAVIOR-002 auto-claim-work", () => {
+  it("redirects a pawn from wandering into a claimed chop job and starts anchored work", () => {
+    const sim = createHeadlessSim({
+      seed: CHOP_TREE_COMMAND_SCENARIO.seed,
+      worldGrid: CHOP_TREE_COMMAND_SCENARIO.gridConfig
+    });
     hydrateScenario(sim, {
       ...CHOP_TREE_COMMAND_SCENARIO,
-      domainCommandsAfterHydrate: undefined
+      /** 与 behavior-wander 一致：压低需求分，否则 eat/sleep/rec 长期压过 wander，单测永远等不到闲逛。 */
+      pawns: [
+        {
+          ...CHOP_TREE_COMMAND_SCENARIO.pawns[0]!,
+          overrides: {
+            satiety: 100,
+            energy: 100,
+            needs: { hunger: 0, rest: 0, recreation: 0 }
+          }
+        }
+      ],
+      timeConfig: { startMinuteOfDay: 10 * 60 },
+      domainCommandsAfterHydrate: undefined,
+      expectations: []
     });
 
     const treeCell = CHOP_TREE_COMMAND_SCENARIO.trees![0]!.cell;
-    sim
-      .getWorldPort()
-      .submit(makeLumberCommand([coordKey(treeCell)]), 1);
-
     const collector = sim.getSimEventCollector();
-    collector.clear();
 
-    const { reachedPredicate, ticksRun } = sim.runUntil(
-      () => collector.getEventsByKind("work-claimed").length > 0,
-      { maxTicks: 500, deltaMs: 16 }
-    );
-
-    expect(reachedPredicate).toBe(true);
-    expect(ticksRun).toBeGreaterThan(0);
-    const claimed = collector.getEventsByKind("work-claimed");
-    expect(claimed.length).toBeGreaterThanOrEqual(1);
-    expect(claimed[0]!.kind).toBe("work-claimed");
-
-    const chop = [...sim.getWorldPort().getWorld().workItems.values()].find((w) => w.kind === "chop-tree");
-    expect(chop?.status).toBe("claimed");
-    expect(chop?.claimedBy).toBeDefined();
-  });
-
-  it("2 小人 + 1 条 open 工单 → 单 tick 仅 1 次 work-claimed（互斥）", () => {
-    const sim = createHeadlessSim({ seed: 0xac_71 });
-    let w = sim.getWorldPort().getWorld();
-    const treeCell = { col: 8, row: 8 };
-    const spawned = spawnWorldEntity(w, {
-      kind: "tree",
-      cell: treeCell,
-      occupiedCells: [treeCell],
-      loggingMarked: false,
-      label: "mutex-tree"
+    const reachedWander = sim.runUntil(() => sim.getPawns()[0]?.currentGoal?.kind === "wander", {
+      maxTicks: 400,
+      deltaMs: 16
     });
-    w = spawned.world;
-    const reg = registerChopTreeWork(w, spawned.entityId);
-    sim.getWorldPort().setWorld(reg.world);
+    expect(reachedWander.reachedPredicate).toBe(true);
+    expect(sim.getPawns()[0]!.currentGoal).toMatchObject({ kind: "wander" });
 
-    sim.spawnPawn("Near", { col: 8, row: 7 });
-    sim.spawnPawn("Far", { col: 2, row: 2 });
+    collector.clear();
+    const movedWhileWandering = sim.runUntil(
+      () => collector.getEventsByKind("pawn-moved").some((event) => event.pawnId === "pawn-0"),
+      { maxTicks: 800, deltaMs: 16 }
+    );
+    expect(movedWhileWandering.reachedPredicate).toBe(true);
+    expect(sim.getPawns()[0]!.currentGoal).toMatchObject({ kind: "wander" });
 
-    const collector = sim.getSimEventCollector();
     collector.clear();
 
-    sim.tick(16);
+    const submit = sim.commitPlayerSelection({
+      toolId: "lumber",
+      selectionModifier: "replace",
+      cellKeys: new Set([coordKey(treeCell)]),
+      inputShape: "rect-selection",
+      currentMarkers: new Map(),
+      nowMs: 0
+    });
 
-    const claimedEvents = collector.getEventsByKind("work-claimed");
-    expect(claimedEvents).toHaveLength(1);
+    expect(submit.didSubmitToWorld).toBe(true);
+    expect(submit.command?.verb).toBe("assign_tool_task:lumber");
+    expect(submit.submitResult?.accepted).toBe(true);
+    expect(
+      captureVisibleState(sim).workItems.some(
+        (item) => item.kind === "chop-tree" && item.status === "open"
+      )
+    ).toBe(true);
 
-    const openChop = [...sim.getWorldPort().getWorld().workItems.values()].filter(
-      (x) => x.kind === "chop-tree" && x.status === "open"
-    );
-    expect(openChop).toHaveLength(0);
+    const claimed = sim.runUntil(() => findChopTreeWork(sim)?.status === "claimed", {
+      maxTicks: 600,
+      deltaMs: 16
+    });
+    expect(claimed.reachedPredicate).toBe(true);
+
+    const claimedWork = findChopTreeWork(sim);
+    expect(claimedWork).toMatchObject({
+      kind: "chop-tree",
+      status: "claimed",
+      claimedBy: "pawn-0"
+    });
+
+    const startedWorking = sim.runUntil(() => {
+      const pawn = sim.getPawns()[0];
+      return pawn?.activeWorkItemId === claimedWork?.id && pawn.workTimerSec > 0;
+    }, { maxTicks: 4_000, deltaMs: 16 });
+    expect(startedWorking.reachedPredicate).toBe(true);
+
+    const finalPawn = sim.getPawns()[0]!;
+    const visibleWork = captureVisibleState(sim).workItems.find((item) => item.id === claimedWork?.id);
+    const claimEvents = collector.getEventsByKind("work-claimed");
+    const moveEvents = collector.getEventsByKind("pawn-moved");
+
+    expect(claimEvents).toHaveLength(1);
+    expect(claimEvents[0]).toMatchObject({
+      workItemId: claimedWork?.id,
+      claimedBy: "pawn-0"
+    });
+    expect(moveEvents.some((event) => event.pawnId === "pawn-0")).toBe(true);
+    expect(visibleWork).toMatchObject({
+      id: claimedWork?.id,
+      kind: "chop-tree",
+      status: "claimed",
+      claimedBy: "pawn-0"
+    });
+    expect(finalPawn.activeWorkItemId).toBe(claimedWork?.id);
+    expect(finalPawn.workTimerSec).toBeGreaterThan(0);
   });
 });

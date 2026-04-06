@@ -7,6 +7,8 @@ import type { PawnActionState, PawnGoalState, PawnId, PawnState } from "../game/
 import type { WorldSnapshot } from "../game/world-core-types";
 
 export type SimEventKind =
+  | "day-start"
+  | "night-start"
   | "pawn-moved"
   | "pawn-motion-changed"
   | "pawn-goal-changed"
@@ -19,6 +21,18 @@ export type SimEventKind =
   | "entity-removed";
 
 export type SimEvent =
+  | Readonly<{
+      tick: number;
+      kind: "day-start";
+      dayNumber: number;
+      minuteOfDay: number;
+    }>
+  | Readonly<{
+      tick: number;
+      kind: "night-start";
+      dayNumber: number;
+      minuteOfDay: number;
+    }>
   | Readonly<{
       tick: number;
       kind: "pawn-moved";
@@ -237,6 +251,14 @@ export function createSimEventCollector(): SimEventCollector {
   const recordWorldDiff = (before: WorldSnapshot, after: WorldSnapshot, tick: number): void => {
     const beforeEntities = new Map(before.entities.map((e) => [e.id, e]));
     const afterEntities = new Map(after.entities.map((e) => [e.id, e]));
+    if (before.time.currentPeriod !== after.time.currentPeriod) {
+      events.push({
+        tick,
+        kind: after.time.currentPeriod === "night" ? "night-start" : "day-start",
+        dayNumber: after.time.dayNumber,
+        minuteOfDay: after.time.minuteOfDay
+      });
+    }
     for (const id of unionIds(before.entities, after.entities)) {
       if (!beforeEntities.has(id) && afterEntities.has(id)) {
         events.push({ tick, kind: "entity-spawned", entityId: id });

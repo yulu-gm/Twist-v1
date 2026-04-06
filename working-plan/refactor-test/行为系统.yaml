@@ -1,0 +1,222 @@
+schema_version: "1.0"
+document_role: "refactor_test_design_module"
+
+module_id: "行为系统"
+module_name: "行为系统"
+source_acceptance_file: "oh-acceptance/行为系统.yaml"
+source_audit_file: "working-plan/test-exist-check/行为系统.yaml"
+
+design_scope: >
+  本稿只覆盖行为系统的 4 个 scenario 端到端重构设计，范围为 BEHAVIOR-001 到 BEHAVIOR-004。
+  重点围绕四类重构焦点展开：散步、工作转执行、需求打断、无资源降级。
+  所有设计都必须以“仅设计，不实现测试”“无头测试只模拟用户操作与场景推进”为前提，
+  严禁用 planner/state-machine 直调代替端到端测试。
+
+refactor_objectives:
+  - "把 BEHAVIOR-001 的空闲散步从 domain 级 wander 断言，提升为可通过场景推进观察到的小人移动与 UI 状态变化的 E2E 设计。"
+  - "把 BEHAVIOR-002 的工作转执行，从“拿到工单”升级为“接单、转身、前往工位、开始执行”的完整可见链路。"
+  - "把 BEHAVIOR-003 的需求打断，从单纯的饥饿目标切换，提升为工作释放、目标切换、返回可见交互点的连续场景。"
+  - "把 BEHAVIOR-004 的无资源降级，明确设计成没有床铺或没有可用资源时的降级行为，而不是伪装成正常 sleep 命中。"
+  - "所有场景都输出用户可观察反馈：小人目标、移动、放弃工作、降级行为、UI 提示或状态面板变化。"
+
+global_constraints:
+  - "仅设计，不实现测试。"
+  - "无头测试只模拟用户操作与场景推进，不得以 domain 直调替代真实业务路径。"
+  - "用户验收流程必须包含操作顺序、预期目标、可见反馈。"
+  - "旧 domain/局部无头测试仅作为底层回归，不再充当主业务验收。"
+scenario_redesign:  - scenario_id: "BEHAVIOR-001"
+    current_status_summary: >
+      现有审计显示该场景在 headless 层缺失，玩家侧也只有多小人殖民地的人工验收近似项。
+      当前能找到的相近证据只是 goal-driven-planning 的 wander 单元级断言，
+      以及 multi-pawn-colony 的长局手工观察，但都不是“无工作、无紧迫需求时的小人散步”专用端到端场景。
+    current_mismatch: >
+      现有证据主要证明“能算出 wander”，没有证明“玩家能在场景里看到小人真的散步、真的移动、真的切换为空闲/散步状态”。
+      也没有证明该行为是从真实场景推进中自然发生的，而不是 planner/state-machine 直调出来的结果。
+    user_acceptance_flow:
+      steps:
+        - "加载一个单独的散步场景：只有一个小人，场上没有可执行工作，也没有足以触发吃饭、睡觉等紧急需求的干扰。"
+        - "启动无头场景推进，让系统完成一轮或多轮决策更新，等待小人从空闲进入散步。"
+        - "观察小人从原地开始移动，沿可达路径在附近可行走格子之间游走。"
+        - "继续推进一小段时间，确认 UI 中可见的小人状态从空闲切换为散步或闲逛。"
+      expected_goal: "小人在没有工作和紧迫需求时进入散步，并通过真实移动表现出闲逛行为。"
+      visible_feedback:
+        - "小人在地图上发生连续移动，而不是停在原地不动。"
+        - "UI 状态面板或小人卡片显示空闲/散步中的状态变化。"
+        - "若有日志或事件面板，应能看到目标切换为 wander 或等价的散步目标。"
+    e2e_test_strategy:
+      user_actions:
+        - "通过场景文件启动无头模拟，而不是直接调用 planner/state-machine。"
+        - "让场景自然推进到决策时刻，必要时只用 tick 或等价推进动作。"
+        - "读取小人位置、当前目标、事件收集器和 UI 提示来判断结果。"
+      assertions:
+        - "小人最终进入 wander/散步类目标，而不是被伪装成其他工作目标。"
+        - "小人的位置发生过实际变化，且变化路径符合可达移动。"
+        - "UI 或场景日志中能看到空闲转散步的反馈。"
+      forbidden_shortcuts:
+        - "禁止直接断言 planner/state-machine 的内部返回值来代替场景结果。"
+        - "禁止直接把 currentGoal 或行为状态改成 wander 来伪造通过。"
+        - "禁止用 domain 级单元测试替代端到端场景。"
+    migration_notes: >
+      建议新增一个只服务于 BEHAVIOR-001 的单人散步 scenario，避免复用 multi-pawn-colony 这类噪声很大的场景。
+      该新增场景应把“无工作、无紧迫需求、小人实际走动、UI 可见状态变化”作为核心验收点，
+      headless 断言只围绕真实场景推进后的结果，而不是 planner 计算过程。
+
+  - scenario_id: "BEHAVIOR-002"
+    current_status_summary: >
+      现有审计显示 headless 层已经有 auto-claim-work 相关覆盖，也能看到工单被 claimed 的痕迹。
+      但这更接近“拿到工单”的局部证明，还没有完整表达“从散步或空闲转入工作执行”的用户可见链路。
+    current_mismatch: >
+      现有测试更偏向工单认领是否发生，缺少“停下散步、转身前往工位、开始执行”的连续可见反馈。
+      玩家侧也缺少明确的场景叙述来证明这不是直接注入工单状态，而是真实的 E2E 转执行。
+    user_acceptance_flow:
+      steps:
+        - "让小人先处于空闲或散步状态。"
+        - "场景中生成或暴露一个可认领的伐木工作。"
+        - "推进模拟，观察小人停止散步并转向工作点。"
+        - "继续推进，确认小人实际到达树附近并进入执行工作状态。"
+      expected_goal: "小人从空闲/散步自然转入工作执行，并能被玩家看到接单与前往工位的过程。"
+      visible_feedback:
+        - "小人状态从空闲/散步变为前往工作或执行中。"
+        - "地图上能看到小人向树或工位移动。"
+        - "工单状态从 open 变为 claimed，随后进入执行中的可见反馈。"
+    e2e_test_strategy:
+      user_actions:
+        - "通过场景和命令系统触发可认领工作，不直接改 work item 状态。"
+        - "用无头推进观察 work-claimed、移动和执行开始三个阶段。"
+        - "必要时读取工单状态、小人位置、当前目标和 HUD 文本。"
+      assertions:
+        - "工单确实被认领。"
+        - "小人确实停止散步并移动到工作点。"
+        - "UI/事件层能看见工作转执行的连续反馈。"
+      forbidden_shortcuts:
+        - "禁止直接把工单写成 claimed 或 executing 来绕过接单过程。"
+        - "禁止用 planner/state-machine 的直调结果代替场景演进。"
+        - "禁止只保留“已认领”而不验证移动和执行开始。"
+    migration_notes: >
+      现有 auto-claim-work 可以作为技术参考，但设计目标要从“工单被认领”提升为“认领后真的去干活”。
+      如果原始场景无法表达散步到执行的过渡，应该补一个能被玩家理解的工作转执行 scenario 设计，
+      再让 headless 测试围绕这个场景做端到端断言。
+
+  - scenario_id: "BEHAVIOR-003"
+    current_status_summary: >
+      现有 headless 测试和场景已经覆盖“工作进行中因饥饿而打断，随后切换去吃饭”的主链路，
+      玩家侧也已经存在手工验收场景，并且有明确的 scenario 绑定。
+    current_mismatch: >
+      当前证据更像是“已经能打断”而不是“把打断做成用户能连续看见的完整 E2E 链路”。
+      尤其需要把“释放工单、切换目标、转向食物点”写成统一的可观察反馈，而不是只看最后目标是否变成 eat。
+    user_acceptance_flow:
+      steps:
+        - "让小人先认领伐木工作并进入执行。"
+        - "在场景推进过程中把饥饿压力推到打断阈值。"
+        - "观察系统中断当前工作。"
+        - "确认小人释放工单并转向食物点。"
+      expected_goal: "小人在需求打断时优先放弃当前工作，转去满足更紧急的需求。"
+      visible_feedback:
+        - "小人从伐木/工作动作切换为前往进食。"
+        - "原工单从 claimed 回到 open，或者以等价方式明确释放。"
+        - "UI 中能看见目标从工作变成 eat，且伴随可见的中断反馈。"
+    e2e_test_strategy:
+      user_actions:
+        - "通过场景推进自然触发饥饿阈值，不直接改 planner 结论。"
+        - "只在必要时使用场景级状态变更来模拟世界推进，不在测试里手工塞目标。"
+        - "持续观察工作状态、小人当前目标和目标切换事件。"
+      assertions:
+        - "pawn-goal-changed 确实切换到了 eat。"
+        - "当前工作被释放回 open 或等价的未占用状态。"
+        - "小人不应继续把被打断的工作当作当前主目标。"
+      forbidden_shortcuts:
+        - "禁止直接把小人 needs 或 currentGoal 改成 eat 来伪造打断结果。"
+        - "禁止直接调用 planner/state-machine 推导结果作为最终断言。"
+        - "禁止忽略工单释放，只检查最后目标。"
+    migration_notes: >
+      这个场景可以继续沿用现有 need-interrupt-during-work 场景作为基础，但设计稿要把“中断”和“释放工单”写成同等重要的验收点。
+      如果现有场景素材不够自然，应在 scenario 资产里补一个可控的饥饿推进步骤，
+      让测试仍然只通过场景推进来完成，而不是在断言里手动篡改小人状态。
+
+  - scenario_id: "BEHAVIOR-004"
+    current_status_summary: >
+      现有审计显示该场景在 headless 和玩家侧都缺失。
+      目前能找到的相近内容主要是“能睡着”的正向 sleep 场景，但没有“没有床铺或没有可用资源时如何降级”的端到端证据。
+    current_mismatch: >
+      现有睡眠类场景证明的是“有床可睡时能达成 sleep 目标”，不是“无床可用时不会伪造 sleep，而是进入降级行为”。
+      因此当前缺少对资源不可用时用户可见反馈的专用验证。
+    user_acceptance_flow:
+      steps:
+        - "让小人进入极度疲劳，但场景中不提供可用床铺，或确保该小人没有任何可分配的睡眠资源。"
+        - "推进决策轮次，观察系统尝试寻找睡眠目标。"
+        - "确认系统找不到有效床铺后，进入降级行为，而不是假装已经 sleep 成功。"
+        - "继续推进，观察小人以徘徊、等待或疲劳可见状态呈现。"
+      expected_goal: "当睡眠资源不可用时，小人进入可见的降级行为，而不是错误地命中 sleep。"
+      visible_feedback:
+        - "小人不会拿到有效的 sleep 目标。"
+        - "UI 或表情反馈能看出疲劳但无法睡眠的状态。"
+        - "如果实现了降级移动，小人会在附近徘徊或等待，而不是进入不存在的床铺流程。"
+    e2e_test_strategy:
+      user_actions:
+        - "用一个专用的无床场景推进疲劳状态，不直接 stub 出 sleep 决策。"
+        - "观察是否出现 sleep 目标、目标切换事件和资源查找结果。"
+        - "用小人位置、事件、UI 状态来验证降级行为。"
+      assertions:
+        - "找不到有效床铺时，不应出现伪造的 sleep 成功。"
+        - "小人最终应表现为降级行为，例如 wander、原地等待或疲劳停滞中的可见状态。"
+        - "UI 需要能告诉玩家“疲劳但没有可用床铺”这类降级信息。"
+      forbidden_shortcuts:
+        - "禁止直接把小人改成 sleep 成功状态来骗过测试。"
+        - "禁止用 sleep 正向场景替代无资源降级场景。"
+        - "禁止用 planner/state-machine 直调来规避资源查找过程。"
+    migration_notes: >
+      这个场景需要单独新增一个无床铺/无可用资源的 scenario，因为现有 sleep 场景都默认资源存在。
+      新设计必须把“无资源时的降级行为”与“成功睡眠”切开，确保测试验证的是失败降级而不是正向达成。
+
+test_architecture:
+  scenario_layer:
+    - "每个 BEHAVIOR 场景都应有明确的 scenario 资产，必要时新增独立 scenario 文件，而不是复用噪声过大的多用途场景。"
+    - "BEHAVIOR-001 和 BEHAVIOR-004 需要补专用 scenario 设计，分别覆盖散步和无资源降级。"
+  headless_e2e_layer:
+    - "只通过 createHeadlessSim、hydrateScenario、runScenarioHeadless、tick 或等价用户推进动作来验证。"
+    - "断言点优先放在事件、工单状态、小人位置、当前目标和 UI/HUD 可见反馈上。"
+    - "headless 测试必须模拟用户操作与场景推进，不得直接调用 planner/state-machine。"
+  player_acceptance_layer:
+    - "玩家侧验收只保留手工可观察步骤，不把 domain 级结论当成玩家体验。"
+    - "如果场景面板或 HUD 已有 YAML 提示入口，应继续作为手工验收说明的承载点。"
+  shared_observables:
+    - "小人当前目标变化"
+    - "小人地图移动轨迹"
+    - "工单 claimed / open / released 状态变化"
+    - "UI 状态文字、图标、面板提示"
+    - "与需求打断或资源不可用相关的事件记录"
+
+out_of_scope:
+  - "不修改任何测试代码。"
+  - "不修改任何源码。"
+  - "不调整任务树或模块归属。"
+  - "不把 domain 单元测试当成端到端测试替代品。"
+  - "不在本稿中实现任何场景逻辑。"
+
+deliverable_checklist:
+  - "已覆盖 BEHAVIOR-001 到 BEHAVIOR-004，且没有遗漏。"
+  - "已明确四类重构焦点：散步、工作转执行、需求打断、无资源降级。"
+  - "已为每个场景补齐用户可观察的目标、移动、放弃工作、降级等反馈。"
+  - "已明确禁止用 planner/state-machine 直调替代端到端测试。"
+  - "已单独补充 BEHAVIOR-001 与 BEHAVIOR-004 的新增 scenario 设计。"
+  - "已保持“仅设计，不实现测试”“无头测试只模拟用户操作与场景推进”的约束。"
+
+supplemental_scenario_designs:
+  - scenario_id: "BEHAVIOR-001"
+    proposed_scenario_file: "scenarios/behavior-001-wander.scenario.ts"
+    design_focus: "单人散步、无工作、无紧迫需求、可见移动轨迹"
+    required_observations:
+      - "进入 wander/散步类目标"
+      - "至少一次实际移动"
+      - "UI 或日志显示空闲转散步"
+    notes: >
+      该 scenario 应尽量简洁，只保留一个小人和最少的干扰变量，避免 multi-pawn-colony 的噪声。
+  - scenario_id: "BEHAVIOR-004"
+    proposed_scenario_file: "scenarios/behavior-004-no-resource-downgrade.scenario.ts"
+    design_focus: "无床铺、极度疲劳、不可伪造 sleep、明确降级"
+    required_observations:
+      - "没有有效 sleep 目标"
+      - "小人表现出降级行为，例如 wander、等待或疲劳停滞"
+      - "UI 明确提示床铺不可用"
+    notes: >
+      该 scenario 必须和正向 sleep 场景分离，核心是证明“无资源时会降级”，而不是证明“有资源时能睡着”。

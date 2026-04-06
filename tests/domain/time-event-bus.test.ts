@@ -1,3 +1,6 @@
+/**
+ * refactor-test：时间事件总线域回归；TIME-002 主证据以无头场景 `time-day-rollover` 为准。
+ */
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_TIME_CONTROL_STATE,

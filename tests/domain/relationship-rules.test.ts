@@ -1,3 +1,7 @@
+/**
+ * 关系与一致性规则单元护栏（validate*、assign* 等）。
+ * ENTITY-002/004 的携带与冲突验收以 headless 场景断言为准，本文件仅作底层回归。
+ */
 import { describe, expect, it } from "vitest";
 import type { PawnEntity, ResourceEntity } from "../../src/game/entity";
 import {

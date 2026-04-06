@@ -1,0 +1,507 @@
+task_name: "基于 working-plan/refactor-test 的 9 模块测试重构设计稿，落地为可执行的场景级任务树"
+created_at: "2026-04-06"
+status: "completed"
+
+tasks:
+  - id: "T-00"
+    title: "建立 refactor-test 执行矩阵与 36 个 scenario_id 对照表"
+    status: "completed"
+    dependencies: []
+    context:
+      read_files:
+        - ".agent/skills/generate-task-tree/SKILL.md"
+        - "working-plan/refactor-test/refactor-test-design.schema.yml"
+        - "working-plan/refactor-test/需求系统.yaml"
+        - "working-plan/refactor-test/时间系统.yaml"
+        - "working-plan/refactor-test/行为系统.yaml"
+        - "working-plan/refactor-test/工作系统.yaml"
+        - "working-plan/refactor-test/实体系统.yaml"
+        - "working-plan/refactor-test/地图系统.yaml"
+        - "working-plan/refactor-test/建筑系统.yaml"
+        - "working-plan/refactor-test/交互系统.yaml"
+        - "working-plan/refactor-test/UI系统.yaml"
+      reference_docs:
+        - "scenarios/index.ts"
+        - "src/headless/scenario-types.ts"
+        - "tests/headless/scenario-runner.test.ts"
+    action: |
+      1. 创建 `working-plan/refactor-test-execution-matrix.md`，把 9 个模块、36 个 `scenario_id`、现有场景文件、现有测试文件、新增场景需求、保留回归测试、降级测试逐条列清。
+      2. 明确每个 `scenario_id` 的执行策略：
+         - 复用现有 `scenarios/*.scenario.ts`
+         - 需要新增 `scenarios/*.scenario.ts`
+         - 复用现有 `tests/headless/*.test.ts`
+         - 需要新增或重写的 `tests/headless/*.test.ts`
+         - 仅保留为 domain / local regression 的旧测试
+      3. 在矩阵中单独标记以下缺口场景的拟定文件名：
+         - `scenarios/need-zero-floor.scenario.ts`
+         - `scenarios/time-day-rollover.scenario.ts`
+         - `scenarios/time-pause-freeze.scenario.ts`
+         - `scenarios/time-frame-gap-guard.scenario.ts`
+         - `scenarios/behavior-001-wander.scenario.ts`
+         - `scenarios/behavior-004-no-resource-downgrade.scenario.ts`
+         - `scenarios/entity-resource-conflict.scenario.ts`
+         - `scenarios/map-blocked-placement.scenario.ts`
+         - `scenarios/map-out-of-bounds-selection.scenario.ts`
+         - `scenarios/build-invalid-placement.scenario.ts`
+         - `scenarios/bed-overflow-unassigned.scenario.ts`
+         - `scenarios/interaction-no-tool.scenario.ts`
+         - `scenarios/ui-layer-clarity.scenario.ts`
+      4. 为每个模块补一列“主验收入口”，要求明确写出将通过 `runScenarioHeadless`、`createHeadlessSim`、`commitPlayerSelection`、`manualAcceptance` 中哪些入口推进。
+    acceptance_criteria: |
+      - [ ] Read: `working-plan/refactor-test-execution-matrix.md` 存在，且覆盖 9 个模块与 36 个 `scenario_id`。
+      - [ ] Grep: 执行矩阵中必须出现 `NEED-001`、`TIME-004`、`BEHAVIOR-004`、`WORK-004`、`ENTITY-004`、`MAP-004`、`BUILD-004`、`INTERACT-004`、`UI-004`。
+      - [ ] Grep: 执行矩阵中必须明确区分 “复用场景 / 新增场景 / 保留回归 / 降级旧测试” 四类结果。
+
+  - id: "T-01"
+    title: "补齐共享 headless 测试支架与可见反馈断言工具"
+    status: "completed"
+    dependencies: ["T-00"]
+    context:
+      read_files:
+        - "src/headless/index.ts"
+        - "src/headless/scenario-helpers.ts"
+        - "src/headless/scenario-runner.ts"
+        - "src/headless/scenario-types.ts"
+        - "src/headless/sim-event-log.ts"
+        - "tests/headless/scenario-runner.test.ts"
+        - "tests/headless/sim-event-log.test.ts"
+      reference_docs:
+        - "working-plan/refactor-test/需求系统.yaml"
+        - "working-plan/refactor-test/时间系统.yaml"
+        - "working-plan/refactor-test/行为系统.yaml"
+        - "working-plan/refactor-test/UI系统.yaml"
+    action: |
+      1. 在 `src/headless/` 或 `tests/headless/` 下补充共享测试辅助能力，统一支持以下断言需求：
+         - 事件流断言，如 `night-start`、`day-start`、`pawn-goal-changed`、`work-claimed`、`work-completed`
+         - 玩家输入断言，如 `rect-selection`、`brush-stroke`、`single-cell`、`no-tool`
+         - 可见状态断言，如 HUD 时间、工作项状态、归属信息、失败提示
+      2. 如果现有 `ScenarioDefinition` 缺少支撑字段，为暂停冻结、极端帧间隔、冲突场景、UI 分层观测补充最小必要字段，并保持向后兼容。
+      3. 为新增的共享工具补齐 `tests/headless/scenario-runner.test.ts` 和/或 `tests/headless/sim-event-log.test.ts`。
+      4. 严禁在这个任务里实现具体业务逻辑；只允许补测试支架、场景观测能力和通用断言工具。
+    acceptance_criteria: |
+      - [ ] Shell: `npx vitest run tests/headless/scenario-runner.test.ts tests/headless/sim-event-log.test.ts` 全部通过。
+      - [ ] Read: `src/headless/index.ts` 必须重新导出新增的共享工具或类型。
+      - [ ] Grep: `src/headless/scenario-types.ts` 或新增 helper 文件中，必须明确支持 `rect-selection`、`brush-stroke`、`single-cell`、`no-tool` 相关语义。
+
+  - id: "T-02"
+    title: "新增需求/时间/行为模块缺失的 scenario 资产"
+    status: "completed"
+    dependencies: ["T-00", "T-01"]
+    context:
+      read_files:
+        - "working-plan/refactor-test/需求系统.yaml"
+        - "working-plan/refactor-test/时间系统.yaml"
+        - "working-plan/refactor-test/行为系统.yaml"
+        - "scenarios/pawn-eats-when-hungry.scenario.ts"
+        - "scenarios/night-forces-sleep.scenario.ts"
+        - "scenarios/need-interrupt-during-work.scenario.ts"
+        - "scenarios/multi-pawn-colony.scenario.ts"
+      reference_docs:
+        - "src/headless/scenario-types.ts"
+        - "src/headless/scenario-helpers.ts"
+    action: |
+      1. 新建并填充以下场景文件，只写场景资产与 `manualAcceptance`，不写测试实现：
+         - `scenarios/need-zero-floor.scenario.ts`
+         - `scenarios/time-day-rollover.scenario.ts`
+         - `scenarios/time-pause-freeze.scenario.ts`
+         - `scenarios/time-frame-gap-guard.scenario.ts`
+         - `scenarios/behavior-001-wander.scenario.ts`
+         - `scenarios/behavior-004-no-resource-downgrade.scenario.ts`
+      2. 对每个场景写明：
+         - 初始时间、初始 pawn / 资源 / 床铺 / zone 布局
+         - `playerSelectionAfterHydrate` 或 `domainCommandsAfterHydrate` 的最小入口
+         - `manualAcceptance.steps`
+         - `manualAcceptance.outcomes`
+      3. 保证这些场景的设计语义与 `working-plan/refactor-test/*.yaml` 中对应 `scenario_id` 一一对应，不混淆 “工作被饥饿打断” 与 “进食被打断”、不把 “无资源降级” 写成 “正常 sleep”。
+    acceptance_criteria: |
+      - [ ] Read: 以上 6 个 `scenarios/*.scenario.ts` 文件全部存在。
+      - [ ] Grep: `scenarios/need-zero-floor.scenario.ts` 中必须出现 `manualAcceptance`。
+      - [ ] Grep: `scenarios/time-day-rollover.scenario.ts`、`scenarios/time-pause-freeze.scenario.ts`、`scenarios/time-frame-gap-guard.scenario.ts` 中必须出现与时间推进相关的配置字段。
+      - [ ] Grep: `scenarios/behavior-001-wander.scenario.ts` 和 `scenarios/behavior-004-no-resource-downgrade.scenario.ts` 中必须出现可区分的 `description` 与 `manualAcceptance`。
+
+  - id: "T-03"
+    title: "新增实体/地图/建筑/交互/UI 模块缺失的 scenario 资产"
+    status: "completed"
+    dependencies: ["T-00", "T-01"]
+    context:
+      read_files:
+        - "working-plan/refactor-test/实体系统.yaml"
+        - "working-plan/refactor-test/地图系统.yaml"
+        - "working-plan/refactor-test/建筑系统.yaml"
+        - "working-plan/refactor-test/交互系统.yaml"
+        - "working-plan/refactor-test/UI系统.yaml"
+        - "scenarios/build-wall-flow.scenario.ts"
+        - "scenarios/build-bed-flow.scenario.ts"
+        - "scenarios/haul-mark-pickup.scenario.ts"
+        - "scenarios/map-initial-state.scenario.ts"
+      reference_docs:
+        - "src/headless/scenario-types.ts"
+        - "src/headless/scenario-helpers.ts"
+    action: |
+      1. 新建并填充以下场景文件：
+         - `scenarios/entity-resource-conflict.scenario.ts`
+         - `scenarios/map-blocked-placement.scenario.ts`
+         - `scenarios/map-out-of-bounds-selection.scenario.ts`
+         - `scenarios/build-invalid-placement.scenario.ts`
+         - `scenarios/bed-overflow-unassigned.scenario.ts`
+         - `scenarios/interaction-no-tool.scenario.ts`
+         - `scenarios/ui-layer-clarity.scenario.ts`
+      2. 每个场景都要写出玩家触发动作、失败或成功反馈、以及 `manualAcceptance`。
+      3. 对冲突与失败场景，必须把“系统拒绝”写成显式反馈，不能只靠最终 world state 没变化来表达。
+      4. 对 `ui-layer-clarity` 场景，必须提供多层叠加素材，确保后续能验证选区框、蓝图虚影、marker、zone 边界同时存在。
+    acceptance_criteria: |
+      - [ ] Read: 以上 7 个 `scenarios/*.scenario.ts` 文件全部存在。
+      - [ ] Grep: `scenarios/build-invalid-placement.scenario.ts`、`scenarios/entity-resource-conflict.scenario.ts`、`scenarios/interaction-no-tool.scenario.ts` 中必须出现失败或拒绝语义。
+      - [ ] Grep: `scenarios/ui-layer-clarity.scenario.ts` 中必须出现 `manualAcceptance`，且描述多层叠加观察点。
+
+  - id: "T-04"
+    title: "落地时间系统 TIME-001 到 TIME-004 的 headless 场景测试"
+    status: "completed"
+    dependencies: ["T-01", "T-02"]
+    context:
+      read_files:
+        - "working-plan/refactor-test/时间系统.yaml"
+        - "tests/headless/headless-sim-basic.test.ts"
+        - "tests/headless/night-forces-sleep.test.ts"
+        - "tests/domain/time-of-day.test.ts"
+        - "tests/domain/time-event-bus.test.ts"
+        - "scenarios/night-forces-sleep.scenario.ts"
+        - "scenarios/time-day-rollover.scenario.ts"
+        - "scenarios/time-pause-freeze.scenario.ts"
+        - "scenarios/time-frame-gap-guard.scenario.ts"
+      reference_docs:
+        - "src/headless/index.ts"
+        - "src/headless/scenario-helpers.ts"
+    action: |
+      1. 保留 `tests/headless/night-forces-sleep.test.ts` 的可复用部分，但把 TIME-001 改写为“跨阈值推进到夜晚”的场景级断言。
+      2. 新增以下 headless 测试文件：
+         - `tests/headless/time-day-rollover.test.ts`
+         - `tests/headless/time-pause-freeze.test.ts`
+         - `tests/headless/time-frame-gap-guard.test.ts`
+      3. 每个测试都只通过场景加载、主循环推进、暂停开关或受控 frame gap 注入完成，不得直接调用时间纯函数替代业务路径。
+      4. 让 TIME-001 ~ TIME-004 的断言同时覆盖：事件、HUD 时间、dayNumber / minuteOfDay、暂停冻结、上限保护。
+    acceptance_criteria: |
+      - [ ] Shell: `npx vitest run tests/headless/night-forces-sleep.test.ts tests/headless/time-day-rollover.test.ts tests/headless/time-pause-freeze.test.ts tests/headless/time-frame-gap-guard.test.ts` 全部通过。
+      - [ ] Grep: 以上 4 个测试文件中必须出现 `runScenarioHeadless` 或 `createHeadlessSim`。
+      - [ ] Grep: `tests/headless/time-pause-freeze.test.ts` 中必须同时断言时间冻结与动作/进度冻结。
+      - [ ] Grep: `tests/headless/time-frame-gap-guard.test.ts` 中必须出现对 `MAX_FRAME_DT_SEC` 或等价保护结果的断言。
+
+  - id: "T-05"
+    title: "落地需求系统 NEED-001 到 NEED-004 的 headless 场景测试"
+    status: "completed"
+    dependencies: ["T-01", "T-02"]
+    context:
+      read_files:
+        - "working-plan/refactor-test/需求系统.yaml"
+        - "tests/headless/pawn-eats-when-hungry.test.ts"
+        - "tests/headless/pawn-sleeps-when-tired.test.ts"
+        - "tests/headless/need-interrupt-during-work.test.ts"
+        - "scenarios/pawn-eats-when-hungry.scenario.ts"
+        - "scenarios/night-forces-sleep.scenario.ts"
+        - "scenarios/need-interrupt-during-work.scenario.ts"
+        - "scenarios/need-zero-floor.scenario.ts"
+      reference_docs:
+        - "src/headless/index.ts"
+        - "src/headless/sim-event-log.ts"
+    action: |
+      1. 保留并重写现有 3 个 headless 测试的主断言，使其聚焦玩家可见链路，而不是内部数值直改。
+      2. 新增 `tests/headless/need-zero-floor.test.ts`，覆盖 NEED-004 的 0 边界与极端反馈。
+      3. 明确区分以下三类语义并分别断言：
+         - 正常饥饿到进食
+         - 工作被饥饿打断
+         - 饥饿或疲劳触底但不出现负数
+      4. 测试中禁止直接改写 `satiety` / `energy` 作为主路径，只允许通过场景与推进驱动变化。
+    acceptance_criteria: |
+      - [ ] Shell: `npx vitest run tests/headless/pawn-eats-when-hungry.test.ts tests/headless/pawn-sleeps-when-tired.test.ts tests/headless/need-interrupt-during-work.test.ts tests/headless/need-zero-floor.test.ts` 全部通过。
+      - [ ] Grep: `tests/headless/need-zero-floor.test.ts` 中必须明确断言不会出现负数。
+      - [ ] Grep: `tests/headless/need-interrupt-during-work.test.ts` 中必须同时断言工作释放与目标切换为 `eat`。
+      - [ ] Grep: 以上 4 个测试文件中不得以直接改写 `satiety` / `energy` 作为唯一主路径。
+
+  - id: "T-06"
+    title: "落地行为系统 BEHAVIOR-001 到 BEHAVIOR-004 的 headless 场景测试"
+    status: "completed"
+    dependencies: ["T-01", "T-02"]
+    context:
+      read_files:
+        - "working-plan/refactor-test/行为系统.yaml"
+        - "tests/headless/auto-claim-work.test.ts"
+        - "tests/headless/need-interrupt-during-work.test.ts"
+        - "tests/headless/multi-pawn-colony.test.ts"
+        - "tests/domain/goal-driven-planning.test.ts"
+        - "tests/domain/wander-planning.test.ts"
+        - "scenarios/behavior-001-wander.scenario.ts"
+        - "scenarios/need-interrupt-during-work.scenario.ts"
+        - "scenarios/behavior-004-no-resource-downgrade.scenario.ts"
+      reference_docs:
+        - "src/headless/index.ts"
+        - "src/headless/sim-event-log.ts"
+    action: |
+      1. 新增 `tests/headless/behavior-wander.test.ts`，把 BEHAVIOR-001 从 planner 单测提升为场景级散步验证。
+      2. 新增 `tests/headless/behavior-no-resource-downgrade.test.ts`，覆盖 BEHAVIOR-004 的无资源降级。
+      3. 重写或补强 `tests/headless/auto-claim-work.test.ts` 与 `tests/headless/need-interrupt-during-work.test.ts` 的场景断言，使其覆盖：
+         - 从空闲/散步转向执行工作
+         - 被需求打断后的工作释放与目标切换
+      4. 明确禁止用 `planner/state-machine` 直调充当场景测试入口。
+    acceptance_criteria: |
+      - [ ] Shell: `npx vitest run tests/headless/behavior-wander.test.ts tests/headless/auto-claim-work.test.ts tests/headless/need-interrupt-during-work.test.ts tests/headless/behavior-no-resource-downgrade.test.ts` 全部通过。
+      - [ ] Grep: `tests/headless/behavior-wander.test.ts` 中必须断言实际移动与 `wander` 或等价散步目标。
+      - [ ] Grep: `tests/headless/behavior-no-resource-downgrade.test.ts` 中必须断言“无有效 sleep 目标”与“降级反馈”。
+      - [ ] Grep: 以上测试中不得把 `planner/state-machine` 直调当作主入口。
+
+  - id: "T-07"
+    title: "落地工作系统 WORK-001 到 WORK-004 的 headless 场景测试"
+    status: "completed"
+    dependencies: ["T-01", "T-03"]
+    context:
+      read_files:
+        - "working-plan/refactor-test/工作系统.yaml"
+        - "tests/headless/chop-haul-full-chain.test.ts"
+        - "tests/headless/haul-mark-pickup.test.ts"
+        - "tests/headless/stale-work-cleanup.test.ts"
+        - "tests/headless/auto-claim-work.test.ts"
+        - "scenarios/chop-haul-full-chain.scenario.ts"
+        - "scenarios/haul-mark-pickup.scenario.ts"
+        - "scenarios/build-bed-flow.scenario.ts"
+      reference_docs:
+        - "src/headless/index.ts"
+        - "src/headless/sim-event-log.ts"
+    action: |
+      1. 把 `tests/headless/chop-haul-full-chain.test.ts` 改造成 WORK-001 的完整玩家路径测试，覆盖砍树、拾取、搬运入库。
+      2. 把 `tests/headless/haul-mark-pickup.test.ts` 改造成 WORK-002 的局部链路测试，覆盖玩家框选、资源变为可拾取、生成 open 工单。
+      3. 把 `tests/headless/stale-work-cleanup.test.ts` 改造成 WORK-003 的失败回退测试，覆盖目标失效后的工单清理与工人释放。
+      4. 新增 `tests/headless/work-blueprint-race.test.ts`，用现有或补充的床铺建造场景覆盖 WORK-004 的多人竞争与唯一认领。
+      5. 严禁把 `claimWorkItem`、`completeWorkItem`、`removeEntityMutable` 直接当作主测试入口。
+    acceptance_criteria: |
+      - [ ] Shell: `npx vitest run tests/headless/chop-haul-full-chain.test.ts tests/headless/haul-mark-pickup.test.ts tests/headless/stale-work-cleanup.test.ts tests/headless/work-blueprint-race.test.ts` 全部通过。
+      - [ ] Grep: `tests/headless/work-blueprint-race.test.ts` 中必须断言同一工单不会被两个 pawn 同时持有。
+      - [ ] Grep: `tests/headless/stale-work-cleanup.test.ts` 中必须同时断言工单回收与工人释放。
+      - [ ] Grep: 上述 4 个测试文件中不得以 `claimWorkItem` 或 `completeWorkItem` 作为主入口。
+
+  - id: "T-08"
+    title: "落地实体系统 ENTITY-001 到 ENTITY-004 的 headless 场景测试"
+    status: "completed"
+    dependencies: ["T-01", "T-03", "T-07"]
+    context:
+      read_files:
+        - "working-plan/refactor-test/实体系统.yaml"
+        - "tests/headless/chop-tree-full-flow.test.ts"
+        - "tests/headless/chop-haul-full-chain.test.ts"
+        - "tests/headless/build-wall-flow.test.ts"
+        - "tests/domain/lifecycle-rules.test.ts"
+        - "tests/domain/relationship-rules.test.ts"
+        - "scenarios/chop-tree-full-flow.scenario.ts"
+        - "scenarios/entity-resource-conflict.scenario.ts"
+      reference_docs:
+        - "src/headless/index.ts"
+        - "src/headless/sim-event-log.ts"
+    action: |
+      1. 将 `tests/headless/chop-tree-full-flow.test.ts` 对齐 ENTITY-001，重点验证“玩家发起 -> 树消失 -> 木头落地”。
+      2. 将 `tests/headless/chop-haul-full-chain.test.ts` 中与携带/放下相关的断言抽出并对齐 ENTITY-002。
+      3. 将 `tests/headless/build-wall-flow.test.ts` 对齐 ENTITY-003，验证蓝图到建筑实体的落地链路。
+      4. 新增 `tests/headless/entity-conflict-guard.test.ts`，覆盖 ENTITY-004 的一致性冲突场景。
+      5. 保留 `tests/domain/lifecycle-rules.test.ts`、`tests/domain/relationship-rules.test.ts` 作为底层回归，不让它们再承担主验收职责。
+    acceptance_criteria: |
+      - [ ] Shell: `npx vitest run tests/headless/chop-tree-full-flow.test.ts tests/headless/chop-haul-full-chain.test.ts tests/headless/build-wall-flow.test.ts tests/headless/entity-conflict-guard.test.ts` 全部通过。
+      - [ ] Grep: `tests/headless/entity-conflict-guard.test.ts` 中必须同时断言“用户触发冲突 / 系统拒绝 / world state 保持一致”。
+      - [ ] Grep: 上述 headless 测试中不得把 `transformTreeToResource`、`pickUpResource`、`dropResource`、`transformBlueprintToBuilding` 当作主入口。
+
+  - id: "T-09"
+    title: "落地地图系统 MAP-001 到 MAP-004 的 headless 场景测试"
+    status: "completed"
+    dependencies: ["T-01", "T-03"]
+    context:
+      read_files:
+        - "working-plan/refactor-test/地图系统.yaml"
+        - "tests/headless/map-initial-state.test.ts"
+        - "tests/headless/story-1-day-one.test.ts"
+        - "tests/headless/zone-create.test.ts"
+        - "tests/domain/floor-selection.test.ts"
+        - "tests/domain/occupancy-manager.test.ts"
+        - "scenarios/map-initial-state.scenario.ts"
+        - "scenarios/map-blocked-placement.scenario.ts"
+        - "scenarios/map-out-of-bounds-selection.scenario.ts"
+      reference_docs:
+        - "src/headless/index.ts"
+        - "src/headless/scenario-helpers.ts"
+    action: |
+      1. 用 `tests/headless/map-initial-state.test.ts` 或 `tests/headless/story-1-day-one.test.ts` 承接 MAP-001 的首屏地图初始化验收。
+      2. 把 `tests/headless/zone-create.test.ts` 改造成 MAP-002 的合法选区验收，明确框选、预览、确认、zone 落地。
+      3. 新增 `tests/headless/map-blocked-placement.test.ts`，覆盖 MAP-003 的占用冲突拦截。
+      4. 新增 `tests/headless/map-out-of-bounds-selection.test.ts`，覆盖 MAP-004 的越界裁切与合法区域保留。
+      5. 保留 `tests/domain/floor-selection.test.ts`、`tests/domain/occupancy-manager.test.ts` 作为局部规则回归，不再充当主验收。
+    acceptance_criteria: |
+      - [ ] Shell: `npx vitest run tests/headless/map-initial-state.test.ts tests/headless/zone-create.test.ts tests/headless/map-blocked-placement.test.ts tests/headless/map-out-of-bounds-selection.test.ts` 全部通过。
+      - [ ] Grep: `tests/headless/map-blocked-placement.test.ts` 中必须断言失败反馈且不生成蓝图或工单。
+      - [ ] Grep: `tests/headless/map-out-of-bounds-selection.test.ts` 中必须断言越界格不会进入最终选区。
+      - [ ] Grep: 上述 headless 测试中不得只用 `floor-selection` 或 `occupancy` 单测代替场景验收。
+
+  - id: "T-10"
+    title: "落地建筑系统 BUILD-001 到 BUILD-004 的 headless 场景测试"
+    status: "completed"
+    dependencies: ["T-01", "T-03", "T-09"]
+    context:
+      read_files:
+        - "working-plan/refactor-test/建筑系统.yaml"
+        - "tests/headless/build-wall-flow.test.ts"
+        - "tests/headless/build-bed-flow.test.ts"
+        - "tests/headless/bed-auto-assign.test.ts"
+        - "scenarios/build-wall-flow.scenario.ts"
+        - "scenarios/build-bed-flow.scenario.ts"
+        - "scenarios/bed-auto-assign.scenario.ts"
+        - "scenarios/build-invalid-placement.scenario.ts"
+        - "scenarios/bed-overflow-unassigned.scenario.ts"
+      reference_docs:
+        - "src/headless/index.ts"
+        - "src/headless/sim-event-log.ts"
+    action: |
+      1. 对齐 BUILD-001：重写 `tests/headless/build-wall-flow.test.ts`，把合法建墙路径写成完整 E2E。
+      2. 对齐 BUILD-002：重写 `tests/headless/build-bed-flow.test.ts` 与 `tests/headless/bed-auto-assign.test.ts`，明确“玩家放床”和“建成后自动分配”的职责边界。
+      3. 新增 `tests/headless/build-invalid-placement.test.ts`，覆盖 BUILD-003 的非法位置拦截。
+      4. 新增 `tests/headless/bed-overflow-unassigned.test.ts`，覆盖 BUILD-004 的多余床铺无归属。
+      5. 所有测试都必须从 `build` 工具的真实输入进入，禁止直接调用 `placeBlueprint` 伪造结果。
+    acceptance_criteria: |
+      - [ ] Shell: `npx vitest run tests/headless/build-wall-flow.test.ts tests/headless/build-bed-flow.test.ts tests/headless/bed-auto-assign.test.ts tests/headless/build-invalid-placement.test.ts tests/headless/bed-overflow-unassigned.test.ts` 全部通过。
+      - [ ] Grep: `tests/headless/build-invalid-placement.test.ts` 中必须断言“不生成蓝图 / 不生成 construct-blueprint 工单 / 有失败反馈”。
+      - [ ] Grep: `tests/headless/bed-overflow-unassigned.test.ts` 中必须断言多余床铺的 `ownerPawnId` 或等价归属字段为空。
+      - [ ] Grep: 上述测试中不得把 `placeBlueprint` 当作主入口。
+
+  - id: "T-11"
+    title: "落地交互系统 INTERACT-001 到 INTERACT-004 的 headless 场景测试"
+    status: "completed"
+    dependencies: ["T-01", "T-03"]
+    context:
+      read_files:
+        - "working-plan/refactor-test/交互系统.yaml"
+        - "tests/headless/haul-mark-pickup.test.ts"
+        - "tests/headless/build-wall-flow.test.ts"
+        - "tests/headless/build-bed-flow.test.ts"
+        - "scenarios/haul-mark-pickup.scenario.ts"
+        - "scenarios/build-wall-flow.scenario.ts"
+        - "scenarios/build-bed-flow.scenario.ts"
+        - "scenarios/interaction-no-tool.scenario.ts"
+      reference_docs:
+        - "src/headless/scenario-types.ts"
+        - "src/headless/index.ts"
+    action: |
+      1. 用现有 3 个 headless 测试分别承接：
+         - `INTERACT-001` rect-selection
+         - `INTERACT-002` brush-stroke
+         - `INTERACT-003` single-cell
+      2. 新增 `tests/headless/interaction-no-tool.test.ts`，覆盖 INTERACT-004 的 no-tool 无效输入。
+      3. 对 4 个输入模式分别写清楚断言边界，确保：
+         - rect-selection 只关心矩形覆盖与提交结果
+         - brush-stroke 只关心连续路径覆盖与提交结果
+         - single-cell 只关心单格点击与单格落点
+         - no-tool 只关心无业务副作用与显式无效反馈
+      4. 禁止把 command builder、null 返回或 domain 直调当成互动主验证。
+    acceptance_criteria: |
+      - [ ] Shell: `npx vitest run tests/headless/haul-mark-pickup.test.ts tests/headless/build-wall-flow.test.ts tests/headless/build-bed-flow.test.ts tests/headless/interaction-no-tool.test.ts` 全部通过。
+      - [ ] Grep: `tests/headless/interaction-no-tool.test.ts` 中必须断言“无选区 / 无蓝图 / 无工单 / 无 world side effect”。
+      - [ ] Grep: 4 个测试文件中都必须出现 `commitPlayerSelection` 或等价玩家输入入口。
+      - [ ] Grep: 上述测试中不得把 command builder 或 `null` 返回当作最终结论。
+
+  - id: "T-12"
+    title: "落地 UI 系统 UI-001 到 UI-004 的场景测试与可见验收脚本"
+    status: "completed"
+    dependencies: ["T-01", "T-03", "T-09", "T-10", "T-11"]
+    context:
+      read_files:
+        - "working-plan/refactor-test/UI系统.yaml"
+        - "tests/scene-hud-markup.test.ts"
+        - "tests/headless/build-wall-flow.test.ts"
+        - "tests/headless/chop-tree-full-flow.test.ts"
+        - "scenarios/build-wall-flow.scenario.ts"
+        - "scenarios/chop-tree-full-flow.scenario.ts"
+        - "scenarios/ui-layer-clarity.scenario.ts"
+      reference_docs:
+        - "src/ui/hud-manager.ts"
+        - "src/headless/scenario-types.ts"
+    action: |
+      1. 保留 `tests/scene-hud-markup.test.ts` 作为局部回归，但不再让它承担 UI 主验收。
+      2. 新增以下 UI 场景测试：
+         - `tests/headless/ui-menu-mode-switch.test.ts`
+         - `tests/headless/ui-progress-visibility.test.ts`
+         - `tests/headless/ui-pawn-panel-sync.test.ts`
+         - `tests/headless/ui-layer-clarity.test.ts`
+      3. 同步补强相关 `scenarios/*.scenario.ts` 的 `manualAcceptance`，把 UI-001 ~ UI-004 的玩家可见步骤写清楚。
+      4. UI 测试只验证玩家可见状态：菜单层级、进度条、状态面板、分层清晰度；禁止直接调用 `HudManager.sync*` 充当主入口。
+    acceptance_criteria: |
+      - [ ] Shell: `npx vitest run tests/scene-hud-markup.test.ts tests/headless/ui-menu-mode-switch.test.ts tests/headless/ui-progress-visibility.test.ts tests/headless/ui-pawn-panel-sync.test.ts tests/headless/ui-layer-clarity.test.ts` 全部通过。
+      - [ ] Grep: `tests/headless/ui-menu-mode-switch.test.ts` 中必须断言“建造 -> 墙 -> 当前模式提示”的可见链路。
+      - [ ] Grep: `tests/headless/ui-progress-visibility.test.ts` 中必须断言进度条出现、推进、完成后消失。
+      - [ ] Grep: `tests/headless/ui-layer-clarity.test.ts` 中必须断言多层叠加对象同时可辨认。
+      - [ ] Grep: 上述 UI 测试中不得把 `HudManager.sync*` 当作主入口。
+
+  - id: "T-13"
+    title: "注册所有新增 scenario 到总表并补 runner 覆盖"
+    status: "completed"
+    dependencies:
+      - "T-02"
+      - "T-03"
+      - "T-04"
+      - "T-05"
+      - "T-06"
+      - "T-07"
+      - "T-08"
+      - "T-09"
+      - "T-10"
+      - "T-11"
+      - "T-12"
+    context:
+      read_files:
+        - "scenarios/index.ts"
+        - "src/headless/scenario-types.ts"
+        - "tests/headless/scenario-runner.test.ts"
+        - "working-plan/refactor-test-execution-matrix.md"
+      reference_docs:
+        - "scenarios/behavior-001-wander.scenario.ts"
+        - "scenarios/behavior-004-no-resource-downgrade.scenario.ts"
+        - "scenarios/time-day-rollover.scenario.ts"
+        - "scenarios/time-pause-freeze.scenario.ts"
+        - "scenarios/time-frame-gap-guard.scenario.ts"
+        - "scenarios/build-invalid-placement.scenario.ts"
+        - "scenarios/ui-layer-clarity.scenario.ts"
+    action: |
+      1. 更新 `scenarios/index.ts`，把所有新增场景导出并加入 `ALL_SCENARIOS`。
+      2. 如果需要，补充 `tests/headless/scenario-runner.test.ts` 的 smoke 用例，覆盖新增场景结构不会破坏 runner。
+      3. 确保执行矩阵中所有“需要新增 scenario”的条目，都能在 `ALL_SCENARIOS` 中找到对应导出。
+    acceptance_criteria: |
+      - [ ] Shell: `npx vitest run tests/headless/scenario-runner.test.ts` 全部通过。
+      - [ ] Grep: `scenarios/index.ts` 中必须导出并注册 `behavior-001-wander`、`behavior-004-no-resource-downgrade`、`time-day-rollover`、`time-pause-freeze`、`time-frame-gap-guard`、`build-invalid-placement`、`ui-layer-clarity` 等新增场景。
+      - [ ] Read: `scenarios/index.ts` 的 `ALL_SCENARIOS` 至少包含执行矩阵里所有新增场景。
+
+  - id: "T-14"
+    title: "收口旧测试定位、执行全量验证并回写执行结果"
+    status: "completed"
+    dependencies: ["T-13"]
+    context:
+      read_files:
+        - "working-plan/refactor-test-execution-matrix.md"
+        - "working-plan/refactor-test/需求系统.yaml"
+        - "working-plan/refactor-test/时间系统.yaml"
+        - "working-plan/refactor-test/行为系统.yaml"
+        - "working-plan/refactor-test/工作系统.yaml"
+        - "working-plan/refactor-test/实体系统.yaml"
+        - "working-plan/refactor-test/地图系统.yaml"
+        - "working-plan/refactor-test/建筑系统.yaml"
+        - "working-plan/refactor-test/交互系统.yaml"
+        - "working-plan/refactor-test/UI系统.yaml"
+      reference_docs:
+        - "tests/headless"
+        - "tests/domain"
+        - "tests/scene-hud-markup.test.ts"
+    action: |
+      1. 根据执行矩阵，把所有旧的直连测试明确标注为：
+         - 保留为底层回归
+         - 不再承担主验收
+         - 如有必要，补注释说明其职责边界
+      2. 运行本次 refactor-test 相关的 headless / UI 测试集合，确认新增测试与保留回归可以同时通过。
+      3. 回写 `working-plan/refactor-test-execution-matrix.md`，补上每个 `scenario_id` 的落地文件路径与验证结果。
+      4. 最后再次核对 36 个 `scenario_id` 是否全部具备：
+         - 对应场景
+         - 对应 headless 或 UI 测试
+         - 清晰的旧测试降级边界
+    acceptance_criteria: |
+      - [ ] Shell: `npx vitest run tests/headless tests/scene-hud-markup.test.ts` 相关集合通过，且无新增失败。
+      - [ ] Grep: 执行矩阵中 36 个 `scenario_id` 全部标记了“场景文件 / 测试文件 / 回归边界”。
+      - [ ] Grep: 旧的 `tests/domain/*.test.ts`、`tests/headless/*-complete.test.ts`、`tests/scene-hud-markup.test.ts` 若保留，必须有“仅作回归”或等价职责说明。

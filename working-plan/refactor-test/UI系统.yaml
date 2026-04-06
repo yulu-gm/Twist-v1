@@ -1,0 +1,198 @@
+schema_version: "1.0"
+document_role: "refactor_test_design"
+
+module_id: "UI系统"
+module_name: "UI系统"
+source_acceptance_file: "oh-acceptance/UI系统.yaml"
+source_audit_file: "working-plan/test-exist-check/UI系统.yaml"
+design_scope: >-
+  本稿只做设计，不实现测试，不修改源码或现有测试代码。覆盖 UI-001 到 UI-004 的端到端测试重构方案，
+  目标是把验收重心放到玩家可见状态上，明确层级菜单、进度条、状态面板和分层清晰度四条 UI 线索的验收口径。
+  无头测试仅用于模拟用户操作与场景推进，不能替代真实游玩验收。
+refactor_objectives:
+  - "把 UI-001~UI-004 的验收从组件级/域级断言迁移到玩家可见的真实 UI 状态。"
+  - "明确层级菜单的展开、高亮、模式提示与层级切换的验收流程。"
+  - "明确进度条的出现、填充、完成与消失必须在真实场景里可见。"
+  - "明确状态面板的角色选择、行为标签、需求警示与当前状态同步必须可见。"
+  - "明确分层清晰度的验收必须落在真实渲染结果上，而不是内部调用或单点 DOM 结构。"
+  - "保留可复用的组件/无头测试作为局部回归，新增 playable/manual 设计补齐真机验收。"
+global_constraints:
+  - "仅设计，不实现测试。"
+  - "无头测试只模拟用户操作与场景推进，不得以 domain 直调替代真实业务路径。"
+  - "用户验收流程必须包含操作顺序、预期目标、可见反馈。"
+  - "旧 domain/局部无头测试仅作为底层回归，不再充当主业务验收。"
+scenario_redesign:  - scenario_id: "UI-001"
+    current_status_summary: >-
+      现有 `tests/scene-hud-markup.test.ts` 已验证工具栏与建造子菜单的 DOM 结构，
+      `tests/headless/build-wall-flow.test.ts` 已验证 build + brush-stroke 的世界结果；
+      在审计里，UI-001 的 player_acceptance 仍被标为 needs-manual-judgement。
+    current_mismatch: >-
+      现有覆盖主要停在静态结构、HudManager 同步或 world state 结果，没有证明玩家在真实游玩中能看到
+      “建造 -> 墙 -> 木墙” 的层级菜单切换、当前选中项高亮和玩家通道模式提示。
+    user_acceptance_flow:
+      steps:
+        - "在真实游戏画面中打开工具栏，点击“建造”。"
+        - "继续点击子菜单里的“墙”，确认菜单从一级工具进入二级子项。"
+        - "观察当前选中项高亮，确认“墙”是被激活的子模式。"
+        - "查看玩家通道提示，确认它已经切到墙体绘制模式。"
+      expected_goal: "玩家能通过层级菜单进入墙体建造模式，并从可见反馈上确认自己已切到木墙绘制。"
+      visible_feedback:
+        - "建造子菜单展开，且“墙”项高亮。"
+        - "工具栏选中态与快捷键提示保持一致。"
+        - "玩家通道提示显示当前处于墙体绘制模式。"
+    e2e_test_strategy:
+      user_actions:
+        - "启动可交互场景，进入正常游玩状态。"
+        - "点击工具栏“建造”，再点击“墙”。"
+        - "读取玩家可见的工具栏选中态、子菜单展开态和通道提示。"
+      assertions:
+        - "主断言必须落在玩家可见状态上，例如子菜单是否展开、选中态是否显示、提示文案是否变化。"
+        - "不得把 `tests/scene-hud-markup.test.ts` 或 `HudManager.syncToolBarSelection` 的内部调用当作主验收路径。"
+        - "保留 `tests/scene-hud-markup.test.ts` 作为局部回归，只负责结构和绑定点存在性。"
+      forbidden_shortcuts:
+        - "禁止只断言工具栏 HTML 结构或 HudManager 同步函数调用。"
+        - "禁止跳过真实点击链路，直接改选中工具或子菜单状态。"
+        - "禁止用 headless 世界结果替代玩家在 HUD 上看到的模式切换。"
+    migration_notes: >-
+      UI-001 的现有组件测试继续保留为局部回归，负责验证层级菜单结构和子菜单是否存在；
+      真正的 UI 验收需要新增 playable/manual 设计，围绕真实点击建造 -> 墙 -> 木墙 的链路做玩家可见断言。
+
+  - scenario_id: "UI-002"
+    current_status_summary: >-
+      `tests/headless/chop-tree-full-flow.test.ts` 已验证伐木任务的世界结果、树木移除和木材资源产出，
+      但审计指出当前并没有直接对齐“地图上可见进度条”的 UI 验收路径。
+    current_mismatch: >-
+      现有验证只证明任务在世界里完成了，没有证明玩家能在真实场景中看到工人/目标上的进度条填充、
+      进度结束后的即时消失，以及与状态面板同步的工作状态。
+    user_acceptance_flow:
+      steps:
+        - "在真实游戏画面里触发一次伐木工作，让小人进入砍树流程。"
+        - "观察地图上的进度条从开始填充到接近完成。"
+        - "等待工作完成，确认树木消失并出现木材资源。"
+        - "回看状态面板，确认当前行为与工作状态同步更新。"
+      expected_goal: "玩家能在地图层面看见伐木进度条的变化，并确认工作完成后世界反馈和状态面板都同步正确。"
+      visible_feedback:
+        - "目标附近或工人上方出现进度条。"
+        - "进度条随着工作推进平滑填充。"
+        - "完成后树木消失并出现木材资源。"
+        - "状态面板显示对应的工作状态变化。"
+    e2e_test_strategy:
+      user_actions:
+        - "进入可交互场景并触发伐木任务。"
+        - "在推进过程中观察进度条和状态面板。"
+        - "等待任务完成并核对结果。"
+      assertions:
+        - "主断言必须基于玩家可见的进度条、资源消失/生成和状态面板变化。"
+        - "无头测试只保留为世界结果回归，不作为 UI 主验收。"
+        - "不得用 `tests/headless/chop-tree-full-flow.test.ts` 的 completed 结果冒充进度条验收。"
+      forbidden_shortcuts:
+        - "禁止只断言 world entity 的增删，不看进度条渲染。"
+        - "禁止把任务完成时间或 workTimer 内部数值当作视觉验收。"
+        - "禁止省略真实游玩推进，只用模拟完成结果代替。"
+    migration_notes: >-
+      `tests/headless/chop-tree-full-flow.test.ts` 继续保留为局部回归，验证伐木任务的世界闭环；
+      UI-002 需要新增 playable/manual 设计，补齐真实场景里的进度条、状态面板和完成反馈。
+
+  - scenario_id: "UI-003"
+    current_status_summary: >-
+      `tests/scene-hud-markup.test.ts` 已验证 pawn detail 面板的结构和 `HudManager.syncPawnDetail` 的文本同步，
+      审计里也指出当前没有可直接对齐 scenario_id 的 headless 绑定。
+    current_mismatch: >-
+      现有测试主要在组件层验证行为标签、需求提示和文本内容，没有证明玩家在真实游戏里点选角色后，
+      名册高亮、状态面板、需求警示色和当前行为会同步呈现。
+    user_acceptance_flow:
+      steps:
+        - "在真实游戏画面中打开小人名册。"
+        - "点击一个小人，确认名册项高亮切换到当前选中对象。"
+        - "观察状态面板，确认当前行为、当前目标和需求信号同步刷新。"
+        - "若该小人处于饥饿或工作中，确认面板上的警示色和行为文本都可见。"
+      expected_goal: "玩家能通过点选小人，直接看见状态面板同步到当前行为与需求状态。"
+      visible_feedback:
+        - "名册里被点选的小人出现高亮。"
+        - "状态面板展开并显示该小人的当前行为。"
+        - "饥饿、休息或需求信号在面板上有明显可见反馈。"
+        - "当前目标/行动文本即时更新。"
+    e2e_test_strategy:
+      user_actions:
+        - "启动可交互场景并打开小人名册。"
+        - "切换不同小人的选中状态。"
+        - "观察状态面板中的行为、目标和需求信号。"
+      assertions:
+        - "主断言必须落在名册高亮、状态面板文本和警示色等玩家可见状态上。"
+        - "不得把 `HudManager.syncPawnDetail` 当作验收本身。"
+        - "保留 `tests/scene-hud-markup.test.ts` 作为局部回归，验证面板结构和字段存在性。"
+      forbidden_shortcuts:
+        - "禁止只读 DOM 文本，不验证真实选择流程。"
+        - "禁止把组件级同步方法的返回或内部文本拼接结果当作主结论。"
+        - "禁止省略角色点选和名册高亮，只靠函数调用补结果。"
+    migration_notes: >-
+      `tests/scene-hud-markup.test.ts` 保留为局部回归，负责结构和字段覆盖；
+      UI-003 需要新增 playable/manual 设计，验证真实点选小人后状态面板与可见警示同步变化。
+
+  - scenario_id: "UI-004"
+    current_status_summary: >-
+      审计结果显示 UI-004 当前没有合适的 headless 绑定，也没有现成的 player_acceptance；
+      这个场景本质上是分层渲染与视觉清晰度问题，不能靠世界状态回归直接覆盖。
+    current_mismatch: >-
+      现有测试没有证明同一格子上同时出现选区框、蓝图虚影、标记图标、存储边界或其他反应层时，
+      玩家仍能清楚分辨各层，且不会出现严重遮挡、闪烁或 Z-fighting。
+    user_acceptance_flow:
+      steps:
+        - "进入一个会同时产生多层反馈的建造场景。"
+        - "把视线或鼠标移动到目标格子上，观察选区框、蓝图虚影、标记和边界是否同时可辨。"
+        - "在同一位置叠加多个 UI 反馈时，确认层级顺序稳定，没有明显闪烁。"
+        - "切换或取消选区，再次确认不同层仍然清楚可分。"
+      expected_goal: "玩家能在复杂叠层下仍然清楚识别目标、蓝图、边界和高亮，确认渲染分层清晰。"
+      visible_feedback:
+        - "选区框、蓝图虚影、标记图标和边界线都能同时辨认。"
+        - "层级顺序稳定，没有严重遮挡。"
+        - "不存在明显 Z-fighting 或闪烁。"
+        - "目标对象的可视焦点始终清晰。"
+    e2e_test_strategy:
+      user_actions:
+        - "启动一个容易制造多层 UI 叠加的真实场景。"
+        - "移动到关键格子并维持观察，必要时切换选区。"
+        - "检查不同叠加层的可见性和稳定性。"
+      assertions:
+        - "主断言必须基于玩家可见的渲染结果，而不是内部排序逻辑。"
+        - "不得把任何 `HudManager.sync*` 方法或静态 DOM 结构当作主验收路径。"
+        - "如果后续补充截图/录屏类验证，也只能作为辅助，不可替代真实可见断言。"
+      forbidden_shortcuts:
+        - "禁止用 headless 世界状态直接替代视觉分层验收。"
+        - "禁止只做单帧静态断言，不看层级稳定性和叠加清晰度。"
+        - "禁止把 Z-index 推理或内部绘制顺序当作最终验收结论。"
+    migration_notes: >-
+      UI-004 暂无可复用的现成组件回归，优先新增 playable/manual 设计来补齐真机验收；
+      如果后续补出专门的渲染帮助测试，只能作为局部回归，不能取代真实视觉验收。
+test_architecture:
+  local_regressions:
+    - "tests/scene-hud-markup.test.ts 继续保留，覆盖菜单/面板结构、子菜单存在性和局部文本同步。"
+    - "tests/headless/build-wall-flow.test.ts 继续保留，覆盖建造墙体的 world 结果闭环。"
+    - "tests/headless/chop-tree-full-flow.test.ts 继续保留，覆盖伐木任务的 world 结果闭环。"
+  playable_manual_designs:
+    - "UI-001 需要新增 playable/manual 设计，验证层级菜单展开、子项高亮和玩家通道提示。"
+    - "UI-002 需要新增 playable/manual 设计，验证进度条出现、填充、完成和消失。"
+    - "UI-003 需要新增 playable/manual 设计，验证点选小人后状态面板同步刷新。"
+    - "UI-004 需要新增 playable/manual 设计，验证多层 UI 的分层清晰度。"
+  assertion_policy:
+    - "主验收只认玩家可见状态。"
+    - "无头测试只负责模拟用户操作与场景推进，不能代替真机验收。"
+    - "component/DOM 级测试只能作为局部回归，不能作为 UI 场景的主要结论。"
+    - "所有场景的断言都要围绕真实点击、真实选中、真实可视反馈组织。"
+  coverage_matrix:
+    - "层级菜单：UI-001 为主，局部回归保留 scene-hud-markup 和 build-wall-flow。"
+    - "进度条：UI-002 为主，局部回归保留 chop-tree-full-flow。"
+    - "状态面板：UI-003 为主，局部回归保留 scene-hud-markup。"
+    - "分层清晰度：UI-004 为主，当前以 playable/manual 为唯一可靠路径。"
+out_of_scope:
+  - "不修改任何测试代码、源码或任务树。"
+  - "不把 `scene-hud-markup`、`HudManager.sync*` 或其他组件级调用当作主验收路径。"
+  - "不新增只看 world state 的伪 UI 验收。"
+  - "不做像素级性能基准或跨分辨率的视觉回归扩展。"
+  - "不为未列出的场景扩写额外模块设计。"
+deliverable_checklist:
+  - "已覆盖 UI-001 到 UI-004，且每条都包含 current_status_summary、current_mismatch、user_acceptance_flow、e2e_test_strategy 和 migration_notes。"
+  - "已明确层级菜单、进度条、状态面板、分层清晰度四类 UI 目标。"
+  - "已区分局部回归测试与需要新增的 playable/manual 设计。"
+  - "已把主断言限定在玩家可见状态上，避免把组件级调用当主验收。"
+  - "已明确本稿只做设计，不实现测试。"

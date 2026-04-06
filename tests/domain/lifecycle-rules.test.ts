@@ -1,3 +1,8 @@
+/**
+ * 领域生命周期规则回归（registry 直调 transform / pickUp / drop 等）。
+ * 主业务端到端验收以 tests/headless 场景为准；本文件不承担 ENTITY-001~003 的玩家路径职责。
+ * refactor-test：ENTITY-004 冲突场景主证据以 `entity-conflict-guard.test.ts` 为准；本文件不可替代资源冲突玩家路径。
+ */
 import { describe, expect, it } from "vitest";
 import type { EntityId, PawnEntity } from "../../src/game/entity";
 import {

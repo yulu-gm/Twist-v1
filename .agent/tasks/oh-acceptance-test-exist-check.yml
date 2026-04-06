@@ -1,0 +1,341 @@
+task_name: "按 oh-acceptance 模块检查测试存在性并输出模块报告"
+created_at: "2026-04-06"
+status: "completed"
+
+# 约定：
+# 1. 模块 id 采用 `oh-acceptance/<模块名>.yaml` 的文件名，例如 `行为系统`、`建筑系统`。
+# 2. 用户输入中的 `working--plan/test-exist-check/` 按仓库现有目录结构解释为
+#    `working-plan/test-exist-check/`。
+# 3. 只有满足客观证据时，才允许把某个验收场景标记为“已有测试”：
+#    - 无头测试：存在自动化测试文件，并且测试通过 `runScenarioHeadless(...)`
+#      或 `createHeadlessSim(...)` 直接模拟业务场景，且能追溯到对应场景定义或等价场景搭建。
+#    - 玩家可验收测试：存在 `scenarios/*.scenario.ts`，包含
+#      `manualAcceptance.steps` 与 `manualAcceptance.outcomes`，且该场景已注册到
+#      `scenarios/index.ts`，可经 `src/player/scenario-loader.ts` / HUD 在玩家侧加载。
+# 4. 若某条测试与某个 `scenario_id` 之间无法建立唯一、客观的映射，必须输出
+#    `status: "needs-manual-judgement"`，并附证据，不得主观认定“差不多覆盖了”。
+
+tasks:
+  - id: "T-00"
+    title: "建立测试存在性检查契约与结果 YAML 模板"
+    status: "completed"
+    dependencies: []
+    context:
+      read_files:
+        - "package.json"
+        - "src/headless/scenario-types.ts"
+        - "scenarios/index.ts"
+        - "src/player/scenario-loader.ts"
+        - "src/ui/hud-manager.ts"
+        - "index.html"
+      reference_docs:
+        - "working-plan/headless-sim.yml"
+        - "oh-acceptance/行为系统.yaml"
+    action: |
+      1. 创建目录 `working-plan/test-exist-check/`。
+      2. 约定所有模块结果文件统一输出到 `working-plan/test-exist-check/{模块名}.yaml`。
+      3. 结果 YAML 至少包含以下字段：
+         - `module_id`, `module_name`, `source_acceptance_file`
+         - `audit_rules.headless_required`
+         - `audit_rules.player_acceptance_required`
+         - `scenarios[]`
+         - `summary`
+      4. 在 `scenarios[]` 的每条记录中，至少写出：
+         - `scenario_id`, `scenario_name`, `intent`
+         - `headless.status`, `headless.evidence`
+         - `player_acceptance.status`, `player_acceptance.evidence`
+         - `notes`
+      5. 只有当测试文件里存在 `runScenarioHeadless(` 或 `createHeadlessSim(`，且能对齐到某个验收场景的业务目标时，才允许把 `headless.status` 记为 `exists`。
+      6. 只有当场景文件存在 `manualAcceptance.steps` 与 `manualAcceptance.outcomes`，且场景已加入 `ALL_SCENARIOS`，才允许把 `player_acceptance.status` 记为 `exists`。
+      7. 若只能找到相近测试，但无法证明与某个 `scenario_id` 一一对应，则必须写成 `needs-manual-judgement`，并记录命中的文件路径与原因。
+    acceptance_criteria: |
+      - [ ] Grep: 本任务树中明确出现 `runScenarioHeadless`、`createHeadlessSim`、`manualAcceptance`、`ALL_SCENARIOS` 作为检查证据。
+      - [ ] Grep: 本任务树中明确规定输出路径为 `working-plan/test-exist-check/{模块名}.yaml`。
+      - [ ] Read: 后续 9 个模块任务都以统一 schema 产出结果 YAML，而不是自由格式文本。
+
+  - id: "T-01"
+    title: "检查需求系统的无头测试与玩家可验收测试是否存在"
+    status: "completed"
+    dependencies:
+      - "T-00"
+    context:
+      read_files:
+        - "oh-acceptance/需求系统.yaml"
+        - "src/headless/scenario-types.ts"
+        - "scenarios/index.ts"
+        - "src/player/scenario-loader.ts"
+      reference_docs:
+        - "tests/headless/pawn-eats-when-hungry.test.ts"
+        - "tests/headless/pawn-sleeps-when-tired.test.ts"
+        - "tests/headless/need-interrupt-during-work.test.ts"
+        - "tests/headless/night-forces-sleep.test.ts"
+    action: |
+      1. 读取 `oh-acceptance/需求系统.yaml`，枚举 `NEED-001` 到 `NEED-004` 的场景、名称与 intent。
+      2. 在 `tests/`、`scenarios/`、`src/` 中检索与这些场景语义对应的测试与场景定义。
+      3. 逐条判断：
+         - 是否存在无头模拟入口（`runScenarioHeadless` / `createHeadlessSim`）；
+         - 是否存在带 `manualAcceptance` 的场景文件；
+         - 该场景是否已注册到 `ALL_SCENARIOS` 并可被 `scenario-loader` 使用。
+      4. 将结论写入 `working-plan/test-exist-check/需求系统.yaml`；每个 `scenario_id` 都必须明确写出 `exists` / `missing` / `needs-manual-judgement` 三选一，且附证据路径。
+    acceptance_criteria: |
+      - [ ] Read: `working-plan/test-exist-check/需求系统.yaml` 存在，且包含 `NEED-001`、`NEED-002`、`NEED-003`、`NEED-004`。
+      - [ ] Grep: 结果文件中每条场景都同时包含 `headless:` 与 `player_acceptance:` 段落。
+      - [ ] Grep: 结果文件中包含 `source_acceptance_file: "oh-acceptance/需求系统.yaml"`。
+
+  - id: "T-02"
+    title: "检查时间系统的无头测试与玩家可验收测试是否存在"
+    status: "completed"
+    dependencies:
+      - "T-00"
+    context:
+      read_files:
+        - "oh-acceptance/时间系统.yaml"
+        - "src/headless/scenario-types.ts"
+        - "scenarios/index.ts"
+        - "src/player/scenario-loader.ts"
+      reference_docs:
+        - "tests/domain/time-of-day.test.ts"
+        - "tests/domain/time-event-bus.test.ts"
+        - "tests/headless/night-forces-sleep.test.ts"
+    action: |
+      1. 读取 `oh-acceptance/时间系统.yaml`，枚举 `TIME-001` 到 `TIME-004` 的场景、名称与 intent。
+      2. 检索项目内是否存在能直接推动时间流逝、昼夜切换、跨天、暂停、极端帧间隔保护的无头测试。
+      3. 同时检索是否存在对应的玩家可验收场景：必须具备 `manualAcceptance`，并能经 `ALL_SCENARIOS` + `scenario-loader` 进入真实渲染界面。
+      4. 将结论写入 `working-plan/test-exist-check/时间系统.yaml`；对无法唯一对齐到 `TIME-*` 的情况，必须标记为 `needs-manual-judgement`。
+    acceptance_criteria: |
+      - [ ] Read: `working-plan/test-exist-check/时间系统.yaml` 存在，且包含 `TIME-001`、`TIME-002`、`TIME-003`、`TIME-004`。
+      - [ ] Grep: 结果文件中每条场景都带有至少一个证据文件路径。
+      - [ ] Grep: 结果文件中包含 `summary:`，并统计 headless / player_acceptance 的存在与缺失数量。
+
+  - id: "T-03"
+    title: "检查行为系统的无头测试与玩家可验收测试是否存在"
+    status: "completed"
+    dependencies:
+      - "T-00"
+    context:
+      read_files:
+        - "oh-acceptance/行为系统.yaml"
+        - "src/headless/scenario-types.ts"
+        - "scenarios/index.ts"
+        - "src/player/scenario-loader.ts"
+      reference_docs:
+        - "tests/domain/behavior-state-machine.test.ts"
+        - "tests/domain/action-scorer.test.ts"
+        - "tests/headless/need-interrupt-during-work.test.ts"
+        - "tests/headless/auto-claim-work.test.ts"
+    action: |
+      1. 读取 `oh-acceptance/行为系统.yaml`，枚举 `BEHAVIOR-001` 到 `BEHAVIOR-004`。
+      2. 检索散步、接单、需求打断、无资源时的行为降级是否已有无头测试覆盖；只有能直接驱动行为演化并验证结果的测试，才能算 `headless.exists`。
+      3. 检索是否存在对应的场景文件与 `manualAcceptance` 文案，并验证该场景已经注册到 `ALL_SCENARIOS`。
+      4. 将结论写入 `working-plan/test-exist-check/行为系统.yaml`，每条场景都必须保留“证据足够 / 证据不足”的说明。
+    acceptance_criteria: |
+      - [ ] Read: `working-plan/test-exist-check/行为系统.yaml` 存在，且包含 `BEHAVIOR-001`、`BEHAVIOR-002`、`BEHAVIOR-003`、`BEHAVIOR-004`。
+      - [ ] Grep: 结果文件中的 `headless.evidence` 至少记录命中的测试文件或明确写出未命中。
+      - [ ] Grep: 结果文件中的 `player_acceptance.evidence` 至少记录命中的场景文件与注册证据或明确写出未命中。
+
+  - id: "T-04"
+    title: "检查工作系统的无头测试与玩家可验收测试是否存在"
+    status: "completed"
+    dependencies:
+      - "T-00"
+    context:
+      read_files:
+        - "oh-acceptance/工作系统.yaml"
+        - "src/headless/scenario-types.ts"
+        - "scenarios/index.ts"
+        - "src/player/scenario-loader.ts"
+      reference_docs:
+        - "tests/headless/chop-tree-full-flow.test.ts"
+        - "tests/headless/chop-haul-full-chain.test.ts"
+        - "tests/headless/haul-mark-pickup.test.ts"
+        - "tests/headless/stale-work-cleanup.test.ts"
+    action: |
+      1. 读取 `oh-acceptance/工作系统.yaml`，枚举 `WORK-001` 到 `WORK-004`。
+      2. 检索伐木生成-完成-派生、物资拾取-搬运、目标失效清理、多人争抢互斥这四类链路是否已有无头测试。
+      3. 检索是否存在玩家可验收场景文件，并验证 `manualAcceptance` + `ALL_SCENARIOS` 两项证据。
+      4. 将结论写入 `working-plan/test-exist-check/工作系统.yaml`；若只有领域单测、没有完整 headless 业务链路，则不得误记为 `headless.exists`。
+    acceptance_criteria: |
+      - [ ] Read: `working-plan/test-exist-check/工作系统.yaml` 存在，且包含 `WORK-001`、`WORK-002`、`WORK-003`、`WORK-004`。
+      - [ ] Grep: 结果文件中对每个 `WORK-*` 都注明是“完整链路 headless”还是“仅局部单测”。
+      - [ ] Grep: 结果文件中每条场景都落到 `exists` / `missing` / `needs-manual-judgement` 之一。
+
+  - id: "T-05"
+    title: "检查实体系统的无头测试与玩家可验收测试是否存在"
+    status: "completed"
+    dependencies:
+      - "T-00"
+    context:
+      read_files:
+        - "oh-acceptance/实体系统.yaml"
+        - "src/headless/scenario-types.ts"
+        - "scenarios/index.ts"
+        - "src/player/scenario-loader.ts"
+      reference_docs:
+        - "tests/domain/entity-field-passthrough.test.ts"
+        - "tests/domain/lifecycle-rules.test.ts"
+        - "tests/domain/relationship-rules.test.ts"
+        - "tests/headless/chop-work-complete.test.ts"
+        - "tests/headless/pickup-work-complete.test.ts"
+        - "tests/headless/haul-work-complete.test.ts"
+    action: |
+      1. 读取 `oh-acceptance/实体系统.yaml`，枚举 `ENTITY-001` 到 `ENTITY-004`。
+      2. 检索树转木头、拾取-携带-放下、蓝图转建筑、关系一致性保护这些链路是否已被 headless 直接模拟或仅被局部规则测试覆盖。
+      3. 检索对应的玩家可验收场景是否存在，并验证 `manualAcceptance` 与场景注册证据。
+      4. 将结论写入 `working-plan/test-exist-check/实体系统.yaml`；若只能证明“有相关底层单测”，但不能证明“对应验收场景可无头跑通”，必须标为 `missing` 或 `needs-manual-judgement`。
+    acceptance_criteria: |
+      - [ ] Read: `working-plan/test-exist-check/实体系统.yaml` 存在，且包含 `ENTITY-001`、`ENTITY-002`、`ENTITY-003`、`ENTITY-004`。
+      - [ ] Grep: 结果文件里区分“局部规则测试证据”和“完整场景 headless 证据”。
+      - [ ] Grep: 结果文件中保留至少一条对场景文件或 manualAcceptance 的引用，或者明确写出未找到。
+
+  - id: "T-06"
+    title: "检查地图系统的无头测试与玩家可验收测试是否存在"
+    status: "completed"
+    dependencies:
+      - "T-00"
+    context:
+      read_files:
+        - "oh-acceptance/地图系统.yaml"
+        - "src/headless/scenario-types.ts"
+        - "scenarios/index.ts"
+        - "src/player/scenario-loader.ts"
+      reference_docs:
+        - "tests/headless/map-initial-state.test.ts"
+        - "tests/headless/zone-create.test.ts"
+        - "tests/domain/occupancy-manager.test.ts"
+        - "tests/domain/floor-selection.test.ts"
+    action: |
+      1. 读取 `oh-acceptance/地图系统.yaml`，枚举 `MAP-001` 到 `MAP-004`。
+      2. 检索初始地图生成、合法选区建区、占用冲突拦截、越界选区过滤是否存在对应的无头模拟测试。
+      3. 检索玩家可验收场景是否存在，并确认具备 `manualAcceptance` 与注册证据。
+      4. 将结论写入 `working-plan/test-exist-check/地图系统.yaml`；若只有 domain 校验测试、没有可直接模拟玩家流程的 headless 测试，必须在备注中写明差距。
+    acceptance_criteria: |
+      - [ ] Read: `working-plan/test-exist-check/地图系统.yaml` 存在，且包含 `MAP-001`、`MAP-002`、`MAP-003`、`MAP-004`。
+      - [ ] Grep: 结果文件中注明 `MAP-002`、`MAP-004` 是否具备“带输入形态的玩家流程证据”。
+      - [ ] Grep: 结果文件中每条场景都含有 `notes:` 字段，解释判定依据。
+
+  - id: "T-07"
+    title: "检查建筑系统的无头测试与玩家可验收测试是否存在"
+    status: "completed"
+    dependencies:
+      - "T-00"
+    context:
+      read_files:
+        - "oh-acceptance/建筑系统.yaml"
+        - "src/headless/scenario-types.ts"
+        - "scenarios/index.ts"
+        - "src/player/scenario-loader.ts"
+      reference_docs:
+        - "tests/headless/build-wall-flow.test.ts"
+        - "tests/headless/build-bed-flow.test.ts"
+        - "tests/headless/bed-auto-assign.test.ts"
+        - "tests/domain/build-flow.test.ts"
+    action: |
+      1. 读取 `oh-acceptance/建筑系统.yaml`，枚举 `BUILD-001` 到 `BUILD-004`。
+      2. 检索墙体蓝图建造、床铺建成自动分配、非法位置拦截、多余床铺无归属是否已存在对应无头测试。
+      3. 检索是否有对应场景文件能在玩家侧直观验收，并确认 `manualAcceptance` + `ALL_SCENARIOS` 注册。
+      4. 将结论写入 `working-plan/test-exist-check/建筑系统.yaml`；若同一测试只覆盖了部分 then 条件，备注里必须明确缺什么，不得笼统写“已覆盖”。
+    acceptance_criteria: |
+      - [ ] Read: `working-plan/test-exist-check/建筑系统.yaml` 存在，且包含 `BUILD-001`、`BUILD-002`、`BUILD-003`、`BUILD-004`。
+      - [ ] Grep: 结果文件中至少有一处明确引用 `build-wall-flow`、`build-bed-flow` 或 `bed-auto-assign` 相关证据，或明确写出未匹配。
+      - [ ] Grep: 结果文件中的 `summary` 统计了“双模式都具备”的场景数量。
+
+  - id: "T-08"
+    title: "检查交互系统的无头测试与玩家可验收测试是否存在"
+    status: "completed"
+    dependencies:
+      - "T-00"
+    context:
+      read_files:
+        - "oh-acceptance/交互系统.yaml"
+        - "src/headless/scenario-types.ts"
+        - "scenarios/index.ts"
+        - "src/player/scenario-loader.ts"
+      reference_docs:
+        - "tests/domain/floor-selection.test.ts"
+        - "tests/domain/commit-player-intent.test.ts"
+        - "tests/domain/player-channel-domain-command.test.ts"
+        - "tests/headless/haul-mark-pickup.test.ts"
+        - "tests/headless/build-wall-flow.test.ts"
+        - "tests/headless/build-bed-flow.test.ts"
+    action: |
+      1. 读取 `oh-acceptance/交互系统.yaml`，枚举 `INTERACT-001` 到 `INTERACT-004`。
+      2. 检索矩形选区、笔刷拖拽、单点点击、无模式输入屏蔽是否已有 headless 或等价输入驱动测试；必须明确输入形态（`rect-selection` / `brush-stroke` / `single-cell`）证据。
+      3. 检索对应玩家可验收场景是否存在，且已提供 `manualAcceptance` 与场景注册证据。
+      4. 将结论写入 `working-plan/test-exist-check/交互系统.yaml`；对只验证命令构造、未落到完整业务结果的测试，要在备注中单独指出。
+    acceptance_criteria: |
+      - [ ] Read: `working-plan/test-exist-check/交互系统.yaml` 存在，且包含 `INTERACT-001`、`INTERACT-002`、`INTERACT-003`、`INTERACT-004`。
+      - [ ] Grep: 结果文件中出现 `rect-selection`、`brush-stroke`、`single-cell` 之中的命中证据或缺失说明。
+      - [ ] Grep: 结果文件中明确区分“输入层测试”与“完整玩家流程测试”。
+
+  - id: "T-09"
+    title: "检查 UI 系统的无头测试与玩家可验收测试是否存在"
+    status: "completed"
+    dependencies:
+      - "T-00"
+    context:
+      read_files:
+        - "oh-acceptance/UI系统.yaml"
+        - "src/headless/scenario-types.ts"
+        - "scenarios/index.ts"
+        - "src/player/scenario-loader.ts"
+        - "src/ui/hud-manager.ts"
+        - "index.html"
+      reference_docs:
+        - "tests/component/menu-model.test.ts"
+        - "tests/component/villager-tool-bar-model.test.ts"
+        - "tests/scene-hud-markup.test.ts"
+        - "tests/headless/build-wall-flow.test.ts"
+        - "tests/headless/chop-tree-full-flow.test.ts"
+    action: |
+      1. 读取 `oh-acceptance/UI系统.yaml`，枚举 `UI-001` 到 `UI-004`。
+      2. 检索主菜单层级展开、地图叠加进度、状态需求面板同步、多层反馈清晰度是否存在可客观对应的测试；区分纯组件/标记测试与真实玩家可验收场景。
+      3. 检索是否存在带 `manualAcceptance` 的场景文件，且这些场景已能通过 `ALL_SCENARIOS` + `scenario-loader` 在真实渲染界面中加载。
+      4. 将结论写入 `working-plan/test-exist-check/UI系统.yaml`；若只能证明 HUD 容器存在、不能证明玩家可操作验收，则不得记为“玩家可验收测试已存在”。
+    acceptance_criteria: |
+      - [ ] Read: `working-plan/test-exist-check/UI系统.yaml` 存在，且包含 `UI-001`、`UI-002`、`UI-003`、`UI-004`。
+      - [ ] Grep: 结果文件中明确区分“组件/UI 结构测试证据”和“玩家侧可渲染可操作验收证据”。
+      - [ ] Grep: 结果文件中至少引用 `manualAcceptance` 或明确写出某条 UI 场景缺少 manualAcceptance。
+
+  - id: "T-10"
+    title: "校验 9 个模块结果文件齐全且判定口径一致"
+    status: "completed"
+    dependencies:
+      - "T-01"
+      - "T-02"
+      - "T-03"
+      - "T-04"
+      - "T-05"
+      - "T-06"
+      - "T-07"
+      - "T-08"
+      - "T-09"
+    context:
+      read_files:
+        - "working-plan/test-exist-check/需求系统.yaml"
+        - "working-plan/test-exist-check/时间系统.yaml"
+        - "working-plan/test-exist-check/行为系统.yaml"
+        - "working-plan/test-exist-check/工作系统.yaml"
+        - "working-plan/test-exist-check/实体系统.yaml"
+        - "working-plan/test-exist-check/地图系统.yaml"
+        - "working-plan/test-exist-check/建筑系统.yaml"
+        - "working-plan/test-exist-check/交互系统.yaml"
+        - "working-plan/test-exist-check/UI系统.yaml"
+      reference_docs:
+        - "oh-acceptance/需求系统.yaml"
+        - "oh-acceptance/时间系统.yaml"
+        - "oh-acceptance/行为系统.yaml"
+        - "oh-acceptance/工作系统.yaml"
+        - "oh-acceptance/实体系统.yaml"
+        - "oh-acceptance/地图系统.yaml"
+        - "oh-acceptance/建筑系统.yaml"
+        - "oh-acceptance/交互系统.yaml"
+        - "oh-acceptance/UI系统.yaml"
+    action: |
+      1. 校验 `working-plan/test-exist-check/` 下 9 个模块 YAML 全部存在，文件名与 `oh-acceptance/*.yaml` 一一对应。
+      2. 校验每个结果文件都使用 T-00 定义的统一 schema，且每条验收场景都给出 headless / player_acceptance 两个维度的判定。
+      3. 校验没有遗漏任何 `scenario_id`，也没有把“局部单测”误记成“完整无头验收”或把“HUD 文案存在”误记成“玩家可验收测试存在”。
+      4. 若发现口径不一致，回退到对应模块 YAML 修正，直到 9 份结果判定规则一致。
+    acceptance_criteria: |
+      - [ ] Shell: `rg --files "working-plan/test-exist-check"` 能看到且仅看到 9 个模块结果 YAML。
+      - [ ] Read: 每个结果文件都覆盖其源 `oh-acceptance` 文件中的全部 `scenario_id`。
+      - [ ] Grep: 9 个结果文件中均出现 `headless:`、`player_acceptance:`、`summary:` 三个顶层检查区块。

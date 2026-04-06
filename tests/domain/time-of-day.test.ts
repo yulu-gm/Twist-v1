@@ -1,3 +1,7 @@
+/**
+ * refactor-test：时间纯函数域回归；TIME-002 主证据以 `tests/headless/time-day-rollover.test.ts` 与
+ * `time-day-rollover.scenario.ts` 为准，本文件不承担跨天场景语义主验收。
+ */
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_TIME_OF_DAY_CONFIG,

@@ -8,6 +8,7 @@ import type { GridCoord } from "../game/map/world-grid";
 import { coordKey, isWalkableCell } from "../game/map/world-grid";
 import { DEFAULT_PAWN_NAMES, type PawnId, type PawnState } from "../game/pawn-state";
 import { getWorldSnapshot } from "../game/world-core";
+import { cloneWorld, removeEntityMutable } from "../game/world-internal";
 import type { HeadlessSim } from "./headless-sim";
 import type { SimEvent, SimEventKind } from "./sim-event-log";
 import type { AssertionResult } from "./sim-reporter";
@@ -181,6 +182,27 @@ export function assertEventOccurred<K extends SimEventKind>(
   };
 }
 
+export function assertEventSequence(
+  sim: HeadlessSim,
+  expectedKinds: readonly SimEventKind[],
+  label: string = defaultAssertLabel("assertEventSequence", expectedKinds.join(" -> "))
+): AssertionResult {
+  const events = sim.getSimEventCollector().getEvents();
+  let matched = 0;
+  for (const event of events) {
+    if (event.kind !== expectedKinds[matched]) continue;
+    matched += 1;
+    if (matched === expectedKinds.length) {
+      return { passed: true, label, message: "ok" };
+    }
+  }
+  return {
+    passed: false,
+    label,
+    message: `matched ${matched}/${expectedKinds.length} events, actual=${events.map((e) => e.kind).join(", ")}`
+  };
+}
+
 export function assertWorkItemCompleted(
   sim: HeadlessSim,
   workItemId: string,
@@ -221,6 +243,21 @@ export function assertNoPawnStarved(
  * 在世界网格上于可走、边界内格子上生成若干默认小人；优先使用 `grid.defaultSpawnPoints` 前 `count` 格。
  * @param count 默认 3
  */
+/**
+ * Scenario-only helper to simulate an external invalidation, such as a target
+ * entity disappearing while a pawn is already working on it.
+ */
+export function invalidateScenarioEntity(sim: HeadlessSim, entityId: string): boolean {
+  const world = sim.getWorldPort().getWorld();
+  if (!world.entities.has(entityId)) {
+    return false;
+  }
+  const next = cloneWorld(world);
+  removeEntityMutable(next, entityId);
+  sim.getWorldPort().setWorld(next);
+  return true;
+}
+
 export function spawnDefaultColony(sim: HeadlessSim, count: number = 3): readonly PawnState[] {
   if (count < 0) {
     throw new Error("spawnDefaultColony: count must be non-negative");

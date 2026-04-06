@@ -1,0 +1,212 @@
+schema_version: "1.0"
+
+module_id: "工作系统"
+module_name: "工作系统"
+source_acceptance_file: "oh-acceptance/工作系统.yaml"
+source_audit_file: "working-plan/test-exist-check/工作系统.yaml"
+
+design_scope: >
+  本稿只覆盖工作系统的端到端测试重构设计，不实现测试代码，不修改源码，不改任务树。
+  范围包含 WORK-001 到 WORK-004 四个 scenario_id，分别对应完整链路、局部链路、目标消失清理与多人争抢。
+  设计目标是把旧的 world-core / domain 直连验收，收敛为基于玩家输入、场景推进和可见反馈的无头端到端设计。
+
+refactor_objectives:
+  - "把 WORK-001 的伐木-拾取-搬运完整链路改造成以玩家选工具、框选目标、观察工单流转为主的端到端验收。"
+  - "把 WORK-002 的局部链路改造成以 haul 标记触发 open pick-up-resource 工单、并验证玩家可见反馈为主的验收。"
+  - "把 WORK-003 的目标消失清理改造成以场景内目标失效、工单撤销、工人释放为主的验收。"
+  - "把 WORK-004 的多人争抢改造成以蓝图工单唯一认领、互斥锁定、其他工人让出或改派为主的验收。"
+  - "明确所有主验收路径都不得依赖 claimWorkItem、completeWorkItem、removeEntityMutable 之类的直连捷径。"
+  - "保留少量旧 WorldCore / headless 直连测试，只作为底层回归，不作为场景级主验收。"
+
+global_constraints:
+  - "仅设计，不实现测试。"
+  - "无头测试只模拟用户操作与场景推进，不得以 domain 直调替代真实业务路径。"
+  - "用户验收流程必须包含操作顺序、预期目标、可见反馈。"
+  - "旧 domain/局部无头测试仅作为底层回归，不再充当主业务验收。"
+scenario_redesign:  - scenario_id: "WORK-001"
+    current_status_summary: >
+      现有 headless 已有 `tests/headless/chop-haul-full-chain.test.ts`，并绑定
+      `scenarios/chop-haul-full-chain.scenario.ts`，能够验证伐木后生成木材、拾取并搬运入库。
+      该链路已经覆盖完整工作流，但验收语义仍偏向场景数据与 headless 回放，玩家输入与 UI 可见反馈表达不够完整。
+    current_mismatch: >
+      现状更像“给定 lumber 命令后跑完整链路”的回放式测试，而不是“玩家在场景中选工具、框选树木、观察工单生成与搬运结果”的端到端验收。
+      另外，旧的直连工作完成断言会把 claim / complete 过程压扁到内部状态检查里，不能作为主验收路径。
+    user_acceptance_flow:
+      steps:
+        - "玩家打开工作系统场景，看到未标记的树木、空闲小人和可用的储存区。"
+        - "玩家在工具栏选择 lumber 工具，并对目标树木进行框选或点选。"
+        - "场景推进后，小人认领伐木工作，前往树木并完成砍伐。"
+        - "树木消失后，系统自动生成木材资源，再生成拾取与搬运工单。"
+        - "小人拾取木材并搬运到储存区，直到木材进入容器为止。"
+      expected_goal: "玩家通过一次完整的工具操作，完成从伐木到入库的闭环，并能从界面上看见工单流转与最终结果。"
+      visible_feedback:
+        - "树木在伐木完成后从地面消失，木材资源在原地或中间状态短暂出现。"
+        - "拾取与搬运工单在任务队列中依次出现并完成。"
+        - "木材最终以 zone / container 归属的形式出现在储存区。"
+        - "小人路径与携带状态变化可见，证明不是靠直连完成状态伪造。"
+    e2e_test_strategy:
+      user_actions:
+        - "进入场景并确认树木、储存区和空闲小人都已就位。"
+        - "用玩家可见的工具栏动作选择 lumber，并对树木执行选择操作。"
+        - "通过场景推进或 headless tick 观察小人认领、执行、搬运和入库。"
+        - "等待木材进入储存区后，再检查场景和工单列表的最终状态。"
+      assertions:
+        - "树木最终消失，且木材不再以地面资源状态残留。"
+        - "chop-tree、pick-up-resource、haul-to-zone 三类工单都能从完成链路中被观察到。"
+        - "木材最终位于储存区容器内，而不是仅停留在携带中间态。"
+        - "任务队列与可见反馈同步变化，说明链路是从玩家输入推进出来的。"
+      forbidden_shortcuts:
+        - "禁止把 claimWorkItem / completeWorkItem 当作主验收路径。"
+        - "禁止直接提交已完成的 work item 状态来绕过玩家输入。"
+        - "禁止用仅断言内部 world state 的方式替代完整场景推进。"
+        - "禁止把 `tests/headless/chop-work-complete.test.ts` 这类 WorldCore 直连用例当成场景级验收。"
+    migration_notes: >
+      这一类场景继续作为 WORK-001 的主链路重构目标，推荐保留 `tests/headless/chop-haul-full-chain.test.ts`
+      作为场景级无头回归，但将 `tests/headless/chop-work-complete.test.ts` 仅降级为底层回归参考。
+      旧的 claim / complete 直连断言只保留用于工作系统内部状态稳定性检查，不再承担主验收职责。
+
+  - scenario_id: "WORK-002"
+    current_status_summary: >
+      现有 headless 已有 `tests/headless/haul-mark-pickup.test.ts`，并绑定 `scenarios/haul-mark-pickup.scenario.ts`。
+      它验证 haul 工具会把地面资源标记为可拾取，并生成 open 的 pick-up-resource 工单，属于工作系统里的局部链路。
+    current_mismatch: >
+      当前设计更偏“提交 haul 命令后检查 pickupAllowed 和 open 工单存在”，还没有完整表达玩家怎样通过界面触发标记、工单如何被认领、以及失败或重复标记时的互斥反馈。
+      这会让它看起来像一条内部派生规则，而不是玩家可感知的局部工作链路。
+    user_acceptance_flow:
+      steps:
+        - "玩家打开场景，看到地面散落资源和空闲小人。"
+        - "玩家选择 haul 工具，并框选要收集的资源区域。"
+        - "系统把对应资源标记为可拾取，并生成 open 的 pick-up-resource 工单。"
+        - "小人认领其中一个可执行的拾取任务，前往资源位置并完成拾取。"
+        - "如果玩家重复标记同一资源，系统保持工单去重与互斥，不重复派单。"
+      expected_goal: "玩家能把地面资源从“不可拾取”推进到“可拾取并生成工单”的状态，并观察到小人对开放工单的正常执行。"
+      visible_feedback:
+        - "资源的 pickupAllowed 状态从 false 变为 true。"
+        - "任务队列出现 open 的 pick-up-resource 工单。"
+        - "小人拾取后资源从地面消失，进入携带或后续搬运状态。"
+        - "重复标记时不会出现重复工单或重复拾取反馈。"
+    e2e_test_strategy:
+      user_actions:
+        - "在玩家界面选择 haul 工具并框选地面资源。"
+        - "通过场景推进观察资源可拾取状态和工单列表变化。"
+        - "让小人认领并执行拾取，确认资源状态进入下一步。"
+        - "在重复标记或资源已被处理的情况下，检查是否仍保持互斥和去重。"
+      assertions:
+        - "资源被标记后 pickupAllowed 变为 true。"
+        - "场景中出现 open 状态的 pick-up-resource 工单。"
+        - "同一资源不会因重复标记而生成多份同类工单。"
+        - "拾取完成后资源不再以地面可拾取形态留存。"
+      forbidden_shortcuts:
+        - "禁止直接调用 claimWorkItem / completeWorkItem 来伪造拾取闭环。"
+        - "禁止只断言 work item 数量，不验证玩家标记动作。"
+        - "禁止把 `tests/headless/haul-work-complete.test.ts`、`tests/headless/pickup-work-complete.test.ts` 这类直连测试当成主验收。"
+    migration_notes: >
+      `tests/headless/haul-mark-pickup.test.ts` 继续作为 WORK-002 的场景级无头回归，但验收语义要从“内部派工规则”转向“玩家标记后系统公开反馈”。
+      `tests/headless/haul-work-complete.test.ts` 与 `tests/headless/pickup-work-complete.test.ts` 只保留为底层回归，不再承担局部链路的主验收。
+
+  - scenario_id: "WORK-003"
+    current_status_summary: >
+      现有 `tests/headless/stale-work-cleanup.test.ts` 已覆盖“目标实体在执行前消失后，工单与工人状态被清理”的底层回收逻辑。
+      该用例与 `scenarios/chop-tree-command.scenario.ts` 绑定，证明系统能在树木被移除后清理 active work item。
+    current_mismatch: >
+      当前测试是通过直接删 world entity 再 tick 的方式验证内部清理，属于典型的 WorldCore 直连回归。
+      它能说明机制存在，但还没有把“玩家看见工单失效、工人停止移动、队列被清空”这些可见反馈表达出来。
+    user_acceptance_flow:
+      steps:
+        - "玩家先对树木发起 lumber 操作，让小人进入前往目标或执行中的状态。"
+        - "在小人到达或执行前，场景中的目标树木因为外部原因失效、消失或被替换。"
+        - "系统检测到目标失效后，撤销对应工作，释放小人的锁定与行进状态。"
+        - "玩家查看任务队列时，能看到该任务已失败、取消或被清理。"
+      expected_goal: "玩家能理解：目标没了，工单就会被安全清理，小人不会一直挂在无效目标上。"
+      visible_feedback:
+        - "小人停止前往失效目标，动作和计时器回到可重新评估的状态。"
+        - "对应工单从队列中移除，或明确显示为失败 / 取消。"
+        - "界面不再保留锁定的目标提示，也不会继续显示已失效的工作进度。"
+    e2e_test_strategy:
+      user_actions:
+        - "以玩家方式发起 lumber 任务，让工作先进入已认领或执行中的状态。"
+        - "让场景推进到目标失效的时刻，再观察系统如何回收。"
+        - "验证工单状态、工人状态和任务队列是否同步恢复。"
+      assertions:
+        - "失效目标对应的工单不会继续保留为可执行或已认领状态。"
+        - "小人不再持有 activeWorkItemId，workTimerSec 被清零或恢复到可再调度状态。"
+        - "任务队列中不残留对失效目标的锁定。"
+        - "清理逻辑通过场景推进触发，而不是靠直接删工作单来伪造。"
+      forbidden_shortcuts:
+        - "禁止把 `removeEntityMutable` 或类似 world-internal 直改当作主验收路径。"
+        - "禁止只检查清理后的内部集合大小，不检查玩家可见反馈。"
+        - "禁止把 `tests/headless/stale-work-cleanup.test.ts` 的直连 world 回收方式当作唯一验收。"
+    migration_notes: >
+      `tests/headless/stale-work-cleanup.test.ts` 只保留为底层回归，用来锁定“目标消失后状态回收”这个机制。
+      场景级设计则应把重点放在玩家能感知的失败回退、队列清空与工人释放，而不是仅验证内部删除是否成功。
+
+  - scenario_id: "WORK-004"
+    current_status_summary: >
+      现有验收与场景资料已经覆盖建床蓝图的认领与完成语义，参考 `scenarios/build-bed-flow.scenario.ts`。
+      它证明了单个蓝图工作可以从认领、行走到完工，并带有 manualAcceptance，适合作为多人争抢时的主场景基础。
+    current_mismatch: >
+      现状更强调“某个指定工人认领并完成蓝图”，而不是“多个空闲工人同时竞争同一工作、系统保证唯一认领与互斥锁定”。
+      如果继续沿用直连认领或预设认领人，就会掩盖争抢、拒绝与重新寻工这些关键体验。
+    user_acceptance_flow:
+      steps:
+        - "玩家放置一个建床蓝图，场景中同时存在多个空闲小人。"
+        - "系统向候选工人广播可认领的 construct-blueprint 工作。"
+        - "第一个响应者成功认领该工作，其他小人尝试认领时被拒绝或转去寻找别的工作。"
+        - "已认领的小人前往蓝图位置并完成建造，床实体最终落成。"
+      expected_goal: "同一个蓝图只能被一个小人有效认领，争抢时体现出锁定、拒绝和唯一执行者的互斥规则。"
+      visible_feedback:
+        - "蓝图或工单在 UI 中显示已认领、被锁定或占用状态。"
+        - "其他小人无法继续对同一蓝图重复认领。"
+        - "最终只有一名小人完成建造，床实体出现在目标格子。"
+        - "未抢到工单的小人保留空闲或转派反馈，而不是静默失败。"
+    e2e_test_strategy:
+      user_actions:
+        - "玩家放置蓝图并确保至少有两个可竞争的空闲小人。"
+        - "通过场景推进观察第一个工人认领、其他工人被拒绝的过程。"
+        - "继续推进到建造完成，检查床是否按蓝图位置落成。"
+      assertions:
+        - "同一 construct-blueprint 工作不会被多个小人同时持有。"
+        - "只有一个工人获得 activeWorkItemId 或等价的执行权。"
+        - "其余工人不会对同一目标形成重复锁定。"
+        - "建筑最终在目标格子出现，并与玩家看到的蓝图一致。"
+      forbidden_shortcuts:
+        - "禁止把 claimWorkItem、completeWorkItem 或 `claimConstructBlueprintAsPawnName` 作为主验收捷径。"
+        - "禁止只靠单个工人成功建造来证明多人争抢成立。"
+        - "禁止把 `tests/headless/auto-claim-work.test.ts` 这类直连自动认领测试当作主验收。"
+    migration_notes: >
+      `scenarios/build-bed-flow.scenario.ts` 可继续作为 WORK-004 的场景基础，但主验收必须表达多人竞争与唯一认领，而不是预设单人认领。
+      `tests/headless/auto-claim-work.test.ts` 以及任何直接 claim 逻辑的直连测试，只保留为底层回归，用于守住工作分配器和互斥锁本身的稳定性。
+
+test_architecture:
+  approach: >
+    采用“场景级端到端设计 + 底层回归留存”的分层结构：上层只验证玩家输入、场景推进和可见反馈，
+    下层才保留少量 WorldCore / headless 直连测试用于机制稳定性回归。
+  layers:
+    - "场景级主验收：WORK-001 到 WORK-004 全部以玩家动作驱动，检查 UI / 队列 / 实体状态的联动。"
+    - "无头回归层：仅用于模拟真实场景推进，不把 domain 直调当成主路径。"
+    - "底层机制回归：保留旧的 claim / complete / cleanup 直连测试，但只作为锁机制与状态回收的防线。"
+  reuse_boundary:
+    - "可复用：`tests/headless/chop-haul-full-chain.test.ts`、`tests/headless/haul-mark-pickup.test.ts`、`tests/headless/stale-work-cleanup.test.ts` 的场景骨架。"
+    - "需要降级：`tests/headless/chop-work-complete.test.ts`、`tests/headless/haul-work-complete.test.ts`、`tests/headless/pickup-work-complete.test.ts`、`tests/headless/auto-claim-work.test.ts`。"
+    - "需要新增：围绕玩家输入和可见反馈的场景级无头设计稿，而不是再新增 claim / complete 直连式测试。"
+  scenario_mapping:
+    WORK-001: "chop-haul-full-chain：完整链路，伐木 -> 拾取 -> 搬运入库。"
+    WORK-002: "haul-mark-pickup：局部链路，haul 标记 -> open pickup 工单 -> 拾取。"
+    WORK-003: "stale-work-cleanup：目标消失清理，失效后撤销工单与释放工人。"
+    WORK-004: "build-bed-flow：多人争抢，同一蓝图的唯一认领与互斥。"
+
+out_of_scope:
+  - "不实现任何测试代码。"
+  - "不修改源码、场景源码或任务树。"
+  - "不把 domain 直调、WorldCore 直改或手工注入完成状态当作主验收。"
+  - "不为本模块补充新的业务逻辑，只做测试设计重构。"
+  - "不删除既有底层回归测试，只调整它们在设计中的定位。"
+
+deliverable_checklist:
+  - "已覆盖 WORK-001 到 WORK-004，且四个 scenario_id 均明确写入。"
+  - "已明确完整链路、局部链路、多人争抢、目标消失清理四类场景。"
+  - "每条场景都写清了玩家输入、工单认领 / 执行 / 失败回退 / 互斥，以及可见反馈。"
+  - "已明确禁止 claimWorkItem、completeWorkItem 等直连调用作为主验收路径。"
+  - "已标记哪些旧 WorldCore 直连测试仅保留为底层回归。"
+  - "已遵循契约字段顺序，并且只输出设计文档，不含实现内容。"
+

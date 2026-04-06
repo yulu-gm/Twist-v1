@@ -1,0 +1,202 @@
+schema_version: "1.0"
+document_role: "refactor_test_design"
+
+module_id: "时间系统"
+module_name: "时间系统"
+source_acceptance_file: "oh-acceptance/时间系统.yaml"
+source_audit_file: "working-plan/test-exist-check/时间系统.yaml"
+
+design_scope: >
+  本文仅做时间系统端到端测试重构设计，不实现测试、不修改源码、不修改任务树。
+  设计范围覆盖 TIME-001 到 TIME-004 四个场景，要求无头测试只模拟用户操作与场景推进，
+  不能用时间纯函数直调替代真实加载场景、推进时间、触发暂停或等待事件广播的路径。
+
+refactor_objectives:
+  - "把时间系统的测试从纯函数/域单测语义，重构为可通过加载场景、推进时间、触发暂停、观察结果来验证的端到端场景。"
+  - "覆盖 TIME-001 到 TIME-004 的全部 scenario_id，保证跨阈值推进、跨天归一化、暂停冻结、极端帧间隔保护都有明确可观测断言。"
+  - "让无头测试与 playable scenario 的边界清晰：无头只模拟用户操作和场景推进，不直接调用时间域纯函数代替真实交互。"
+  - "补齐 TIME-002、TIME-003、TIME-004 所需的 playable scenario 设计点，确保这些场景可以被场景装载器和 HUD 手动验收复用。"
+  - "保留对现有 headless 覆盖的复用空间，但把测试意图从单元断言迁移为场景级验收叙事。"
+
+global_constraints:
+  - "仅设计，不实现测试。"
+  - "无头测试只模拟用户操作与场景推进，不得以 domain 直调替代真实业务路径。"
+  - "用户验收流程必须包含操作顺序、预期目标、可见反馈。"
+  - "旧 domain/局部无头测试仅作为底层回归，不再充当主业务验收。"
+scenario_redesign:  - scenario_id: "TIME-001"
+    current_status_summary: >
+      当前验收语义指向“现实时间推进到游戏时间，并在黄昏阈值附近触发夜晚开始”。
+      现有素材中，night-forces-sleep.scenario.ts 只验证夜晚起始时的行为目标，
+      tests/headless/headless-sim-basic.test.ts 只能说明时间会推进，tests/domain/time-of-day.test.ts
+      只能说明跨阈值和格式化逻辑正确，但它们都没有把“加载场景 -> 推进时间 -> 观察昼夜切换反馈”串成可玩流程。
+    current_mismatch: >
+      现有测试分散在场景、headless 和 domain 三层，缺少从场景装载、持续推进到 UI/事件反馈的完整闭环；
+      也没有明确把“跨阈值推进”描述成可由玩家观察到的昼夜切换过程，因此和验收契约的端到端意图不完全一致。
+    user_acceptance_flow:
+      steps:
+        - "加载 TIME-001 对应场景，确认世界处于白天后段，时间接近夜晚阈值。"
+        - "让主循环持续推进时间，直到跨过黄昏阈值。"
+        - "观察 HUD 时间、环境亮度和时间事件广播是否同步切换到夜晚。"
+      expected_goal: "玩家能看到时间跨过夜晚阈值时，游戏世界从白天平滑进入夜晚，并触发夜晚开始反馈。"
+      visible_feedback:
+        - "UI 时间数值持续走动，且在阈值后进入夜晚标识。"
+        - "环境光照和天空背景从白天过渡为夜晚表现。"
+        - "时间事件总线广播 night-start，供后续系统消费。"
+    e2e_test_strategy:
+      user_actions:
+        - "装载 TIME-001 场景。"
+        - "通过场景推进或模拟若干帧，让时间自然跨越夜晚阈值。"
+        - "停在阈值后观察 HUD、环境和事件结果。"
+      assertions:
+        - "时间不是静止的，且推进后确实跨过了黄昏阈值。"
+        - "night-start 在跨阈值后被观察到，而不是提前或缺失。"
+        - "昼夜表现与时间状态一致，没有出现时间已经进入夜晚但界面仍停留在白天的错配。"
+      forbidden_shortcuts:
+        - "禁止直接调用 advanceTimeOfDay 或类似纯函数来伪造跨阈值结果。"
+        - "禁止只断言 domain 返回值而不装载场景。"
+        - "禁止跳过真实主循环推进。"
+    migration_notes: >
+      TIME-001 可作为最接近现有 night-forces-sleep 语义的重构起点，但需要把“起始于夜晚”的单点目标
+      重新收敛为“跨阈值推进”与“夜晚开始广播”两个可见结果。若复用旧素材，必须补足玩家可见的昼夜过渡步骤。
+
+  - scenario_id: "TIME-002"
+    current_status_summary: >
+      当前验收目标是跨天后 dayNumber 正确递增、minuteOfDay 归一化到新的一天，并且日内进度重置。
+      现有 tests/domain/time-of-day.test.ts 已证明纯函数能跨午夜归一化，但没有形成 playable scenario。
+      tests/domain/time-event-bus.test.ts 也验证了 new-day/day-start 的事件顺序，但仍是域级差分，不是场景级体验。
+    current_mismatch: >
+      缺少可玩场景去展示“加载场景 -> 推进时间 -> 跨天归一化 -> 观察日期/UI 变化”的完整链路；
+      当前更多是时间算法正确性证明，而不是玩家在场景里能看到“第 N 天 -> 第 N+1 天”的体验闭环。
+    user_acceptance_flow:
+      steps:
+        - "加载 TIME-002 场景，确认当前接近日终并且日内进度已经很高。"
+        - "继续推进时间直到跨过午夜，进入下一天。"
+        - "观察日期标识、日内进度和事件广播是否完成跨天归一化。"
+      expected_goal: "玩家能看到一天结束后自动进入新的一天，日期递增且日内进度重置到新日起点。"
+      visible_feedback:
+        - "UI 日期从第 N 天变为第 N+1 天。"
+        - "minuteOfDay 回到新一天起点附近。"
+        - "new-day 与 day-start 按正确顺序被广播。"
+    e2e_test_strategy:
+      user_actions:
+        - "装载 TIME-002 可玩场景。"
+        - "让时间继续运行直到午夜跨越。"
+        - "在跨天后停留片刻，检查日期和事件反馈。"
+      assertions:
+        - "dayNumber 必须增加 1，且 minuteOfDay 必须归一化到新一天范围。"
+        - "日内进度不能简单累加到超过 24 小时的绝对值。"
+        - "界面上必须能观察到跨天后的日期变化，而不是只在内部状态上成立。"
+      forbidden_shortcuts:
+        - "禁止只用 time-of-day 纯函数断言 dayNumber。"
+        - "禁止直接构造跨天后的状态来绕过场景推进。"
+        - "禁止只看事件序列，不看可见日期反馈。"
+    migration_notes: >
+      TIME-002 需要单独的 playable scenario 设计点：推荐从“接近日终的稳定运行态”开始，确保玩家只需推进少量时间即可跨天。
+      场景里应明确暴露日期标签、日内时间条与 new-day/day-start 反馈，方便后续把手动验收和无头 E2E 复用同一叙事。
+
+  - scenario_id: "TIME-003"
+    current_status_summary: >
+      当前验收目标是暂停后时间彻底冻结，任何依赖时间推进的行为都停止更新。
+      tests/domain/time-of-day.test.ts 已覆盖 paused 状态下的零有效增量，但只是在纯函数层面。
+      现有场景文件没有把“暂停冻结”做成玩家能操作并观察的端到端流程。
+    current_mismatch: >
+      缺少场景层的暂停开关与冻结反馈设计，导致无法验证“触发暂停 -> 世界停止推进 -> 动作和进度冻结”的真实交互路径；
+      域层零增量并不等价于玩家按下暂停后，角色、进度条、时间、事件都同时停住。
+    user_acceptance_flow:
+      steps:
+        - "加载 TIME-003 场景，确认小人正在移动或进行某个需要时间推进的动作。"
+        - "触发暂停指令，让场景进入暂停状态。"
+        - "在暂停状态下观察一段时间，确认时间、动作和进度都不再变化。"
+      expected_goal: "玩家按下暂停后，整个与时间推进相关的系统都冻结，恢复前不会继续演化。"
+      visible_feedback:
+        - "HUD 时间停止走动。"
+        - "小人的动作进度和移动进度停在当前帧。"
+        - "暂停状态被明确显示，用户可知系统已冻结。"
+    e2e_test_strategy:
+      user_actions:
+        - "装载 TIME-003 场景并等待至少一个可见动作开始。"
+        - "触发暂停。"
+        - "保持若干模拟帧不恢复，检查是否完全冻结。"
+      assertions:
+        - "暂停后世界时间增量必须为 0。"
+        - "暂停后动作进度、移动进度和事件推进都不应继续更新。"
+        - "恢复前不得出现任何依赖时间推进的副作用。"
+      forbidden_shortcuts:
+        - "禁止直接断言 effectiveSimulationDeltaSeconds 返回 0 而不经过暂停交互。"
+        - "禁止用 domain 单测代替暂停场景。"
+        - "禁止只观察时间，不观察动作和进度冻结。"
+    migration_notes: >
+      TIME-003 的 playable scenario 设计点应明确支持“正在发生中的动作”作为冻结参照，否则无法看见暂停效果。
+      推荐在场景里安排移动、读条或工作进度中的至少一种，让暂停冻结既能在时间 HUD 上看到，也能在角色行为上看到。
+
+  - scenario_id: "TIME-004"
+    current_status_summary: >
+      当前验收目标是极端帧间隔保护：即使单帧现实时间异常巨大，游戏时间也不能出现破坏性跳跃。
+      tests/headless/headless-sim-basic.test.ts 已经证明单帧推进不会超过 MAX_FRAME_DT_SEC 约束，
+      但它属于 headless 级别的安全性验证，尚未转化为可玩场景中对“卡顿恢复后仍平滑推进”的体验表达。
+    current_mismatch: >
+      现有证据更多是技术边界证明，而非场景级用户可见反馈；缺少在“系统卡顿/恢复”后观察时间只前进安全小段的 playable scenario。
+      因此还不能从玩家视角直接验证极端帧间隔保护是否真的生效。
+    user_acceptance_flow:
+      steps:
+        - "加载 TIME-004 场景，确认游戏正常运行。"
+        - "模拟一次异常大的单帧间隔或卡顿恢复，让系统经历极端帧间隔输入。"
+        - "观察恢复后时间只前进安全范围内的一小段，而不是瞬间跳过数小时。"
+      expected_goal: "玩家在卡顿恢复后看到的是被保护过的平滑时间推进，而不是灾难性时间跳跃。"
+      visible_feedback:
+        - "HUD 时间恢复后只前进了一个安全小段。"
+        - "角色状态和环境变化保持连续，没有出现跳帧式崩坏。"
+        - "极端 delta 被 MAX_FRAME_DT_SEC 保护逻辑截断。"
+    e2e_test_strategy:
+      user_actions:
+        - "装载 TIME-004 场景。"
+        - "通过场景推进制造一次异常大的 frame gap，或在 headless 语境下注入受控的卡顿恢复模拟。"
+        - "观察恢复后的时间变化是否被安全截断。"
+      assertions:
+        - "单帧时间推进不得超过上限。"
+        - "世界时间推进连续且可预测，不会从一个时间点跳到数小时之后。"
+        - "卡顿恢复后的 UI 与世界状态仍保持同步。"
+      forbidden_shortcuts:
+        - "禁止仅靠 headless 单测结论替代 playable 场景设计。"
+        - "禁止直接手工改写时间状态来绕过极端帧间隔输入。"
+        - "禁止只断言时间上限，不观察恢复后的可见连续性。"
+    migration_notes: >
+      TIME-004 需要一个能够表达“卡顿后恢复”的 playable scenario 设计点，最好有明确的卡顿注入或恢复模拟入口。
+      场景重点不是制造真实故障，而是让玩家或测试能观察到极端帧间隔保护把时间推进限制在安全阈值内。
+
+test_architecture:
+  layers:
+    - name: "场景级验收层"
+      purpose: "以 scenarios/*.scenario.ts 为入口，验证时间推进、暂停冻结、跨天归一化和保护阈值在真实场景中的表现。"
+    - name: "无头执行层"
+      purpose: "只模拟用户操作和场景推进，不直接调 domain 纯函数，负责把场景叙事变成可批量执行的 headless 结果。"
+    - name: "共享时间契约层"
+      purpose: "复用现有时间事件、时间格式化和时间控制约束作为断言依据，但不把这些纯函数当作测试入口替代场景。"
+  reusable_boundary:
+    - "可复用：现有对 MAX_FRAME_DT_SEC、new-day/day-start、night-start、paused 零增量的域级知识。"
+    - "应废弃或降级：只断言时间纯函数返回值、却没有场景加载与推进步骤的局部测试。"
+    - "需要新增：TIME-002、TIME-003、TIME-004 的可玩场景叙事与手动验收步骤。"
+  playable_scenario_design_points:
+    - "TIME-002 应从接近日终的稳定态开始，确保少量推进即可跨天，并在场景里暴露日期与日内进度反馈。"
+    - "TIME-003 应带有一个肉眼可见的进行中动作，方便暂停后验证动作冻结、进度冻结和时间冻结同时成立。"
+    - "TIME-004 应提供卡顿恢复或极端帧间隔的受控入口，让玩家能观察到时间被安全截断，而不是瞬时跳变。"
+  scenario_mapping:
+    - "TIME-001 对应跨阈值推进与 night-start 反馈。"
+    - "TIME-002 对应跨天归一化与 dayNumber 重置。"
+    - "TIME-003 对应暂停冻结与全系统停止演化。"
+    - "TIME-004 对应极端帧间隔保护与恢复连续性。"
+
+out_of_scope:
+  - "不修改任何测试代码。"
+  - "不修改任何源码。"
+  - "不修改任务树或 acceptance 源文件。"
+  - "不在本文件中提供具体测试实现。"
+  - "不把 domain 纯函数单测当作最终设计出口。"
+
+deliverable_checklist:
+  - "module_id、module_name、source_acceptance_file、source_audit_file 已按契约提供。"
+  - "scenario_redesign 覆盖 TIME-001、TIME-002、TIME-003、TIME-004，未遗漏任何 scenario_id。"
+  - "每条场景都包含 user_acceptance_flow、e2e_test_strategy 和 migration_notes。"
+  - "已明确写入跨阈值推进、跨天归一化、暂停冻结、极端帧间隔保护四个关键词和设计重点。"
+  - "已说明无头测试只模拟用户操作与场景推进，不能用时间纯函数直调替代。"
+  - "已补充 TIME-002、TIME-003、TIME-004 的 playable scenario 设计点。"

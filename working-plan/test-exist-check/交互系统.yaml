@@ -1,0 +1,165 @@
+# schema_version 与契约见 working-plan/module-test-exist-check.schema.yml
+schema_version: "1.0"
+document_role: "oh-acceptance_module_test_existence_audit"
+
+module_id: "交互系统"
+module_name: "交互系统"
+source_acceptance_file: "oh-acceptance/交互系统.yaml"
+
+audit_rules:
+  headless_required: true
+  player_acceptance_required: true
+
+scenarios:
+  - scenario_id: "INTERACT-001"
+    scenario_name: "使用选区工具标记物资可拾取"
+    intent: "验证玩家能通过拖拽选区框批量标记散落物资"
+    headless:
+      status: exists
+      evidence:
+        test_files:
+          - "tests/headless/haul-mark-pickup.test.ts"
+        code_hits:
+          - path: "tests/headless/haul-mark-pickup.test.ts"
+            symbol: "runScenarioHeadless"
+            note: "runScenarioHeadless(HAUL_MARK_PICKUP_SCENARIO)；同文件 createHeadlessSim + hydrateScenario / submit haul"
+          - path: "tests/headless/haul-mark-pickup.test.ts"
+            symbol: "createHeadlessSim"
+            note: "makeHaulCommand 与场景内 HAUL_MARK_PICKUP_CELLS 均含 inputShape: rect-selection"
+        scenario_binding:
+          scenario_export: "HAUL_MARK_PICKUP_SCENARIO"
+          scenario_file: "scenarios/haul-mark-pickup.scenario.ts"
+        alignment_note: >
+          验收文案为「物资拾取标记工具」矩形拖拽；实现侧为 toolbar haul + rect-selection。
+          场景用 domainCommandsAfterHydrate 注入等价于两格 rect-selection 的 assign_tool_task:haul，
+          非 playerSelectionAfterHydrate，但领域结果（pickupAllowed、pick-up-resource）与验收 then 对齐。
+          输入形态证据：scenarios/haul-mark-pickup.scenario.ts 中 sourceMode.inputShape: rect-selection；
+          tests/headless/haul-mark-pickup.test.ts 中 makeHaulCommand.inputShape: rect-selection。
+        near_misses: []
+    player_acceptance:
+      status: missing
+      evidence:
+        scenario_file: "scenarios/haul-mark-pickup.scenario.ts"
+        in_all_scenarios: true
+        manual_acceptance_declared:
+          has_steps: false
+          has_outcomes: false
+        hud_entry: "index.html#yaml-scenario-panel；HudManager.syncYamlScenarioManualHints"
+        near_misses: []
+    notes: >
+      输入层/领域：无头已覆盖 rect-selection + haul 链路。
+      完整玩家可验收：场景已注册但缺少显式 manualAcceptance.steps/outcomes（运行时默认提示不算 exists）。
+
+  - scenario_id: "INTERACT-002"
+    scenario_name: "使用蓝图笔刷连续绘制墙体"
+    intent: "验证玩家能通过拖拽笔刷在路径上连续生成建筑蓝图"
+    headless:
+      status: exists
+      evidence:
+        test_files:
+          - "tests/headless/build-wall-flow.test.ts"
+        code_hits:
+          - path: "tests/headless/build-wall-flow.test.ts"
+            symbol: "createHeadlessSim"
+            note: "sim.commitPlayerSelection({ toolId: build, inputShape: brush-stroke, ... }) 多格与单格笔刷"
+          - path: "tests/headless/build-wall-flow.test.ts"
+            symbol: "runScenarioHeadless"
+            note: "runScenarioHeadless(BUILD_WALL_FLOW_SCENARIO)"
+        scenario_binding:
+          scenario_export: "BUILD_WALL_FLOW_SCENARIO"
+          scenario_file: "scenarios/build-wall-flow.scenario.ts"
+        alignment_note: >
+          场景 playerSelectionAfterHydrate 使用 inputShape: brush-stroke + build_wall_blueprint 期望链；
+          同测试文件内三格笔刷用 commitPlayerSelection(..., inputShape: \"brush-stroke\") 覆盖「连续路径」子集。
+        near_misses: []
+    player_acceptance:
+      status: exists
+      evidence:
+        scenario_file: "scenarios/build-wall-flow.scenario.ts"
+        in_all_scenarios: true
+        manual_acceptance_declared:
+          has_steps: true
+          has_outcomes: true
+        hud_entry: "index.html#yaml-scenario-panel；HudManager.syncYamlScenarioManualHints"
+        near_misses: []
+    notes: >
+      输入层测试：tests/headless/build-wall-flow.test.ts 内 createHeadlessSim + brush-stroke。
+      完整玩家流程测试：runScenarioHeadless(BUILD_WALL_FLOW_SCENARIO) 含自动认领至墙实体落成。
+
+  - scenario_id: "INTERACT-003"
+    scenario_name: "单点点击放置家具"
+    intent: "验证玩家能在指定单格位置点击放置家具蓝图"
+    headless:
+      status: exists
+      evidence:
+        test_files:
+          - "tests/headless/build-bed-flow.test.ts"
+        code_hits:
+          - path: "tests/headless/build-bed-flow.test.ts"
+            symbol: "createHeadlessSim"
+            note: "commitPlayerSelection({ toolId: build, inputShape: single-cell, ... }) → place_furniture:bed"
+          - path: "tests/headless/build-bed-flow.test.ts"
+            symbol: "runScenarioHeadless"
+            note: "runScenarioHeadless(BUILD_BED_FLOW_SCENARIO) 验认领后落成（场景预置蓝图，不含 Hydrate 单点提交）"
+        scenario_binding:
+          scenario_export: "BUILD_BED_FLOW_SCENARIO"
+          scenario_file: "scenarios/build-bed-flow.scenario.ts"
+        alignment_note: >
+          「单点放置」由同文件 createHeadlessSim + inputShape: single-cell 与验收 INTERACT-003 直接对齐。
+          runScenarioHeadless(BUILD_BED_FLOW_SCENARIO) 覆盖认领→走向→落成，是完整流程子集，不重复 Hydrate 单点路径。
+        near_misses: []
+    player_acceptance:
+      status: exists
+      evidence:
+        scenario_file: "scenarios/build-bed-flow.scenario.ts"
+        in_all_scenarios: true
+        manual_acceptance_declared:
+          has_steps: true
+          has_outcomes: true
+        hud_entry: "index.html#yaml-scenario-panel；HudManager.syncYamlScenarioManualHints"
+        near_misses: []
+    notes: >
+      输入层测试：single-cell → place_furniture:bed 见 build-bed-flow.test.ts。
+      完整流程：runScenarioHeadless 从预置 bed 蓝图 + claimConstructBlueprintAsPawnName 开始，与浏览器内「需认领 UI」说明一致。
+
+  - scenario_id: "INTERACT-004"
+    scenario_name: "无效交互模式下的输入屏蔽"
+    intent: "验证当玩家未处于任何有效工具模式时，拖拽或点击不会产生意外的领域命令"
+    headless:
+      status: missing
+      evidence:
+        test_files: []
+        code_hits: []
+        scenario_binding:
+          scenario_export: null
+          scenario_file: null
+        alignment_note: >
+          tests/headless 下无 runScenarioHeadless/createHeadlessSim 用例断言「观察/无工具」下拖拽不产生领域命令。
+          tests/domain/player-channel-domain-command.test.ts 仅测 buildDomainCommand 在空格或非 idle 等条件下的 null，
+          不含无头世界提交；不满足 schema 对 headless 的强制信号。
+        near_misses:
+          - hit_paths:
+              - "tests/domain/player-channel-domain-command.test.ts"
+              - "tests/component/mock-task-marker-selection.test.ts"
+            reason: "领域/组件级 buildDomainCommand 或 mock 标记逻辑，未使用 createHeadlessSim/runScenarioHeadless，无法记为 headless exists"
+    player_acceptance:
+      status: missing
+      evidence:
+        scenario_file: null
+        in_all_scenarios: false
+        manual_acceptance_declared:
+          has_steps: false
+          has_outcomes: false
+        hud_entry: "index.html#yaml-scenario-panel；HudManager.syncYamlScenarioManualHints"
+        near_misses: []
+    notes: >
+      无专门 playable 场景声明 manualAcceptance 描述「默认观察态下拖拽不产生选区/命令」。
+
+summary:
+  headless_coverage: "4 条中 3 条 exists（矩形 haul、墙笔刷、床单点）；INTERACT-004 无头缺失。"
+  player_acceptance_coverage: "4 条中 2 条 exists（建墙、建床场景）；INTERACT-001/004 缺 manualAcceptance 或未绑定场景。"
+  last_audited_at: "2026-04-06"
+  auditor_notes: >
+    已区分：输入层指 createHeadlessSim.commitPlayerSelection 或 floor-selection 几何单测、以及等价 DomainCommand 的 inputShape；
+    完整玩家流程指 runScenarioHeadless(ScenarioDefinition) 端到端期望链。
+    tests/domain/floor-selection.test.ts 仅验证选区几何（含单格与矩形拖拽），未绑定 haul/build 工具与网关，故未单独记为 INTERACT-001/002 的 headless 主证据（主证据在 tests/headless）。

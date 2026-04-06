@@ -1,0 +1,186 @@
+# oh-acceptance 地图系统 — 无头 / 玩家可验收测试存在性审计（契约见 working-plan/module-test-exist-check.schema.yml）
+schema_version: "1.0"
+document_role: "oh-acceptance_module_test_existence_audit"
+
+module_id: "地图系统"
+module_name: "地图系统"
+source_acceptance_file: "oh-acceptance/地图系统.yaml"
+
+audit_rules:
+  headless_required: true
+  player_acceptance_required: true
+
+scenarios:
+  - scenario_id: "MAP-001"
+    scenario_name: "第一天地图初始状态生成"
+    intent: "验证游戏开始时地图上的小人、物资和树木按设计正确分布"
+    headless:
+      status: exists
+      evidence:
+        test_files:
+          - "tests/headless/story-1-day-one.test.ts"
+        code_hits:
+          - path: "tests/headless/story-1-day-one.test.ts"
+            symbol: "runScenarioHeadless"
+            note: "runScenarioHeadless(STORY_1_DAY_ONE_SCENARIO) 冒烟；期望组含 MAP-001 标签"
+          - path: "tests/headless/story-1-day-one.test.ts"
+            symbol: "createHeadlessSim"
+            note: "集成用例 hydrate 后 runExpectGroup(sim, STORY_1_DAY_ONE_BOOTSTRAP_EXPECTATIONS)"
+        scenario_binding:
+          scenario_export: "STORY_1_DAY_ONE_SCENARIO"
+          scenario_file: "scenarios/story-1-day-one.scenario.ts"
+        alignment_note: >
+          scenarios/story-1-day-one.scenario.ts 中 STORY_1_DAY_ONE_BOOTSTRAP_EXPECTATIONS 显式标注
+          「MAP-001：存在树木 / 地面食物资源」，与验收「树、散落物资、小人落在有效格」可对读；
+          路径为确定性 hydrate，非 bootstrapWorldForScene 首日播种。
+        near_misses:
+          - hit_paths:
+              - "tests/headless/map-initial-state.test.ts"
+            reason: >
+              覆盖 bootstrapWorldForScene 树木与食物数量，但测试内无 runScenarioHeadless/createHeadlessSim，
+              按契约不计入 headless exists；与 MAP_INITIAL_STATE_SCENARIO 注释（无头不经 bootstrap）一致。
+    player_acceptance:
+      status: missing
+      evidence:
+        scenario_file: "scenarios/map-initial-state.scenario.ts"
+        in_all_scenarios: true
+        manual_acceptance_declared:
+          has_steps: false
+          has_outcomes: false
+        hud_entry: "index.html#yaml-scenario-panel；HudManager.syncYamlScenarioManualHints"
+        near_misses:
+          - hit_paths:
+              - "scenarios/story-1-day-one.scenario.ts"
+            reason: >
+              STORY_1_DAY_ONE_SCENARIO 亦在 ALL_SCENARIOS 且语义贴近首日，但同样未声明非空 manualAcceptance.steps/outcomes。
+    notes: >
+      无头侧以 story-1-day-one 的 MAP-001 期望与集成断言为主；若需严格对齐「全新启动 + bootstrap 播种」，
+      须在 headless 链路中显式调用 createHeadlessSim/runScenarioHeadless 或扩充场景期望，否则与 map-initial-state 单测存在路径差距。
+
+  - scenario_id: "MAP-002"
+    scenario_name: "合法选区创建存储区"
+    intent: "验证玩家通过选区工具框选合法地块后能成功创建存储区"
+    headless:
+      status: exists
+      evidence:
+        test_files:
+          - "tests/headless/zone-create.test.ts"
+          - "tests/headless/story-1-day-one.test.ts"
+        code_hits:
+          - path: "tests/headless/zone-create.test.ts"
+            symbol: "createHeadlessSim"
+            note: "hydrateScenario(sim, ZONE_CREATE_SCENARIO) 后 submit zone_create，断言 zoneKind=storage"
+          - path: "tests/headless/story-1-day-one.test.ts"
+            symbol: "createHeadlessSim"
+            note: "submit STORY_1_DOMAIN_COMMANDS.zoneCreate + afterZoneCreate 期望组（MAP-002）"
+        scenario_binding:
+          scenario_export: "ZONE_CREATE_SCENARIO"
+          scenario_file: "scenarios/zone-create.scenario.ts"
+        alignment_note: >
+          zone-create 单测模拟 toolbar zone_create + rect-selection 与领域提交一致；
+          story-1-day-one 中期望标签「MAP-002：存储区 zone 实体已创建」与验收可对读。
+        near_misses: []
+    player_acceptance:
+      status: missing
+      evidence:
+        scenario_file: "scenarios/zone-create.scenario.ts"
+        in_all_scenarios: true
+        manual_acceptance_declared:
+          has_steps: false
+          has_outcomes: false
+        hud_entry: "index.html#yaml-scenario-panel；HudManager.syncYamlScenarioManualHints"
+        near_misses: []
+    notes: >
+      无头已覆盖合法 zone_create 与领域状态；玩家可验收场景文件未手写 manualAcceptance，不符合契约下的 exists。
+
+  - scenario_id: "MAP-003"
+    scenario_name: "建筑放置时的占用冲突拦截"
+    intent: "验证在已有阻挡实体的地图格上无法放置新建筑"
+    headless:
+      status: missing
+      evidence:
+        test_files: []
+        code_hits: []
+        scenario_binding:
+          scenario_export: null
+          scenario_file: null
+        alignment_note: >
+          tests/headless 下未发现以 runScenarioHeadless/createHeadlessSim 驱动、且意图为
+          「建筑蓝图 / place_furniture 落在树或墙阻挡格并被拒绝」的用例。
+        near_misses:
+          - hit_paths:
+              - "tests/domain/occupancy-manager.test.ts"
+              - "tests/domain/lifecycle-rules.test.ts"
+            reason: >
+              仅占格与蓝图落成规则单元测试，无 headless 强制信号；lifecycle-rules 为 footprint-conflict（小人占格），
+              非验收所述树/墙阻挡。
+          - hit_paths:
+              - "tests/headless/zone-create.test.ts"
+            reason: >
+              阻挡格拒绝 accepted=false 针对 zone_create，语义接近「阻挡拦截」但非建筑放置链路。
+    player_acceptance:
+      status: missing
+      evidence:
+        scenario_file: null
+        in_all_scenarios: false
+        manual_acceptance_declared:
+          has_steps: false
+          has_outcomes: false
+        hud_entry: "index.html#yaml-scenario-panel；HudManager.syncYamlScenarioManualHints"
+        near_misses:
+          - hit_paths:
+              - "scenarios/build-wall-flow.scenario.ts"
+              - "scenarios/build-bed-flow.scenario.ts"
+            reason: >
+              含 manualAcceptance 的建造流场景侧重正向落成，非「阻挡格上不可放置」专条，且与 MAP-003 验收 ID 无直接绑定。
+    notes: >
+      仅有领域层占用/规则测试与 zone 阻挡拒绝；缺少可模拟玩家建造提交并被拒的无头场景，备注中已写明差距。
+
+  - scenario_id: "MAP-004"
+    scenario_name: "越界选区的安全过滤"
+    intent: "验证玩家拖拽选区超出地图边界时，系统能自动过滤无效坐标"
+    headless:
+      status: missing
+      evidence:
+        test_files: []
+        code_hits: []
+        scenario_binding:
+          scenario_export: null
+          scenario_file: null
+        alignment_note: >
+          无通过 createHeadlessSim/runScenarioHeadless 走 commitPlayerSelection 或等价玩家选区路径、
+          并断言越界坐标被剔除的无头用例。
+        near_misses:
+          - hit_paths:
+              - "tests/domain/floor-selection.test.ts"
+            reason: >
+              矩形选区均在网内；未覆盖 anchor/focus 越界时仅合法子集进入 preview。
+          - hit_paths:
+              - "src/game/map/world-grid.ts"
+              - "src/game/interaction/floor-selection.ts"
+            reason: >
+              rectCellsInclusive 对每格 isInsideGrid 过滤，floor-selection 委托 rectCellKeysInclusive；
+              属实现依据而非 tests/headless 契约命中。
+          - hit_paths:
+              - "tests/domain/world-grid.test.ts"
+            reason: >
+              rectCellKeysInclusive 用例仅在边界内两点展开，未断言越界拖拽裁剪结果。
+    player_acceptance:
+      status: missing
+      evidence:
+        scenario_file: null
+        in_all_scenarios: false
+        manual_acceptance_declared:
+          has_steps: false
+          has_outcomes: false
+        hud_entry: "index.html#yaml-scenario-panel；HudManager.syncYamlScenarioManualHints"
+        near_misses: []
+    notes: >
+      越界裁剪逻辑在 world-grid + floor-selection 中可实现，但当前既无 headless 玩家选区模拟，也无带 manualAcceptance 的可玩场景专验 MAP-004。
+
+summary:
+  headless_coverage: "MAP-001/002 有无头场景绑定证据；MAP-003/004 仅有领域或实现层邻近覆盖，无契约要求的 headless 调用。"
+  player_acceptance_coverage: "四条验收均无 scenarios/*.scenario.ts 非空 manualAcceptance.steps 与 outcomes；虽已注册场景无手写人工验收块。"
+  last_audited_at: "2026-04-06"
+  auditor_notes: >
+    rg 检索 tests 下 runScenarioHeadless( / createHeadlessSim(；玩家侧 grep manualAcceptance 于 scenarios/ 未含 map/zone/story-1 地图专条。

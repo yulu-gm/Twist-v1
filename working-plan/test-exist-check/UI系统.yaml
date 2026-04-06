@@ -1,0 +1,197 @@
+# oh-acceptance「UI系统」模块：无头测试 / 玩家可验收测试 存在性审计结果
+# 遵循 working-plan/module-test-exist-check.schema.yml v1.0
+
+schema_version: "1.0"
+document_role: "oh-acceptance_module_test_existence_audit"
+
+module_id: "UI系统"
+module_name: "UI系统"
+source_acceptance_file: "oh-acceptance/UI系统.yaml"
+
+audit_rules:
+  headless_required: true
+  player_acceptance_required: true
+
+scenarios:
+  - scenario_id: "UI-001"
+    scenario_name: "主菜单层级展开与模式切换"
+    intent: "验证玩家可以通过层级菜单正确进入特定的交互模式"
+    headless:
+      status: exists
+      evidence:
+        test_files:
+          - tests/headless/build-wall-flow.test.ts
+        code_hits:
+          - path: tests/headless/build-wall-flow.test.ts
+            symbol: runScenarioHeadless
+            note: "导入并执行 BUILD_WALL_FLOW_SCENARIO"
+          - path: tests/headless/build-wall-flow.test.ts
+            symbol: createHeadlessSim
+            note: "多例以 BUILD_WALL_FLOW_SCENARIO.seed 驱动 commitPlayerSelection(build + brush-stroke)"
+        scenario_binding:
+          scenario_export: BUILD_WALL_FLOW_SCENARIO
+          scenario_file: scenarios/build-wall-flow.scenario.ts
+        alignment_note: >
+          无头侧验证 playerSelectionAfterHydrate（与实机「建造+墙笔刷」提交同形）产生的蓝图工单与墙落成，
+          与验收入门中「向交互系统发送蓝图绘制类指令」的 domain 子集可对读；不覆盖菜单模型展开态、
+          子菜单高亮、模式提示区文案或指针样式等 presentation。
+        near_misses: []
+    player_acceptance:
+      status: needs-manual-judgement
+      evidence:
+        scenario_file: scenarios/build-wall-flow.scenario.ts
+        in_all_scenarios: true
+        manual_acceptance_declared:
+          has_steps: true
+          has_outcomes: true
+        hud_entry: "index.html#yaml-scenario-panel；HudManager.syncYamlScenarioManualHints"
+        near_misses:
+          - hit_paths:
+              - scenarios/build-wall-flow.scenario.ts
+              - index.html
+              - src/ui/hud-manager.ts
+              - src/scenes/GameScene.ts
+            reason: >
+              场景在源码中显式声明 manualAcceptance.steps/outcomes 且已列入 ALL_SCENARIOS，
+              GameScene 通过 listAvailableScenarios→setupYamlScenarioPanel 可载入；
+              但手工指引假定装载后已完成笔刷提交，未要求玩家按验收「建造→墙→木墙」逐级点击，
+              亦无法从该场景单独证明模式提示与指针等玩家侧呈现验收。
+    notes: >
+      组件/UI 结构证据：tests/scene-hud-markup.test.ts（happy-dom）模拟点击建造槽展开子菜单、
+      含「木墙」「木床」及 activeBuildToolState；tests/component/menu-model.test.ts 为泛型菜单状态机，
+      非小人工具栏层级流；tests/component/villager-tool-bar-model.test.ts 仅校验 mock 工具栏配置不变量。
+
+  - scenario_id: "UI-002"
+    scenario_name: "地图叠加反馈层展示工作进度"
+    intent: "验证小人执行耗时工作时，UI能正确在地图空间渲染进度条"
+    headless:
+      status: needs-manual-judgement
+      evidence:
+        test_files:
+          - tests/headless/chop-tree-full-flow.test.ts
+        code_hits:
+          - path: tests/headless/chop-tree-full-flow.test.ts
+            symbol: runScenarioHeadless
+            note: "CHOP_TREE_FULL_FLOW_SCENARIO"
+        scenario_binding:
+          scenario_export: CHOP_TREE_FULL_FLOW_SCENARIO
+          scenario_file: scenarios/chop-tree-full-flow.scenario.ts
+        alignment_note: >
+          无头期望覆盖邻树 lumber 工单认领、完成、树移除与 wood resource 等世界态，与「小人旁伐木读条」
+          的 domain 过程相邻；测试与期望均未断言 workTimer、地图叠加进度条或 Phaser 层绘制。
+        near_misses:
+          - hit_paths:
+              - tests/headless/chop-tree-full-flow.test.ts
+              - scenarios/chop-tree-full-flow.scenario.ts
+            reason: >
+              同域（伐木耗时工作闭环）但缺少与「地图空间进度条呈现」可一一对读的断言或场景字段绑定，
+              无法将本条 scenario_id 与无头结果做强对齐。
+    player_acceptance:
+      status: missing
+      evidence:
+        scenario_file: null
+        in_all_scenarios: false
+        manual_acceptance_declared:
+          has_steps: false
+          has_outcomes: false
+        hud_entry: "index.html#yaml-scenario-panel；HudManager.syncYamlScenarioManualHints"
+        near_misses:
+          - hit_paths:
+              - scenarios/chop-tree-full-flow.scenario.ts
+              - src/scenes/renderers/pawn-renderer.ts
+            reason: >
+              chop-tree-full-flow 已注册 ALL_SCENARIOS 但 ScenarioDefinition 未声明非空 manualAcceptance；
+              运行时 HudManager 可能回落默认 steps/outcomes，按 schema 不计入 player_acceptance exists；
+              生产代码存在 workTimerSec 驱动工作条填充逻辑，但无带显式 manualAcceptance 的可对照场景文件。
+    notes: >
+      组件侧：tests 下未检索到 workBar/叠加进度条相关 Vitest；仅有 pawn-renderer 源码侧 workTimer 与条形变宽逻辑，
+      无自动化验收绑定 UI-002。
+
+  - scenario_id: "UI-003"
+    scenario_name: "小人状态与需求面板的实时同步"
+    intent: "验证UI能准确反映小人的当前行为标签和内在需求状态"
+    headless:
+      status: missing
+      evidence:
+        test_files: []
+        code_hits: []
+        scenario_binding:
+          scenario_export: null
+          scenario_file: null
+        alignment_note: >
+          tests/headless 中无 runScenarioHeadless/createHeadlessSim 调用可与「选中信息面板聚合需求与行为文案」
+          形成 scenario_id 级对齐；相关呈现主要在 HudManager.syncPawnDetail 与组件测。
+        near_misses:
+          - hit_paths:
+              - tests/scene-hud-markup.test.ts
+            reason: >
+              happy-dom 下直接调用 syncPawnDetail 断言 .pawn-detail-behavior 含「伐木中」「进食中」等，
+              属 DOM/模型同步组件测，无场景常量绑定，亦无 headless 强制信号。
+          - hit_paths:
+              - tests/headless/need-interrupt-during-work.test.ts
+            reason: >
+              无头验证饥饿中断与 eat 目标等行为域，不经过信息面板呈现断言，无法记为 UI-003 的 headless exists。
+    player_acceptance:
+      status: missing
+      evidence:
+        scenario_file: null
+        in_all_scenarios: false
+        manual_acceptance_declared:
+          has_steps: false
+          has_outcomes: false
+        hud_entry: "index.html#yaml-scenario-panel；HudManager.syncYamlScenarioManualHints"
+        near_misses:
+          - hit_paths:
+              - scenarios/need-interrupt-during-work.scenario.ts
+            reason: >
+              含显式 manualAcceptance 且已在 ALL_SCENARIOS，但步骤/现象聚焦工单中断与 eat 目标，
+              未规定对照「饱食度条警戒色」「前往进食/寻找食物」等面板文案的玩家操作路径，无法记为本条 exists。
+    notes: >
+      组件/UI 结构证据：tests/scene-hud-markup.test.ts「行为标签同步」用例覆盖工单/goal 驱动的中文行为行；
+      详情 HTML 含 needs 数值与 needSignals 摘要，未见针对「警戒色」进度条的断言。
+
+  - scenario_id: "UI-004"
+    scenario_name: "多层地图反馈的视觉清晰度"
+    intent: "验证当同一地块存在多种反馈时，UI渲染按 Z 轴分层且不出现严重 Z-fighting 或互相完全遮挡"
+    headless:
+      status: missing
+      evidence:
+        test_files: []
+        code_hits: []
+        scenario_binding:
+          scenario_export: null
+          scenario_file: null
+        alignment_note: >
+          无 Phaser 渲染与 Z-index 的视觉回归不在 headless 管线内；tests/headless 未声明与本条 intent 对应的
+          ScenarioDefinition 与期望类型。
+        near_misses:
+          - hit_paths:
+              - tests/headless/build-wall-flow.test.ts
+            reason: >
+              建造/蓝图与世界实体闭环与「多反馈叠加清晰度」无直接对读关系，不构成 UI-004 对齐。
+    player_acceptance:
+      status: missing
+      evidence:
+        scenario_file: null
+        in_all_scenarios: false
+        manual_acceptance_declared:
+          has_steps: false
+          has_outcomes: false
+        hud_entry: "index.html#yaml-scenario-panel；HudManager.syncYamlScenarioManualHints"
+        near_misses: []
+    notes: >
+      未检索到针对选区框、蓝图虚影、标记图标与存储区边界同屏分层的 Vitest 或带 manualAcceptance 的专用场景。
+
+summary:
+  headless_coverage: "UI-001 存在与子集对齐的无头证据；UI-002 有无头邻近场景但缺进度叠加断言，记 needs-manual-judgement；UI-003/UI-004 无合格 headless 绑定"
+  player_acceptance_coverage: "无任一条 oh-acceptance UI 场景与「显式 manualAcceptance + 与呈现/操作步骤一致」同时满足；UI-001 因步骤与层级菜单验收不对齐记 needs-manual-judgement，其余 missing"
+  last_audited_at: "2026-04-06"
+  auditor_notes: >
+    全局：scenarios/*.scenario.ts 中带显式非空 manualAcceptance.steps 与 manualAcceptance.outcomes 的文件包括
+    obstacle-avoidance-eat、build-wall-flow、pawn-sleeps-when-tired、pawn-eats-when-hungry、night-forces-sleep、
+    need-interrupt-during-work、multi-pawn-colony、build-bed-flow、bed-auto-assign；均已在 scenarios/index.ts
+    的 ALL_SCENARIOS 中，且 src/scenes/GameScene.ts 通过 listAvailableScenarios() 与 HudManager.setupYamlScenarioPanel
+    绑定，index.html 含 yaml-scenario-panel 等 DOM。另有多数场景（如 chop-tree-full-flow）无源码级 manualAcceptance，
+    玩家侧提示依赖 HudManager 默认映射时不计入 schema 之 exists。
+    组件与「玩家可渲染可操作验收」区分：tests/scene-hud-markup.test.ts、tests/component/* 可在无完整游戏循环下验证
+    DOM 结构或局部同步，不等同于玩家在真实渲染界面中按验收步骤完成操作。
