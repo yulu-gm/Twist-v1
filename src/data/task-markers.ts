@@ -17,6 +17,7 @@ export type TaskMarkerSelectionInput = Readonly<{
 /** 「待机」不视为下达可标记的任务；未知 id 同空。 */
 export function issuedTaskLabelForToolId(toolId: string): string | null {
   if (toolId === "idle") return null;
+  if (toolId === "zone_create") return null;
   const tool = VILLAGER_TOOLS.find((t) => t.id === toolId);
   if (!tool) return null;
   return tool.label;

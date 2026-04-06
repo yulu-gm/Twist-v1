@@ -24,7 +24,8 @@ function findObstacleCoveringCell(world: WorldCore, cellKey: string): string | u
   const k = coordKey(cell);
   for (const entity of world.entities.values()) {
     if (entity.kind !== "obstacle") continue;
-    if (entity.occupiedCells.some((occupantCell) => coordKey(occupantCell) === k)) {
+    const coveredCells = entity.occupiedCells.length > 0 ? entity.occupiedCells : [entity.cell];
+    if (coveredCells.some((occupantCell) => coordKey(occupantCell) === k)) {
       return entity.id;
     }
   }
@@ -35,7 +36,8 @@ function findUnmarkedTreeCoveringCell(world: WorldCore, cellKey: string): WorldE
   for (const entity of world.entities.values()) {
     if (entity.kind !== "tree") continue;
     if (entity.loggingMarked) continue;
-    if (entity.occupiedCells.some((c) => coordKey(c) === cellKey)) {
+    const coveredCells = entity.occupiedCells.length > 0 ? entity.occupiedCells : [entity.cell];
+    if (coveredCells.some((c) => coordKey(c) === cellKey)) {
       return entity;
     }
   }
@@ -46,7 +48,8 @@ function findGroundResourceCoveringCell(world: WorldCore, cellKey: string): Worl
   for (const entity of world.entities.values()) {
     if (entity.kind !== "resource") continue;
     if (entity.containerKind !== "ground") continue;
-    if (entity.occupiedCells.some((c) => coordKey(c) === cellKey)) {
+    const coveredCells = entity.occupiedCells.length > 0 ? entity.occupiedCells : [entity.cell];
+    if (coveredCells.some((c) => coordKey(c) === cellKey)) {
       return entity;
     }
   }

@@ -126,6 +126,13 @@ export function getWorldSnapshot(world: WorldCore): WorldSnapshot {
     coveredCells: entity.coveredCells?.map((cell) => ({ ...cell })),
     acceptedMaterialKinds: entity.acceptedMaterialKinds
       ? [...entity.acceptedMaterialKinds]
+      : undefined,
+    stackCount: entity.stackCount,
+    stackable: entity.stackable,
+    storageFilterMode: entity.storageFilterMode,
+    storageGroupDisplayName: entity.storageGroupDisplayName,
+    allowedMaterialKinds: entity.allowedMaterialKinds
+      ? [...entity.allowedMaterialKinds]
       : undefined
   }));
   const markers = [...world.markers.values()].map((marker) => ({

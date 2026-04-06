@@ -70,4 +70,9 @@ export type EntityDraft = Readonly<{
   coveredCells?: readonly GridCoord[];
   acceptedMaterialKinds?: readonly ResourceMaterialKind[];
   carriedByPawnId?: string;
+  stackCount?: number;
+  stackable?: boolean;
+  storageFilterMode?: "allow-all" | "allow-list";
+  storageGroupDisplayName?: string;
+  allowedMaterialKinds?: readonly ResourceMaterialKind[];
 }>;

@@ -9,7 +9,7 @@ import {
   createFloorSelectionState,
   updateFloorSelection
 } from "../../src/game/interaction/floor-selection";
-import { coordKey } from "../../src/game/map";
+import { coordKey, listStorageGroupLabels } from "../../src/game/map";
 import { createHeadlessSim } from "../../src/headless";
 import { hydrateScenario } from "../../src/headless/scenario-runner";
 import type { DomainCommand } from "../../src/player/s0-contract";
@@ -67,8 +67,14 @@ describe("MAP-002 legal zone selection", () => {
 
     const zone = zones[0]!;
     expect(zone.zoneKind).toBe("storage");
-    expect(sortedKeys(zone.coveredCells.map((cell) => coordKey(cell)))).toEqual(expectedSelection);
+    expect(sortedKeys((zone.coveredCells ?? []).map((cell) => coordKey(cell)))).toEqual(expectedSelection);
     expect(zone.occupiedCells).toHaveLength(0);
+    expect(listStorageGroupLabels(world)).toMatchObject([
+      {
+        text: "存储区",
+        anchorCell: { col: 7, row: 5 }
+      }
+    ]);
 
     for (const key of expectedSelection) {
       expect(world.occupancy.get(key)).toBeUndefined();

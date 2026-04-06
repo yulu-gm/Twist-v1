@@ -89,7 +89,14 @@ export function createEntity(world: WorldCore, draft: EntityDraft): WorldEntityS
     acceptedMaterialKinds: draft.acceptedMaterialKinds
       ? [...draft.acceptedMaterialKinds]
       : undefined,
-    carriedByPawnId: draft.carriedByPawnId
+    carriedByPawnId: draft.carriedByPawnId,
+    stackCount: draft.stackCount,
+    stackable: draft.stackable,
+    storageFilterMode: draft.storageFilterMode,
+    storageGroupDisplayName: draft.storageGroupDisplayName,
+    allowedMaterialKinds: draft.allowedMaterialKinds
+      ? [...draft.allowedMaterialKinds]
+      : undefined
   };
   world.nextEntityId += 1;
   return entity;

@@ -100,6 +100,8 @@ export class GameScene extends Phaser.Scene {
   private groundResourceGraphics!: Phaser.GameObjects.Graphics;
   private zoneOverlayGraphics!: Phaser.GameObjects.Graphics;
   private groundResourceLabels = new Map<string, Phaser.GameObjects.Text>();
+  private groundResourceCountLabels = new Map<string, Phaser.GameObjects.Text>();
+  private storageZoneLabels = new Map<string, Phaser.GameObjects.Text>();
 
   private variant: GameSceneVariant = "default";
   private selectedToolIndex = 0;
@@ -178,7 +180,7 @@ export class GameScene extends Phaser.Scene {
     this.buildingGraphics = this.add.graphics();
     this.buildingGraphics.setDepth(14);
     this.groundResourceGraphics = this.add.graphics();
-    this.groundResourceGraphics.setDepth(25);
+    this.groundResourceGraphics.setDepth(31);
     this.zoneOverlayGraphics = this.add.graphics();
     this.zoneOverlayGraphics.setDepth(30);
 
@@ -410,6 +412,7 @@ export class GameScene extends Phaser.Scene {
       this,
       this.groundResourceGraphics,
       this.groundResourceLabels,
+      this.groundResourceCountLabels,
       this.worldGrid,
       this.gridOriginX,
       this.gridOriginY,
@@ -417,6 +420,7 @@ export class GameScene extends Phaser.Scene {
     );
     drawZoneOverlaysToGraphics(
       this.zoneOverlayGraphics,
+      this.storageZoneLabels,
       this.worldGrid,
       this.gridOriginX,
       this.gridOriginY,
@@ -787,7 +791,15 @@ export class GameScene extends Phaser.Scene {
     for (const t of this.groundResourceLabels.values()) {
       t.destroy();
     }
+    for (const t of this.groundResourceCountLabels.values()) {
+      t.destroy();
+    }
+    for (const t of this.storageZoneLabels.values()) {
+      t.destroy();
+    }
     this.groundResourceLabels.clear();
+    this.groundResourceCountLabels.clear();
+    this.storageZoneLabels.clear();
     this.interactionLabels.clear();
     this.taskMarkerTexts.clear();
     this.views.clear();

@@ -113,4 +113,69 @@ describe("completePickUpWork（WorldCore 直接工单完成）", () => {
     expect(resource?.containerKind).toBe("pawn");
     expect(resource?.carriedByPawnId).toBe(pawnId);
   });
+
+  it("有 storage 区时：会跳过已锁定其他类型的首格，选择另一个可用格生成 haul-to-zone", () => {
+    let world = createWorldCore({ grid: DEFAULT_WORLD_GRID });
+    const resourceCell = { col: 2, row: 2 };
+
+    const resourceSpawn = spawnWorldEntity(world, {
+      kind: "resource",
+      cell: resourceCell,
+      materialKind: "wood",
+      containerKind: "ground",
+      pickupAllowed: true
+    });
+    expect(resourceSpawn.outcome.kind).toBe("created");
+    world = resourceSpawn.world;
+    const resourceId = resourceSpawn.entityId;
+
+    const zoneSpawn = spawnWorldEntity(world, {
+      kind: "zone",
+      cell: { col: 10, row: 5 },
+      occupiedCells: [],
+      coveredCells: [
+        { col: 10, row: 5 },
+        { col: 11, row: 5 }
+      ],
+      zoneKind: "storage",
+      acceptedMaterialKinds: []
+    });
+    expect(zoneSpawn.outcome.kind).toBe("created");
+    world = zoneSpawn.world;
+
+    const blocker = spawnWorldEntity(world, {
+      kind: "resource",
+      cell: { col: 10, row: 5 },
+      materialKind: "food",
+      containerKind: "zone",
+      containerEntityId: zoneSpawn.entityId,
+      stackCount: 4,
+      pickupAllowed: true
+    });
+    expect(blocker.outcome.kind).toBe("created");
+    world = blocker.world;
+
+    const pickId = "work-pick-reroute";
+    world.workItems.set(pickId, {
+      id: pickId,
+      kind: "pick-up-resource",
+      anchorCell: { ...resourceCell },
+      targetEntityId: resourceId,
+      status: "open",
+      failureCount: 0
+    });
+
+    const pawnId = "pawn-carrier";
+    const claimed = claimWorkItem(world, pickId, pawnId);
+    expect(claimed.outcome.kind).toBe("claimed");
+
+    const completed = completeWorkItem(claimed.world, pickId, pawnId);
+    expect(completed?.outcome.kind).toBe("completed");
+
+    const finalWorld = completed!.world;
+    const hauls = [...finalWorld.workItems.values()].filter((w) => w.kind === "haul-to-zone");
+    const derived = hauls.find((w) => w.status === "open" && w.derivedFromWorkId === pickId);
+    expect(derived).toBeDefined();
+    expect(derived!.haulDropCell).toEqual({ col: 11, row: 5 });
+  });
 });

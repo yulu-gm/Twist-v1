@@ -112,7 +112,14 @@ export class GameOrchestrator {
   }
 
   public commitPlayerSelection(input: PlayerSelectionCommitInput): PlayerSelectionCommitOutcome {
-    return commitPlayerSelectionToWorld(this.options.worldPort, input);
+    const outcome = commitPlayerSelectionToWorld(this.options.worldPort, input);
+    if (outcome.didSubmitToWorld) {
+      this.options.hooks.syncTreesAndGroundItems();
+      this.options.hooks.syncMarkerOverlay();
+      this.options.hooks.syncHoverFromPointer();
+      this.options.hooks.syncPawnDetailPanel();
+    }
+    return outcome;
   }
 
   public mergeTaskMarkerOverlayWithWorld(overlay: ReadonlyMap<string, string>): Map<string, string> {

@@ -34,6 +34,12 @@ export function presentationForVillagerTool(
       usesBrushStroke: false
     };
   }
+  if (tool.id === "zone_create") {
+    return {
+      modeLine: `${tool.label}·储存区：拖拽框选区域；Shift 并集 / Ctrl 切换；Esc 取消`,
+      usesBrushStroke: false
+    };
+  }
   const usesBrushStroke = interactionInputShapeForToolId(tool.id) === "brush-stroke";
   const modeLine = usesBrushStroke
     ? `${tool.label}：拖拽绘制路径（笔刷），Esc 取消当前手势`

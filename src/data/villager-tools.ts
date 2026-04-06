@@ -10,7 +10,7 @@ export type VillagerToolBuildSubItem = Readonly<{
 
 export type VillagerTool = Readonly<{
   id: string;
-  hotkey: "Q" | "W" | "E" | "R" | "T" | "Y" | "U" | "I" | "O";
+  hotkey: "Q" | "W" | "E" | "R" | "T" | "Y" | "U" | "I" | "O" | "P";
   label: string;
   hint: string;
   /** 有此项时，主槽点击后展开子菜单，需再选子项才进入具体建造模式。 */
@@ -35,19 +35,20 @@ export const VILLAGER_TOOLS: readonly VillagerTool[] = [
   { id: "farm", hotkey: "Y", label: "耕种", hint: "翻土与播种" },
   { id: "haul", hotkey: "U", label: "搬运", hint: "运输物资" },
   { id: "patrol", hotkey: "I", label: "巡逻", hint: "沿路线警戒" },
-  { id: "idle", hotkey: "O", label: "待机", hint: "停止主动指令" }
+  { id: "idle", hotkey: "O", label: "待机", hint: "停止主动指令" },
+  { id: "zone_create", hotkey: "P", label: "区域", hint: "划定储存区" }
 ] as const;
 
 /**
- * 与 `Phaser.Input.Keyboard.KeyCodes` 中 Q W E R T Y U I O 的数值一致，供 `addKey` 使用。
+ * 与 `Phaser.Input.Keyboard.KeyCodes` 中 Q W E R T Y U I O P 的数值一致，供 `addKey` 使用。
  * 见 https://github.com/phaserjs/phaser/blob/master/src/input/keyboard/keys/KeyCodes.js
  */
 export const VILLAGER_TOOL_KEY_CODES = [
-  81, 87, 69, 82, 84, 89, 85, 73, 79
+  81, 87, 69, 82, 84, 89, 85, 73, 79, 80
 ] as const;
 
 const EXPECTED_HOTKEYS: readonly VillagerTool["hotkey"][] = [
-  "Q", "W", "E", "R", "T", "Y", "U", "I", "O"
+  "Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"
 ];
 
 /** 校验工具栏配置：槽位数、热键顺序、id 唯一性。供 component 测试与人工排查。 */

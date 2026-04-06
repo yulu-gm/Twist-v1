@@ -8,6 +8,7 @@ import {
   removeEntityMutable,
   upsertEntityMutable
 } from "../world-internal";
+import { findAvailableStorageCell } from "../map/storage-zones";
 import { coordKey, type GridCoord } from "../map/world-grid";
 import type { WorldEntitySnapshot } from "../entity/entity-types";
 import type { WorldCore } from "../world-core-types";
@@ -354,24 +355,6 @@ export function completeMineStoneWork(
     outcome: { kind: "completed", createdEntityId: stoneResource.id }
   };
 }
-
-function findFirstStorageZone(world: WorldCore): WorldEntitySnapshot | undefined {
-  for (const entity of world.entities.values()) {
-    if (entity.kind === "zone" && entity.zoneKind === "storage") {
-      return entity;
-    }
-  }
-  return undefined;
-}
-
-function zoneFirstDropCell(zone: WorldEntitySnapshot): GridCoord {
-  const first = zone.coveredCells?.[0];
-  if (first) {
-    return { col: first.col, row: first.row };
-  }
-  return { col: zone.cell.col, row: zone.cell.row };
-}
-
 export function completePickUpWork(
   world: WorldCore,
   workItem: WorkItemSnapshot
@@ -411,20 +394,19 @@ export function completePickUpWork(
     reservedByPawnId: undefined
   });
 
-  const storageZone = findFirstStorageZone(nextWorld);
-  if (storageZone) {
-    const dropCell = zoneFirstDropCell(storageZone);
+  const availableCell = findAvailableStorageCell(nextWorld, resource.id);
+  if (availableCell) {
     const haulWorkId = makeWorkItemId(nextWorld);
     nextWorld.nextWorkItemId += 1;
     nextWorld.workItems.set(haulWorkId, {
       id: haulWorkId,
       kind: "haul-to-zone",
-      anchorCell: { col: dropCell.col, row: dropCell.row },
+      anchorCell: { col: availableCell.cell.col, row: availableCell.cell.row },
       targetEntityId: resource.id,
       status: "open",
       failureCount: 0,
-      haulTargetZoneId: storageZone.id,
-      haulDropCell: { col: dropCell.col, row: dropCell.row },
+      haulTargetZoneId: availableCell.zoneId,
+      haulDropCell: { col: availableCell.cell.col, row: availableCell.cell.row },
       derivedFromWorkId: workItem.id
     });
     attachWorkItemToEntityMutable(nextWorld, resource.id, haulWorkId);
@@ -440,6 +422,128 @@ export function completePickUpWork(
     world: nextWorld,
     outcome: { kind: "completed" }
   };
+}
+
+function stackCountOf(resource: WorldEntitySnapshot): number {
+  return Math.max(1, resource.stackCount ?? 1);
+}
+
+function isStackable(resource: WorldEntitySnapshot): boolean {
+  return resource.stackable ?? true;
+}
+
+function zoneCoversCell(zone: WorldEntitySnapshot, cell: GridCoord): boolean {
+  return (zone.coveredCells ?? []).some((coveredCell) => coordKey(coveredCell) === coordKey(cell));
+}
+
+function zoneAllowsResource(zone: WorldEntitySnapshot, resource: WorldEntitySnapshot): boolean {
+  const filterMode = zone.storageFilterMode ?? "allow-all";
+  const allowedKinds = zone.allowedMaterialKinds ?? zone.acceptedMaterialKinds ?? [];
+  if (filterMode === "allow-all") {
+    return true;
+  }
+  return allowedKinds.includes(resource.materialKind ?? "generic");
+}
+
+function zoneResourcesAtCell(world: WorldCore, cell: GridCoord, excludeEntityId?: string): WorldEntitySnapshot[] {
+  const key = coordKey(cell);
+  return [...world.entities.values()]
+    .filter((entity) => {
+      if (entity.id === excludeEntityId) return false;
+      if (entity.kind !== "resource") return false;
+      if (entity.containerKind !== "zone") return false;
+      return coordKey(entity.cell) === key;
+    })
+    .sort((left, right) => left.id.localeCompare(right.id));
+}
+
+type PlannedHaulSlotState =
+  | Readonly<{ kind: "empty" }>
+  | Readonly<{ kind: "stack"; stackTarget: WorldEntitySnapshot }>
+  | Readonly<{ kind: "blocked" }>;
+
+function getPlannedHaulSlotState(
+  world: WorldCore,
+  resource: WorldEntitySnapshot,
+  zoneId: string,
+  dropCell: GridCoord
+): PlannedHaulSlotState {
+  const zoneResources = zoneResourcesAtCell(world, dropCell, resource.id);
+  if (zoneResources.length === 0) {
+    return { kind: "empty" };
+  }
+
+  const [stackTarget] = zoneResources;
+  if (!stackTarget) {
+    return { kind: "empty" };
+  }
+
+  const incompatibleSibling = zoneResources.some(
+    (entity) =>
+      entity.containerEntityId !== zoneId ||
+      entity.materialKind !== resource.materialKind ||
+      !isStackable(entity)
+  );
+  if (incompatibleSibling) {
+    return { kind: "blocked" };
+  }
+
+  return {
+    kind: "stack",
+    stackTarget
+  };
+}
+
+function reopenHaulWorkAtDropCell(
+  nextWorld: WorldCore,
+  workItem: WorkItemSnapshot,
+  prior: WorldEntitySnapshot,
+  dropCell: GridCoord
+): Readonly<{ world: WorldCore; outcome: CompleteOutcome }> {
+  const blocking = findBlockingOccupant(nextWorld.occupancy, [dropCell], prior.id);
+  const occupiedCells = blocking ? [] : [{ col: dropCell.col, row: dropCell.row }];
+
+  upsertEntityMutable(nextWorld, {
+    ...prior,
+    cell: { col: dropCell.col, row: dropCell.row },
+    occupiedCells,
+    containerKind: "ground",
+    containerEntityId: undefined,
+    carriedByPawnId: undefined,
+    reservedByPawnId: undefined
+  });
+
+  nextWorld.workItems.set(workItem.id, {
+    ...workItem,
+    status: "open",
+    claimedBy: undefined,
+    failureCount: workItem.failureCount + 1
+  });
+
+  return {
+    world: nextWorld,
+    outcome: { kind: "completed" }
+  };
+}
+
+function reopenHaulWork(
+  nextWorld: WorldCore,
+  workItem: WorkItemSnapshot,
+  prior: WorldEntitySnapshot
+): Readonly<{ world: WorldCore; outcome: CompleteOutcome }> {
+  const claimedBy = workItem.claimedBy;
+  const claimedPawn = claimedBy ? nextWorld.entities.get(claimedBy) : undefined;
+  const claimantIsCarrying =
+    prior.containerKind === "pawn" &&
+    prior.carriedByPawnId === claimedBy &&
+    prior.containerEntityId === claimedBy;
+
+  const dropCell =
+    claimantIsCarrying && claimedPawn?.kind === "pawn"
+      ? { col: claimedPawn.cell.col, row: claimedPawn.cell.row }
+      : { col: prior.cell.col, row: prior.cell.row };
+
+  return reopenHaulWorkAtDropCell(nextWorld, workItem, prior, dropCell);
 }
 
 export function completeHaulWork(
@@ -476,15 +580,45 @@ export function completeHaulWork(
   const prior = nextWorld.entities.get(resource.id)!;
   deleteEntityOccupancy(nextWorld.occupancy, prior.id, prior.occupiedCells);
 
-  upsertEntityMutable(nextWorld, {
-    ...prior,
-    cell: { col: haulDropCell.col, row: haulDropCell.row },
-    occupiedCells: [],
-    containerKind: "zone",
-    containerEntityId: haulZoneId,
-    carriedByPawnId: undefined,
-    reservedByPawnId: undefined
-  });
+  const claimantIsCarrying =
+    prior.containerKind === "pawn" &&
+    prior.carriedByPawnId === workItem.claimedBy &&
+    prior.containerEntityId === workItem.claimedBy;
+  if (!claimantIsCarrying) {
+    return reopenHaulWork(nextWorld, workItem, prior);
+  }
+
+  if (!zoneCoversCell(zone, haulDropCell) || !zoneAllowsResource(zone, prior)) {
+    return reopenHaulWork(nextWorld, workItem, prior);
+  }
+
+  const plannedSlotState = getPlannedHaulSlotState(nextWorld, prior, haulZoneId, haulDropCell);
+  if (plannedSlotState.kind === "blocked") {
+    return reopenHaulWork(nextWorld, workItem, prior);
+  }
+
+  if (
+    plannedSlotState.kind === "stack" &&
+    plannedSlotState.stackTarget.materialKind === prior.materialKind &&
+    isStackable(plannedSlotState.stackTarget) &&
+    isStackable(prior)
+  ) {
+    nextWorld.entities.set(plannedSlotState.stackTarget.id, {
+      ...plannedSlotState.stackTarget,
+      stackCount: stackCountOf(plannedSlotState.stackTarget) + stackCountOf(prior)
+    });
+    nextWorld.entities.delete(prior.id);
+  } else {
+    upsertEntityMutable(nextWorld, {
+      ...prior,
+      cell: { col: haulDropCell.col, row: haulDropCell.row },
+      occupiedCells: [],
+      containerKind: "zone",
+      containerEntityId: haulZoneId,
+      carriedByPawnId: undefined,
+      reservedByPawnId: undefined
+    });
+  }
 
   nextWorld.workItems.set(workItem.id, {
     ...workItem,

@@ -62,6 +62,22 @@ export function buildDomainCommand(input: BuildCommandInput): DomainCommand | nu
     };
   }
 
+  if (toolId === "zone_create") {
+    if (cellKeys.size === 0) return null;
+    return {
+      commandId: nextCommandId(),
+      verb: "zone_create",
+      targetCellKeys: [...cellKeys],
+      targetEntityIds: [],
+      sourceMode: {
+        source: { kind: "toolbar", toolId },
+        selectionModifier,
+        inputShape
+      },
+      issuedAtMs: nowMs
+    };
+  }
+
   const label = issuedTaskLabelForToolId(toolId);
   if (label === null || cellKeys.size === 0) return null;
 
@@ -85,6 +101,7 @@ export function buildDomainCommand(input: BuildCommandInput): DomainCommand | nu
  */
 export function toolbarToolIdForDomainCommand(cmd: DomainCommand): string {
   if (cmd.verb === "clear_task_markers") return "idle";
+  if (cmd.verb === "zone_create") return "zone_create";
   if (cmd.verb.startsWith("assign_tool_task:")) {
     return cmd.verb.slice("assign_tool_task:".length);
   }

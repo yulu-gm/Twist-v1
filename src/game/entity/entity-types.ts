@@ -54,6 +54,11 @@ export type WorldEntitySnapshot = Readonly<{
   coveredCells?: readonly GridCoord[];
   acceptedMaterialKinds?: readonly ResourceMaterialKind[];
   carriedByPawnId?: string;
+  stackCount?: number;
+  stackable?: boolean;
+  storageFilterMode?: "allow-all" | "allow-list";
+  storageGroupDisplayName?: string;
+  allowedMaterialKinds?: readonly ResourceMaterialKind[];
 }>;
 
 export type RestSpotSnapshot = Readonly<{
@@ -111,6 +116,10 @@ export type ResourceEntity = Readonly<{
   pickupAllowed: boolean;
   /** 当前占用/预占该资源的小人实体标识。 */
   reservedByPawnId?: EntityId;
+  /** 当前堆叠数量；未显式设置时视为 1。 */
+  stackCount?: number;
+  /** 是否允许和同类型物品堆叠到同格。 */
+  stackable?: boolean;
 }>;
 
 export type TreeEntity = Readonly<{
@@ -152,6 +161,9 @@ export type ZoneEntity = Readonly<{
   name: string;
   /** 可接受的物资类型；空数组表示由上层规则解释（例如不做限制或拒绝所有）。 */
   acceptedMaterialKinds: readonly ResourceMaterialKind[];
+  storageFilterMode?: "allow-all" | "allow-list";
+  storageGroupDisplayName?: string;
+  allowedMaterialKinds?: readonly ResourceMaterialKind[];
 }>;
 
 export type GameEntity =

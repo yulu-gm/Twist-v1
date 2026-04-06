@@ -74,3 +74,18 @@ export {
   removeZone,
   validateZoneCells
 } from "./zone-manager";
+
+export type {
+  AvailableStorageCell,
+  StorageFilterMode,
+  StorageGroupLabel,
+  StorageGroupSnapshot
+} from "./storage-zones";
+
+export {
+  findAvailableStorageCell,
+  listStorageGroupLabels,
+  listStorageGroups,
+  resolveStorageGroupAtCell,
+  storageCellLockedMaterial
+} from "./storage-zones";
