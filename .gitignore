@@ -29,3 +29,4 @@ coverage/
 
 # Agent 运行时日志
 .agent/runtime/
+.claude/settings.local.json
