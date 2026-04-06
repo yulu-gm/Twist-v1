@@ -22,7 +22,7 @@ import {
 } from "../player/brush-stroke";
 import type { GameOrchestrator } from "../game/game-orchestrator";
 import type { HudManager } from "../ui/hud-manager";
-import { drawSelectionOverlay, redrawFloorSelection } from "./renderers/selection-renderer";
+import { redrawBrushStrokeDraft, redrawFloorSelection } from "./renderers/selection-renderer";
 import { redrawTaskMarkers, type TaskMarkerViewDeps } from "./game-scene-presentation";
 
 export type GameSceneFloorInteractionHost = Readonly<{
@@ -80,25 +80,39 @@ export class GameSceneFloorInteraction {
   public redrawFloorSelectionAndBrush(): void {
     const grid = this.host.getWorldGrid();
     const { ox, oy } = this.host.getGridOrigin();
+    const orchestrator = this.host.getOrchestrator();
+    const port = orchestrator.getPlayerWorldPort();
+    const toolId = this.selectedVillagerToolId();
+
+    let draftEligible: ReadonlySet<string> | null = null;
+    const draft = this.floorSelectionState.draft;
+    if (draft && toolId !== "idle") {
+      const shape = draft.cellKeys.size === 1 ? ("single-cell" as const) : ("rect-selection" as const);
+      draftEligible = port.filterTaskMarkerTargetCells(toolId, shape, draft.cellKeys);
+    }
+
     redrawFloorSelection(
       this.host.getFloorSelectionGraphics(),
       this.host.getFloorDraftGraphics(),
       this.floorSelectionState,
       grid,
       ox,
-      oy
+      oy,
+      { draftEligibleCellKeys: draftEligible }
     );
     if (this.brushState.active) {
-      drawSelectionOverlay(
+      const brushEligible = port.filterTaskMarkerTargetCells(
+        "build",
+        "brush-stroke",
+        this.brushState.accumulatedKeys
+      );
+      redrawBrushStrokeDraft(
         this.host.getFloorDraftGraphics(),
         this.brushState.accumulatedKeys,
         grid,
         ox,
         oy,
-        0xf4a261,
-        0.24,
-        0xffd6a8,
-        0.92
+        brushEligible
       );
     }
   }

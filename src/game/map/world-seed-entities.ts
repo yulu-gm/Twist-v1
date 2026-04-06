@@ -10,6 +10,7 @@ import {
   type GridRand,
   type WorldGridConfig
 } from "./world-grid";
+import { createGameplayTreeDraft } from "../entity/gameplay-tree-spawn";
 import { spawnWorldEntity, type WorldCore } from "../world-core";
 
 function collectFreeCells(grid: WorldGridConfig, excludeSpawn: ReadonlySet<string>): GridCoord[] {
@@ -38,7 +39,7 @@ function shuffleInPlace<T>(items: T[], rng: GridRand): void {
 
 /**
  * 在已通过障碍播种的世界上追加树木与食物资源。
- * - 树木：8–12 棵，`occupiedCells` 为空，不写入占格；`loggingMarked: false`。
+ * - 树木：8–12 棵，经 {@link createGameplayTreeDraft} 与场景/领域一致。
  * - 资源：3–5 个，`materialKind: food`，`containerKind: ground`，`pickupAllowed: false`。
  * 候选格为可行走、非默认出生点；`rng` 建议为 {@link createSeededRng} 以满足同种子可复现。
  */
@@ -62,12 +63,7 @@ export function seedInitialTreesAndResources(
 
   let w = world;
   for (const cell of treeCells) {
-    const spawned = spawnWorldEntity(w, {
-      kind: "tree",
-      cell,
-      occupiedCells: [],
-      loggingMarked: false
-    });
+    const spawned = spawnWorldEntity(w, createGameplayTreeDraft(cell));
     if (spawned.outcome.kind === "created") {
       w = spawned.world;
     }

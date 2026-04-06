@@ -5,9 +5,11 @@
 
 import { applyTaskMarkersForSelection } from "../data/task-markers";
 import type { SelectionModifier } from "../game/interaction/floor-selection";
+import type { OrchestratorWorldBridge } from "../game/orchestrator-world-bridge";
 import { buildDomainCommand, toolbarToolIdForDomainCommand } from "./build-domain-command";
 import type { PlayerWorldPort } from "./world-port-types";
 import type { DomainCommand, MockWorldSubmitResult } from "./s0-contract";
+import { filterCellKeysForToolbarTaskMarkers } from "./task-marker-target-cells";
 
 export type PlayerSelectionCommitInput = Readonly<{
   toolId: string;
@@ -77,6 +79,12 @@ export function commitPlayerSelectionToWorld(
     };
   }
 
+  const bridge = port as Partial<OrchestratorWorldBridge>;
+  const markerCellKeys =
+    typeof bridge.getWorld === "function"
+      ? filterCellKeysForToolbarTaskMarkers(bridge.getWorld(), toolId, inputShape, cellKeys)
+      : port.filterTaskMarkerTargetCells(toolId, inputShape, cellKeys);
+
   const submitResult = port.submit(cmd, nowMs);
   if (!submitResult.accepted) {
     return {
@@ -91,7 +99,7 @@ export function commitPlayerSelectionToWorld(
   const layered = applyTaskMarkersForSelection(frozenMarkers, {
     toolId,
     modifier: selectionModifier,
-    cellKeys
+    cellKeys: markerCellKeys
   });
   const nextMarkers = port.mergeTaskMarkerOverlayWithWorld(layered);
 

@@ -97,6 +97,14 @@ export class MockWorldPort implements PlayerWorldPort {
     return new Map(overlay);
   }
 
+  public filterTaskMarkerTargetCells(
+    _toolId: string,
+    _inputShape: "rect-selection" | "brush-stroke" | "single-cell",
+    cellKeys: ReadonlySet<string>
+  ): ReadonlySet<string> {
+    return new Set(cellKeys);
+  }
+
   /** 将历史命令按顺序再次提交（用于回放验收）。 */
   public replayAll(nowMsStart: number): readonly MockWorldSubmitResult[] {
     const previous = [...this.log];

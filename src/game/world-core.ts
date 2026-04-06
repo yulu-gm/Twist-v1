@@ -215,6 +215,26 @@ export function removeWorldEntity(
 }
 
 /**
+ * 摘掉占住任意指定格的实体（含多格建筑整块移除）。供场景热载入等：在写入树人前保证目标 footprint 为空。
+ */
+export function removeWorldEntitiesOccupyingCells(
+  world: WorldCore,
+  cells: readonly GridCoord[]
+): WorldCore {
+  const ids = new Set<string>();
+  for (const c of cells) {
+    const id = world.occupancy.get(coordKey(c));
+    if (id) ids.add(id);
+  }
+  let w = world;
+  for (const id of ids) {
+    const { world: next } = removeWorldEntity(w, id);
+    w = next;
+  }
+  return w;
+}
+
+/**
  * 按格键清除玩家任务标记：移除对应 {@link MarkerSnapshot}，并对仅被这些标记引用的未领取工单做清理。
  */
 export function clearTaskMarkersAtCells(

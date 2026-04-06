@@ -21,6 +21,7 @@ export type {
   ZoneEntity,
   ZoneKind
 } from "./entity-types";
+export { createGameplayTreeDraft } from "./gameplay-tree-spawn";
 export { toReadonlySnapshot } from "./entity-projection";
 export { createEntityRegistry, EntityRegistry, type GameEntityDraft } from "./entity-registry";
 export {

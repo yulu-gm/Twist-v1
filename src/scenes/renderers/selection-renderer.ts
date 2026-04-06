@@ -11,13 +11,19 @@ import {
 } from "../../game/map/world-grid";
 import type { FloorSelectionState } from "../../game/interaction/floor-selection";
 
+export type FloorSelectionRedrawOptions = Readonly<{
+  /** 当前拖动的矩形范围内「会成为任务目标」的格（与领域过滤一致）；不传则不画预览环。 */
+  draftEligibleCellKeys?: ReadonlySet<string> | null;
+}>;
+
 export function redrawFloorSelection(
   selectionGraphics: Phaser.GameObjects.Graphics,
   draftGraphics: Phaser.GameObjects.Graphics,
   state: FloorSelectionState,
   grid: WorldGridConfig,
   ox: number,
-  oy: number
+  oy: number,
+  options: FloorSelectionRedrawOptions = {}
 ): void {
   selectionGraphics.clear();
   draftGraphics.clear();
@@ -37,13 +43,86 @@ export function redrawFloorSelection(
   const draft = state.draft;
   if (!draft) return;
 
-  if (draft.modifier === "toggle") {
-    drawSelectionOverlay(draftGraphics, draft.addedCellKeys, grid, ox, oy, 0x88c0a8, 0.34, 0xd8f3dc, 0.95);
-    drawSelectionOverlay(draftGraphics, draft.removedCellKeys, grid, ox, oy, 0xc1666b, 0.34, 0xffd6d9, 0.95);
-    return;
-  }
+  drawSelectionBoundsWireframe(draftGraphics, draft.cellKeys, grid, ox, oy, 0xf4e3b2, 0.95, 2);
 
-  drawSelectionOverlay(draftGraphics, draft.cellKeys, grid, ox, oy, 0xd2b96c, 0.2, 0xf4e3b2, 0.95);
+  const elig = options.draftEligibleCellKeys;
+  if (elig && elig.size > 0) {
+    drawDraftTargetHighlights(draftGraphics, elig, grid, ox, oy, 0xd4a84b, 0.88);
+  }
+}
+
+/** 拖动选区外轮廓（矩形包络），不逐格填充。 */
+export function drawSelectionBoundsWireframe(
+  graphics: Phaser.GameObjects.Graphics,
+  cellKeys: ReadonlySet<string>,
+  grid: WorldGridConfig,
+  ox: number,
+  oy: number,
+  strokeColor: number,
+  strokeAlpha: number,
+  lineWidth = 2
+): void {
+  if (cellKeys.size === 0) return;
+
+  let minC = Infinity;
+  let maxC = -Infinity;
+  let minR = Infinity;
+  let maxR = -Infinity;
+  for (const key of cellKeys) {
+    const c = parseGridCoordKey(key);
+    if (!c) continue;
+    minC = Math.min(minC, c.col);
+    maxC = Math.max(maxC, c.col);
+    minR = Math.min(minR, c.row);
+    maxR = Math.max(maxR, c.row);
+  }
+  if (minC === Infinity) return;
+
+  const cs = grid.cellSizePx;
+  const x = ox + minC * cs;
+  const y = oy + minR * cs;
+  const w = (maxC - minC + 1) * cs;
+  const h = (maxR - minR + 1) * cs;
+  graphics.lineStyle(lineWidth, strokeColor, strokeAlpha);
+  graphics.strokeRect(x + 1, y + 1, w - 2, h - 2);
+}
+
+/** 拖动中对「有效目标格」的预览环（与正式任务标记视觉接近）。 */
+export function drawDraftTargetHighlights(
+  graphics: Phaser.GameObjects.Graphics,
+  cellKeys: ReadonlySet<string>,
+  grid: WorldGridConfig,
+  ox: number,
+  oy: number,
+  strokeColor: number,
+  strokeAlpha: number
+): void {
+  if (cellKeys.size === 0) return;
+  const cs = grid.cellSizePx;
+  const radius = cs * 0.25;
+  graphics.lineStyle(2, strokeColor, strokeAlpha);
+  for (const key of cellKeys) {
+    const coord = parseGridCoordKey(key);
+    if (!coord) continue;
+    const cx = ox + coord.col * cs + cs / 2;
+    const cy = oy + coord.row * cs + cs / 2;
+    graphics.strokeCircle(cx, cy, radius);
+  }
+}
+
+/** 笔刷路径的包络框 + 有效目标高亮（与框选草稿一致）。 */
+export function redrawBrushStrokeDraft(
+  draftGraphics: Phaser.GameObjects.Graphics,
+  accumulatedKeys: ReadonlySet<string>,
+  grid: WorldGridConfig,
+  ox: number,
+  oy: number,
+  eligibleCellKeys: ReadonlySet<string> | null | undefined
+): void {
+  drawSelectionBoundsWireframe(draftGraphics, accumulatedKeys, grid, ox, oy, 0xf4a261, 0.92, 2);
+  if (eligibleCellKeys && eligibleCellKeys.size > 0) {
+    drawDraftTargetHighlights(draftGraphics, eligibleCellKeys, grid, ox, oy, 0xd4a84b, 0.88);
+  }
 }
 
 export function drawSelectionOverlay(

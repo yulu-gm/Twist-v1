@@ -7,6 +7,7 @@ import {
 import { applyDomainCommandToWorldCore } from "./apply-domain-command";
 import type { DomainCommand, MockLineAPort, MockWorldSubmitResult } from "./s0-contract";
 import type { MockWorldPortConfig, PlayerWorldPort } from "./world-port-types";
+import { filterCellKeysForToolbarTaskMarkers } from "./task-marker-target-cells";
 import type { OrchestratorWorldBridge } from "../game/orchestrator-world-bridge";
 
 const DEFAULT_CONFIG: MockWorldPortConfig = {
@@ -78,6 +79,14 @@ export class WorldCoreWorldPort implements PlayerWorldPort, OrchestratorWorldBri
 
   public mergeTaskMarkerOverlayWithWorld(overlay: ReadonlyMap<string, string>): Map<string, string> {
     return mergeTaskMarkerOverlayWithWorldSnapshot(overlay, getWorldSnapshot(this.world));
+  }
+
+  public filterTaskMarkerTargetCells(
+    toolId: string,
+    inputShape: "rect-selection" | "brush-stroke" | "single-cell",
+    cellKeys: ReadonlySet<string>
+  ): ReadonlySet<string> {
+    return filterCellKeysForToolbarTaskMarkers(this.world, toolId, inputShape, cellKeys);
   }
 
   public submit(raw: DomainCommand, nowMs: number): MockWorldSubmitResult {

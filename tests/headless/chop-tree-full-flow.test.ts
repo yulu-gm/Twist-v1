@@ -21,7 +21,11 @@ describe("ENTITY-001 chop-tree-full-flow", () => {
     expect(completed.length).toBeGreaterThan(0);
 
     const entities = [...sim.getWorldPort().getWorld().entities.values()];
-    expect(entities.some((e) => e.kind === "tree")).toBe(false);
+    expect(
+      entities.some(
+        (e) => e.kind === "tree" && e.cell.col === treeCell.col && e.cell.row === treeCell.row
+      )
+    ).toBe(false);
 
     const woodAtTree = entities.find(
       (e) =>

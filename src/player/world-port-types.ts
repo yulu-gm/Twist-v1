@@ -15,4 +15,12 @@ export interface PlayerWorldPort {
   replayAll(nowMsStart: number): readonly MockWorldSubmitResult[];
   /** 将 UI 意图叠加层与当前世界快照对齐（A 线实现读 WorldCore；纯 Mock 则为恒等）。 */
   mergeTaskMarkerOverlayWithWorld(overlay: ReadonlyMap<string, string>): Map<string, string>;
+  /**
+   * 玩家选区中哪些格应叠加「.toolbar 工具」任务标记（Mock：整包原样返回；WorldCore：按领域可接单格过滤）。
+   */
+  filterTaskMarkerTargetCells(
+    toolId: string,
+    inputShape: "rect-selection" | "brush-stroke" | "single-cell",
+    cellKeys: ReadonlySet<string>
+  ): ReadonlySet<string>;
 }

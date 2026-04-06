@@ -155,9 +155,10 @@ export class GameOrchestrator {
       hooks.onPaletteChanged();
     }
     hooks.syncTimeHud();
-    hooks.syncTreesAndGroundItems();
 
     if (simulationDt <= 0) {
+      // 暂停时无 tickAnchoredWorkProgress；仍需与 WorldCore 对齐树木/地面/建筑图层。
+      hooks.syncTreesAndGroundItems();
       hooks.syncMarkerOverlay();
       hooks.syncHoverFromPointer();
       hooks.syncPawnDetailPanel();
@@ -249,6 +250,8 @@ export class GameOrchestrator {
       this.refreshSimulationGrid(interactionTemplate, false);
     }
 
+    // 须在 tickSimulation / tickAnchoredWorkProgress 等写入世界之后再同步，否则蓝图落成后仍一帧（或多帧）显示施工虚影。
+    hooks.syncTreesAndGroundItems();
     hooks.redrawInteractionPoints();
     hooks.syncPawnViews();
     hooks.syncMarkerOverlay();

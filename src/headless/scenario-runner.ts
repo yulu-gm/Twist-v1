@@ -3,6 +3,7 @@
  */
 
 import type { ResourceContainerKind, ResourceMaterialKind, ZoneKind } from "../game/entity/entity-types";
+import { createGameplayTreeDraft } from "../game/entity/gameplay-tree-spawn";
 import { claimWorkItem, placeBlueprint, spawnWorldEntity } from "../game/world-core";
 import { coordKey, isInsideGrid, type GridCoord } from "../game/map/world-grid";
 import type { SpawnOutcome } from "../game/world-internal";
@@ -187,7 +188,14 @@ function expectationSatisfied(sim: HeadlessSim, exp: ScenarioExpectation): boole
     case "entity-kind-absent": {
       const k = params.entityKind;
       if (typeof k !== "string") return false;
-      return ![...sim.getWorldPort().getWorld().entities.values()].some((e) => e.kind === k);
+      const cell = params.cell as { col?: unknown; row?: unknown } | undefined;
+      const entities = [...sim.getWorldPort().getWorld().entities.values()];
+      if (cell && typeof cell.col === "number" && typeof cell.row === "number") {
+        return !entities.some(
+          (e) => e.kind === k && e.cell.col === cell.col && e.cell.row === cell.row
+        );
+      }
+      return !entities.some((e) => e.kind === k);
     }
     case "resource-in-container": {
       const ck = params.containerKind;
@@ -327,13 +335,7 @@ export function hydrateScenario(sim: HeadlessSim, def: ScenarioDefinition): Scen
     if (!isInsideGrid(grid, t.cell)) {
       throw new Error(`scenario-runner: tree cell out of grid (${t.cell.col},${t.cell.row})`);
     }
-    const spawned = spawnWorldEntity(world, {
-      kind: "tree",
-      cell: t.cell,
-      occupiedCells: [t.cell],
-      loggingMarked: false,
-      label: `scenario-tree-${ti}`
-    });
+    const spawned = spawnWorldEntity(world, createGameplayTreeDraft(t.cell, `scenario-tree-${ti}`));
     throwUnlessSpawnCreated("tree", spawned.outcome, `#${ti}`);
     world = spawned.world;
   }

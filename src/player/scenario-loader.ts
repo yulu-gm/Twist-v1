@@ -8,10 +8,12 @@
 import type { ScenarioDefinition } from "../headless/scenario-types";
 import { commitPlayerSelectionToWorld } from "./commit-player-intent";
 import { WorldCoreWorldPort } from "./world-core-world-port";
+import { createGameplayTreeDraft } from "../game/entity/gameplay-tree-spawn";
 import {
   claimWorkItem,
   cloneWorldCoreState,
   placeBlueprint,
+  removeWorldEntitiesOccupyingCells,
   spawnWorldEntity,
   type WorldCore
 } from "../game/world-core";
@@ -82,6 +84,10 @@ export type ScenarioLoadResult = Readonly<{
 
 /**
  * 将场景定义载入世界：`pawns` / `blueprints` / `obstacles` / 可调时间；忽略 `expectations`。
+ *
+ * 在写入 obstacle / tree / blueprint / pawn 前，会先对对应 footprint **移除已有占格实体**（与单测 headless、浏览器热切换共用），
+ * 避免随机地形石、上一状态残留或与定义顺序冲突导致占格失败（后写入的格点覆盖前者）。
+ *
  * `domainCommandsAfterHydrate` / `playerSelectionAfterHydrate` 在认领前应用，与无头 `hydrateScenario` 一致；
  * `playerSelectionAfterHydrate` 走 `commitPlayerSelectionToWorld`（与实机工具栏 + 选区形态一致）。
  * `claimConstructBlueprintAsPawnName`：按小人名认领首个 open 的 construct-blueprint（`pawnStates` 的 id 为 `pawn-${索引}`）。
@@ -104,6 +110,7 @@ export function loadScenarioIntoGame(world: WorldCore, def: ScenarioDefinition):
     if (!isInsideGrid(grid, obs.cell)) {
       throw new Error(`scenario-loader: obstacle 越界 (${obs.cell.col},${obs.cell.row})`);
     }
+    w = removeWorldEntitiesOccupyingCells(w, [obs.cell]);
     const spawned = spawnWorldEntity(w, {
       kind: "obstacle",
       cell: obs.cell,
@@ -125,13 +132,11 @@ export function loadScenarioIntoGame(world: WorldCore, def: ScenarioDefinition):
     if (!isInsideGrid(grid, t.cell)) {
       throw new Error(`scenario-loader: tree 越界 (${t.cell.col},${t.cell.row})`);
     }
-    const spawned = spawnWorldEntity(w, {
-      kind: "tree",
-      cell: t.cell,
-      occupiedCells: [t.cell],
-      loggingMarked: false,
-      label: `scenario-tree-${coordKey(t.cell)}-${ti}`
-    });
+    w = removeWorldEntitiesOccupyingCells(w, [t.cell]);
+    const spawned = spawnWorldEntity(
+      w,
+      createGameplayTreeDraft(t.cell, `scenario-tree-${coordKey(t.cell)}-${ti}`)
+    );
     if (spawned.outcome.kind !== "created") {
       const reason =
         spawned.outcome.kind === "conflict"
@@ -146,6 +151,7 @@ export function loadScenarioIntoGame(world: WorldCore, def: ScenarioDefinition):
     if (!isInsideGrid(grid, bp.cell)) {
       throw new Error(`scenario-loader: blueprint 越界 (${bp.cell.col},${bp.cell.row})`);
     }
+    w = removeWorldEntitiesOccupyingCells(w, [bp.cell]);
     const placed = placeBlueprint(w, { buildingKind: bp.kind, cell: bp.cell });
     w = placed.world;
   }
@@ -154,6 +160,7 @@ export function loadScenarioIntoGame(world: WorldCore, def: ScenarioDefinition):
     if (!isInsideGrid(grid, p.cell)) {
       throw new Error(`scenario-loader: pawn 越界 (${p.cell.col},${p.cell.row})`);
     }
+    w = removeWorldEntitiesOccupyingCells(w, [p.cell]);
     const spawned = spawnWorldEntity(w, {
       kind: "pawn",
       cell: p.cell,

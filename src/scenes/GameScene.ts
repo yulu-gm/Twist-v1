@@ -124,10 +124,6 @@ export class GameScene extends Phaser.Scene {
   private debugSelectedEntryId: string | null = null;
   private debugPausedSeq: number | null = null;
   private runtimeTickCount = 0;
-  /**
-   * 本局「地形」不可走格快照（首次 bootstrap 后）：`cleanupRuntimeBeforeNextScenario` 用它把网格从上一场景的同步产物里剥离开。
-   */
-  private initialSimBlockedCellKeys = new Set<string>();
 
   public constructor() {
     super("game");
@@ -361,7 +357,6 @@ export class GameScene extends Phaser.Scene {
     this.floorInteraction.bind();
 
     this.orchestrator.bootstrapSimulationGrid();
-    this.initialSimBlockedCellKeys = new Set(this.worldGrid.blockedCellKeys ?? []);
     this.syncTreesAndGroundLayer();
     this.syncPlayerChannelUi();
     this.setupPawnRosterUi();
@@ -639,20 +634,21 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * 切换 YAML 场景前：集中做与「上一场景 / 上一帧模拟」的解耦。
+   * 切换 YAML 场景前：集中做与「上一场景 / 本机开局地形」的解耦，等价于换一套模拟上下文。
    * 新增强制重置逻辑时优先放在这里，而不是散落在载入语句之间。
    *
-   * - **网格**：`syncWorldGridForSimulation` 会把世界里的墙体等写回 `blockedCellKeys`；不清理则 baseline 会与下一场景抢占同一批格子。
-   * - **交互点**：恢复为与编排器 `interactionTemplate`（{@link DEFAULT_WORLD_GRID}）一致的样板，避免沿用上一世界合并后的列表。
-   * - **同步游标**：`simGridSyncState` 置空，下一轮 `bootstrapSimulationGrid` 必须从 `WorldCore` 完整重算，禁止沿用旧快照。
+   * - **`blockedCellKeys` 置空**：`syncWorldGridForSimulation` 会把墙体与障碍实体写回网格；若再叠「本局随机石格」，
+   *   `seedBlockedCellsAsObstacles` 会先种一批石头实体，常与场景里写死的树/人出生格冲突（headless 从不带随机石头，浏览器却曾恢复它们）。
+   *   YAML 热切换按**空地形**叠 `ScenarioDefinition`，载入后再由新世界同步回不可走格。
+   * - **交互点**：恢复为与编排器 `interactionTemplate`（{@link DEFAULT_WORLD_GRID}）一致的样板。
+   * - **同步游标**：`simGridSyncState` 置空，下一轮 `bootstrapSimulationGrid` 必须从 `WorldCore` 完整重算。
    */
   private cleanupRuntimeBeforeNextScenario(): void {
     const blocked = this.worldGrid.blockedCellKeys;
     if (blocked instanceof Set) {
       blocked.clear();
-      for (const k of this.initialSimBlockedCellKeys) {
-        blocked.add(k);
-      }
+    } else {
+      (this.worldGrid as WorldGridConfig & { blockedCellKeys: Set<string> }).blockedCellKeys = new Set();
     }
     (this.worldGrid as WorldGridConfig & { interactionPoints: InteractionPoint[] }).interactionPoints = [
       ...DEFAULT_WORLD_GRID.interactionPoints
