@@ -27,12 +27,6 @@
 - 必须扩散到源码查询时，优先使用 `rg`进行文本和文件检索
 - 这个流程只负责模块检索，不替代 `route-demand`
 
-**准备推送远端前，必须走 `.agent/skills/push-with-aidoc/SKILL.md`，先校验受影响系统的 aidoc 与索引，再推送**
-
-产品方向、架构目标与近期规格见 `docs/ai/project-overview.md`。
-结构化需求与设计优先从 `oh-gen-doc/`、`oh-code-design/`、`oh-acceptance/` 进入。
-`docs/ai/index/README.md` 和 `docs/ai/index/system-index.json` 仅作为 legacy 实现索引参考，不再是 `route-demand` 的权威注册表。
-
 ## 技术栈速查
 
 - **运行时**：Phaser 3 + TypeScript
