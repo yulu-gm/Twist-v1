@@ -27,6 +27,7 @@
 - `src/data/task-markers.ts`
 - `src/data/pawn-profiles.ts`
 - `src/scenes/GameScene.ts`（仅负责布局、输入和状态 wiring）
+- `src/scenes/game-scene-camera-controls.ts`（主相机：鼠标中键拖拽平移、滚轮以指针为中心缩放；与左键地板交互并存）
 - `src/scenes/game-scene-hud-sync.ts`
 - `src/scenes/game-scene-keyboard-bindings.ts`
 

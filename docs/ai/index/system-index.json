@@ -125,6 +125,7 @@
       "lookupAliases": ["scene-hud", "hud", "ui", "villager-tool-bar"],
       "sharedEntryFiles": [
         "src/ui/hud-manager.ts",
+        "src/scenes/game-scene-camera-controls.ts",
         "src/scenes/game-scene-hud-sync.ts",
         "src/scenes/game-scene-keyboard-bindings.ts"
       ],
@@ -176,6 +177,7 @@
         "src/player/s0-contract.ts",
         "src/player/tool-input-policy.ts",
         "src/scenes/villager-tool-bar-config.ts",
+        "src/scenes/game-scene-camera-controls.ts",
         "src/scenes/mock-villager-tools.ts",
         "src/scenes/mock-ground-items.ts",
         "src/scenes/mock-grid-cell-info.ts",
