@@ -37,6 +37,7 @@
 
 ## 最新/历史 aidoc
 
+- `docs/ai/integration/2026-04-06-headless-obstacle-pathing-and-wall-flow.md`
 - `docs/ai/systems/world-core/2026-04-05-a-line-world-core-and-build-loop.md`
 - `docs/ai/systems/world-core/2026-04-05-worldcore-gateway-and-sim-bridge.md`
 

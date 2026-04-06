@@ -36,6 +36,7 @@
 
 ## 最新/历史 aidoc
 
+- `docs/ai/integration/2026-04-06-headless-obstacle-pathing-and-wall-flow.md`
 - `docs/ai/systems/task-planning/2026-04-05-gamescene-runtime-refactor.md`
 - `docs/ai/systems/task-planning/2026-04-05-random-stone-obstacles.md`
 - `docs/ai/systems/task-planning/2026-04-05-default-grid-wandering-pawns.md`

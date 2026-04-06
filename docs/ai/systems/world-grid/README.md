@@ -39,6 +39,7 @@
 
 ## 最新/历史 aidoc
 
+- `docs/ai/integration/2026-04-06-headless-obstacle-pathing-and-wall-flow.md`
 - `docs/ai/systems/world-grid/2026-04-05-gamescene-runtime-refactor.md`
 - `docs/ai/systems/world-grid/2026-04-05-floor-area-selection-foundation.md`
 - `docs/ai/systems/world-grid/2026-04-05-random-stone-obstacles.md`

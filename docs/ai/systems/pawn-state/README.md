@@ -33,6 +33,7 @@
 
 ## 最新/历史 aidoc
 
+- `docs/ai/integration/2026-04-06-headless-obstacle-pathing-and-wall-flow.md`
 - `docs/ai/systems/pawn-state/2026-04-05-gamescene-runtime-refactor.md`
 - `docs/ai/systems/pawn-state/2026-04-05-default-grid-wandering-pawns.md`
 - `docs/ai/systems/pawn-state/2026-04-05-goal-driven-pawn-ai-prototype.md`

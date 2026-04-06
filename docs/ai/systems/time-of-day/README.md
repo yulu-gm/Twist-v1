@@ -33,6 +33,7 @@
 
 ## 最新/历史 aidoc
 
+- `docs/ai/integration/2026-04-06-headless-obstacle-pathing-and-wall-flow.md`
 - `docs/ai/systems/time-of-day/2026-04-05-gamescene-runtime-refactor.md`
 - `docs/ai/systems/time-of-day/2026-04-05-time-of-day-system.md`
 

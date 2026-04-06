@@ -30,6 +30,7 @@
         "src/scenes/GameScene.ts"
       ],
       "integrationFiles": [
+        "docs/ai/integration/2026-04-06-headless-obstacle-pathing-and-wall-flow.md",
         "docs/ai/integration/2026-04-05-time-of-day-system.md",
         "docs/ai/integration/2026-04-05-gamescene-runtime-refactor.md"
       ],
@@ -56,6 +57,11 @@
         "src/game/world-core.ts",
         "src/game/map/world-seed.ts",
         "src/game/world-sim-bridge.ts",
+        "src/game/world-work-tick.ts",
+        "src/headless/headless-sim.ts",
+        "src/headless/scenario-runner.ts",
+        "src/headless/scenario-types.ts",
+        "src/headless/index.ts",
         "src/player/apply-domain-command.ts",
         "src/player/world-core-world-port.ts",
         "src/player/world-port-types.ts"
@@ -69,6 +75,7 @@
         "src/scenes/GameScene.ts"
       ],
       "integrationFiles": [
+        "docs/ai/integration/2026-04-06-headless-obstacle-pathing-and-wall-flow.md",
         "docs/ai/integration/2026-04-05-a-line-world-core-and-build-loop.md",
         "docs/ai/integration/2026-04-05-worldcore-sim-grid-bridge.md"
       ],
@@ -98,6 +105,7 @@
         "src/scenes/GameScene.ts"
       ],
       "integrationFiles": [
+        "docs/ai/integration/2026-04-06-headless-obstacle-pathing-and-wall-flow.md",
         "docs/ai/integration/2026-04-05-default-grid-wandering-pawns.md",
         "docs/ai/integration/2026-04-05-goal-driven-pawn-ai-prototype.md",
         "docs/ai/integration/2026-04-05-mock-task-markers-on-grid.md",
@@ -127,6 +135,7 @@
         "src/scenes/GameScene.ts"
       ],
       "integrationFiles": [
+        "docs/ai/integration/2026-04-06-headless-obstacle-pathing-and-wall-flow.md",
         "docs/ai/integration/2026-04-05-default-grid-wandering-pawns.md",
         "docs/ai/integration/2026-04-05-goal-driven-pawn-ai-prototype.md",
         "docs/ai/integration/2026-04-05-time-of-day-system.md",
@@ -163,6 +172,7 @@
         "src/player/interaction-mode-presenter.ts",
         "src/player/mock-world-port.ts",
         "src/player/need-signals.ts",
+        "src/player/scenario-loader.ts",
         "src/player/s0-contract.ts",
         "src/player/tool-input-policy.ts",
         "src/scenes/villager-tool-bar-config.ts",
@@ -214,6 +224,7 @@
         "src/scenes/GameScene.ts"
       ],
       "integrationFiles": [
+        "docs/ai/integration/2026-04-06-headless-obstacle-pathing-and-wall-flow.md",
         "docs/ai/integration/2026-04-05-default-grid-wandering-pawns.md",
         "docs/ai/integration/2026-04-05-goal-driven-pawn-ai-prototype.md",
         "docs/ai/integration/2026-04-05-mock-task-markers-on-grid.md",
@@ -246,17 +257,20 @@
         "src/game/behavior/goal-driven-planning.ts",
         "src/game/behavior/sim-config.ts",
         "src/game/behavior/sim-loop.ts",
+        "src/game/game-orchestrator.ts",
         "src/game/world-sim-bridge.ts"
       ],
       "testFiles": [
         "tests/domain/wander-planning.test.ts",
         "tests/domain/goal-driven-planning.test.ts",
-        "tests/game/world-sim-bridge.test.ts"
+        "tests/game/world-sim-bridge.test.ts",
+        "tests/headless/obstacle-avoidance.test.ts"
       ],
       "sceneEntryFiles": [
         "src/scenes/GameScene.ts"
       ],
       "integrationFiles": [
+        "docs/ai/integration/2026-04-06-headless-obstacle-pathing-and-wall-flow.md",
         "docs/ai/integration/2026-04-05-default-grid-wandering-pawns.md",
         "docs/ai/integration/2026-04-05-random-stone-obstacles.md",
         "docs/ai/integration/2026-04-05-goal-driven-pawn-ai-prototype.md",
@@ -291,6 +305,7 @@
         "src/data/ground-items.ts",
         "src/scenes/renderers/grid-renderer.ts",
         "src/scenes/renderers/ground-items-renderer.ts",
+        "src/scenes/renderers/building-renderer.ts",
         "src/scenes/renderers/selection-renderer.ts"
       ],
       "testFiles": [
@@ -301,6 +316,7 @@
         "src/scenes/GameScene.ts"
       ],
       "integrationFiles": [
+        "docs/ai/integration/2026-04-06-headless-obstacle-pathing-and-wall-flow.md",
         "docs/ai/integration/2026-04-05-default-grid-wandering-pawns.md",
         "docs/ai/integration/2026-04-05-random-stone-obstacles.md",
         "docs/ai/integration/2026-04-05-goal-driven-pawn-ai-prototype.md",
