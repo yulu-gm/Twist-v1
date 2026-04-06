@@ -29,7 +29,7 @@ export const NEED_ZERO_FLOOR_SCENARIO: ScenarioDefinition = {
   playerSelectionAfterHydrate: [
     {
       label: "observe-zero-floor",
-      toolId: "idle",
+      commandId: "idle",
       selectionModifier: "replace",
       cellKeys: [coordKey(PAWN_CELL)],
       inputShape: "single-cell",

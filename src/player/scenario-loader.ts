@@ -89,7 +89,7 @@ export type ScenarioLoadResult = Readonly<{
  * 避免随机地形石、上一状态残留或与定义顺序冲突导致占格失败（后写入的格点覆盖前者）。
  *
  * `domainCommandsAfterHydrate` / `playerSelectionAfterHydrate` 在认领前应用，与无头 `hydrateScenario` 一致；
- * `playerSelectionAfterHydrate` 走 `commitPlayerSelectionToWorld`（与实机工具栏 + 选区形态一致）。
+ * `playerSelectionAfterHydrate` 走 `commitPlayerSelectionToWorld`（与实机命令菜单 `commandId` + 选区形态一致）。
  * `claimConstructBlueprintAsPawnName`：按小人名认领首个 open 的 construct-blueprint（`pawnStates` 的 id 为 `pawn-${索引}`）。
  * `def.seed` 仅影响 headless RNG，WorldCore 无对应字段，此处不处理。
  */
@@ -183,7 +183,7 @@ export function loadScenarioIntoGame(world: WorldCore, def: ScenarioDefinition):
   }
   for (const sel of def.playerSelectionAfterHydrate ?? []) {
     commitPlayerSelectionToWorld(port, {
-      toolId: sel.toolId,
+      commandId: sel.commandId,
       selectionModifier: sel.selectionModifier,
       cellKeys: new Set(sel.cellKeys),
       inputShape: sel.inputShape,

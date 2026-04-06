@@ -19,7 +19,7 @@ export const INTERACTION_NO_TOOL_SCENARIO: ScenarioDefinition = {
   playerSelectionAfterHydrate: [
     {
       label: "no-tool-click",
-      toolId: "idle",
+      commandId: "idle",
       selectionModifier: "replace",
       cellKeys: [coordKey(INTERACTION_NO_TOOL_CLICK_CELL)],
       inputShape: "single-cell",
@@ -27,7 +27,7 @@ export const INTERACTION_NO_TOOL_SCENARIO: ScenarioDefinition = {
     },
     {
       label: "no-tool-drag",
-      toolId: "idle",
+      commandId: "idle",
       selectionModifier: "replace",
       cellKeys: INTERACTION_NO_TOOL_DRAG_CELLS.map(coordKey),
       inputShape: "brush-stroke",

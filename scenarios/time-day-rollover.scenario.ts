@@ -23,7 +23,7 @@ export const TIME_DAY_ROLLOVER_SCENARIO: ScenarioDefinition = {
   playerSelectionAfterHydrate: [
     {
       label: "observe-day-rollover",
-      toolId: "idle",
+      commandId: "idle",
       selectionModifier: "replace",
       cellKeys: [coordKey(PAWN_CELL)],
       inputShape: "single-cell",

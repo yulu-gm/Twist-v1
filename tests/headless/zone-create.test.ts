@@ -26,7 +26,7 @@ function makeZoneCreateCommand(targetCellKeys: readonly string[]): DomainCommand
     targetCellKeys: [...targetCellKeys],
     targetEntityIds: [],
     sourceMode: {
-      source: { kind: "toolbar", toolId: "zone_create" },
+      source: { kind: "menu", menuId: "interaction-mode", itemId: "zone-create" },
       selectionModifier: "replace",
       inputShape: "rect-selection"
     }

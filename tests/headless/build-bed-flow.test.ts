@@ -29,7 +29,7 @@ describe("INTERACT-003 single-cell build input", () => {
 
     const cellKey = coordKey(BED_CELL);
     const outcome = sim.commitPlayerSelection({
-      toolId: "build",
+      commandId: "place-bed",
       selectionModifier: "replace",
       cellKeys: new Set([cellKey]),
       inputShape: "single-cell",
@@ -39,7 +39,7 @@ describe("INTERACT-003 single-cell build input", () => {
     const selection = recordScenarioPlayerSelection(
       {
         label: "interact-003-single-cell",
-        toolId: "build",
+        commandId: "place-bed",
         selectionModifier: "replace",
         cellKeys: [cellKey],
         inputShape: "single-cell"

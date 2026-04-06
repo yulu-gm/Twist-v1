@@ -12,7 +12,7 @@ import {
 } from "../game/interaction/floor-selection";
 import type { WorldGridConfig, GridCoord } from "../game/map";
 import { cellAtWorldPixel } from "../game/map";
-import { VILLAGER_TOOLS, type VillagerBuildSubId } from "../data/villager-tools";
+import { getCommandMenuCommand, type CommandMenuCommandId } from "../data/command-menu";
 import {
   beginBrushStroke,
   endBrushStroke,
@@ -35,9 +35,7 @@ export type GameSceneFloorInteractionHost = Readonly<{
   getHud: () => HudManager;
   getTaskMarkers: () => Map<string, string>;
   setTaskMarkers: (m: Map<string, string>) => void;
-  getSelectedToolIndex: () => number;
-  /** 建造子选项；非建造工具或未选子项时为 null。 */
-  getBuildSubTool: () => VillagerBuildSubId | null;
+  getActiveCommandId: () => CommandMenuCommandId;
   onRedrawSelection: () => void;
   getTaskMarkerView: () => TaskMarkerViewDeps;
 }>;
@@ -82,13 +80,14 @@ export class GameSceneFloorInteraction {
     const { ox, oy } = this.host.getGridOrigin();
     const orchestrator = this.host.getOrchestrator();
     const port = orchestrator.getPlayerWorldPort();
-    const toolId = this.selectedVillagerToolId();
+    const activeCommand = getCommandMenuCommand(this.host.getActiveCommandId());
+    const markerToolId = activeCommand?.markerToolId ?? "idle";
 
     let draftEligible: ReadonlySet<string> | null = null;
     const draft = this.floorSelectionState.draft;
-    if (draft && toolId !== "idle") {
+    if (draft && markerToolId !== "idle") {
       const shape = draft.cellKeys.size === 1 ? ("single-cell" as const) : ("rect-selection" as const);
-      draftEligible = port.filterTaskMarkerTargetCells(toolId, shape, draft.cellKeys);
+      draftEligible = port.filterTaskMarkerTargetCells(markerToolId, shape, draft.cellKeys);
     }
 
     redrawFloorSelection(
@@ -102,7 +101,7 @@ export class GameSceneFloorInteraction {
     );
     if (this.brushState.active) {
       const brushEligible = port.filterTaskMarkerTargetCells(
-        "build",
+        markerToolId,
         "brush-stroke",
         this.brushState.accumulatedKeys
       );
@@ -147,31 +146,24 @@ export class GameSceneFloorInteraction {
       return;
     }
 
-    const toolId = this.selectedVillagerToolId();
-    if (toolId === "build") {
-      const sub = this.host.getBuildSubTool();
-      if (sub === "wall") {
-        this.brushGestureModifier = modifier;
-        const grid = this.host.getWorldGrid();
-        this.brushState = beginBrushStroke(pointer.id, grid, cell);
-        this.activeSelectionPointerId = pointer.id;
-        this.host.onRedrawSelection();
-        return;
-      }
-      if (sub === "bed") {
-        const grid = this.host.getWorldGrid();
-        this.floorSelectionState = beginFloorSelection(this.floorSelectionState, grid, cell, modifier);
-        this.activeSelectionPointerId = pointer.id;
-        this.host.onRedrawSelection();
-        return;
-      }
+    const command = getCommandMenuCommand(this.host.getActiveCommandId());
+    if (!command) return;
+
+    if (command.inputShape === "brush-stroke") {
+      this.brushGestureModifier = modifier;
+      const grid = this.host.getWorldGrid();
+      this.brushState = beginBrushStroke(pointer.id, grid, cell);
+      this.activeSelectionPointerId = pointer.id;
+      this.host.onRedrawSelection();
       return;
     }
 
-    const grid = this.host.getWorldGrid();
-    this.floorSelectionState = beginFloorSelection(this.floorSelectionState, grid, cell, modifier);
-    this.activeSelectionPointerId = pointer.id;
-    this.host.onRedrawSelection();
+    if (command.inputShape === "single-cell" || command.inputShape === "rect-selection") {
+      const grid = this.host.getWorldGrid();
+      this.floorSelectionState = beginFloorSelection(this.floorSelectionState, grid, cell, modifier);
+      this.activeSelectionPointerId = pointer.id;
+      this.host.onRedrawSelection();
+    }
   };
 
   private handleFloorPointerMove = (pointer: Phaser.Input.Pointer): void => {
@@ -197,6 +189,7 @@ export class GameSceneFloorInteraction {
     const grid = this.host.getWorldGrid();
     const hud = this.host.getHud();
     const orchestrator = this.host.getOrchestrator();
+    const commandId = this.host.getActiveCommandId();
 
     if (this.brushState.active) {
       const keys = endBrushStroke(this.brushState);
@@ -207,7 +200,7 @@ export class GameSceneFloorInteraction {
 
       const taskMarkers = this.host.getTaskMarkers();
       const brushOutcome = orchestrator.commitPlayerSelection({
-        toolId: "build",
+        commandId,
         selectionModifier: this.brushGestureModifier,
         cellKeys: keys,
         inputShape: "brush-stroke",
@@ -235,7 +228,7 @@ export class GameSceneFloorInteraction {
     const shape = draft.cellKeys.size === 1 ? ("single-cell" as const) : ("rect-selection" as const);
     const taskMarkers = this.host.getTaskMarkers();
     const rectOutcome = orchestrator.commitPlayerSelection({
-      toolId: this.selectedVillagerToolId(),
+      commandId,
       selectionModifier: draft.modifier,
       cellKeys: draft.cellKeys,
       inputShape: shape,
@@ -250,11 +243,6 @@ export class GameSceneFloorInteraction {
     this.floorSelectionState = clearFloorSelection(this.floorSelectionState);
     this.host.onRedrawSelection();
   };
-
-  private selectedVillagerToolId(): string {
-    const idx = this.host.getSelectedToolIndex();
-    return VILLAGER_TOOLS[idx]?.id ?? "idle";
-  }
 
   private pointerCell(pointer: Phaser.Input.Pointer, clampToGrid = false): GridCoord | undefined {
     const { ox, oy } = this.host.getGridOrigin();

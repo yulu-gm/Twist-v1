@@ -30,7 +30,8 @@ import {
 import type { SimGridSyncState } from "../game/world-sim-bridge";
 import { DEFAULT_SIM_CONFIG, type SimConfig } from "../game/behavior";
 import { HudManager } from "../ui/hud-manager";
-import { VILLAGER_TOOLS, type VillagerBuildSubId } from "../data/villager-tools";
+import { defaultCommandMenuCommandId, type CommandMenuCommandId } from "../data/command-menu";
+import { createCommandMenuState, selectCommandMenuCommand as selectCommandMenuStateCommand } from "../ui/menu-model";
 import {
   drawGridLines,
   drawStoneCellsToGraphics,
@@ -104,9 +105,10 @@ export class GameScene extends Phaser.Scene {
   private storageZoneLabels = new Map<string, Phaser.GameObjects.Text>();
 
   private variant: GameSceneVariant = "default";
-  private selectedToolIndex = 0;
-  /** 仅当主工具为 `build` 时有效；选中主槽后须再选木墙/木床。 */
-  private buildSubTool: VillagerBuildSubId | null = null;
+  private commandMenuState = createCommandMenuState({
+    isOpen: true,
+    activeCommandId: defaultCommandMenuCommandId()
+  });
   private selectedPawnId: string | null = null;
   private taskMarkersByCell = new Map<string, string>();
 
@@ -133,8 +135,10 @@ export class GameScene extends Phaser.Scene {
 
   public init(data: { variant?: string } = {}): void {
     this.variant = data.variant === "alt-en" ? "alt-en" : "default";
-    this.selectedToolIndex = 0;
-    this.buildSubTool = null;
+    this.commandMenuState = createCommandMenuState({
+      isOpen: true,
+      activeCommandId: defaultCommandMenuCommandId()
+    });
     this.timeOfDayState = createInitialTimeOfDayState(DEFAULT_TIME_OF_DAY_CONFIG);
     this.timeOfDayPalette = sampleTimeOfDayPalette(this.timeOfDayState);
     this.timeControlState = DEFAULT_TIME_CONTROL_STATE;
@@ -226,14 +230,11 @@ export class GameScene extends Phaser.Scene {
       (s) => this.setTimeSpeed(s),
       () => this.pauseTime()
     );
-    this.keyboard.setupVillagerToolBarKeys(this, (i) => this.selectVillagerTool(i));
-    this.hud.setupToolBar(
-      (i) => this.selectVillagerTool(i),
-      this.selectedToolIndex,
-      {
-        onSelectSub: (sub) => this.selectBuildSubTool(sub),
-        initialSub: this.buildSubTool
-      }
+    this.keyboard.setupCommandMenuHotkeys(this, (commandId) => this.selectCommandMenuCommand(commandId));
+    this.hud.setupCommandMenu(
+      (commandId) => this.selectCommandMenuCommand(commandId as CommandMenuCommandId),
+      this.commandMenuState.activeCommandId,
+      this.commandMenuState.activeCategoryId
     );
     this.hud.bindSceneVariantSelect(this.variant, (next) => {
       this.scene.restart({ variant: next });
@@ -356,8 +357,7 @@ export class GameScene extends Phaser.Scene {
       setTaskMarkers: (m: Map<string, string>) => {
         this.taskMarkersByCell = m;
       },
-      getSelectedToolIndex: () => this.selectedToolIndex,
-      getBuildSubTool: () => this.buildSubTool,
+      getActiveCommandId: () => this.commandMenuState.activeCommandId,
       onRedrawSelection: () => {
         floor.redrawFloorSelectionAndBrush();
       },
@@ -521,19 +521,9 @@ export class GameScene extends Phaser.Scene {
     this.hud.syncTimeOfDayHud(this.timeOfDayState, this.timeControlState, this.timeOfDayPalette);
   }
 
-  private selectVillagerTool(index: number): void {
-    if (index < 0 || index >= VILLAGER_TOOLS.length) return;
-    this.selectedToolIndex = index;
-    this.buildSubTool = null;
-    this.hud.syncToolBarSelection(index, this.buildSubTool);
-    this.floorInteraction.resetForToolChange();
-    this.syncPlayerChannelUi();
-  }
-
-  private selectBuildSubTool(sub: VillagerBuildSubId): void {
-    if (VILLAGER_TOOLS[this.selectedToolIndex]?.id !== "build") return;
-    this.buildSubTool = sub;
-    this.hud.syncToolBarSelection(this.selectedToolIndex, this.buildSubTool);
+  private selectCommandMenuCommand(commandId: CommandMenuCommandId): void {
+    this.commandMenuState = selectCommandMenuStateCommand(this.commandMenuState, commandId);
+    this.hud.syncCommandMenuSelection(commandId);
     this.floorInteraction.resetForToolChange();
     this.syncPlayerChannelUi();
   }
@@ -551,7 +541,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private syncPlayerChannelUi(): void {
-    syncPlayerChannelHintLines(this.hud, this.orchestrator, this.selectedToolIndex, this.buildSubTool);
+    syncPlayerChannelHintLines(this.hud, this.orchestrator, this.commandMenuState.activeCommandId);
   }
 
   private captureRuntimeDebugEntries(

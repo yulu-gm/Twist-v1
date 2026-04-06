@@ -17,7 +17,7 @@ describe("BUILD-003 invalid build placement", () => {
     expect(hydration.playerSelections).toHaveLength(1);
 
     const selection = hydration.playerSelections[0]!;
-    expect(selection.toolId).toBe("build");
+    expect(selection.markerToolId).toBe("build");
     expect(selection.inputShape).toBe("single-cell");
     expect(selection.commandVerb).toBe("place_furniture:bed");
     expect(selection.didSubmitToWorld).toBe(true);

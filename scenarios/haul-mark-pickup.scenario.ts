@@ -11,7 +11,7 @@ const HAUL_MARK_PICKUP_CELLS: DomainCommand = {
   targetCellKeys: [coordKey(RESOURCE_A), coordKey(RESOURCE_B)],
   targetEntityIds: [],
   sourceMode: {
-    source: { kind: "toolbar", toolId: "haul" },
+    source: { kind: "menu", menuId: "orders", itemId: "haul" },
     selectionModifier: "replace",
     inputShape: "rect-selection"
   }
@@ -20,7 +20,7 @@ const HAUL_MARK_PICKUP_CELLS: DomainCommand = {
 /** 固定 seed：2 份地面 food（默认不可拾取）→ hydrate 后提交 haul，生成 pick-up-resource 工单。 */
 export const HAUL_MARK_PICKUP_SCENARIO: ScenarioDefinition = {
   name: "haul-mark-pickup",
-  description: "toolbar haul → 地面物资 pickupAllowed + pick-up-resource 开放工单",
+  description: "haul 命令 → 地面物资 pickupAllowed + pick-up-resource 开放工单",
   seed: 0x68_61_75_6c_70,
   pawns: [{ name: "Hauler", cell: DEFAULT_WORLD_GRID.defaultSpawnPoints[0]! }],
   resources: [

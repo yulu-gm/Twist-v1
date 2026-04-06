@@ -12,7 +12,7 @@ export const BUILD_WALL_FLOW_SCENARIO: ScenarioDefinition = {
   pawns: [{ name: "WallBuilder", cell: DEFAULT_WORLD_GRID.defaultSpawnPoints[0]! }],
   playerSelectionAfterHydrate: [
     {
-      toolId: "build",
+      commandId: "build-wall",
       selectionModifier: "replace",
       cellKeys: [coordKey(WALL_CELL)],
       inputShape: "brush-stroke"
@@ -39,7 +39,7 @@ export const BUILD_WALL_FLOW_SCENARIO: ScenarioDefinition = {
   manualAcceptance: {
     steps: [
       "（UI-001）在实机中打开工具栏，依次点「建造」→「木墙」，确认子菜单展开且「木墙」呈选中高亮。",
-      "（UI-001）查看左上角玩家通道提示，确认文案已进入木墙笔刷模式（与 `presentationForVillagerTool` 的 modeLine 一致）。",
+      "（UI-001）查看左上角玩家通道提示，确认文案已进入木墙笔刷模式（与 presentationForCommandMenuCommand('build-wall') 一致）。",
       "选择本场景：出生点 WallBuilder；与实机相同，装载后已在 (11,6) 执行一次「建造→墙笔刷」提交。",
       "与实机一致：装载后不手工认领；下一帧起由 `autoClaimOpenWorkItems` 分配 construct-blueprint。"
     ],

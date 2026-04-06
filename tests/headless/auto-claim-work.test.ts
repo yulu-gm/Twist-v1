@@ -62,7 +62,7 @@ describe("BEHAVIOR-002 auto-claim-work", () => {
     collector.clear();
 
     const submit = sim.commitPlayerSelection({
-      toolId: "lumber",
+      commandId: "lumber",
       selectionModifier: "replace",
       cellKeys: new Set([coordKey(treeCell)]),
       inputShape: "rect-selection",

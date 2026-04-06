@@ -9,9 +9,9 @@ describe("player channel domain commands", () => {
     resetDomainCommandIdSequence();
   });
 
-  it("maps mine tool + cells to assign_tool_task verb", () => {
+  it("maps mine command + cells to assign_tool_task verb", () => {
     const cmd = buildDomainCommand({
-      toolId: "mine",
+      commandId: "mine",
       selectionModifier: "replace",
       cellKeys: new Set(["0,0", "1,0"]),
       inputShape: "rect-selection"
@@ -20,23 +20,25 @@ describe("player channel domain commands", () => {
     expect(cmd!.verb).toBe("assign_tool_task:mine");
     expect(cmd!.targetCellKeys).toEqual(["0,0", "1,0"]);
     expect(cmd!.sourceMode.inputShape).toBe("rect-selection");
+    expect(cmd!.sourceMode.source).toEqual({ kind: "menu", menuId: "orders", itemId: "mine" });
     expect(cmd!.commandId).toBe("cmd-1");
   });
 
   it("idle + cells clears markers", () => {
     const cmd = buildDomainCommand({
-      toolId: "idle",
+      commandId: "idle",
       selectionModifier: "replace",
       cellKeys: new Set(["2,2"]),
       inputShape: "single-cell"
     });
     expect(cmd!.verb).toBe("clear_task_markers");
+    expect(cmd!.sourceMode.source).toEqual({ kind: "menu", menuId: "orders", itemId: "idle" });
   });
 
   it("returns null when no cells for non-idle tool", () => {
     expect(
       buildDomainCommand({
-        toolId: "lumber",
+        commandId: "lumber",
         selectionModifier: "replace",
         cellKeys: new Set(),
         inputShape: "rect-selection"

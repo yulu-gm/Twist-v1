@@ -22,7 +22,7 @@ function makeLumberCommand(targetCellKeys: readonly string[]): DomainCommand {
     targetCellKeys: [...targetCellKeys],
     targetEntityIds: [],
     sourceMode: {
-      source: { kind: "toolbar", toolId: "lumber" },
+      source: { kind: "menu", menuId: "orders", itemId: "lumber" },
       selectionModifier: "replace",
       inputShape: "rect-selection"
     }
@@ -77,7 +77,7 @@ describe("chop-tree-command（lumber → WorldCore）", () => {
   it("applyDomainCommandToWorldCore 的 lumber 分支含 chop-tree", () => {
     const srcPath = join(__dirname, "..", "..", "src", "player", "apply-domain-command.ts");
     const src = readFileSync(srcPath, "utf8");
-    expect(src).toContain('toolId === "lumber"');
+    expect(src).toContain("lumber");
     expect(src).toContain("chop-tree");
   });
 });

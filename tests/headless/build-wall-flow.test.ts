@@ -31,7 +31,7 @@ describe("ENTITY-003 wall blueprint to building", () => {
     sim.spawnPawn("WallBuilder", DEFAULT_WORLD_GRID.defaultSpawnPoints[0]!);
 
     const outcome = sim.commitPlayerSelection({
-      toolId: "build",
+      commandId: "build-wall",
       selectionModifier: "replace",
       cellKeys: new Set(WALL_CELLS.map((cell) => coordKey(cell))),
       inputShape: "brush-stroke",
@@ -97,7 +97,7 @@ describe("INTERACT-002 brush-stroke build input", () => {
 
     const cellKeys = WALL_CELLS.map((cell) => coordKey(cell));
     const outcome = sim.commitPlayerSelection({
-      toolId: "build",
+      commandId: "build-wall",
       selectionModifier: "replace",
       cellKeys: new Set(cellKeys),
       inputShape: "brush-stroke",
@@ -107,7 +107,7 @@ describe("INTERACT-002 brush-stroke build input", () => {
     const selection = recordScenarioPlayerSelection(
       {
         label: "interact-002-brush-stroke",
-        toolId: "build",
+        commandId: "build-wall",
         selectionModifier: "replace",
         cellKeys,
         inputShape: "brush-stroke"
@@ -161,7 +161,7 @@ describe("INTERACT-002 brush-stroke build input", () => {
 
     expect(results.every((result) => result.passed)).toBe(true);
     expect(hydration.playerSelections).toHaveLength(1);
-    expect(selection.toolId).toBe("build");
+    expect(selection.markerToolId).toBe("build");
     expect(selection.semantic).toBe("brush-stroke");
     expect(selection.inputShape).toBe("brush-stroke");
     expect(selection.didSubmitToWorld).toBe(true);

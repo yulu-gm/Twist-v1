@@ -31,13 +31,13 @@ describe("mode-registry", () => {
       modeId: "chop",
       displayName: "覆写伐木",
       inputShape: "rect-selection",
-      interactionSource: { kind: "toolbar", toolId: "chop" },
+      interactionSource: { kind: "menu", menuId: "interaction-mode", itemId: "chop" },
       explainRule: (input) => ({
         verb: "assign_tool_task:chop-override",
         targetCellKeys: input.cells.map((c) => `${c.col},${c.row}`),
         targetEntityIds: [],
         sourceMode: {
-          source: { kind: "toolbar", toolId: "chop" },
+          source: { kind: "menu", menuId: "interaction-mode", itemId: "chop" },
           selectionModifier: input.modifier,
           inputShape: "rect-selection"
         }
@@ -81,7 +81,11 @@ describe("interaction session + commit", () => {
     expect(cmd.targetEntityIds).toEqual([]);
     expect(cmd.sourceMode.selectionModifier).toBe("union");
     expect(cmd.sourceMode.inputShape).toBe("rect-selection");
-    expect(cmd.sourceMode.source).toEqual({ kind: "toolbar", toolId: "zone-create" });
+    expect(cmd.sourceMode.source).toEqual({
+      kind: "menu",
+      menuId: "interaction-mode",
+      itemId: "zone-create"
+    });
     expect(session.state).toBe("committed");
   });
 

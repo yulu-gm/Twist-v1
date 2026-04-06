@@ -1,20 +1,10 @@
-/** 小人指令工具栏：纯数据与校验（不依赖 Phaser，可在 Node 中单测）。 */
-
-/** 建造工具子选项：决定输入形态与领域动词（见 menu-model `activeBuildToolState`）。 */
-export type VillagerBuildSubId = "wall" | "bed";
-
-export type VillagerToolBuildSubItem = Readonly<{
-  id: VillagerBuildSubId;
-  label: string;
-}>;
+/** 与命令菜单热键槽位对应的展示用条目（Q–O）；`id` 与任务标记用 toolId 对齐处仍含 `build`。 */
 
 export type VillagerTool = Readonly<{
   id: string;
   hotkey: "Q" | "W" | "E" | "R" | "T" | "Y" | "U" | "I" | "O" | "P";
   label: string;
   hint: string;
-  /** 有此项时，主槽点击后展开子菜单，需再选子项才进入具体建造模式。 */
-  buildSubmenu?: readonly VillagerToolBuildSubItem[];
 }>;
 
 export const VILLAGER_TOOLS: readonly VillagerTool[] = [
@@ -22,16 +12,7 @@ export const VILLAGER_TOOLS: readonly VillagerTool[] = [
   { id: "demolish", hotkey: "W", label: "拆除", hint: "拆除建筑或障碍" },
   { id: "mow", hotkey: "E", label: "割草", hint: "清理植被" },
   { id: "lumber", hotkey: "R", label: "伐木", hint: "砍伐树木" },
-  {
-    id: "build",
-    hotkey: "T",
-    label: "建造",
-    hint: "放置建筑",
-    buildSubmenu: [
-      { id: "wall", label: "木墙" },
-      { id: "bed", label: "木床" }
-    ]
-  },
+  { id: "build", hotkey: "T", label: "建造", hint: "木墙笔刷 / 木床放置（见命令菜单）" },
   { id: "farm", hotkey: "Y", label: "耕种", hint: "翻土与播种" },
   { id: "haul", hotkey: "U", label: "搬运", hint: "运输物资" },
   { id: "patrol", hotkey: "I", label: "巡逻", hint: "沿路线警戒" },

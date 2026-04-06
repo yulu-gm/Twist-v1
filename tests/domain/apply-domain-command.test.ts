@@ -18,7 +18,7 @@ function demoCmd(verb: string, cellKeys: string[]): DomainCommand {
     targetCellKeys: cellKeys,
     targetEntityIds: [],
     sourceMode: {
-      source: { kind: "toolbar", toolId: "demolish" },
+      source: { kind: "menu", menuId: "orders", itemId: "demolish" },
       selectionModifier: "replace",
       inputShape: "rect-selection"
     },
@@ -84,7 +84,7 @@ describe("applyDomainCommandToWorldCore", () => {
       targetCellKeys: [stoneKey, "4,4"],
       targetEntityIds: [],
       sourceMode: {
-        source: { kind: "toolbar", toolId: "mine" },
+        source: { kind: "menu", menuId: "orders", itemId: "mine" },
         selectionModifier: "replace",
         inputShape: "rect-selection"
       },

@@ -10,12 +10,17 @@ import { formatTimeOfDayLabel, type TimeOfDayState } from "../game/time";
 import { pawnProfileForId } from "../data/pawn-profiles";
 import { pawnDetailBehaviorLabelZh } from "./status-display-model";
 import type { RuntimeLogPanelEntry } from "../runtime-log/runtime-log";
+import { VILLAGER_TOOLS, VILLAGER_TOOL_KEY_CODES, type VillagerTool } from "../data/villager-tools";
 import {
-  VILLAGER_TOOLS,
-  VILLAGER_TOOL_KEY_CODES,
-  type VillagerBuildSubId,
-  type VillagerTool
-} from "../data/villager-tools";
+  COMMAND_MENU_CATEGORIES,
+  commandMenuCommandsForCategory,
+  commandMenuHotkeyLabel,
+  defaultCommandMenuCommandId,
+  getCommandMenuCategory,
+  getCommandMenuCommand,
+  type CommandMenuCategoryId,
+  type CommandMenuCommandId
+} from "../data/command-menu";
 import { needSignalsFromNeeds } from "../player/need-signals";
 import type { ScenarioDefinition } from "../headless/scenario-types";
 
@@ -27,12 +32,6 @@ export type TimeControlCallbacks = Readonly<{
   onTogglePause: () => void;
   onSetSpeed: (speed: TimeSpeed) => void;
 }>;
-
-/** 工具选中回调。 */
-export type ToolSelectCallback = (index: number) => void;
-
-/** 建造子项选中（木墙 / 木床）。 */
-export type BuildSubSelectCallback = (sub: VillagerBuildSubId) => void;
 
 /** Pawn 选中回调。 */
 export type PawnSelectCallback = (pawnId: string | null) => void;
@@ -90,6 +89,12 @@ export class HudManager {
   /** 建造槽位的子菜单容器（仅 `build` 槽存在此项）。 */
   private buildSubmenuContainer: HTMLElement | null = null;
   private buildToolIndex: number | null = null;
+  private commandCategoryEls: HTMLButtonElement[] = [];
+  private commandMenuAbort: AbortController | null = null;
+  private commandMenuSelectedId: string | null = null;
+  private commandMenuActiveCategoryId: string | null = null;
+  private commandMenuOpen = true;
+  private commandMenuOnSelect: ((commandId: string) => void) | null = null;
 
   // Pawn 名册 + 详情
   private rosterRoot: HTMLElement | null;
@@ -425,6 +430,9 @@ export class HudManager {
     if (this.debugToggleEl) {
       this.debugToggleEl.setAttribute("aria-pressed", state.open ? "true" : "false");
     }
+    if (!state.open) {
+      return;
+    }
     if (this.debugPauseEl) {
       this.debugPauseEl.classList.toggle("selected", state.paused);
       this.debugPauseEl.setAttribute("aria-pressed", state.paused ? "true" : "false");
@@ -463,110 +471,156 @@ export class HudManager {
     this.debugCallbacks = null;
   }
 
-  // ── 工具栏 ────────────────────────────────────────────────
+  private commandMenuCategoryForId(categoryId: string | null) {
+    if (!categoryId) return null;
+    return getCommandMenuCategory(categoryId as CommandMenuCategoryId) ?? null;
+  }
 
-  public setupToolBar(
-    onSelect: ToolSelectCallback,
-    initialIndex: number,
-    build?: Readonly<{
-      onSelectSub: BuildSubSelectCallback;
-      initialSub: VillagerBuildSubId | null;
-    }>
-  ): AbortController {
-    this.teardownToolBar();
-    const abort = new AbortController();
-    const { signal } = abort;
-    this.toolUiAbort = abort;
+  private renderCommandMenu(): void {
+    const root = this.toolBarRoot;
+    if (!root) return;
 
-    if (this.toolBarRoot) {
-      for (let i = 0; i < VILLAGER_TOOLS.length; i++) {
-        const tool = VILLAGER_TOOLS[i]!;
-        const slot = document.createElement("button");
-        slot.type = "button";
-        slot.className = "tool-slot";
-        slot.dataset.toolId = tool.id;
-        slot.title = `${tool.hint}（${tool.hotkey}）`;
-        slot.setAttribute("aria-label", `${tool.label}，快捷键 ${tool.hotkey}`);
-        slot.innerHTML = `<span class="tool-key">${tool.hotkey}</span><div class="tool-label">${tool.label}</div>`;
-        slot.addEventListener("click", () => onSelect(i), { signal });
+    root.replaceChildren();
+    this.toolSlotEls = [];
+    this.commandCategoryEls = [];
 
-        const subs = tool.buildSubmenu;
-        if (subs?.length) {
-          const wrap = document.createElement("div");
-          wrap.className = "tool-slot-with-submenu";
+    const selectedEntry =
+      (this.commandMenuSelectedId && getCommandMenuCommand(this.commandMenuSelectedId as CommandMenuCommandId)) ??
+      getCommandMenuCommand(defaultCommandMenuCommandId())!;
+    const activeCategoryId =
+      this.commandMenuCategoryForId(this.commandMenuActiveCategoryId)?.id ?? selectedEntry.categoryId;
+    this.commandMenuActiveCategoryId = activeCategoryId;
 
-          const subContainer = document.createElement("div");
-          subContainer.className = "build-tool-submenu";
-          subContainer.setAttribute("role", "group");
-          subContainer.setAttribute("aria-label", `${tool.label}子选项`);
-          subContainer.hidden = true;
+    const primary = document.createElement("button");
+    primary.type = "button";
+    primary.id = "villager-command-primary";
+    primary.className = "villager-command-primary";
+    primary.dataset.commandId = selectedEntry.id;
+    primary.dataset.categoryId = selectedEntry.categoryId;
+    primary.setAttribute("aria-label", `当前命令 ${selectedEntry.label}`);
+    primary.setAttribute("aria-pressed", "true");
+    const activeCategoryLabel = getCommandMenuCategory(selectedEntry.categoryId)?.label ?? selectedEntry.categoryId;
+    primary.innerHTML = `
+      <span class="command-primary-prefix">当前命令</span>
+      <span class="command-primary-label">${escapeHtml(selectedEntry.label)}</span>
+      <span class="command-primary-meta">${escapeHtml(activeCategoryLabel)}</span>
+    `;
+    primary.addEventListener(
+      "click",
+      () => {
+        this.commandMenuOpen = !this.commandMenuOpen;
+        this.renderCommandMenu();
+      },
+      { signal: this.commandMenuAbort?.signal }
+    );
 
-          for (const sub of subs) {
-            const subBtn = document.createElement("button");
-            subBtn.type = "button";
-            subBtn.className = "build-tool-submenu-item";
-            subBtn.dataset.buildSubId = sub.id;
-            subBtn.textContent = sub.label;
-            subBtn.setAttribute("aria-label", sub.label);
-            subBtn.addEventListener(
-              "click",
-              (ev) => {
-                ev.stopPropagation();
-                build?.onSelectSub(sub.id);
-              },
-              { signal }
-            );
-            subContainer.appendChild(subBtn);
-          }
+    const categories = document.createElement("div");
+    categories.id = "villager-command-categories";
+    categories.className = "villager-command-categories";
+    categories.setAttribute("role", "tablist");
+    categories.setAttribute("aria-label", "命令分类");
+    categories.hidden = !this.commandMenuOpen;
 
-          wrap.appendChild(slot);
-          wrap.appendChild(subContainer);
-          this.toolBarRoot.appendChild(wrap);
-          this.buildSubmenuContainer = subContainer;
-          this.buildToolIndex = i;
-        } else {
-          this.toolBarRoot.appendChild(slot);
-        }
-
-        this.toolSlotEls.push(slot);
-      }
+    for (const category of COMMAND_MENU_CATEGORIES) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "command-category-button";
+      button.dataset.categoryId = category.id;
+      button.textContent = category.label;
+      const selected = category.id === activeCategoryId;
+      button.classList.toggle("selected", selected);
+      button.setAttribute("aria-pressed", selected ? "true" : "false");
+      button.setAttribute("aria-controls", "villager-command-list");
+      button.addEventListener(
+        "click",
+        () => {
+          this.commandMenuActiveCategoryId = category.id;
+          this.renderCommandMenu();
+        },
+        { signal: this.commandMenuAbort?.signal }
+      );
+      categories.appendChild(button);
+      this.commandCategoryEls.push(button);
     }
 
-    this.syncToolBarSelection(initialIndex, build?.initialSub ?? null);
+    const list = document.createElement("div");
+    list.id = "villager-command-list";
+    list.className = "villager-command-list";
+    list.setAttribute("role", "group");
+    list.setAttribute("aria-label", "命令列表");
+    list.hidden = !this.commandMenuOpen;
+
+    const commands = commandMenuCommandsForCategory(activeCategoryId as CommandMenuCategoryId);
+    for (const entry of commands) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "command-item-button";
+      button.dataset.commandId = entry.id;
+      button.dataset.categoryId = entry.categoryId;
+      const selected = entry.id === selectedEntry.id;
+      button.classList.toggle("selected", selected);
+      button.setAttribute("aria-pressed", selected ? "true" : "false");
+      const hotkey = commandMenuHotkeyLabel(entry.id);
+      button.setAttribute("aria-label", `${entry.label}，快捷键 ${hotkey}`);
+      button.innerHTML = `
+        <span class="command-item-hotkey">${escapeHtml(hotkey)}</span>
+        <span class="command-item-label">${escapeHtml(entry.label)}</span>
+      `;
+      button.addEventListener(
+        "click",
+        () => {
+          this.commandMenuSelectedId = entry.id;
+          this.commandMenuActiveCategoryId = entry.categoryId;
+          this.renderCommandMenu();
+          this.commandMenuOnSelect?.(entry.id);
+        },
+        { signal: this.commandMenuAbort?.signal }
+      );
+      list.appendChild(button);
+      this.toolSlotEls.push(button);
+    }
+
+    root.append(primary, categories, list);
+  }
+
+  public setupCommandMenu(
+    onSelect: (commandId: string) => void,
+    initialCommandId: string,
+    initialCategoryId?: string
+  ): AbortController {
+    this.teardownCommandMenu();
+    const abort = new AbortController();
+    this.commandMenuAbort = abort;
+    this.commandMenuOnSelect = onSelect;
+    const initialEntry =
+      getCommandMenuCommand(initialCommandId as CommandMenuCommandId) ??
+      getCommandMenuCommand(defaultCommandMenuCommandId())!;
+    this.commandMenuSelectedId = initialEntry.id;
+    this.commandMenuActiveCategoryId =
+      initialCategoryId && COMMAND_MENU_CATEGORIES.some((category) => category.id === initialCategoryId)
+        ? initialCategoryId
+        : initialEntry.categoryId;
+    this.commandMenuOpen = true;
+    this.renderCommandMenu();
     return abort;
   }
 
-  public syncToolBarSelection(selectedIndex: number, buildSub: VillagerBuildSubId | null): void {
-    for (let i = 0; i < this.toolSlotEls.length; i++) {
-      const el = this.toolSlotEls[i]!;
-      const on = i === selectedIndex;
-      el.classList.toggle("selected", on);
-      el.setAttribute("aria-pressed", on ? "true" : "false");
-    }
-
-    if (this.buildSubmenuContainer && this.buildToolIndex !== null) {
-      const expanded = selectedIndex === this.buildToolIndex;
-      this.buildSubmenuContainer.hidden = !expanded;
-      const buttons = Array.from(
-        this.buildSubmenuContainer.querySelectorAll<HTMLButtonElement>(
-          ".build-tool-submenu-item[data-build-sub-id]"
-        )
-      );
-      for (const subBtn of buttons) {
-        const id = subBtn.dataset.buildSubId as VillagerBuildSubId | undefined;
-        const on = expanded && id !== undefined && id === buildSub;
-        subBtn.classList.toggle("selected", on);
-        subBtn.setAttribute("aria-pressed", on ? "true" : "false");
-      }
-    }
+  public syncCommandMenuSelection(commandId: string): void {
+    const entry = getCommandMenuCommand(commandId as CommandMenuCommandId);
+    if (!entry) return;
+    this.commandMenuSelectedId = entry.id;
+    this.commandMenuActiveCategoryId = entry.categoryId;
+    this.renderCommandMenu();
   }
 
-  public teardownToolBar(): void {
-    this.toolUiAbort?.abort();
-    this.toolUiAbort = null;
+  public teardownCommandMenu(): void {
+    this.commandMenuAbort?.abort();
+    this.commandMenuAbort = null;
+    this.commandMenuOnSelect = null;
+    this.commandMenuSelectedId = null;
+    this.commandMenuActiveCategoryId = null;
     this.toolSlotEls = [];
-    this.buildSubmenuContainer = null;
-    this.buildToolIndex = null;
+    this.commandCategoryEls = [];
     if (this.toolBarRoot) this.toolBarRoot.replaceChildren();
   }
 
@@ -699,7 +753,7 @@ export class HudManager {
   // ── 全部清理 ──────────────────────────────────────────────
 
   public teardownAll(): void {
-    this.teardownToolBar();
+    this.teardownCommandMenu();
     this.teardownPawnRoster();
     this.teardownPawnDetail();
     this.teardownYamlScenarioPanel();

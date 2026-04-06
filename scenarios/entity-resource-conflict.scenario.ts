@@ -27,7 +27,7 @@ export const ENTITY_RESOURCE_CONFLICT_SCENARIO: ScenarioDefinition = {
   playerSelectionAfterHydrate: [
     {
       label: "second-claim-on-contended-resource",
-      toolId: "haul",
+      commandId: "haul",
       selectionModifier: "replace",
       cellKeys: [conflictKey],
       inputShape: "rect-selection",

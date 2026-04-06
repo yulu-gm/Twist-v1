@@ -20,11 +20,27 @@
         font-family: "Segoe UI", sans-serif;
       }
 
-      #scene-hud {
+      /* 左上角：场景栏 + 其下方纵向展开的运行时调试面板 */
+      #top-left-hud-stack {
         position: fixed;
         left: 12px;
         top: 12px;
         z-index: 10;
+        display: inline-flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+        max-width: min(720px, calc(100vw - 24px));
+        pointer-events: none;
+      }
+
+      #top-left-hud-stack > #scene-hud,
+      #top-left-hud-stack > #scene-debug-panel {
+        pointer-events: auto;
+      }
+
+      #scene-hud {
+        position: relative;
         display: flex;
         flex-direction: row;
         align-items: flex-end;
@@ -36,7 +52,7 @@
         box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
         font-size: 13px;
         color: #f5f1e8;
-        pointer-events: auto;
+        flex-shrink: 0;
       }
 
       #scene-hud label,
@@ -251,23 +267,13 @@
         display: none !important;
       }
 
+      #scene-debug-panel[hidden] {
+        display: none !important;
+      }
+
+      /* 玩家通道（网关反馈）：隐藏显示，DOM 保留供逻辑绑定 */
       #player-channel-hint {
-        position: fixed;
-        left: 50%;
-        bottom: 96px;
-        transform: translateX(-50%);
-        z-index: 11;
-        max-width: min(560px, calc(100vw - 24px));
-        padding: 8px 12px;
-        border-radius: 8px;
-        border: 1px solid #5c5346;
-        background: rgba(28, 24, 20, 0.92);
-        color: #f5f1e8;
-        font-size: 12px;
-        line-height: 1.4;
-        text-align: center;
-        pointer-events: none;
-        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+        display: none !important;
       }
 
       #player-channel-hint .player-channel-mode {
@@ -276,83 +282,247 @@
       }
 
       #player-channel-hint .player-channel-result {
-        margin-top: 4px;
+        margin-top: 0;
         font-size: 11px;
         color: #d4c4a8;
       }
 
       #player-channel-hint .player-channel-contract {
-        margin-top: 4px;
+        margin-top: 0;
         font-size: 10px;
         color: #a89878;
+        word-break: break-word;
+      }
+
+      #scene-debug-panel {
+        position: relative;
+        flex-shrink: 0;
+        box-sizing: border-box;
+        width: 100%;
+        max-height: min(58vh, 520px);
+        overflow: auto;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid #5c5346;
+        background: rgba(28, 24, 20, 0.94);
+        color: #f5f1e8;
+        font-size: 12px;
+        line-height: 1.45;
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        align-items: stretch;
+      }
+
+      #scene-debug-panel > .scene-hud-group {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+      }
+
+      #scene-debug-panel label {
+        display: block;
+        font-size: 11px;
+        opacity: 0.88;
+        letter-spacing: 0.04em;
+      }
+
+      #scene-debug-panel input#scene-debug-filter {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 6px 8px;
+        border-radius: 6px;
+        border: 1px solid #5c5346;
+        background: #242019;
+        color: #f5f1e8;
+        font: inherit;
+      }
+
+      #scene-debug-panel input#scene-debug-filter:focus {
+        outline: 2px solid #81b29a;
+        outline-offset: 2px;
+      }
+
+      .scene-debug-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        align-items: stretch;
+      }
+
+      .scene-debug-actions .scene-time-button {
+        width: 100%;
+      }
+
+      #scene-debug-log-list {
+        flex: 1 1 auto;
+        min-height: 72px;
+        max-height: 180px;
+        overflow-y: auto;
+        border-radius: 6px;
+        border: 1px solid #3d3830;
+        background: rgba(18, 16, 14, 0.65);
+      }
+
+      #scene-debug-detail {
+        flex-shrink: 0;
+        max-height: 120px;
+        overflow: auto;
+        margin: 0;
+        padding: 8px;
+        border-radius: 6px;
+        border: 1px solid #3d3830;
+        background: rgba(18, 16, 14, 0.85);
+        font-size: 11px;
+        white-space: pre-wrap;
+        word-break: break-word;
       }
 
       #villager-tool-bar {
+        position: fixed;
+        inset: 0;
+        z-index: 11;
+        pointer-events: none;
+      }
+
+      #villager-tool-bar button {
+        font: inherit;
+      }
+
+      #villager-command-primary {
+        position: fixed;
+        left: 12px;
+        bottom: 16px;
+        z-index: 11;
+        min-width: 168px;
+        min-height: 84px;
+        padding: 12px 14px;
+        border-radius: 12px;
+        border: 1px solid #5c5346;
+        background: linear-gradient(180deg, rgba(45, 39, 30, 0.98), rgba(28, 24, 20, 0.98));
+        color: #f5f1e8;
+        cursor: pointer;
+        text-align: left;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        gap: 6px;
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
+        pointer-events: auto;
+      }
+
+      #villager-command-primary:hover,
+      #villager-command-primary:focus-visible {
+        border-color: #8b7e68;
+        outline: none;
+      }
+
+      #villager-command-primary .command-primary-prefix {
+        font-size: 10px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: #c4b8a4;
+      }
+
+      #villager-command-primary .command-primary-label {
+        font-size: 18px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+      }
+
+      #villager-command-primary .command-primary-meta {
+        font-size: 11px;
+        color: #d4c4a8;
+      }
+
+      #villager-command-categories {
+        position: fixed;
+        left: 12px;
+        bottom: 112px;
+        z-index: 11;
+        width: 110px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        pointer-events: auto;
+      }
+
+      #villager-command-list {
         position: fixed;
         left: 50%;
         bottom: 16px;
         transform: translateX(-50%);
         z-index: 11;
         display: flex;
-        flex-direction: row;
-        align-items: stretch;
-        gap: 8px;
-        padding: 10px 12px;
-        border-radius: 10px;
-        border: 1px solid #5c5346;
-        background: rgba(28, 24, 20, 0.94);
-        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
-        pointer-events: auto;
-        max-width: calc(100vw - 24px);
         flex-wrap: wrap;
         justify-content: center;
+        gap: 8px;
+        width: min(calc(9 * 88px + 8 * 8px), calc(100vw - 220px));
+        pointer-events: auto;
       }
 
-      #villager-tool-bar .tool-slot {
-        min-width: 64px;
-        padding: 6px 8px 8px;
-        border-radius: 8px;
+      .command-category-button,
+      .command-item-button {
+        min-height: 56px;
+        padding: 8px 10px;
+        border-radius: 10px;
         border: 1px solid #3d3830;
         background: #242019;
         color: #f5f1e8;
         cursor: pointer;
-        text-align: center;
-        font-size: 12px;
-        line-height: 1.2;
         transition:
           border-color 0.12s ease,
           background 0.12s ease,
-          box-shadow 0.12s ease;
+          box-shadow 0.12s ease,
+          transform 0.12s ease;
       }
 
-      #villager-tool-bar .tool-slot:hover {
+      .command-category-button:hover,
+      .command-item-button:hover,
+      .command-category-button:focus-visible,
+      .command-item-button:focus-visible {
         border-color: #6e6558;
         background: #2a241c;
+        outline: none;
       }
 
-      #villager-tool-bar .tool-slot:focus-visible {
-        outline: 2px solid #81b29a;
-        outline-offset: 2px;
-      }
-
-      #villager-tool-bar .tool-slot.selected {
+      .command-category-button.selected,
+      .command-item-button.selected {
         border-color: #e8c547;
         box-shadow: 0 0 0 1px rgba(232, 197, 71, 0.45);
         background: #2f281c;
       }
 
-      #villager-tool-bar .tool-key {
-        display: inline-block;
-        font-size: 11px;
+      .command-category-button {
+        text-align: left;
+        font-size: 12px;
+        line-height: 1.2;
         font-weight: 600;
-        letter-spacing: 0.06em;
-        color: #c4b8a4;
-        margin-bottom: 4px;
+        letter-spacing: 0.04em;
       }
 
-      #villager-tool-bar .tool-label {
+      .command-item-button {
+        min-width: 88px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        gap: 4px;
+        text-align: left;
+        line-height: 1.2;
+      }
+
+      .command-item-hotkey {
+        display: inline-block;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        color: #c4b8a4;
+      }
+
+      .command-item-label {
         font-size: 13px;
-        font-weight: 500;
+        font-weight: 600;
       }
 
       #pawn-roster {
@@ -498,39 +668,55 @@
     </style>
   </head>
   <body>
-    <div id="scene-hud" aria-label="场景菜单栏">
-      <div class="scene-hud-group">
-        <label for="scene-variant">测试场景</label>
-        <select id="scene-variant" title="仅切换显示名组合（与右下角验收独立）">
-          <option value="default">默认（原显示名）</option>
-          <option value="alt-en">随机英文名 ×5</option>
-        </select>
-      </div>
-      <div id="scene-time" class="scene-hud-group" aria-live="polite">
-        <span class="scene-hud-label">时间</span>
-        <span id="scene-time-value">Day 1 06:00</span>
-      </div>
-      <div id="scene-time-controls" class="scene-hud-group">
-        <span class="scene-hud-label">时间控制</span>
-        <div id="scene-speed-controls">
-          <button id="scene-time-toggle" class="scene-time-button" type="button" title="空格：暂停/继续；` 键（主键盘 1 左侧）：暂停">
-            暂停
-          </button>
-          <button id="scene-speed-1" class="scene-time-button selected" type="button" title="主键盘 1：1 倍速">
-            1x
-          </button>
-          <button id="scene-speed-2" class="scene-time-button" type="button" title="主键盘 2：2 倍速">
-            2x
-          </button>
-          <button id="scene-speed-3" class="scene-time-button" type="button" title="主键盘 3：3 倍速">
-            3x
-          </button>
+    <div id="top-left-hud-stack" aria-label="场景菜单与运行时调试">
+      <div id="scene-hud" aria-label="场景菜单栏">
+        <div class="scene-hud-group">
+          <label for="scene-variant">测试场景</label>
+          <select id="scene-variant" title="仅切换显示名组合（与右下角验收独立）">
+            <option value="default">默认（原显示名）</option>
+            <option value="alt-en">随机英文名 ×5</option>
+          </select>
+        </div>
+        <div id="scene-time" class="scene-hud-group" aria-live="polite">
+          <span class="scene-hud-label">时间</span>
+          <span id="scene-time-value">Day 1 06:00</span>
+        </div>
+        <div id="scene-time-controls" class="scene-hud-group">
+          <span class="scene-hud-label">时间控制</span>
+          <div id="scene-speed-controls">
+            <button id="scene-time-toggle" class="scene-time-button" type="button" title="空格：暂停/继续；` 键（主键盘 1 左侧）：暂停">
+              暂停
+            </button>
+            <button id="scene-speed-1" class="scene-time-button selected" type="button" title="主键盘 1：1 倍速">
+              1x
+            </button>
+            <button id="scene-speed-2" class="scene-time-button" type="button" title="主键盘 2：2 倍速">
+              2x
+            </button>
+            <button id="scene-speed-3" class="scene-time-button" type="button" title="主键盘 3：3 倍速">
+              3x
+            </button>
+          </div>
+        </div>
+        <div class="scene-hud-group">
+          <span class="scene-hud-label">运行时日志</span>
+          <button id="scene-debug-toggle" class="scene-time-button" type="button">调试面板</button>
         </div>
       </div>
-      <div class="scene-hud-group">
-        <span class="scene-hud-label">运行时日志</span>
-        <button id="scene-debug-toggle" class="scene-time-button" type="button">调试面板</button>
-      </div>
+      <aside id="scene-debug-panel" aria-label="运行时调试日志" hidden>
+        <div class="scene-hud-group">
+          <span class="scene-hud-label">运行时调试日志</span>
+          <div class="scene-debug-actions">
+            <button id="scene-debug-pause" class="scene-time-button" type="button">暂停滚动</button>
+            <button id="scene-debug-clear" class="scene-time-button" type="button">清空</button>
+          </div>
+        </div>
+        <label for="scene-debug-filter">过滤</label>
+        <input id="scene-debug-filter" type="text" placeholder="关键词" />
+        <div id="scene-debug-count" aria-live="polite"></div>
+        <div id="scene-debug-log-list" aria-live="polite"></div>
+        <pre id="scene-debug-detail"></pre>
+      </aside>
     </div>
     <div id="right-dev-stack" aria-label="测试场景面板">
       <aside id="yaml-scenario-panel" aria-label="测试场景（热切换，不重启场景）">
@@ -554,28 +740,14 @@
           </div>
         </div>
       </aside>
-      <aside id="scene-debug-panel" aria-label="运行时调试日志" hidden>
-        <div class="scene-hud-group">
-          <span class="scene-hud-label">运行时调试日志</span>
-          <div class="scene-debug-actions">
-            <button id="scene-debug-pause" class="scene-time-button" type="button">暂停滚动</button>
-            <button id="scene-debug-clear" class="scene-time-button" type="button">清空</button>
-          </div>
-        </div>
-        <label for="scene-debug-filter">过滤</label>
-        <input id="scene-debug-filter" type="text" placeholder="关键词" />
-        <div id="scene-debug-count" aria-live="polite"></div>
-        <div id="scene-debug-log-list" aria-live="polite"></div>
-        <pre id="scene-debug-detail"></pre>
-      </aside>
     </div>
-    <div id="grid-hover-info" hidden aria-live="polite"></div>
-    <div id="player-channel-hint" aria-live="polite">
+    <div id="player-channel-hint" aria-live="polite" hidden>
       <div id="player-channel-mode" class="player-channel-mode"></div>
       <div id="player-channel-result" class="player-channel-result"></div>
       <div id="player-channel-contract" class="player-channel-contract"></div>
     </div>
-    <div id="villager-tool-bar" role="toolbar" aria-label="小人指令工具"></div>
+    <div id="grid-hover-info" hidden aria-live="polite"></div>
+    <div id="villager-tool-bar" role="toolbar" aria-label="三层命令菜单"></div>
     <div id="pawn-roster" role="tablist" aria-label="人物略缩图"></div>
     <aside id="pawn-detail-panel" hidden aria-live="polite"></aside>
     <div id="app"></div>

@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import type { TimeSpeed } from "../game/time";
 import type { HudManager } from "../ui/hud-manager";
+import { commandIdForHotkeyIndex, type CommandMenuCommandId } from "../data/command-menu";
 import { VILLAGER_TOOL_KEY_CODES } from "../data/villager-tools";
 
 export class GameSceneKeyboardBindings {
@@ -45,17 +46,23 @@ export class GameSceneKeyboardBindings {
     this.timeControlKeyObjects = [];
   }
 
-  public setupVillagerToolBarKeys(scene: Phaser.Scene, onSelectTool: (index: number) => void): void {
+  public setupCommandMenuHotkeys(
+    scene: Phaser.Scene,
+    onSelectCommand: (commandId: CommandMenuCommandId) => void
+  ): void {
     if (!scene.input.keyboard) return;
     for (let i = 0; i < VILLAGER_TOOL_KEY_CODES.length; i++) {
       const code = VILLAGER_TOOL_KEY_CODES[i]!;
       const key = scene.input.keyboard.addKey(code);
-      key.on("down", () => onSelectTool(i));
+      key.on("down", () => {
+        const id = commandIdForHotkeyIndex(i);
+        if (id) onSelectCommand(id);
+      });
       this.toolKeyObjects.push(key);
     }
   }
 
-  public teardownVillagerToolBarKeys(): void {
+  public teardownCommandMenuHotkeys(): void {
     for (const k of this.toolKeyObjects) k.destroy();
     this.toolKeyObjects = [];
   }
@@ -75,7 +82,7 @@ export class GameSceneKeyboardBindings {
 
   public teardownAll(hud: HudManager): void {
     this.teardownTimeControls(hud);
-    this.teardownVillagerToolBarKeys();
+    this.teardownCommandMenuHotkeys();
     this.teardownEsc();
   }
 }

@@ -23,7 +23,7 @@ export const BEHAVIOR_001_WANDER_SCENARIO: ScenarioDefinition = {
   playerSelectionAfterHydrate: [
     {
       label: "observe-wander",
-      toolId: "idle",
+      commandId: "idle",
       selectionModifier: "replace",
       cellKeys: [coordKey(PAWN_CELL)],
       inputShape: "single-cell",

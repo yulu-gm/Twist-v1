@@ -1,10 +1,21 @@
 /**
- * 扁平菜单读模型：与工具栏 / 交互模式动作对齐，无 DOM。
+ * Pure menu-state model：三层命令菜单状态与读模型辅助函数。
  */
 
-import type { VillagerBuildSubId } from "../data/villager-tools";
+import {
+  commandMenuCommandsForCategory,
+  commandMenuDomainSemantics,
+  commandMenuHotkeyLabel,
+  defaultCommandMenuCategoryId,
+  defaultCommandMenuCommandId,
+  getCommandMenuCommand,
+  type CommandMenuCategoryId,
+  type CommandMenuCommandId,
+  type CommandMenuDomainSemantics,
+  type CommandMenuInputShape
+} from "../data/command-menu";
 
-/** 与小人工具栏 id（如 villager-tools）或交互模式键对齐的语义化动作。 */
+/** 旧版扁平菜单动作（少量组件测试仍引用）。 */
 export type MenuItemAction =
   | string
   | Readonly<{ kind: "villager-tool"; toolId: string }>
@@ -43,22 +54,90 @@ export function toggleMenuVisibility(state: MenuState): MenuState {
   return { ...state, visible: !state.visible };
 }
 
-// ── Story-1：建造子菜单 → 活跃交互态（供 floor / 测试对齐 inputShape + verb）────────
+export interface CommandMenuState {
+  readonly isOpen: boolean;
+  readonly activeCategoryId: CommandMenuCategoryId;
+  readonly activeCommandId: CommandMenuCommandId;
+}
 
-export type ActiveBuildToolState = Readonly<{
-  inputShape: "brush-stroke" | "single-cell";
-  verb: "build_wall_blueprint" | "place_furniture:bed";
+export type CommandMenuInteractionSemantics = Readonly<{
+  readonly inputShape: CommandMenuInputShape;
+  readonly modeKey: string;
+  readonly markerToolId: string;
+  readonly hotkeyLabel: string;
 }>;
 
-/** 未选择子项时不视为已进入具体建造模式。 */
-export function activeBuildToolState(
-  buildSub: VillagerBuildSubId | null
-): ActiveBuildToolState | null {
-  if (buildSub === "wall") {
-    return { inputShape: "brush-stroke", verb: "build_wall_blueprint" };
-  }
-  if (buildSub === "bed") {
-    return { inputShape: "single-cell", verb: "place_furniture:bed" };
-  }
-  return null;
+function resolveCategoryForCommand(commandId: CommandMenuCommandId): CommandMenuCategoryId {
+  const command = getCommandMenuCommand(commandId);
+  if (command) return command.categoryId;
+  return defaultCommandMenuCategoryId();
+}
+
+function resolveCommandInCategory(categoryId: CommandMenuCategoryId): CommandMenuCommandId {
+  return commandMenuCommandsForCategory(categoryId)[0]?.id ?? defaultCommandMenuCommandId();
+}
+
+export function createCommandMenuState(overrides: Partial<CommandMenuState> = {}): CommandMenuState {
+  const activeCommandId =
+    overrides.activeCommandId ??
+    resolveCommandInCategory(overrides.activeCategoryId ?? defaultCommandMenuCategoryId());
+  const activeCategoryId = overrides.activeCategoryId ?? resolveCategoryForCommand(activeCommandId);
+
+  return {
+    isOpen: overrides.isOpen ?? false,
+    activeCategoryId,
+    activeCommandId
+  };
+}
+
+export function setCommandMenuOpen(state: CommandMenuState, isOpen: boolean): CommandMenuState {
+  return { ...state, isOpen };
+}
+
+export function toggleCommandMenuOpen(state: CommandMenuState): CommandMenuState {
+  return { ...state, isOpen: !state.isOpen };
+}
+
+export function setCommandMenuCategory(
+  state: CommandMenuState,
+  activeCategoryId: CommandMenuCategoryId
+): CommandMenuState {
+  return { ...state, activeCategoryId };
+}
+
+export function selectCommandMenuCommand(
+  state: CommandMenuState,
+  activeCommandId: CommandMenuCommandId
+): CommandMenuState {
+  return {
+    ...state,
+    activeCommandId,
+    activeCategoryId: resolveCategoryForCommand(activeCommandId)
+  };
+}
+
+export function visibleCommandsForCommandMenuState(state: CommandMenuState) {
+  return commandMenuCommandsForCategory(state.activeCategoryId);
+}
+
+export function activeCommandForCommandMenuState(state: CommandMenuState) {
+  return getCommandMenuCommand(state.activeCommandId) ?? getCommandMenuCommand(defaultCommandMenuCommandId())!;
+}
+
+export function commandInteractionSemantics(commandId: CommandMenuCommandId): CommandMenuInteractionSemantics {
+  const command = getCommandMenuCommand(commandId) ?? getCommandMenuCommand(defaultCommandMenuCommandId())!;
+  return {
+    inputShape: command.inputShape,
+    modeKey: command.modeKey,
+    markerToolId: command.markerToolId,
+    hotkeyLabel: commandMenuHotkeyLabel(command.id)
+  };
+}
+
+export function activeCommandInteractionSemantics(state: CommandMenuState): CommandMenuInteractionSemantics {
+  return commandInteractionSemantics(state.activeCommandId);
+}
+
+export function activeCommandDomainSemantics(state: CommandMenuState): CommandMenuDomainSemantics {
+  return commandMenuDomainSemantics(state.activeCommandId);
 }

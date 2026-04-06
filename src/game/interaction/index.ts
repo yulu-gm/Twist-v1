@@ -22,9 +22,8 @@ export { applyDomainCommandToWorldCore } from "../../player/apply-domain-command
 export {
   type BuildCommandInput,
   buildDomainCommand,
-  defaultInputShapeForTool,
   resetDomainCommandIdSequence,
-  toolbarToolIdForDomainCommand
+  taskMarkerToolIdForDomainCommand
 } from "../../player/build-domain-command";
 export {
   type PlayerSelectionCommitInput,
@@ -32,10 +31,7 @@ export {
   commitPlayerSelectionToWorld,
   rebuildTaskMarkersFromCommandResults
 } from "../../player/commit-player-intent";
-export {
-  type ToolInteractionPresentation,
-  presentationForVillagerTool
-} from "../../player/interaction-mode-presenter";
+export { type ToolInteractionPresentation } from "../../player/interaction-mode-presenter";
 export {
   type BrushStrokeState,
   beginBrushStroke,

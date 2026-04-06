@@ -52,7 +52,7 @@ describe("MAP-004 out-of-bounds selection", () => {
     expect(sortedKeys(committed.selectedCellKeys)).toEqual(expectedSelection);
 
     const outcome = sim.commitPlayerSelection({
-      toolId: "haul",
+      commandId: "haul",
       selectionModifier: "replace",
       cellKeys: committed.selectedCellKeys,
       inputShape: "rect-selection",

@@ -29,7 +29,7 @@ export const BEHAVIOR_004_NO_RESOURCE_DOWNGRADE_SCENARIO: ScenarioDefinition = {
   playerSelectionAfterHydrate: [
     {
       label: "observe-no-resource-downgrade",
-      toolId: "idle",
+      commandId: "idle",
       selectionModifier: "replace",
       cellKeys: [coordKey(PAWN_CELL)],
       inputShape: "single-cell",

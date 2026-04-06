@@ -21,7 +21,7 @@ const LUMBER_ON_TREE: DomainCommand = {
   targetCellKeys: [treeKey],
   targetEntityIds: [],
   sourceMode: {
-    source: { kind: "toolbar", toolId: "lumber" },
+    source: { kind: "menu", menuId: "orders", itemId: "lumber" },
     selectionModifier: "replace",
     inputShape: "rect-selection"
   }

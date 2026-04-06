@@ -390,7 +390,7 @@ export function hydrateScenario(sim: HeadlessSim, def: ScenarioDefinition): Scen
         continue;
       }
       const outcome = sim.commitPlayerSelection({
-        toolId: sel.toolId,
+        commandId: sel.commandId,
         selectionModifier: sel.selectionModifier,
         cellKeys: new Set(sel.cellKeys),
         inputShape: sel.inputShape,
