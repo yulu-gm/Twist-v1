@@ -17,6 +17,24 @@ export function obstacleBlockedCellKeys(world: WorldCore): Set<string> {
   return out;
 }
 
+/**
+ * 与寻路/游荡共用的不可走格：地形障碍 + **墙体建筑**占格。
+ * 墙格若不写入 {@link WorldGridConfig.blockedCellKeys}，小人离开工地后会随机走回墙格再离开，形成两格振荡，
+ * 且移动中无法自动认领新蓝图工单（`world-work-tick` 仅在 idle 时认领）。
+ * 床铺等需走近使用的建筑不占此集合（与 `simulationInteractionPoints` 床位一致）。
+ */
+export function simulationImpassableCellKeys(world: WorldCore): Set<string> {
+  const out = obstacleBlockedCellKeys(world);
+  for (const entity of world.entities.values()) {
+    if (entity.kind !== "building") continue;
+    if (entity.buildingKind !== "wall") continue;
+    for (const c of entity.occupiedCells) {
+      out.add(coordKey(c));
+    }
+  }
+  return out;
+}
+
 function templateBedPrototype(template: WorldGridConfig): InteractionPoint {
   const found = template.interactionPoints.find((p) => p.kind === "bed");
   if (found) return found;
@@ -96,7 +114,7 @@ export function syncWorldGridForSimulation(
   interactionTemplate: WorldGridConfig,
   prev: SimGridSyncState | null
 ): Readonly<{ blockedChanged: boolean; interactionChanged: boolean; next: SimGridSyncState }> {
-  const nextBlocked = obstacleBlockedCellKeys(world);
+  const nextBlocked = simulationImpassableCellKeys(world);
   const blockedReadonly = grid.blockedCellKeys;
   let blockedChanged = false;
   if (blockedReadonly) {

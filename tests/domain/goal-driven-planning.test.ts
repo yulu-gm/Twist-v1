@@ -1,15 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
   chooseGoalDecision,
+  chooseStepTowardCell,
   type GoalDecision,
   type GoalKind
 } from "../../src/game/behavior/goal-driven-planning";
 import { createDefaultPawnStates, withPawnNeeds } from "../../src/game/pawn-state";
 import {
+  coordKey,
   DEFAULT_WORLD_GRID,
   createReservationSnapshot,
   reserveInteractionPoint
 } from "../../src/game/map/world-grid";
+import { logicalCellsByPawnId } from "../../src/game/pawn-state";
 
 function expectGoalKind(decision: GoalDecision, kind: GoalKind): void {
   expect(decision.goal).toBe(kind);
@@ -112,6 +115,17 @@ describe("goal-driven-planning", () => {
       timePeriod: "night"
     });
     expect(decision.goal).toBe("sleep");
+  });
+
+  it("chooseStepTowardCell 不踏入 blockedCellKeys（如随机石格）", () => {
+    const grid = {
+      ...DEFAULT_WORLD_GRID,
+      blockedCellKeys: new Set<string>([coordKey({ col: 6, row: 5 })])
+    };
+    const pawn = createDefaultPawnStates([{ col: 5, row: 5 }], ["T"])[0]!;
+    const logical = logicalCellsByPawnId([pawn]);
+    const step = chooseStepTowardCell(grid, pawn, logical, { col: 10, row: 5 });
+    expect(step).toEqual({ col: 4, row: 5 });
   });
 
   it("falls back to wander when no interaction target is available", () => {

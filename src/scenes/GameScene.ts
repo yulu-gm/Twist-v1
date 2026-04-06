@@ -44,6 +44,7 @@ import {
 import { syncGroundResourceItems } from "./renderers/ground-items-renderer";
 import { drawTreesToGraphics } from "./renderers/tree-renderer";
 import { drawZoneOverlaysToGraphics } from "./renderers/zone-overlay-renderer";
+import { drawBuildingsAndBlueprintsToGraphics } from "./renderers/building-renderer";
 import { syncTaskMarkerView } from "./renderers/selection-renderer";
 import { GameSceneFloorInteraction } from "./game-scene-floor-interaction";
 import {
@@ -86,6 +87,7 @@ export class GameScene extends Phaser.Scene {
   private taskMarkerGraphics!: Phaser.GameObjects.Graphics;
   private taskMarkerTexts = new Map<string, Phaser.GameObjects.Text>();
   private treeGraphics!: Phaser.GameObjects.Graphics;
+  private buildingGraphics!: Phaser.GameObjects.Graphics;
   private groundResourceGraphics!: Phaser.GameObjects.Graphics;
   private zoneOverlayGraphics!: Phaser.GameObjects.Graphics;
   private groundResourceLabels = new Map<string, Phaser.GameObjects.Text>();
@@ -156,6 +158,8 @@ export class GameScene extends Phaser.Scene {
     );
     this.treeGraphics = this.add.graphics();
     this.treeGraphics.setDepth(13);
+    this.buildingGraphics = this.add.graphics();
+    this.buildingGraphics.setDepth(14);
     this.groundResourceGraphics = this.add.graphics();
     this.groundResourceGraphics.setDepth(25);
     this.zoneOverlayGraphics = this.add.graphics();
@@ -337,6 +341,13 @@ export class GameScene extends Phaser.Scene {
     );
     drawZoneOverlaysToGraphics(
       this.zoneOverlayGraphics,
+      this.worldGrid,
+      this.gridOriginX,
+      this.gridOriginY,
+      world.entities.values()
+    );
+    drawBuildingsAndBlueprintsToGraphics(
+      this.buildingGraphics,
       this.worldGrid,
       this.gridOriginX,
       this.gridOriginY,

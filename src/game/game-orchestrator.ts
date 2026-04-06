@@ -168,10 +168,16 @@ export class GameOrchestrator {
       pawnsForWork = sim.getPawns();
     }
 
-    const worldAfterClaim = autoClaimOpenWorkItems(worldForWork, pawnsForWork);
+    const { world: worldAfterClaim, pawns: pawnsAfterClaim } = autoClaimOpenWorkItems(
+      worldForWork,
+      pawnsForWork
+    );
     if (worldAfterClaim !== worldForWork) {
       worldPort.setWorld(worldAfterClaim);
       this.refreshSimulationGrid(interactionTemplate, false);
+    }
+    if (pawnsAfterClaim !== pawnsForWork) {
+      sim.setPawns([...pawnsAfterClaim]);
     }
 
 

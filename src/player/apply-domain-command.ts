@@ -1,5 +1,5 @@
 import { coordKey, isInsideGrid, parseCoordKey, type GridCoord } from "../game/map/world-grid";
-import { obstacleBlockedCellKeys } from "../game/world-sim-bridge";
+import { simulationImpassableCellKeys } from "../game/world-sim-bridge";
 import type { WorldEntitySnapshot } from "../game/entity/entity-types";
 import {
   clearTaskMarkersAtCells,
@@ -12,9 +12,9 @@ import {
 } from "../game/world-core";
 import type { DomainCommand, MockWorldSubmitResult } from "./s0-contract";
 
-/** 阻挡格：`grid.blockedCellKeys` 与障碍实体占格合并（无头世界常仅后者有值）。 */
+/** 阻挡格：`grid.blockedCellKeys` 与障碍实体 + 墙体建筑占格合并（与模拟层可走性一致）。 */
 function mergedBlockedCellKeys(world: WorldCore): ReadonlySet<string> {
-  const fromEntities = obstacleBlockedCellKeys(world);
+  const fromEntities = simulationImpassableCellKeys(world);
   const fromGrid = world.grid.blockedCellKeys;
   if (!fromGrid || fromGrid.size === 0) return fromEntities;
   const out = new Set(fromEntities);

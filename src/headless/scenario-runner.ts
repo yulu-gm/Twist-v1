@@ -346,6 +346,19 @@ export function hydrateScenario(sim: HeadlessSim, def: ScenarioDefinition): void
     }
   }
 
+  if (def.playerSelectionAfterHydrate) {
+    for (const sel of def.playerSelectionAfterHydrate) {
+      sim.commitPlayerSelection({
+        toolId: sel.toolId,
+        selectionModifier: sel.selectionModifier,
+        cellKeys: new Set(sel.cellKeys),
+        inputShape: sel.inputShape,
+        currentMarkers: new Map(),
+        nowMs: 0
+      });
+    }
+  }
+
   const claimerName = def.claimConstructBlueprintAsPawnName;
   if (claimerName) {
     const pawn = sim.getPawns().find((x) => x.name === claimerName);

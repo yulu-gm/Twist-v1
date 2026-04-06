@@ -18,6 +18,10 @@ import {
 import type { WorldTimeSnapshot } from "../game/time/world-time";
 import { createWorldCore, getWorldSnapshot } from "../game/world-core";
 import { createSeededRng } from "../game/util/seeded-rng";
+import type {
+  PlayerSelectionCommitInput,
+  PlayerSelectionCommitOutcome
+} from "../player/commit-player-intent";
 import { WorldCoreWorldPort } from "../player/world-core-world-port";
 import { createHeadlessSimAccess, type HeadlessGameOrchestratorSimAccess } from "./headless-sim-access";
 import { createSimEventCollector, type SimEventCollector } from "./sim-event-log";
@@ -79,12 +83,22 @@ export type HeadlessSim = Readonly<{
   getSimEventCollector: () => SimEventCollector;
   /** 可变世界端口（放置蓝图、障碍等 headless 场景写入）。 */
   getWorldPort: () => WorldCoreWorldPort;
+  /**
+   * 与 `GameOrchestrator.commitPlayerSelection` 一致：`buildDomainCommand` → 网关 → 任务标记。
+   * 玩法单测应优先走此路径，避免手写领域命令与工具栏/输入形态不一致。
+   */
+  commitPlayerSelection: (input: PlayerSelectionCommitInput) => PlayerSelectionCommitOutcome;
 }>;
 
 export function createHeadlessSim(options: HeadlessSimOptions = {}): HeadlessSim {
   const seed = options.seed ?? DEFAULT_HEADLESS_SEED;
   const rng = createSeededRng(seed);
-  const worldGrid = options.worldGrid ?? DEFAULT_WORLD_GRID;
+  const baseGrid = options.worldGrid ?? DEFAULT_WORLD_GRID;
+  /** 必须为可变 `Set`，否则 `syncWorldGridForSimulation` 因 falsy 跳过节流写入，石格障碍对寻路不可见。 */
+  const worldGrid: WorldGridConfig = {
+    ...baseGrid,
+    blockedCellKeys: new Set(baseGrid.blockedCellKeys ?? [])
+  };
   const interactionTemplate = options.interactionTemplate ?? worldGrid;
   const simConfig = options.simConfig ?? DEFAULT_SIM_CONFIG;
 
@@ -191,6 +205,7 @@ export function createHeadlessSim(options: HeadlessSimOptions = {}): HeadlessSim
     runUntil,
     getSimAccess: () => simAccess,
     getSimEventCollector: () => simEventCollector,
-    getWorldPort: () => worldPort
+    getWorldPort: () => worldPort,
+    commitPlayerSelection: (input: PlayerSelectionCommitInput) => orchestrator.commitPlayerSelection(input)
   };
 }

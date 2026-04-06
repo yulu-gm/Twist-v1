@@ -3,8 +3,7 @@
  * 锚格读条落成见 {@link tickAnchoredWorkProgress}。
  */
 
-import { canChooseNewGoal } from "./behavior/goal-driven-planning";
-import { describePawnDebugLabel, type PawnState } from "./pawn-state";
+import { clearPawnIntent, describePawnDebugLabel, type PawnState } from "./pawn-state";
 import type { WorldCore } from "./world-core-types";
 import { cloneWorld } from "./world-internal";
 import { workItemAnchorDurationSeconds } from "./work/work-item-duration";
@@ -25,10 +24,15 @@ function pawnHasClaimedWork(world: WorldCore, pawnId: string): boolean {
   return false;
 }
 
-/** 与 sim-loop 一致：可走新目标、未正在使用交互点、未已持有一条认领工单（含走向锚格途中）。 */
-function isPawnIdleForWorkClaim(world: WorldCore, pawn: PawnState): boolean {
-  if (!canChooseNewGoal(pawn)) return false;
+/**
+ * 可否参与 open 工单认领：不得已有 claimed 走向单、不得正在 use-target（吃睡娱乐）。
+ * 不要求「未在移动」：游荡时每帧开始时常 `isMoving===true`，若仅此才不认领，
+ * 则玩家放下新蓝图后工单会永远保持 open（小人一直在两格间闲逛）。
+ * 认领时会清掉位移意图，当帧 `tickSimulation` 会改沿工单锚格行走。
+ */
+function canPawnAutoClaimOpenWork(world: WorldCore, pawn: PawnState): boolean {
   if (pawnHasClaimedWork(world, pawn.id)) return false;
+  if (pawn.currentAction?.kind === "use-target") return false;
   return true;
 }
 
@@ -110,12 +114,19 @@ export function cleanupStaleTargetWorkItems(
 }
 
 /**
- * 对每条仍为 `open` 且未被认领的工单，由空闲小人按曼哈顿距离就近认领；每工单最多一人，顺序按小人 id 稳定遍历。
+ * 对每条仍为 `open` 的工单，由可用小人按曼哈顿距离就近认领；每轮每个小人最多认领一条，小人 id 稳定排序。
+ * 认领成功时会打断游荡位移并清空工单读条字段，避免与新建认领不同步。
  */
-export function autoClaimOpenWorkItems(world: WorldCore, pawns: readonly PawnState[]): WorldCore {
-  const candidates = pawns.filter((p) => isPawnIdleForWorkClaim(world, p)).sort((a, b) => a.id.localeCompare(b.id));
+export function autoClaimOpenWorkItems(
+  world: WorldCore,
+  pawns: readonly PawnState[]
+): Readonly<{ world: WorldCore; pawns: readonly PawnState[] }> {
+  const sorted = [...pawns].sort((a, b) => a.id.localeCompare(b.id));
   let next = world;
-  for (const pawn of candidates) {
+  const clearedIds = new Set<string>();
+
+  for (const pawn of sorted) {
+    if (!canPawnAutoClaimOpenWork(next, pawn)) continue;
     let bestId: string | undefined;
     let bestD = Infinity;
     for (const w of next.workItems.values()) {
@@ -128,9 +139,29 @@ export function autoClaimOpenWorkItems(world: WorldCore, pawns: readonly PawnSta
     }
     if (bestId === undefined) continue;
     const { world: after, outcome } = claimWorkItem(next, bestId, pawn.id);
-    if (outcome.kind === "claimed") next = after;
+    if (outcome.kind === "claimed") {
+      next = after;
+      clearedIds.add(pawn.id);
+    }
   }
-  return next;
+
+  if (clearedIds.size === 0) {
+    return { world: next, pawns };
+  }
+
+  const nextPawns = pawns.map((p) => {
+    if (!clearedIds.has(p.id)) return p;
+    return relabelWorkFields(
+      clearPawnIntent({
+        ...p,
+        moveTarget: undefined,
+        moveProgress01: 0,
+        activeWorkItemId: undefined,
+        workTimerSec: 0
+      })
+    );
+  });
+  return { world: next, pawns: nextPawns };
 }
 
 /**

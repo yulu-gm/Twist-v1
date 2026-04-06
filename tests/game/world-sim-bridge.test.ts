@@ -3,11 +3,31 @@ import { DEFAULT_WORLD_GRID } from "../../src/game/map/world-grid";
 import { createWorldCore, removeWorldEntity, spawnWorldEntity } from "../../src/game/world-core";
 import {
   obstacleBlockedCellKeys,
+  simulationImpassableCellKeys,
   simulationInteractionPoints,
   syncWorldGridForSimulation
 } from "../../src/game/world-sim-bridge";
 
 describe("world-sim-bridge", () => {
+  it("simulationImpassableCellKeys 含 obstacle 与 wall 建筑占格", () => {
+    let w = createWorldCore({ grid: DEFAULT_WORLD_GRID });
+    const o = spawnWorldEntity(w, {
+      kind: "obstacle",
+      cell: { col: 1, row: 1 },
+      occupiedCells: [{ col: 1, row: 1 }]
+    });
+    w = o.world;
+    const b = spawnWorldEntity(w, {
+      kind: "building",
+      cell: { col: 10, row: 5 },
+      occupiedCells: [{ col: 10, row: 5 }],
+      buildingKind: "wall",
+      label: "w"
+    });
+    w = b.world;
+    expect(simulationImpassableCellKeys(w)).toEqual(new Set(["1,1", "10,5"]));
+  });
+
   it("obstacleBlockedCellKeys 收集 obstacle 占用格", () => {
     let w = createWorldCore({ grid: DEFAULT_WORLD_GRID });
     const s = spawnWorldEntity(w, {

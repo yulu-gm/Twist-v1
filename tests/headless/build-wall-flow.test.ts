@@ -1,32 +1,22 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { coordKey, DEFAULT_WORLD_GRID } from "../../src/game/map";
 import { claimWorkItem } from "../../src/game/world-core";
 import { createHeadlessSim } from "../../src/headless";
 import { runScenarioHeadless } from "../../src/headless/scenario-runner";
-import type { DomainCommand } from "../../src/player/s0-contract";
+import { resetDomainCommandIdSequence } from "../../src/player/build-domain-command";
 import { BUILD_WALL_FLOW_SCENARIO } from "../../scenarios/build-wall-flow.scenario";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-function makeBuildWallBlueprintCommand(targetCellKeys: readonly string[]): DomainCommand {
-  return {
-    commandId: `cmd-wall-${targetCellKeys.join("-")}`,
-    verb: "build_wall_blueprint",
-    targetCellKeys: [...targetCellKeys],
-    targetEntityIds: [],
-    sourceMode: {
-      source: { kind: "toolbar", toolId: "build_wall_blueprint" },
-      selectionModifier: "replace",
-      inputShape: "rect-selection"
-    }
-  };
-}
+describe("build_wall_blueprint → WorldCore（玩家选区路径）", () => {
+  beforeEach(() => {
+    resetDomainCommandIdSequence();
+  });
 
-describe("build_wall_blueprint → WorldCore", () => {
-  it("三格提交：3 个 wall 蓝图 + 3 条 construct-blueprint；逐条认领后落成墙建筑", () => {
+  it("三格笔刷：`build`+brush-stroke → 3 个 wall 蓝图 + 3 条 construct-blueprint；逐条认领后落成墙建筑", () => {
     const sim = createHeadlessSim({ seed: BUILD_WALL_FLOW_SCENARIO.seed });
     sim.spawnPawn("WallBuilder", DEFAULT_WORLD_GRID.defaultSpawnPoints[0]!);
 
@@ -36,9 +26,18 @@ describe("build_wall_blueprint → WorldCore", () => {
       { col: 16, row: 5 }
     ];
     const keys = cells.map((c) => coordKey(c));
-    const submit = sim.getWorldPort().submit(makeBuildWallBlueprintCommand(keys), 0);
-    expect(submit.accepted).toBe(true);
-    expect(submit.messages.some((m) => m.includes("墙蓝图"))).toBe(true);
+    const outcome = sim.commitPlayerSelection({
+      toolId: "build",
+      selectionModifier: "replace",
+      cellKeys: new Set(keys),
+      inputShape: "brush-stroke",
+      currentMarkers: new Map(),
+      nowMs: 0
+    });
+    expect(outcome.didSubmitToWorld).toBe(true);
+    expect(outcome.command?.verb).toBe("build_wall_blueprint");
+    expect(outcome.submitResult?.accepted).toBe(true);
+    expect(outcome.submitResult?.messages.some((m) => m.includes("墙蓝图"))).toBe(true);
 
     const world0 = sim.getWorldPort().getWorld();
     const blueprints = [...world0.entities.values()].filter(
@@ -74,6 +73,99 @@ describe("build_wall_blueprint → WorldCore", () => {
     for (const c of cells) {
       expect(buildings.some((b) => b.cell.col === c.col && b.cell.row === c.row)).toBe(true);
     }
+  });
+
+  it("单格墙笔刷：不手工认领，靠 autoClaim + 走向锚格落成墙（与实机笔刷后一致）", () => {
+    const sim = createHeadlessSim({ seed: BUILD_WALL_FLOW_SCENARIO.seed });
+    sim.spawnPawn("WallBuilder", DEFAULT_WORLD_GRID.defaultSpawnPoints[0]!);
+    // 与 build-wall-flow.scenario 的 playerSelectionAfterHydrate 目标格一致
+    const cell = { col: 11, row: 6 };
+    const outcome = sim.commitPlayerSelection({
+      toolId: "build",
+      selectionModifier: "replace",
+      cellKeys: new Set([coordKey(cell)]),
+      inputShape: "brush-stroke",
+      currentMarkers: new Map(),
+      nowMs: 0
+    });
+    expect(outcome.didSubmitToWorld).toBe(true);
+    expect(outcome.command?.verb).toBe("build_wall_blueprint");
+    const worldAfterBrush = sim.getWorldPort().getWorld();
+    expect(
+      [...worldAfterBrush.workItems.values()].some(
+        (w) => w.kind === "construct-blueprint" && w.status === "open"
+      )
+    ).toBe(true);
+
+    const done = sim.runUntil(() => {
+      const w = sim.getWorldPort().getWorld();
+      return [...w.entities.values()].some(
+        (e) =>
+          e.kind === "building" &&
+          e.buildingKind === "wall" &&
+          e.cell.col === cell.col &&
+          e.cell.row === cell.row
+      );
+    }, { maxTicks: 5_000 });
+    expect(done.reachedPredicate).toBe(true);
+  });
+
+  it("首段墙落成后经 idle 再布第二段墙：仍能 autoClaim 并完成（回归墙格可走振荡 + 游荡中拒认领）", () => {
+    const sim = createHeadlessSim({ seed: BUILD_WALL_FLOW_SCENARIO.seed });
+    sim.spawnPawn("WallBuilder", DEFAULT_WORLD_GRID.defaultSpawnPoints[0]!);
+    const cellFirst = { col: 11, row: 6 };
+    const cellSecond = { col: 12, row: 6 };
+
+    expect(
+      sim.commitPlayerSelection({
+        toolId: "build",
+        selectionModifier: "replace",
+        cellKeys: new Set([coordKey(cellFirst)]),
+        inputShape: "brush-stroke",
+        currentMarkers: new Map(),
+        nowMs: 0
+      }).didSubmitToWorld
+    ).toBe(true);
+
+    const firstDone = sim.runUntil(() => {
+      const w = sim.getWorldPort().getWorld();
+      return [...w.entities.values()].some(
+        (e) =>
+          e.kind === "building" &&
+          e.buildingKind === "wall" &&
+          e.cell.col === cellFirst.col &&
+          e.cell.row === cellFirst.row
+      );
+    }, { maxTicks: 6_000 });
+    expect(firstDone.reachedPredicate).toBe(true);
+
+    // 模拟「过一小段时间」：若墙格仍可走，小人易在墙与邻格间来回踱步并长期 isMoving，无法认领新单
+    for (let i = 0; i < 200; i++) {
+      sim.tick(16);
+    }
+
+    expect(
+      sim.commitPlayerSelection({
+        toolId: "build",
+        selectionModifier: "replace",
+        cellKeys: new Set([coordKey(cellSecond)]),
+        inputShape: "brush-stroke",
+        currentMarkers: new Map(),
+        nowMs: 0
+      }).didSubmitToWorld
+    ).toBe(true);
+
+    const secondDone = sim.runUntil(() => {
+      const w = sim.getWorldPort().getWorld();
+      return [...w.entities.values()].some(
+        (e) =>
+          e.kind === "building" &&
+          e.buildingKind === "wall" &&
+          e.cell.col === cellSecond.col &&
+          e.cell.row === cellSecond.row
+      );
+    }, { maxTicks: 6_000 });
+    expect(secondDone.reachedPredicate).toBe(true);
   });
 
   it("build-wall-flow scenario passes expectations", () => {

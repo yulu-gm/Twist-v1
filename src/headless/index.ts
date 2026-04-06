@@ -35,6 +35,7 @@ export {
 export type {
   ScenarioDefinition,
   ScenarioExpectation,
+  ScenarioPlayerSelectionAfterHydrate,
   ScenarioResourceSpawn,
   ScenarioTreeSpawn,
   ScenarioZoneSpawn

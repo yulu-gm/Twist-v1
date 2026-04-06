@@ -15,6 +15,7 @@ import { MAP_INITIAL_STATE_SCENARIO } from "./map-initial-state.scenario";
 import { MULTI_PAWN_COLONY_SCENARIO } from "./multi-pawn-colony.scenario";
 import { NEED_INTERRUPT_DURING_WORK_SCENARIO } from "./need-interrupt-during-work.scenario";
 import { NIGHT_FORCES_SLEEP_SCENARIO } from "./night-forces-sleep.scenario";
+import { OBSTACLE_AVOIDANCE_EAT_SCENARIO } from "./obstacle-avoidance-eat.scenario";
 import { PAWN_EATS_WHEN_HUNGRY_SCENARIO } from "./pawn-eats-when-hungry.scenario";
 import { PAWN_SLEEPS_WHEN_TIRED_SCENARIO } from "./pawn-sleeps-when-tired.scenario";
 import { ZONE_CREATE_SCENARIO } from "./zone-create.scenario";
@@ -32,6 +33,7 @@ export {
   MULTI_PAWN_COLONY_SCENARIO,
   NEED_INTERRUPT_DURING_WORK_SCENARIO,
   NIGHT_FORCES_SLEEP_SCENARIO,
+  OBSTACLE_AVOIDANCE_EAT_SCENARIO,
   PAWN_EATS_WHEN_HUNGRY_SCENARIO,
   PAWN_SLEEPS_WHEN_TIRED_SCENARIO,
   ZONE_CREATE_SCENARIO,
@@ -41,6 +43,7 @@ export {
 export const ALL_SCENARIOS: ScenarioDefinition[] = [
   MAP_INITIAL_STATE_SCENARIO,
   PAWN_EATS_WHEN_HUNGRY_SCENARIO,
+  OBSTACLE_AVOIDANCE_EAT_SCENARIO,
   PAWN_SLEEPS_WHEN_TIRED_SCENARIO,
   BED_AUTO_ASSIGN_SCENARIO,
   BUILD_BED_FLOW_SCENARIO,

@@ -10,6 +10,7 @@ import {
   interactionPointsByKind,
   isCellOccupiedByOthers,
   isInteractionPointReservedByOther,
+  isWalkableCell,
   orthogonalNeighbors
 } from "../map/world-grid";
 import { legalWanderNeighbors, pickWanderTarget, type WanderRng } from "./wander-planning";
@@ -145,7 +146,10 @@ export function chooseStepTowardCell(
   }
 
   return orthogonalNeighbors(grid, pawn.logicalCell)
-    .filter((cell) => !isCellOccupiedByOthers(logicalCellsByPawnId, cell, pawn.id))
+    .filter(
+      (cell) =>
+        isWalkableCell(grid, cell) && !isCellOccupiedByOthers(logicalCellsByPawnId, cell, pawn.id)
+    )
     .sort(
       (left, right) =>
         manhattanDistance(left, targetCell) - manhattanDistance(right, targetCell)

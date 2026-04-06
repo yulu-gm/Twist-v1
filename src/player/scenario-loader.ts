@@ -6,6 +6,8 @@
  */
 
 import type { ScenarioDefinition } from "../headless/scenario-types";
+import { commitPlayerSelectionToWorld } from "./commit-player-intent";
+import { WorldCoreWorldPort } from "./world-core-world-port";
 import {
   claimWorkItem,
   cloneWorldCoreState,
@@ -80,7 +82,9 @@ export type ScenarioLoadResult = Readonly<{
 
 /**
  * 将场景定义载入世界：`pawns` / `blueprints` / `obstacles` / 可调时间；忽略 `expectations`。
- * `claimConstructBlueprintAsPawnName` 与无头 `hydrateScenario` 一致：按小人名认领首个 open 的 construct-blueprint（`pawnStates` 的 id 为 `pawn-${索引}`）。
+ * `domainCommandsAfterHydrate` / `playerSelectionAfterHydrate` 在认领前应用，与无头 `hydrateScenario` 一致；
+ * `playerSelectionAfterHydrate` 走 `commitPlayerSelectionToWorld`（与实机工具栏 + 选区形态一致）。
+ * `claimConstructBlueprintAsPawnName`：按小人名认领首个 open 的 construct-blueprint（`pawnStates` 的 id 为 `pawn-${索引}`）。
  * `def.seed` 仅影响 headless RNG，WorldCore 无对应字段，此处不处理。
  */
 export function loadScenarioIntoGame(world: WorldCore, def: ScenarioDefinition): ScenarioLoadResult {
@@ -165,6 +169,22 @@ export function loadScenarioIntoGame(world: WorldCore, def: ScenarioDefinition):
     }
     w = spawned.world;
   }
+
+  const port = new WorldCoreWorldPort(w);
+  for (const cmd of def.domainCommandsAfterHydrate ?? []) {
+    port.submit(cmd, 0);
+  }
+  for (const sel of def.playerSelectionAfterHydrate ?? []) {
+    commitPlayerSelectionToWorld(port, {
+      toolId: sel.toolId,
+      selectionModifier: sel.selectionModifier,
+      cellKeys: new Set(sel.cellKeys),
+      inputShape: sel.inputShape,
+      currentMarkers: new Map(),
+      nowMs: 0
+    });
+  }
+  w = port.getWorld();
 
   const claimerName = def.claimConstructBlueprintAsPawnName;
   if (claimerName) {

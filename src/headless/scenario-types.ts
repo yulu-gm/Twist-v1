@@ -6,6 +6,7 @@
  */
 
 import type { BuildingKind } from "../game/entity/entity-types";
+import type { SelectionModifier } from "../game/interaction/floor-selection";
 import type { GridCoord, WorldGridConfig } from "../game/map";
 import type { PawnState } from "../game/pawn-state";
 import type { DomainCommand } from "../player/s0-contract";
@@ -21,6 +22,17 @@ export type ScenarioResourceSpawn = Readonly<{
 export type ScenarioZoneSpawn = Readonly<{
   cells: readonly GridCoord[];
   zoneKind?: string;
+}>;
+
+/**
+ * 与 `commitPlayerSelectionToWorld` / 场景内 `HeadlessSim.commitPlayerSelection` 同形；
+ * `cellKeys` 为 `coordKey` 字符串，对应玩家一次抬高鼠标时的格集合。
+ */
+export type ScenarioPlayerSelectionAfterHydrate = Readonly<{
+  toolId: string;
+  selectionModifier: SelectionModifier;
+  cellKeys: readonly string[];
+  inputShape: "rect-selection" | "brush-stroke" | "single-cell";
 }>;
 
 /** 期望条：`resource-in-container` 的 params 可含 `materialKind`（如 wood / food）。 */
@@ -67,6 +79,11 @@ export type ScenarioDefinition = Readonly<{
    * 装载后、跑 `expectations` 前依次提交到世界端口（如需领域命令才出现的工单等）。
    */
   domainCommandsAfterHydrate?: readonly DomainCommand[];
+  /**
+   * 与正式游戏一致：经 `buildDomainCommand` + 网关写入世界（例：`toolId:"build"` + `brush-stroke` 放墙）。
+   * 优先于手写 `domainCommandsAfterHydrate`，以免 `sourceMode` / `inputShape` 与工具栏语义漂移。
+   */
+  playerSelectionAfterHydrate?: readonly ScenarioPlayerSelectionAfterHydrate[];
   expectations?: ScenarioExpectation[];
   /**
    * 浏览器内人工验收提示（`HudManager`）；不参与 `runScenarioHeadless`。
