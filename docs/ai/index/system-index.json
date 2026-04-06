@@ -118,7 +118,6 @@
       "sharedEntryFiles": [
         "src/ui/hud-manager.ts",
         "src/scenes/game-scene-hud-sync.ts",
-        "src/scenes/game-scene-acceptance-ui.ts",
         "src/scenes/game-scene-keyboard-bindings.ts"
       ],
       "standardDoc": "docs/ai/system-standards/scene-hud.md",

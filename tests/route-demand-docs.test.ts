@@ -119,7 +119,6 @@ describe("route-demand oh-doc workflow", () => {
   });
 
   it("updates project workflow docs to route multi-system work through the oh-doc chain", () => {
-    const twistDoc = readUtf8(path.join(rootDir, "TWIST.md"));
     const agentDoc = readUtf8(path.join(rootDir, "Agent.md"));
     const claudeDoc = readUtf8(path.join(rootDir, "CLAUDE.md"));
     const taskWorkflowDoc = readUtf8(path.join(rootDir, ".agent", "task-workflow.md"));
@@ -127,7 +126,7 @@ describe("route-demand oh-doc workflow", () => {
     const registryDoc = readUtf8(registryFile);
     const tddDoc = readUtf8(path.join(referenceDir, "skill-tdd.md"));
 
-    for (const content of [twistDoc, taskWorkflowDoc, registryDoc, tddDoc]) {
+    for (const content of [taskWorkflowDoc, registryDoc, tddDoc]) {
       expect(content).toContain("route-demand");
       expect(content).toContain(requiredOrder);
     }
@@ -141,14 +140,13 @@ describe("route-demand oh-doc workflow", () => {
   });
 
   it("documents lookup-module-with-aidoc as the preferred module lookup entrypoint", () => {
-    const twistDoc = readUtf8(path.join(rootDir, "TWIST.md"));
     const agentDoc = readUtf8(path.join(rootDir, "Agent.md"));
     const claudeDoc = readUtf8(path.join(rootDir, "CLAUDE.md"));
     const taskWorkflowDoc = readUtf8(path.join(rootDir, ".agent", "task-workflow.md"));
     const contributingDoc = readUtf8(path.join(rootDir, "docs", "human", "contributing.md"));
     const requestsReadme = readUtf8(path.join(rootDir, "docs", "ai", "requests", "README.md"));
 
-    for (const content of [twistDoc, taskWorkflowDoc, contributingDoc]) {
+    for (const content of [taskWorkflowDoc, contributingDoc]) {
       expect(content).toContain("lookup-module-with-aidoc");
       expect(content).toContain("模块定位");
       expect(content).toContain("模块阅读");
@@ -158,8 +156,8 @@ describe("route-demand oh-doc workflow", () => {
       expect(content).toContain("lookup-module-with-aidoc");
     }
 
-    expect(twistDoc).toContain("route-demand");
-    expect(twistDoc).toContain("push-with-aidoc");
+    expect(taskWorkflowDoc).toContain("route-demand");
+    expect(taskWorkflowDoc).toContain("push-with-aidoc");
     expect(requestsReadme).toContain("working-plan/route-demand/<yyyy-mm-dd>-<topic>.md");
     expect(requestsReadme).toContain("历史参考");
   });

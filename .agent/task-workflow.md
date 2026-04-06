@@ -2,7 +2,7 @@
 
 Agent 默认工作流：
 
-1. 阅读 `TWIST.md` 以及 `.agent/` 下的相关文件。
+1. 阅读 `Agent.md` / `CLAUDE.md` 以及 `.agent/` 下的相关文件。
 2. 在提出架构改动前先检查本地代码与文档。
 3. 模块定位、模块阅读、归属判断、找入口文件 → 先走 `.agent/skills/lookup-module-with-aidoc/SKILL.md`。
 4. 新增玩法、改交互、扩系统、补规则 → 先走 `.agent/skills/route-demand/SKILL.md`。

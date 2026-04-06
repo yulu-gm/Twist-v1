@@ -8,7 +8,7 @@
 
 - `routedSystems`：`UI系统`
 - `lookupAliases`：`scene-hud`、`hud`、`ui`、`villager-tool-bar`
-- `sharedEntryFiles`：`src/ui/hud-manager.ts`、`src/scenes/game-scene-hud-sync.ts`、`src/scenes/game-scene-acceptance-ui.ts`、`src/scenes/game-scene-keyboard-bindings.ts`
+- `sharedEntryFiles`：`src/ui/hud-manager.ts`、`src/scenes/game-scene-hud-sync.ts`、`src/scenes/game-scene-keyboard-bindings.ts`
 
 这页仍然是 legacy implementation lookup，不是 `route-demand` 的权威注册表。UI 或面板能力如果被新的一级 routedSystem 吸走，只回填桥接字段，不在这里改成新注册表。
 
@@ -28,7 +28,6 @@
 - `src/data/pawn-profiles.ts`
 - `src/scenes/GameScene.ts`（仅负责布局、输入和状态 wiring）
 - `src/scenes/game-scene-hud-sync.ts`
-- `src/scenes/game-scene-acceptance-ui.ts`
 - `src/scenes/game-scene-keyboard-bindings.ts`
 
 ## 当前关键测试文件

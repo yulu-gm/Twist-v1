@@ -109,7 +109,8 @@ describe("aidoc index and push workflow", () => {
     expect(skill).toContain("AIDOC-Managed: true");
 
     const entryDocs = [
-      path.join(rootDir, "TWIST.md"),
+      path.join(rootDir, "Agent.md"),
+      path.join(rootDir, "CLAUDE.md"),
       path.join(rootDir, ".agent", "task-workflow.md"),
       path.join(rootDir, ".agent", "doc-rules.md"),
       path.join(rootDir, "docs", "human", "contributing.md")
