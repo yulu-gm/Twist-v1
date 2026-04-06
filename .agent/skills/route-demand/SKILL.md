@@ -1,13 +1,13 @@
 ---
 name: route-demand
-description: Use when Twist_V1 receives a new gameplay, interaction, rules, or multi-system requirement that must be split into subsystem aidocs before design, testing, or implementation.
+description: Use when Twist_V1 receives a new gameplay, interaction, rules, or multi-system requirement that must be routed through the 9 top-level oh-doc systems before design, acceptance, testing, or implementation.
 ---
 
 # Route Demand
 
-把新增玩法、改交互、扩系统、补规则这类需求先路由成可管理的子系统任务，再进入设计、TDD 和实现。本 Skill 只负责拆分和分派，不直接完成设计或实现。
+把新增玩法、改交互、扩系统、补规则这类需求，先路由成可管理的 9 子系统文档更新任务，再进入设计、验收、TDD 和实现。本 Skill 只负责拆分、编排和记录，不直接代替 `oh-gen-doc`、`oh-code-design`、`oh-acceptance` 或实现阶段。
 
-分拆清单与注册表权威副本：
+分拆清单与权威副本：
 
 - `references/demand-router.md`
 - `references/system-registry.md`
@@ -21,17 +21,19 @@ description: Use when Twist_V1 receives a new gameplay, interaction, rules, or m
 - 新增玩法
 - 新增 UI 交互或画面反馈
 - 修改会影响两个及以上系统的需求
-- 需要新 aidoc、拆多个子系统、或调用多个 SubAgent 的任务
+- 需要同步 `oh-gen-doc`、`oh-code-design`、`oh-acceptance` 其中两层及以上的任务
+- 需要拆多个子系统、或调用多个 SubAgent 的任务
 
 不触发：单文件文案修正、纯样式微调且不新增交互、已有系统内部小型无争议 bugfix。
 
 ## Workflow
 
 1. **提炼需求**：依次提取玩家目标 → 输入动作 → 画面反馈 → 状态承诺 → 边界条件（哪些可 fake/stub，哪些必须真实）。
-2. **系统拆分**：满足任一条件时拆出独立系统——有独立玩家可见结果、需独立测试层级、假实现边界不同、修改会改另一系统接口。输出：目标系统、依赖系统、各目标系统的玩家可见结果、默认测试层级、共享 fake/stub 清单。
-3. **查注册表**：从下方系统注册表读取标准文档路径、aidoc 路径、默认 failing test 层级。
-4. **分派 SubAgent**：每个目标系统创建一个 SubAgent，下发内容和返回要求见下方契约。
-5. **汇总**：等所有 aidoc 返回后，主 agent 写主控需求单、集成文档、TDD 顺序、fake-to-real 反推顺序。
+2. **系统拆分**：从 9 个顶层系统中识别目标系统与依赖系统。输出：影响系统、各系统负责的玩家可见结果、需要补的 `oh-gen-doc` / `oh-code-design` / `oh-acceptance`、默认验证层级、共享 fake/stub 清单。
+3. **查注册表**：从 `references/system-registry.md` 读取每个系统对应的结构化文档路径、主要代码目录、默认验证层级和上游依赖。
+4. **分派 SubAgent**：每个目标系统创建一个 SubAgent，下发内容和返回要求见 `references/subagent-contract.md`。
+5. **汇总主控路由单**：等各系统建议返回后，主 agent 写 `working-plan/route-demand/<yyyy-mm-dd>-<topic>.md`，整理影响系统矩阵、文档更新顺序、跨系统依赖、fake/stub 边界、测试入口建议、进入实现前检查项。
+6. **进入下游链路**：路由完成后，严格按 `oh-gen-doc -> oh-code-design -> oh-acceptance -> TDD/实现` 顺序推进；不要在路由阶段跳过前置文档直接写代码。
 
 ## Required References
 
@@ -42,46 +44,78 @@ description: Use when Twist_V1 receives a new gameplay, interaction, rules, or m
 3. `references/subagent-contract.md`
 4. `references/skill-tdd.md`
 
+## 顶层系统
+
+`route-demand` 只允许把需求路由到以下 9 个一级系统：
+
+- `UI系统`
+- `交互系统`
+- `地图系统`
+- `实体系统`
+- `工作系统`
+- `建筑系统`
+- `时间系统`
+- `行为系统`
+- `需求系统`
+
+不要把新需求重新折叠回旧的 `world-core`、`task-planning`、`scene-hud`、`selection-ui` 等历史路由目标。
+
 ## 系统注册表
 
-| system | 职责摘要 | 标准文档 | aidoc 路径 | 默认 failing test | 主要依赖 |
-|---|---|---|---|---|---|
-| time-of-day | 世界时间推进、跨天归一化、时间文案和昼夜调色板 | docs/ai/system-standards/time-of-day.md | docs/ai/systems/time-of-day/ | domain | scene-hud |
-| world-core | 世界真相源、实体快照、占用索引、工作单与建造落地 | docs/ai/system-standards/world-core.md | docs/ai/systems/world-core/ | domain | world-grid, time-of-day, task-planning |
-| world-grid | 格子地图尺寸、格坐标、邻格、边界、出生点、占用快照 | docs/ai/system-standards/world-grid.md | docs/ai/systems/world-grid/ | domain | pawn-state, task-planning |
-| selection-ui | 选中、焦点、高亮、可点击反馈、目标切换 | docs/ai/system-standards/selection-ui.md | docs/ai/systems/selection-ui/ | acceptance | scene-hud, pawn-state |
-| scene-hud | HUD、状态卡、菜单、按钮、场景内信息展示 | docs/ai/system-standards/scene-hud.md | docs/ai/systems/scene-hud/ | component | selection-ui, pawn-state |
-| pawn-state | 角色可读状态、属性、需求、UI 派生字段 | docs/ai/system-standards/pawn-state.md | docs/ai/systems/pawn-state/ | domain | task-planning |
-| task-planning | 目标评估、工作选择、任务计划、可执行动作候选 | docs/ai/system-standards/task-planning.md | docs/ai/systems/task-planning/ | domain | pawn-state |
+| system | oh-gen-doc | oh-code-design | oh-acceptance | 主要代码目录 | 默认验证层级 | 上游依赖 |
+|---|---|---|---|---|---|---|
+| UI系统 | oh-gen-doc/UI系统.yaml | oh-code-design/UI系统.yaml | oh-acceptance/UI系统.yaml | src/ui/, src/scenes/, src/data/ | component / acceptance | 交互系统, 时间系统, 行为系统, 地图系统, 实体系统 |
+| 交互系统 | oh-gen-doc/交互系统.yaml | oh-code-design/交互系统.yaml | oh-acceptance/交互系统.yaml | src/game/interaction/, src/player/, src/scenes/ | domain / integration | UI系统, 地图系统, 建筑系统 |
+| 地图系统 | oh-gen-doc/地图系统.yaml | oh-code-design/地图系统.yaml | oh-acceptance/地图系统.yaml | src/game/map/, src/scenes/renderers/ | domain / integration | 实体系统, 建筑系统, 交互系统 |
+| 实体系统 | oh-gen-doc/实体系统.yaml | oh-code-design/实体系统.yaml | oh-acceptance/实体系统.yaml | src/game/entity/, src/game/world-core.ts | domain | 地图系统, 建筑系统, 工作系统, 需求系统 |
+| 工作系统 | oh-gen-doc/工作系统.yaml | oh-code-design/工作系统.yaml | oh-acceptance/工作系统.yaml | src/game/work/, src/game/flows/ | domain / integration | 实体系统, 建筑系统, 行为系统 |
+| 建筑系统 | oh-gen-doc/建筑系统.yaml | oh-code-design/建筑系统.yaml | oh-acceptance/建筑系统.yaml | src/game/building/, src/game/flows/build-flow.ts | domain / integration | 地图系统, 实体系统, 工作系统, 交互系统 |
+| 时间系统 | oh-gen-doc/时间系统.yaml | oh-code-design/时间系统.yaml | oh-acceptance/时间系统.yaml | src/game/time/, src/scenes/renderers/ | domain | 行为系统, 需求系统, UI系统 |
+| 行为系统 | oh-gen-doc/行为系统.yaml | oh-code-design/行为系统.yaml | oh-acceptance/行为系统.yaml | src/game/behavior/, src/game/game-orchestrator.ts, src/game/flows/ | domain / integration | 需求系统, 工作系统, 时间系统, 实体系统 |
+| 需求系统 | oh-gen-doc/需求系统.yaml | oh-code-design/需求系统.yaml | oh-acceptance/需求系统.yaml | src/game/need/, src/game/pawn-state.ts | domain | 时间系统, 行为系统, 实体系统 |
 
 - 必须从本表读取路径，不要凭记忆猜。
-- 新 aidoc 文件写入表中声明的目录。
-- 涉及新系统时先扩充本表再路由。
+- 如果系统文件缺失，先补齐 `oh-gen-doc`、`oh-code-design`、`oh-acceptance` 的同名文档，再继续路由。
+- 若系统存在，但本次需求不产生新承诺，可以只在主控路由单中标记为依赖系统。
 
 ## SubAgent 契约
 
-**主 agent 下发内容**：原始需求摘要、本系统负责的玩家可见结果、标准文档路径、aidoc 输出路径、默认 failing test 层级、已知 fake/stub 边界。
+**主 agent 下发内容**：原始需求摘要、本系统负责的玩家可见结果、对应的 `oh-gen-doc` / `oh-code-design` / `oh-acceptance` 路径、默认验证层级、主要代码目录、已知 fake/stub 边界、被哪些上游系统阻塞。
 
 **SubAgent 必须执行**：
 
-1. 阅读系统标准文档。
-2. 只提炼本系统需要承诺的行为和边界。
-3. 回写系统 aidoc，标注：前置依赖、输入、输出/反馈、假实现边界、最先失败的测试、最小通过实现、后续反推接口/规则。
+1. 阅读本系统对应的 `oh-gen-doc`、`oh-code-design`、`oh-acceptance`。
+2. 只提炼本系统需要更新的行为、边界和验证点。
+3. 返回一份文档更新建议包，至少包含：
+   - `system`
+   - `why_impacted`
+   - `upstream_docs_to_update`
+   - `code_design_sync_points`
+   - `acceptance_sync_points`
+   - `recommended_first_test`
+   - `blocked_by`
 
-**SubAgent 返回**：写入了哪个 aidoc 文件、首个 failing test 应测什么、还依赖主 agent 汇总哪些外部系统结果。
-
-**禁止**：替其他系统补规格、擅改注册表、越过主 agent 决定跨系统接口、把未确认规则伪装成既定事实。
+**禁止**：替其他系统补规格、擅改系统注册表、越过主 agent 决定跨系统接口、把未确认规则伪装成既定事实。
 
 ## Required Outputs
 
-- `docs/ai/requests/<yyyy-mm-dd>-<topic>.md`
-- `docs/ai/integration/<yyyy-mm-dd>-<topic>.md`
-- `docs/ai/systems/<system>/<yyyy-mm-dd>-<topic>.md`
+- `working-plan/route-demand/<yyyy-mm-dd>-<topic>.md`
+
+主控路由单必须包含：
+
+- 需求摘要
+- 影响系统矩阵
+- 各系统的文档更新顺序
+- 跨系统依赖
+- fake/stub 边界
+- 测试入口建议
+- 进入实现前检查项
 
 ## Guardrails
 
 - 不要跳过系统拆分直接写混合规格。
+- 不要把多个一级系统重新折叠回旧的历史 system key。
 - 不要让 SubAgent 跨系统补写内容。
-- 不要在全部 aidoc 返回前提前拍板跨系统接口。
-- UI-first 需求允许 fake/stub，但必须在 aidoc 中显式登记。
-- 真实领域规则由后续 domain TDD 接管，不要在路由阶段偷偷实现。
+- 不要在全部系统建议返回前提前拍板跨系统接口。
+- UI-first 需求允许 fake/stub，但必须在主控路由单中显式登记。
+- `oh-gen-doc` 是需求事实源，`oh-code-design` 承接代码设计，`oh-acceptance` 承接验收；路由阶段不要越权代写实现。

@@ -28,15 +28,6 @@ function readUtf8(filePath: string): string {
   return readFileSync(filePath, "utf8");
 }
 
-function registrySystemKeys(): string[] {
-  return readUtf8(registryFile)
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => /^\|\s*[a-z0-9-]+\s*\|/.test(line))
-    .map((line) => line.split("|")[1]!.trim())
-    .filter((value) => value !== "system" && value !== "---");
-}
-
 describe("aidoc index and push workflow", () => {
   it("provides aidoc index entrypoints and structured system metadata", () => {
     expect(existsSync(indexReadme)).toBe(true);
@@ -77,13 +68,18 @@ describe("aidoc index and push workflow", () => {
     }
   });
 
-  it("keeps the system index aligned with the route-demand registry", () => {
-    const registryKeys = registrySystemKeys();
+  it("marks the system index as a legacy reference instead of the route-demand source of truth", () => {
+    const registry = readUtf8(registryFile);
+    const systemIndex = readUtf8(systemIndexFile);
     const indexKeys = readSystemIndex(rootDir).systems.map(
       (system: { key: string }) => system.key
     );
 
-    expect(indexKeys.sort()).toEqual(registryKeys.sort());
+    expect(systemIndex).toContain("\"routeDemandRole\": \"legacy-reference-only\"");
+    expect(systemIndex).toContain("\"routeDemandSourceOfTruth\": false");
+    expect(indexKeys).toContain("world-core");
+    expect(registry).toContain("| UI系统 |");
+    expect(registry).not.toContain("| world-core |");
   });
 
   it("upgrades each system readme into a system-specific lookup page", () => {

@@ -13,12 +13,15 @@
 **新增玩法、改交互、扩系统、补规则时，先走 `route-demand`：**
 
 - 入口：`.agent/skills/route-demand/SKILL.md`
-- 先路由需求，再拆系统 aidoc，再进入各系统 TDD 与实现
+- 先确定受影响的 `oh-gen-doc` / `oh-code-design` / `oh-acceptance` 子系统
+- 再按 `oh-gen-doc -> oh-code-design -> oh-acceptance -> TDD/实现` 顺序推进
+- 路由结果统一写入 `working-plan/route-demand/<yyyy-mm-dd>-<topic>.md`
 
 **准备推送远端前，必须走 `.agent/skills/push-with-aidoc/SKILL.md`，先校验受影响系统的 aidoc 与索引，再推送**
 
 产品方向、架构目标与近期规格见 `docs/ai/project-overview.md`。
-AI 查询系统实现时，先从 `docs/ai/index/README.md` 和 `docs/ai/index/system-index.json` 进入。
+结构化需求与设计优先从 `oh-gen-doc/`、`oh-code-design/`、`oh-acceptance/` 进入。
+`docs/ai/index/README.md` 和 `docs/ai/index/system-index.json` 仅作为 legacy 实现索引参考，不再是 `route-demand` 的权威注册表。
 
 ## 技术栈速查
 

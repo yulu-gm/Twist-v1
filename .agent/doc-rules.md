@@ -10,11 +10,13 @@
 
 - 面向人的上手说明与协作说明放入 `docs/human/`。
 - 系统规格、架构笔记、数据结构与 AI 工作流文档放入 `docs/ai/`。
-- 需求路由后的主控需求单放入 `docs/ai/requests/`。
+- 多系统需求的主控路由单放入 `working-plan/route-demand/`。
+- `oh-gen-doc/` 保存结构化需求事实源，`oh-code-design/` 保存代码设计承接，`oh-acceptance/` 保存结构化验收文档。
+- `docs/ai/requests/` 仅保留历史资料或人工补充说明，不再作为 `route-demand` 的必选输出。
 - 跨系统集成文档放入 `docs/ai/integration/`。
 - 按系统拆分的 aidoc 放入 `docs/ai/systems/<system>/`。
 - 系统级文档规范放入 `docs/ai/system-standards/`。
-- `docs/ai/index/` 作为 aidoc 总入口，维护系统索引、关键实现文件和查询说明。
+- `docs/ai/index/` 作为 legacy aidoc 索引入口，维护历史系统索引、关键实现文件和查询说明。
 - 当项目初始化方式或开发流程变化时，需要同步更新 `README.md`。
 
 重大功能必须具备的文档内容：

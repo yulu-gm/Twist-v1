@@ -7,7 +7,9 @@ const rootDir = path.resolve(__dirname, "..");
 const skillDir = path.join(rootDir, ".agent", "skills", "route-demand");
 const skillFile = path.join(skillDir, "SKILL.md");
 const referenceDir = path.join(skillDir, "references");
+const demandRouterFile = path.join(referenceDir, "demand-router.md");
 const registryFile = path.join(referenceDir, "system-registry.md");
+const planningReadmeFile = path.join(rootDir, "working-plan", "route-demand", "README.md");
 
 const requiredReferenceFiles = [
   "demand-router.md",
@@ -16,84 +18,144 @@ const requiredReferenceFiles = [
   "skill-tdd.md",
 ];
 
-const requiredSystems = [
-  {
-    key: "time-of-day",
-    standard: path.join(rootDir, "docs", "ai", "system-standards", "time-of-day.md"),
-  },
-  {
-    key: "selection-ui",
-    standard: path.join(rootDir, "docs", "ai", "system-standards", "selection-ui.md"),
-  },
-  {
-    key: "scene-hud",
-    standard: path.join(rootDir, "docs", "ai", "system-standards", "scene-hud.md"),
-  },
-  {
-    key: "pawn-state",
-    standard: path.join(rootDir, "docs", "ai", "system-standards", "pawn-state.md"),
-  },
-  {
-    key: "task-planning",
-    standard: path.join(rootDir, "docs", "ai", "system-standards", "task-planning.md"),
-  },
+const routedSystems = [
+  "UI系统",
+  "交互系统",
+  "地图系统",
+  "实体系统",
+  "工作系统",
+  "建筑系统",
+  "时间系统",
+  "行为系统",
+  "需求系统",
+];
+
+const legacySystems = [
+  "time-of-day",
+  "world-core",
+  "world-grid",
+  "selection-ui",
+  "scene-hud",
+  "pawn-state",
+  "task-planning",
 ];
 
 function readUtf8(filePath: string): string {
   return readFileSync(filePath, "utf8");
 }
 
-describe("route-demand documentation workflow", () => {
-  it("provides a project-local route-demand skill with required references", () => {
+const requiredOrder = "oh-gen-doc -> oh-code-design -> oh-acceptance";
+
+describe("route-demand oh-doc workflow", () => {
+  it("provides a project-local route-demand skill with the new oh-doc workflow references", () => {
     expect(existsSync(skillFile)).toBe(true);
 
     const content = readUtf8(skillFile);
 
     expect(content).toContain("name: route-demand");
-    expect(content).toContain("新增玩法");
-    expect(content).toContain("demand-router.md");
-    expect(content).toContain("system-registry.md");
-    expect(content).toContain("subagent-contract.md");
+    expect(content).toContain("oh-gen-doc");
+    expect(content).toContain("oh-code-design");
+    expect(content).toContain("oh-acceptance");
+    expect(content).toContain(requiredOrder);
+    expect(content).toContain("working-plan/route-demand/");
+    expect(content).not.toContain("docs/ai/system-standards");
+
+    for (const systemName of routedSystems) {
+      expect(content).toContain(systemName);
+    }
+
+    for (const legacySystem of legacySystems) {
+      expect(content).not.toContain(`| ${legacySystem} |`);
+    }
 
     for (const fileName of requiredReferenceFiles) {
       expect(existsSync(path.join(referenceDir, fileName))).toBe(true);
     }
   });
 
-  it("registers system standards and referenced aidoc paths", () => {
+  it("registers all nine top-level systems against oh-gen-doc, oh-code-design, and oh-acceptance", () => {
     expect(existsSync(registryFile)).toBe(true);
 
     const registry = readUtf8(registryFile);
 
-    for (const system of requiredSystems) {
-      expect(registry).toContain(`| ${system.key} |`);
-      expect(registry).toContain(`${system.key}.md`);
-      expect(registry).toContain(`docs/ai/systems/${system.key}/`);
-      expect(existsSync(system.standard)).toBe(true);
+    expect(registry).toContain("| system | oh-gen-doc | oh-code-design | oh-acceptance |");
+
+    for (const systemName of routedSystems) {
+      expect(registry).toContain(`| ${systemName} |`);
+      expect(registry).toContain(`oh-gen-doc/${systemName}.yaml`);
+      expect(registry).toContain(`oh-code-design/${systemName}.yaml`);
+      expect(registry).toContain(`oh-acceptance/${systemName}.yaml`);
+      expect(existsSync(path.join(rootDir, "oh-gen-doc", `${systemName}.yaml`))).toBe(true);
+      expect(existsSync(path.join(rootDir, "oh-code-design", `${systemName}.yaml`))).toBe(true);
+      expect(existsSync(path.join(rootDir, "oh-acceptance", `${systemName}.yaml`))).toBe(true);
+    }
+
+    for (const legacySystem of legacySystems) {
+      expect(registry).not.toContain(`| ${legacySystem} |`);
     }
   });
 
-  it("documents request and integration templates for routed demands", () => {
-    const requestTemplate = path.join(rootDir, "docs", "ai", "templates", "request-template.md");
-    const integrationTemplate = path.join(rootDir, "docs", "ai", "templates", "integration-template.md");
-    const systemAidocTemplate = path.join(rootDir, "docs", "ai", "templates", "system-aidoc-template.md");
+  it("documents routing examples that keep wall-blueprint flow in the new subsystem split", () => {
+    const demandRouter = readUtf8(demandRouterFile);
 
-    expect(existsSync(requestTemplate)).toBe(true);
-    expect(existsSync(integrationTemplate)).toBe(true);
-    expect(existsSync(systemAidocTemplate)).toBe(true);
-
-    expect(readUtf8(requestTemplate)).toContain("route-demand");
-    expect(readUtf8(integrationTemplate)).toContain("UI-first fake");
-    expect(readUtf8(systemAidocTemplate)).toContain("最先失败的测试");
+    expect(demandRouter).toContain("墙体蓝图绘制");
+    expect(demandRouter).toContain("交互系统");
+    expect(demandRouter).toContain("地图系统");
+    expect(demandRouter).toContain("建筑系统");
+    expect(demandRouter).toContain("工作系统");
+    expect(demandRouter).toContain("实体系统");
+    expect(demandRouter).toContain("UI系统");
   });
 
-  it("updates project entry docs to route multi-system demands through the skill", () => {
+  it("documents routing examples that keep night-rest recovery in the new subsystem split", () => {
+    const demandRouter = readUtf8(demandRouterFile);
+
+    expect(demandRouter).toContain("夜晚休息与精力恢复");
+    expect(demandRouter).toContain("时间系统");
+    expect(demandRouter).toContain("行为系统");
+    expect(demandRouter).toContain("需求系统");
+    expect(demandRouter).toContain("实体系统");
+    expect(demandRouter).toContain("UI系统");
+  });
+
+  it("updates project workflow docs to route multi-system work through the oh-doc chain", () => {
+    const twistDoc = readUtf8(path.join(rootDir, "TWIST.md"));
     const agentDoc = readUtf8(path.join(rootDir, "Agent.md"));
     const claudeDoc = readUtf8(path.join(rootDir, "CLAUDE.md"));
+    const taskWorkflowDoc = readUtf8(path.join(rootDir, ".agent", "task-workflow.md"));
+    const docRulesDoc = readUtf8(path.join(rootDir, ".agent", "doc-rules.md"));
+    const registryDoc = readUtf8(registryFile);
+    const tddDoc = readUtf8(path.join(referenceDir, "skill-tdd.md"));
 
-    expect(agentDoc).toContain("route-demand");
-    expect(claudeDoc).toContain("route-demand");
-    expect(agentDoc).toContain(".agent/skills/route-demand/SKILL.md");
-    expect(claudeDoc).toContain(".agent/skills/route-demand/SKILL.md");
+    for (const content of [twistDoc, taskWorkflowDoc, registryDoc, tddDoc]) {
+      expect(content).toContain("route-demand");
+      expect(content).toContain(requiredOrder);
+    }
+
+    for (const content of [agentDoc, claudeDoc, docRulesDoc]) {
+      expect(content).toContain("route-demand");
+      expect(content).toContain("oh-gen-doc");
+      expect(content).toContain("oh-code-design");
+      expect(content).toContain("oh-acceptance");
+    }
+  });
+
+  it("marks docs/ai index as legacy for route-demand instead of the source of truth", () => {
+    const systemIndex = readUtf8(path.join(rootDir, "docs", "ai", "index", "system-index.json"));
+
+    expect(systemIndex).toContain("\"routeDemandRole\": \"legacy-reference-only\"");
+    expect(systemIndex).toContain("\"routeDemandSourceOfTruth\": false");
+  });
+
+  it("documents the required planning entrypoint for route-demand outputs", () => {
+    expect(existsSync(planningReadmeFile)).toBe(true);
+
+    const planningReadme = readUtf8(planningReadmeFile);
+
+    expect(planningReadme).toContain("route-demand 主控路由单");
+    expect(planningReadme).toContain("working-plan/route-demand/<yyyy-mm-dd>-<topic>.md");
+    expect(planningReadme).toContain("影响系统矩阵");
+    expect(planningReadme).toContain("文档更新顺序");
+    expect(planningReadme).toContain("进入实现前检查项");
   });
 });

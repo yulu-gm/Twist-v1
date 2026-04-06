@@ -1,4 +1,7 @@
 {
+  "routeDemandRole": "legacy-reference-only",
+  "routeDemandSourceOfTruth": false,
+  "routeDemandNote": "route-demand now routes against oh-gen-doc, oh-code-design, and oh-acceptance. This file remains a legacy implementation index for existing docs/ai assets.",
   "systems": [
     {
       "key": "time-of-day",

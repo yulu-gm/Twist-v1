@@ -1,12 +1,14 @@
-# aidoc 索引入口
+# aidoc 索引入口（legacy）
 
-`docs/ai/` 是本项目的 aidoc 主目录，供 Agent 在修改代码、补充系统规格和准备推送远端前统一查询。
+`docs/ai/` 是本项目历史 aidoc 与实现索引目录，供 Agent 在修改代码、补充系统规格和准备推送远端前查询既有资料。
 
 ## 使用方式
 
 - 首先阅读本页，按照系统找到标准文档、系统入口页、关键源码文件和关键测试文件。
 - 需要结构化消费时，读取同目录下的 `system-index.json`。
-- 多系统需求优先执行 `route-demand`，准备推送远端前再执行 `push-with-aidoc`。
+- 多系统需求优先执行 `route-demand`，先在 `oh-gen-doc/`、`oh-code-design/`、`oh-acceptance/` 中完成路由与同步。
+- `docs/ai/index/system-index.json` 仅作为 legacy 实现索引参考，不再是 `route-demand` 的权威注册表。
+- 准备推送远端前再执行 `push-with-aidoc`。
 
 ## 系统总表
 
