@@ -4,6 +4,9 @@
   "private": true,
   "description": "Agent-first post-apocalyptic colony simulation prototype built with Phaser and TypeScript.",
   "type": "module",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "dev": "npx vite",
     "build": "tsc --noEmit && npx vite build",
@@ -21,7 +24,7 @@
     "@types/node": "^25.5.2",
     "happy-dom": "^20.8.9",
     "typescript": "^5.9.3",
-    "vite": "^7.1.0",
+    "vite": "^6.4.1",
     "vite-plugin-singlefile": "^2.3.2",
     "vitest": "^3.2.4"
   }

@@ -48,6 +48,7 @@ import { drawTreesToGraphics } from "./renderers/tree-renderer";
 import { drawZoneOverlaysToGraphics } from "./renderers/zone-overlay-renderer";
 import { drawBuildingsAndBlueprintsToGraphics } from "./renderers/building-renderer";
 import { syncTaskMarkerView } from "./renderers/selection-renderer";
+import { GameSceneCameraControls } from "./game-scene-camera-controls";
 import { GameSceneFloorInteraction } from "./game-scene-floor-interaction";
 import {
   applyTimeOfDayPaletteToScene,
@@ -118,6 +119,7 @@ export class GameScene extends Phaser.Scene {
   private simGridSyncState: SimGridSyncState | null = null;
   private orchestrator!: GameOrchestrator;
   private floorInteraction!: GameSceneFloorInteraction;
+  private cameraControls!: GameSceneCameraControls;
 
   private hud!: HudManager;
   private readonly runtimeLogSession = getRuntimeLogSession();
@@ -367,6 +369,9 @@ export class GameScene extends Phaser.Scene {
     this.floorInteraction = floor;
     this.floorInteraction.redrawFloorSelectionAndBrush();
     this.floorInteraction.bind();
+
+    this.cameraControls = new GameSceneCameraControls(this);
+    this.cameraControls.bind();
 
     this.orchestrator.bootstrapSimulationGrid();
     this.syncTreesAndGroundLayer();
@@ -776,6 +781,7 @@ export class GameScene extends Phaser.Scene {
   private onShutdown(): void {
     void this.runtimeLogSession.flush();
     this.keyboard.teardownAll(this.hud);
+    this.cameraControls.unbind();
     this.floorInteraction.unbind();
     this.hud.teardownAll();
     for (const t of this.groundResourceLabels.values()) {
