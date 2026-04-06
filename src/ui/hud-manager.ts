@@ -9,6 +9,7 @@ import type { TimeControlState, TimeOfDayPalette, TimeSpeed } from "../game/time
 import { formatTimeOfDayLabel, type TimeOfDayState } from "../game/time";
 import { pawnProfileForId } from "../data/pawn-profiles";
 import { pawnDetailBehaviorLabelZh } from "./status-display-model";
+import type { RuntimeLogPanelEntry } from "../runtime-log/runtime-log";
 import {
   VILLAGER_TOOLS,
   VILLAGER_TOOL_KEY_CODES,
@@ -35,6 +36,25 @@ export type BuildSubSelectCallback = (sub: VillagerBuildSubId) => void;
 
 /** Pawn 选中回调。 */
 export type PawnSelectCallback = (pawnId: string | null) => void;
+
+/** 运行时调试面板回调。 */
+export type DebugPanelCallbacks = Readonly<{
+  onToggleOpen: () => void;
+  onTogglePause: () => void;
+  onClear: () => void;
+  onFilterChange: (value: string) => void;
+  onFilterFocusChange?: (focused: boolean) => void;
+  onSelectEntry: (entryId: string) => void;
+}>;
+
+/** 调试面板渲染状态。 */
+export type DebugPanelState = Readonly<{
+  open: boolean;
+  paused: boolean;
+  filter: string;
+  selectedEntryId: string | null;
+  entries: readonly RuntimeLogPanelEntry[];
+}>;
 
 function colorToCss(color: number): string {
   return `#${(color & 0xffffff).toString(16).padStart(6, "0")}`;
@@ -86,6 +106,18 @@ export class HudManager {
   private yamlScenarioManualStepsEl: HTMLOListElement | null;
   private yamlScenarioManualOutcomesEl: HTMLOListElement | null;
 
+  // 运行时调试面板
+  private debugToggleEl: HTMLButtonElement | null;
+  private debugPanelEl: HTMLElement | null;
+  private debugClearEl: HTMLButtonElement | null;
+  private debugPauseEl: HTMLButtonElement | null;
+  private debugFilterEl: HTMLInputElement | null;
+  private debugCountEl: HTMLElement | null;
+  private debugLogListEl: HTMLElement | null;
+  private debugDetailEl: HTMLElement | null;
+  private debugUiAbort: AbortController | null = null;
+  private debugCallbacks: DebugPanelCallbacks | null = null;
+
   public constructor() {
     this.sceneHudEl = document.getElementById("scene-hud");
     this.sceneTimeValueEl = document.getElementById("scene-time-value");
@@ -114,6 +146,14 @@ export class HudManager {
     this.yamlScenarioManualOutcomesEl = document.getElementById(
       "yaml-scenario-manual-outcomes"
     ) as HTMLOListElement | null;
+    this.debugToggleEl = document.getElementById("scene-debug-toggle") as HTMLButtonElement | null;
+    this.debugPanelEl = document.getElementById("scene-debug-panel");
+    this.debugClearEl = document.getElementById("scene-debug-clear") as HTMLButtonElement | null;
+    this.debugPauseEl = document.getElementById("scene-debug-pause") as HTMLButtonElement | null;
+    this.debugFilterEl = document.getElementById("scene-debug-filter") as HTMLInputElement | null;
+    this.debugCountEl = document.getElementById("scene-debug-count");
+    this.debugLogListEl = document.getElementById("scene-debug-log-list");
+    this.debugDetailEl = document.getElementById("scene-debug-detail");
   }
 
   // ── 时间 HUD ──────────────────────────────────────────────
@@ -334,6 +374,93 @@ export class HudManager {
     this.yamlScenarioAbort?.abort();
     this.yamlScenarioAbort = null;
     this.syncYamlScenarioManualHints(null);
+  }
+
+  // ── 运行时调试面板 ───────────────────────────────────────
+
+  public setupDebugPanel(callbacks: DebugPanelCallbacks): AbortController {
+    this.teardownDebugPanel();
+    const abort = new AbortController();
+    const { signal } = abort;
+    this.debugUiAbort = abort;
+    this.debugCallbacks = callbacks;
+
+    this.debugToggleEl?.addEventListener(
+      "click",
+      () => callbacks.onToggleOpen(),
+      { signal }
+    );
+    this.debugPauseEl?.addEventListener(
+      "click",
+      () => callbacks.onTogglePause(),
+      { signal }
+    );
+    this.debugClearEl?.addEventListener(
+      "click",
+      () => callbacks.onClear(),
+      { signal }
+    );
+    this.debugFilterEl?.addEventListener(
+      "input",
+      () => callbacks.onFilterChange(this.debugFilterEl?.value ?? ""),
+      { signal }
+    );
+    this.debugFilterEl?.addEventListener(
+      "focus",
+      () => callbacks.onFilterFocusChange?.(true),
+      { signal }
+    );
+    this.debugFilterEl?.addEventListener(
+      "blur",
+      () => callbacks.onFilterFocusChange?.(false),
+      { signal }
+    );
+    return abort;
+  }
+
+  public syncDebugPanel(state: DebugPanelState): void {
+    if (this.debugPanelEl) {
+      this.debugPanelEl.hidden = !state.open;
+    }
+    if (this.debugToggleEl) {
+      this.debugToggleEl.setAttribute("aria-pressed", state.open ? "true" : "false");
+    }
+    if (this.debugPauseEl) {
+      this.debugPauseEl.classList.toggle("selected", state.paused);
+      this.debugPauseEl.setAttribute("aria-pressed", state.paused ? "true" : "false");
+    }
+    if (this.debugFilterEl && this.debugFilterEl.value !== state.filter) {
+      this.debugFilterEl.value = state.filter;
+    }
+    if (this.debugCountEl) {
+      this.debugCountEl.textContent = `${state.entries.length}`;
+    }
+    if (this.debugLogListEl) {
+      this.debugLogListEl.replaceChildren();
+      for (const entry of state.entries) {
+        const row = document.createElement("button");
+        row.type = "button";
+        row.className = "scene-debug-log-entry";
+        row.dataset.entryId = entry.id;
+        row.textContent = entry.text;
+        const selected = entry.id === state.selectedEntryId;
+        row.classList.toggle("selected", selected);
+        row.setAttribute("aria-pressed", selected ? "true" : "false");
+        row.addEventListener("click", () => this.debugCallbacks?.onSelectEntry(entry.id));
+        row.addEventListener("pointerdown", () => this.debugCallbacks?.onSelectEntry(entry.id));
+        this.debugLogListEl.appendChild(row);
+      }
+    }
+    if (this.debugDetailEl) {
+      const selectedEntry = state.entries.find((entry) => entry.id === state.selectedEntryId) ?? null;
+      this.debugDetailEl.textContent = selectedEntry?.detailText ?? "";
+    }
+  }
+
+  public teardownDebugPanel(): void {
+    this.debugUiAbort?.abort();
+    this.debugUiAbort = null;
+    this.debugCallbacks = null;
   }
 
   // ── 工具栏 ────────────────────────────────────────────────
@@ -576,6 +703,7 @@ export class HudManager {
     this.teardownPawnRoster();
     this.teardownPawnDetail();
     this.teardownYamlScenarioPanel();
+    this.teardownDebugPanel();
     this.variantSelectAbort?.abort();
     this.variantSelectAbort = null;
   }

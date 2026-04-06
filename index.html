@@ -512,6 +512,10 @@
           </button>
         </div>
       </div>
+      <div class="scene-hud-group">
+        <span class="scene-hud-label">运行时日志</span>
+        <button id="scene-debug-toggle" class="scene-time-button" type="button">调试面板</button>
+      </div>
     </div>
     <div id="right-dev-stack" aria-label="测试场景面板">
       <aside id="yaml-scenario-panel" aria-label="测试场景（热切换，不重启场景）">
@@ -534,6 +538,20 @@
             <ol id="yaml-scenario-manual-outcomes"></ol>
           </div>
         </div>
+      </aside>
+      <aside id="scene-debug-panel" aria-label="运行时调试日志" hidden>
+        <div class="scene-hud-group">
+          <span class="scene-hud-label">运行时调试日志</span>
+          <div class="scene-debug-actions">
+            <button id="scene-debug-pause" class="scene-time-button" type="button">暂停滚动</button>
+            <button id="scene-debug-clear" class="scene-time-button" type="button">清空</button>
+          </div>
+        </div>
+        <label for="scene-debug-filter">过滤</label>
+        <input id="scene-debug-filter" type="text" placeholder="关键词" />
+        <div id="scene-debug-count" aria-live="polite"></div>
+        <div id="scene-debug-log-list" aria-live="polite"></div>
+        <pre id="scene-debug-detail"></pre>
       </aside>
     </div>
     <div id="grid-hover-info" hidden aria-live="polite"></div>

@@ -33,6 +33,7 @@ import { failWorkItem } from "./work/work-operations";
 import { getWorldSnapshot } from "./world-core";
 import type { OrchestratorWorldBridge } from "./orchestrator-world-bridge";
 import type { PlayerWorldPort } from "../player/world-port-types";
+import type { PawnDecisionTrace } from "../headless/sim-debug-trace";
 import {
   commitPlayerSelectionToWorld,
   type PlayerSelectionCommitInput,
@@ -90,6 +91,9 @@ function sameTimeOfDayPalette(left: TimeOfDayPalette, right: TimeOfDayPalette): 
 
 export class GameOrchestrator {
   private readonly timeBus: TimeEventBus;
+  private advancedSimulationLastTick = false;
+  private lastAiEvents: readonly string[] = [];
+  private lastPawnDecisionTraces: readonly PawnDecisionTrace[] = [];
 
   public constructor(private readonly options: GameOrchestratorOptions) {
     this.timeBus = options.timeEventBus ?? createTimeEventBus();
@@ -120,6 +124,9 @@ export class GameOrchestrator {
     const realDt = deltaMs / 1000;
     const timeControlState = sim.getTimeControlState();
     const simulationDt = effectiveSimulationDeltaSeconds(realDt, timeControlState);
+    this.advancedSimulationLastTick = simulationDt > 0;
+    this.lastAiEvents = [];
+    this.lastPawnDecisionTraces = [];
 
     const worldBefore = worldPort.getWorld();
     const prevTimeSnapshot = worldBefore.time;
@@ -199,6 +206,7 @@ export class GameOrchestrator {
     for (const msg of result.aiEvents) {
       console.info(msg);
     }
+    this.lastAiEvents = result.aiEvents;
 
     sim.setReservations(result.reservations);
     sim.setPawns([...result.pawns]);
@@ -313,6 +321,24 @@ export class GameOrchestrator {
   /** 场景在 `create` 末尾首次同步网格时可调用（等价于原先 `refreshSimulationGridFromWorldCore(true)`）。 */
   public bootstrapSimulationGrid(): void {
     this.refreshSimulationGrid(this.options.interactionTemplate, true);
+  }
+
+  /** 提供给 GameScene：本帧是否真正推进了模拟（暂停时为 false）。 */
+  public didAdvanceSimulationLastTick(): boolean {
+    return this.advancedSimulationLastTick;
+  }
+
+  /** 提供给 GameScene：上一帧模拟产生的 AI 文本事件。 */
+  public getLastAiEvents(): readonly string[] {
+    return this.lastAiEvents;
+  }
+
+  /**
+   * 提供给 GameScene：上一帧的 pawn 决策追踪。
+   * 当前 sim-loop 仅输出 AI 文本事件，未产出结构化决策轨迹，先返回空数组保持 API 兼容。
+   */
+  public getLastPawnDecisionTraces(): readonly PawnDecisionTrace[] {
+    return this.lastPawnDecisionTraces;
   }
 }
 
