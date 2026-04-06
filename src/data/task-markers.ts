@@ -16,8 +16,9 @@ export type TaskMarkerSelectionInput = Readonly<{
 
 /** 「待机」不视为下达可标记的任务；未知 id 同空。 */
 export function issuedTaskLabelForToolId(toolId: string): string | null {
+  if (toolId === "idle") return null;
   const tool = VILLAGER_TOOLS.find((t) => t.id === toolId);
-  if (!tool || tool.id === "idle") return null;
+  if (!tool) return null;
   return tool.label;
 }
 
@@ -82,6 +83,13 @@ function worldDerivedTaskLabelForCell(cellKey: string, snap: WorldSnapshot): str
       }
     }
   }
+  for (const w of snap.workItems) {
+    if (w.kind !== "pick-up-resource") continue;
+    if (w.status === "completed") continue;
+    if (coordKey(w.anchorCell) === cellKey) {
+      return issuedTaskLabelForToolId("haul") ?? undefined;
+    }
+  }
   return undefined;
 }
 
@@ -89,7 +97,7 @@ let domainBackedTaskDisplayLabels: Set<string> | undefined;
 function domainBackedDisplayLabels(): Set<string> {
   if (!domainBackedTaskDisplayLabels) {
     domainBackedTaskDisplayLabels = new Set(
-      ["demolish", "build"]
+      ["demolish", "build", "haul"]
         .map((id) => issuedTaskLabelForToolId(id))
         .filter((x): x is string => x != null)
     );

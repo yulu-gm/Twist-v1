@@ -122,7 +122,11 @@ export function getWorldSnapshot(world: WorldCore): WorldSnapshot {
     interactionCapabilities: entity.interactionCapabilities
       ? [...entity.interactionCapabilities]
       : undefined,
-    ownership: entity.ownership ? { ...entity.ownership } : undefined
+    ownership: entity.ownership ? { ...entity.ownership } : undefined,
+    coveredCells: entity.coveredCells?.map((cell) => ({ ...cell })),
+    acceptedMaterialKinds: entity.acceptedMaterialKinds
+      ? [...entity.acceptedMaterialKinds]
+      : undefined
   }));
   const markers = [...world.markers.values()].map((marker) => ({
     ...marker,
@@ -290,3 +294,73 @@ export function placeTaskMarker(
   };
 }
 
+/**
+ * 标记树木为待伐并确保存在 {@link WorkItemKind} `chop-tree` 开放工单（与既有开放/认领单合并）。
+ */
+export function registerChopTreeWork(
+  world: WorldCore,
+  treeEntityId: string
+): Readonly<{ world: WorldCore; workItemId: string }> {
+  const entity = world.entities.get(treeEntityId);
+  if (!entity || entity.kind !== "tree") {
+    throw new Error(`registerChopTreeWork: 实体 ${treeEntityId} 不是树`);
+  }
+
+  const nextWorld = cloneWorld(world);
+  const tree = nextWorld.entities.get(treeEntityId)!;
+  nextWorld.entities.set(treeEntityId, { ...tree, loggingMarked: true });
+
+  const existingWorkItem = findExistingWorkItem(nextWorld, "chop-tree", treeEntityId);
+  const workItemId = existingWorkItem?.id ?? makeWorkItemId(nextWorld);
+  if (!existingWorkItem) {
+    nextWorld.nextWorkItemId += 1;
+    nextWorld.workItems.set(workItemId, {
+      id: workItemId,
+      kind: "chop-tree",
+      anchorCell: { ...tree.cell },
+      targetEntityId: treeEntityId,
+      status: "open",
+      failureCount: 0
+    });
+  }
+
+  attachWorkItemToEntityMutable(nextWorld, treeEntityId, workItemId);
+  return { world: nextWorld, workItemId };
+}
+
+/**
+ * 将地面物资标为可拾取并确保存在 {@link WorkItemKind} `pick-up-resource` 开放工单（与既有开放/认领单合并）。
+ */
+export function registerPickUpResourceWork(
+  world: WorldCore,
+  resourceEntityId: string
+): Readonly<{ world: WorldCore; workItemId: string }> {
+  const entity = world.entities.get(resourceEntityId);
+  if (!entity || entity.kind !== "resource") {
+    throw new Error(`registerPickUpResourceWork: 实体 ${resourceEntityId} 不是物资`);
+  }
+  if (entity.containerKind !== "ground") {
+    throw new Error(`registerPickUpResourceWork: 物资 ${resourceEntityId} 不在地面`);
+  }
+
+  const nextWorld = cloneWorld(world);
+  const resource = nextWorld.entities.get(resourceEntityId)!;
+  nextWorld.entities.set(resourceEntityId, { ...resource, pickupAllowed: true });
+
+  const existingWorkItem = findExistingWorkItem(nextWorld, "pick-up-resource", resourceEntityId);
+  const workItemId = existingWorkItem?.id ?? makeWorkItemId(nextWorld);
+  if (!existingWorkItem) {
+    nextWorld.nextWorkItemId += 1;
+    nextWorld.workItems.set(workItemId, {
+      id: workItemId,
+      kind: "pick-up-resource",
+      anchorCell: { ...resource.cell },
+      targetEntityId: resourceEntityId,
+      status: "open",
+      failureCount: 0
+    });
+  }
+
+  attachWorkItemToEntityMutable(nextWorld, resourceEntityId, workItemId);
+  return { world: nextWorld, workItemId };
+}

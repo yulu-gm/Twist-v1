@@ -2,10 +2,56 @@
  * HUD 状态展示读模型：聚合领域只读字段，无 DOM。
  */
 
+import type { GoalKind } from "../game/behavior/goal-driven-planning";
 import { formatTimeOfDayLabel } from "../game/time";
 import type { WorldTimeSnapshot } from "../game/time/world-time";
+import type { PawnState } from "../game/pawn-state";
 import type { WorkRegistry } from "../game/work/work-registry";
-import type { WorkOrderStatus } from "../game/work/work-types";
+import type {
+  WorkItemKind,
+  WorkItemSnapshot,
+  WorkOrderStatus
+} from "../game/work/work-types";
+
+const WORK_ITEM_KIND_TO_BEHAVIOR_ZH: Readonly<Record<WorkItemKind, string>> = {
+  "chop-tree": "伐木中",
+  "pick-up-resource": "拾取物资",
+  "haul-to-zone": "搬运物资",
+  "construct-blueprint": "建造中",
+  "deconstruct-obstacle": "拆除中"
+};
+
+function goalKindToBehaviorZh(kind: GoalKind): string {
+  switch (kind) {
+    case "eat":
+      return "进食中";
+    case "sleep":
+      return "休息中";
+    case "wander":
+      return "空闲";
+    case "recreate":
+      return "娱乐中";
+  }
+}
+
+/**
+ * 小人详情面板「当前行为」中文标签：优先 activeWorkItemId 对应工单 kind，否则 currentGoal。
+ */
+export function pawnDetailBehaviorLabelZh(
+  pawn: PawnState,
+  workItems: ReadonlyMap<string, WorkItemSnapshot> | undefined
+): string {
+  const wid = pawn.activeWorkItemId;
+  if (wid !== undefined && workItems !== undefined) {
+    const item = workItems.get(wid);
+    if (item !== undefined) {
+      return WORK_ITEM_KIND_TO_BEHAVIOR_ZH[item.kind];
+    }
+  }
+  const goalKind = pawn.currentGoal?.kind;
+  if (goalKind !== undefined) return goalKindToBehaviorZh(goalKind);
+  return "空闲";
+}
 
 /** 用于聚合的最小棋子视图（避免 UI 直接依赖完整 PawnState）。 */
 export type PawnStatusDisplayInput = Readonly<{

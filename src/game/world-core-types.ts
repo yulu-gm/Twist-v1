@@ -3,9 +3,12 @@ import type {
   BuildState,
   EntityOwnership,
   InteractionCapability,
+  ResourceContainerKind,
+  ResourceMaterialKind,
   RestSpotSnapshot,
   WorldEntityKind,
-  WorldEntitySnapshot
+  WorldEntitySnapshot,
+  ZoneKind
 } from "./entity/entity-types";
 import type { OccupancyMap } from "./map/occupancy-manager";
 import type { GridCoord, WorldGridConfig } from "./map/world-grid";
@@ -56,4 +59,14 @@ export type EntityDraft = Readonly<{
   relatedWorkItemIds?: readonly string[];
   interactionCapabilities?: readonly InteractionCapability[];
   ownership?: EntityOwnership;
+  materialKind?: ResourceMaterialKind;
+  containerKind?: ResourceContainerKind;
+  containerEntityId?: string;
+  pickupAllowed?: boolean;
+  reservedByPawnId?: string;
+  loggingMarked?: boolean;
+  zoneKind?: ZoneKind;
+  coveredCells?: readonly GridCoord[];
+  acceptedMaterialKinds?: readonly ResourceMaterialKind[];
+  carriedByPawnId?: string;
 }>;

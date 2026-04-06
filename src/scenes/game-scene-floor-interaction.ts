@@ -12,7 +12,7 @@ import {
 } from "../game/interaction/floor-selection";
 import type { WorldGridConfig, GridCoord } from "../game/map";
 import { cellAtWorldPixel } from "../game/map";
-import { VILLAGER_TOOLS } from "../data/villager-tools";
+import { VILLAGER_TOOLS, type VillagerBuildSubId } from "../data/villager-tools";
 import {
   beginBrushStroke,
   endBrushStroke,
@@ -36,6 +36,8 @@ export type GameSceneFloorInteractionHost = Readonly<{
   getTaskMarkers: () => Map<string, string>;
   setTaskMarkers: (m: Map<string, string>) => void;
   getSelectedToolIndex: () => number;
+  /** 建造子选项；非建造工具或未选子项时为 null。 */
+  getBuildSubTool: () => VillagerBuildSubId | null;
   onRedrawSelection: () => void;
   getTaskMarkerView: () => TaskMarkerViewDeps;
 }>;
@@ -131,12 +133,24 @@ export class GameSceneFloorInteraction {
       return;
     }
 
-    if (this.selectedVillagerToolId() === "build") {
-      this.brushGestureModifier = modifier;
-      const grid = this.host.getWorldGrid();
-      this.brushState = beginBrushStroke(pointer.id, grid, cell);
-      this.activeSelectionPointerId = pointer.id;
-      this.host.onRedrawSelection();
+    const toolId = this.selectedVillagerToolId();
+    if (toolId === "build") {
+      const sub = this.host.getBuildSubTool();
+      if (sub === "wall") {
+        this.brushGestureModifier = modifier;
+        const grid = this.host.getWorldGrid();
+        this.brushState = beginBrushStroke(pointer.id, grid, cell);
+        this.activeSelectionPointerId = pointer.id;
+        this.host.onRedrawSelection();
+        return;
+      }
+      if (sub === "bed") {
+        const grid = this.host.getWorldGrid();
+        this.floorSelectionState = beginFloorSelection(this.floorSelectionState, grid, cell, modifier);
+        this.activeSelectionPointerId = pointer.id;
+        this.host.onRedrawSelection();
+        return;
+      }
       return;
     }
 

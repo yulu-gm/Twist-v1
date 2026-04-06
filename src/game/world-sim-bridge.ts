@@ -29,12 +29,25 @@ function templateBedPrototype(template: WorldGridConfig): InteractionPoint {
   };
 }
 
+function templateFoodPrototype(template: WorldGridConfig): InteractionPoint {
+  const found = template.interactionPoints.find((p) => p.kind === "food");
+  if (found) return found;
+  return {
+    id: "food-template-fallback",
+    kind: "food",
+    cell: { col: 0, row: 0 },
+    useDurationSec: 2.4,
+    needDelta: { hunger: -55 }
+  };
+}
+
 /** 供 pathfinding / 需求 AI 使用的交互点列表：非床类沿用模板，床类为模板床 + WorldCore 休息床位。 */
 export function simulationInteractionPoints(
   template: WorldGridConfig,
   world: WorldCore
 ): InteractionPoint[] {
   const bedProto = templateBedPrototype(template);
+  const foodProto = templateFoodPrototype(template);
   const nonBed = template.interactionPoints.filter((p) => p.kind !== "bed");
   const templateBeds = template.interactionPoints.filter((p) => p.kind === "bed");
 
@@ -46,7 +59,22 @@ export function simulationInteractionPoints(
     needDelta: { ...bedProto.needDelta }
   }));
 
-  return [...nonBed, ...templateBeds, ...fromWorld];
+  const fromPickupFoodOnGround: InteractionPoint[] = [];
+  for (const entity of world.entities.values()) {
+    if (entity.kind !== "resource") continue;
+    if (entity.materialKind !== "food") continue;
+    if (entity.containerKind !== "ground") continue;
+    if (entity.pickupAllowed !== true) continue;
+    fromPickupFoodOnGround.push({
+      id: `world-food-${entity.id}`,
+      kind: "food",
+      cell: { ...entity.cell },
+      useDurationSec: foodProto.useDurationSec,
+      needDelta: { ...foodProto.needDelta }
+    });
+  }
+
+  return [...nonBed, ...templateBeds, ...fromWorld, ...fromPickupFoodOnGround];
 }
 
 function setsEqual(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {

@@ -10,6 +10,7 @@
     "build:release": "tsc --noEmit && npx vite build",
     "preview": "npx vite preview",
     "test": "vitest run",
+    "test:headless": "vitest run tests/headless/",
     "test:docs": "node tools/aidoc/validate-index.mjs && vitest run tests/route-demand-docs.test.ts tests/aidoc-docs.test.ts",
     "test:watch": "vitest"
   },
@@ -18,6 +19,7 @@
   },
   "devDependencies": {
     "@types/node": "^25.5.2",
+    "happy-dom": "^20.8.9",
     "typescript": "^5.9.3",
     "vite": "^7.1.0",
     "vite-plugin-singlefile": "^2.3.2",

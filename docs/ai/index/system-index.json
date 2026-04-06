@@ -155,7 +155,6 @@
         "src/data/grid-cell-info.ts",
         "src/data/task-markers.ts",
         "src/data/pawn-profiles.ts",
-        "src/data/player-acceptance-scenarios.ts",
         "src/player/brush-stroke.ts",
         "src/player/build-domain-command.ts",
         "src/player/commit-player-intent.ts",
@@ -183,7 +182,6 @@
         "tests/domain/commit-player-intent.test.ts",
         "tests/domain/mock-world-port.test.ts",
         "tests/domain/need-signals.test.ts",
-        "tests/domain/player-acceptance-scenarios.test.ts",
         "tests/domain/player-channel-domain-command.test.ts",
         "tests/domain/apply-domain-command.test.ts"
       ]

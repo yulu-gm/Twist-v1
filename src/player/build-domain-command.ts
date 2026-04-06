@@ -45,6 +45,23 @@ export function buildDomainCommand(input: BuildCommandInput): DomainCommand | nu
     };
   }
 
+  if (toolId === "build") {
+    if (cellKeys.size === 0) return null;
+    const verb = inputShape === "single-cell" ? "place_furniture:bed" : "build_wall_blueprint";
+    return {
+      commandId: nextCommandId(),
+      verb,
+      targetCellKeys: [...cellKeys],
+      targetEntityIds: [],
+      sourceMode: {
+        source: { kind: "toolbar", toolId },
+        selectionModifier,
+        inputShape
+      },
+      issuedAtMs: nowMs
+    };
+  }
+
   const label = issuedTaskLabelForToolId(toolId);
   if (label === null || cellKeys.size === 0) return null;
 

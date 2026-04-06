@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_TIME_OF_DAY_CONFIG,
   DEFAULT_TIME_CONTROL_STATE,
+  MAX_FRAME_DT_SEC,
   advanceTimeOfDay,
   createInitialTimeOfDayState,
   effectiveSimulationDeltaSeconds,
@@ -64,20 +65,30 @@ describe("time-of-day", () => {
     ).toBe(0);
   });
 
-  it("multiplies effective delta by the selected speed", () => {
-    expect(effectiveSimulationDeltaSeconds(2, DEFAULT_TIME_CONTROL_STATE)).toBe(2);
+  it("multiplies effective delta by the selected speed (clamped to MAX_FRAME_DT_SEC)", () => {
+    expect(effectiveSimulationDeltaSeconds(2, DEFAULT_TIME_CONTROL_STATE)).toBe(MAX_FRAME_DT_SEC);
     expect(
       effectiveSimulationDeltaSeconds(2, {
         paused: false,
         speed: 2
       })
-    ).toBe(4);
+    ).toBe(MAX_FRAME_DT_SEC * 2);
     expect(
       effectiveSimulationDeltaSeconds(2, {
         paused: false,
         speed: 3
       })
-    ).toBe(6);
+    ).toBe(MAX_FRAME_DT_SEC * 3);
+  });
+
+  it("does not clamp deltas at or below MAX_FRAME_DT_SEC before speed", () => {
+    expect(effectiveSimulationDeltaSeconds(0.25, DEFAULT_TIME_CONTROL_STATE)).toBe(0.25);
+    expect(
+      effectiveSimulationDeltaSeconds(MAX_FRAME_DT_SEC, {
+        paused: false,
+        speed: 2
+      })
+    ).toBe(MAX_FRAME_DT_SEC * 2);
   });
 
   it("returns keyed palette colors for anchor times and interpolates between them", () => {

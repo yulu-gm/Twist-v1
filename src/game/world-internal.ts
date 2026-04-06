@@ -29,7 +29,10 @@ export function makeEntityId(world: WorldCore): string {
 }
 
 export function normalizeOccupiedCells(draft: EntityDraft): readonly GridCoord[] {
-  return draft.occupiedCells?.length ? [...draft.occupiedCells] : [draft.cell];
+  if (draft.occupiedCells !== undefined) {
+    return [...draft.occupiedCells];
+  }
+  return [draft.cell];
 }
 
 export { findBlockingOccupant, writeEntityOccupancy, deleteEntityOccupancy } from "./map/occupancy-manager";
@@ -73,7 +76,19 @@ export function createEntity(world: WorldCore, draft: EntityDraft): WorldEntityS
     interactionCapabilities: draft.interactionCapabilities
       ? [...draft.interactionCapabilities]
       : undefined,
-    ownership: draft.ownership
+    ownership: draft.ownership,
+    materialKind: draft.materialKind,
+    containerKind: draft.containerKind,
+    containerEntityId: draft.containerEntityId,
+    pickupAllowed: draft.pickupAllowed,
+    reservedByPawnId: draft.reservedByPawnId,
+    loggingMarked: draft.loggingMarked,
+    zoneKind: draft.zoneKind,
+    coveredCells: draft.coveredCells?.map((c) => ({ ...c })),
+    acceptedMaterialKinds: draft.acceptedMaterialKinds
+      ? [...draft.acceptedMaterialKinds]
+      : undefined,
+    carriedByPawnId: draft.carriedByPawnId
   };
   world.nextEntityId += 1;
   return entity;

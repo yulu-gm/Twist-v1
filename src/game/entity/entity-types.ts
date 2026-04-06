@@ -6,7 +6,14 @@ import type { GridCoord } from "../map/world-grid";
 import type { PawnActionState, PawnGoalState } from "../pawn-state";
 
 /** 与 world-core 序列化视图一致的实体种类（可走“障碍/蓝图/建筑/小人”四条枚举）。 */
-export type WorldEntityKind = "pawn" | "obstacle" | "blueprint" | "building";
+export type WorldEntityKind =
+  | "pawn"
+  | "obstacle"
+  | "blueprint"
+  | "building"
+  | "tree"
+  | "resource"
+  | "zone";
 
 export type BuildingKind = "wall" | "bed";
 
@@ -35,6 +42,16 @@ export type WorldEntitySnapshot = Readonly<{
   relatedWorkItemIds: readonly string[];
   interactionCapabilities?: readonly InteractionCapability[];
   ownership?: EntityOwnership;
+  materialKind?: ResourceMaterialKind;
+  containerKind?: ResourceContainerKind;
+  containerEntityId?: string;
+  pickupAllowed?: boolean;
+  reservedByPawnId?: string;
+  loggingMarked?: boolean;
+  zoneKind?: ZoneKind;
+  coveredCells?: readonly GridCoord[];
+  acceptedMaterialKinds?: readonly ResourceMaterialKind[];
+  carriedByPawnId?: string;
 }>;
 
 export type RestSpotSnapshot = Readonly<{

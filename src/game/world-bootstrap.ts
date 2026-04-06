@@ -9,14 +9,16 @@ import { WorldCoreWorldPort } from "../player/world-core-world-port";
 import type { SimConfig } from "./behavior";
 import {
   blockedKeysFromCells,
-  parseCoordKey,
   pickRandomBlockedCells,
   seedBlockedCellsAsObstacles,
+  seedInitialTreesAndResources,
   DEFAULT_WORLD_GRID,
   type WorldGridConfig
 } from "./map";
-import type { PlayerAcceptanceScenario } from "../data/player-acceptance-scenarios";
+import { createSeededRng } from "./util/seeded-rng";
 import type { OrchestratorWorldBridge } from "./orchestrator-world-bridge";
+
+const DEFAULT_TERRAIN_DECORATION_SEED = 0xc0ffee42;
 
 export type WorldBootstrapResult = Readonly<{
   worldGrid: WorldGridConfig;
@@ -24,39 +26,36 @@ export type WorldBootstrapResult = Readonly<{
 }>;
 
 export function bootstrapWorldForScene(opts: Readonly<{
-  scenario: PlayerAcceptanceScenario | undefined;
   simConfig: SimConfig;
   timeOfDayState: TimeOfDayState;
+  /** 树木与食物资源的 Mulberry32 种子；默认固定值以保证可复现。 */
+  terrainDecorationSeed?: number;
 }>): WorldBootstrapResult {
-  const { scenario, simConfig, timeOfDayState } = opts;
+  const { simConfig, timeOfDayState, terrainDecorationSeed = DEFAULT_TERRAIN_DECORATION_SEED } = opts;
   const excludeSpawn = blockedKeysFromCells(DEFAULT_WORLD_GRID.defaultSpawnPoints);
-  const forcedBlockedKeys = scenario?.forcedBlockedCellKeys ?? [];
   const stoneCellsRandom = pickRandomBlockedCells(
     DEFAULT_WORLD_GRID,
     simConfig.stoneCellCount,
     excludeSpawn,
     () => Math.random()
   );
-  const stoneCells = [...stoneCellsRandom];
-  for (const fk of forcedBlockedKeys) {
-    const p = parseCoordKey(fk);
-    if (!p) continue;
-    if (!stoneCells.some((s) => s.col === p.col && s.row === p.row)) {
-      stoneCells.push(p);
-    }
-  }
   const worldGrid: WorldGridConfig = {
     ...DEFAULT_WORLD_GRID,
-    blockedCellKeys: new Set([...blockedKeysFromCells(stoneCells), ...forcedBlockedKeys])
+    blockedCellKeys: new Set(blockedKeysFromCells(stoneCellsRandom))
   };
 
-  const worldCore = seedBlockedCellsAsObstacles(
-    createWorldCore({
-      grid: worldGrid,
-      timeState: { dayNumber: timeOfDayState.dayNumber, minuteOfDay: timeOfDayState.minuteOfDay },
-      timeConfig: DEFAULT_TIME_OF_DAY_CONFIG
-    }),
-    worldGrid.blockedCellKeys ?? new Set()
+  const decorationRng = createSeededRng(terrainDecorationSeed >>> 0);
+  const worldCore = seedInitialTreesAndResources(
+    seedBlockedCellsAsObstacles(
+      createWorldCore({
+        grid: worldGrid,
+        timeState: { dayNumber: timeOfDayState.dayNumber, minuteOfDay: timeOfDayState.minuteOfDay },
+        timeConfig: DEFAULT_TIME_OF_DAY_CONFIG
+      }),
+      worldGrid.blockedCellKeys ?? new Set()
+    ),
+    worldGrid,
+    decorationRng
   );
 
   const worldPort: OrchestratorWorldBridge = new WorldCoreWorldPort(worldCore);

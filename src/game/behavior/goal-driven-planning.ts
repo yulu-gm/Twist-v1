@@ -1,5 +1,9 @@
 import type { PawnId, PawnState } from "../pawn-state";
 import { isMoving } from "../pawn-state";
+import {
+  NIGHT_SLEEP_GOAL_SCORE_MULTIPLIER,
+  REST_SLEEP_PRIORITY_THRESHOLD
+} from "../need/threshold-rules";
 import type { GridCoord, ReservationSnapshot, WorldGridConfig } from "../map/world-grid";
 import {
   findInteractionPointById,
@@ -20,10 +24,12 @@ export type GoalDecision = Readonly<{
   reason: string;
 }>;
 
-type PlannerInput = Readonly<{
+export type ChooseGoalPlannerInput = Readonly<{
   grid: WorldGridConfig;
   pawn: PawnState;
   reservations: ReservationSnapshot;
+  /** 当前时段；省略时按白天处理（不施加夜间睡眠得分乘数）。 */
+  timePeriod?: "day" | "night";
 }>;
 
 const WANDER_BASE_SCORE = 5;
@@ -58,7 +64,7 @@ function needScoreForGoal(pawn: PawnState, goal: GoalKind): number {
   }
 }
 
-function buildGoalDecision(input: PlannerInput, goal: GoalKind): GoalDecision {
+function buildGoalDecision(input: ChooseGoalPlannerInput, goal: GoalKind): GoalDecision {
   const baseScore = needScoreForGoal(input.pawn, goal);
   const interactionKind = interactionKindForGoal(goal);
   if (!interactionKind) {
@@ -88,15 +94,24 @@ function buildGoalDecision(input: PlannerInput, goal: GoalKind): GoalDecision {
     };
   }
 
+  let score = Math.max(0, baseScore - manhattanDistance(input.pawn.logicalCell, target.cell) * 2);
+  if (
+    goal === "sleep" &&
+    input.timePeriod === "night" &&
+    input.pawn.needs.rest > REST_SLEEP_PRIORITY_THRESHOLD
+  ) {
+    score *= NIGHT_SLEEP_GOAL_SCORE_MULTIPLIER;
+  }
+
   return {
     goal,
-    score: Math.max(0, baseScore - manhattanDistance(input.pawn.logicalCell, target.cell) * 2),
+    score,
     targetId: target.id,
     reason: `${goal}-need-${baseScore}`
   };
 }
 
-export function chooseGoalDecision(input: PlannerInput): GoalDecision {
+export function chooseGoalDecision(input: ChooseGoalPlannerInput): GoalDecision {
   const candidates = (["eat", "sleep", "recreate", "wander"] as const)
     .map((goal) => buildGoalDecision(input, goal))
     .sort((left, right) => right.score - left.score);

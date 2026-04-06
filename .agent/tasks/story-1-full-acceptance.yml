@@ -1,0 +1,845 @@
+# ──────────────────────────────────────────────────────────────────
+# Story-1 完整验收 — 从当前代码到可玩第一天的全部任务
+# ──────────────────────────────────────────────────────────────────
+# 事实来源：oh-story/story-1.md + oh-acceptance/*.yaml
+# 核心缺口：WorldCore 实体模型不足（缺 tree/resource/zone），
+#   命令层不生成真实工单，行为系统与工单系统断开，UI 缺层级菜单与进度条。
+#
+# 无头测试范式：
+#   scenario 定义   → scenarios/<name>.scenario.ts（导出 ScenarioDefinition）
+#   vitest 包装     → tests/headless/<name>.test.ts（调用 runScenarioHeadless / createHeadlessSim）
+#   场景注册        → scenarios/index.ts（加入 ALL_SCENARIOS 供浏览器面板枚举）
+#   断言 helpers    → src/headless/scenario-helpers.ts（谓词工厂、assertXxx）
+#   事件类型        → src/headless/sim-event-log.ts（SimEventKind 差分事件）
+# ──────────────────────────────────────────────────────────────────
+
+task_name: "Story-1 第一天验收：领域串联 + 行为桥接 + UI 补全"
+created_at: "2026-04-06"
+status: "completed"
+
+# ====================================================================
+#  Phase 1：WorldCore 领域模型扩展（基础）
+# ====================================================================
+tasks:
+  - id: "T-01"
+    title: "WorldEntityKind 增加 tree / resource / zone 三种实体类型"
+    status: "completed"
+    dependencies: []
+    context:
+      read_files:
+        - "src/game/entity/entity-types.ts"
+        - "src/game/world-core-types.ts"
+      reference_docs:
+        - "oh-acceptance/实体系统.yaml"
+        - "oh-acceptance/地图系统.yaml"
+    action: |
+      1. 在 `entity-types.ts` 的 `WorldEntityKind` 联合类型中追加 `"tree" | "resource" | "zone"`。
+      2. 在 `WorldEntitySnapshot` 中增加可选字段（与已有 EntityRegistry 类型对齐）：
+         - `materialKind?: ResourceMaterialKind`（resource 用）
+         - `containerKind?: ResourceContainerKind`（resource 用）
+         - `containerEntityId?: string`（resource：所在容器）
+         - `pickupAllowed?: boolean`（resource）
+         - `reservedByPawnId?: string`（resource / tree）
+         - `loggingMarked?: boolean`（tree）
+         - `zoneKind?: ZoneKind`（zone）
+         - `coveredCells?: readonly GridCoord[]`（zone 覆盖格）
+         - `acceptedMaterialKinds?: readonly ResourceMaterialKind[]`（zone）
+         - `carriedByPawnId?: string`（resource：被谁携带）
+      3. 在 `EntityDraft` (world-core-types.ts) 中同步增加上述可选字段。
+      4. 确保 `tsc --noEmit` 通过。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Grep: `entity-types.ts` 中 `WorldEntityKind` 包含 `"tree"` `"resource"` `"zone"`。
+      - [ ] Grep: `WorldEntitySnapshot` 包含 `materialKind` 字段。
+      - [ ] Grep: `EntityDraft` 包含 `loggingMarked` 字段。
+
+  - id: "T-02"
+    title: "WorkItemKind 增加 chop-tree / pick-up-resource / haul-to-zone"
+    status: "completed"
+    dependencies: ["T-01"]
+    context:
+      read_files:
+        - "src/game/work/work-types.ts"
+        - "src/game/work/work-operations.ts"
+        - "src/game/world-internal.ts"
+      reference_docs:
+        - "oh-acceptance/工作系统.yaml"
+    action: |
+      1. 在 `work-types.ts` 的 `WorkItemKind` 联合中追加 `"chop-tree" | "pick-up-resource" | "haul-to-zone"`。
+      2. 在 `WorkItemSnapshot` 增加可选字段：
+         - `haulTargetZoneId?: string`
+         - `haulDropCell?: GridCoord`
+         - `derivedFromWorkId?: string`（伐木完成后自动派生拾取工单时记录来源）
+      3. 在 `work-operations.ts` 的 `completeWorkItem` switch 中增加三种新分支的 stub：
+         - `chop-tree`：调用新函数 `completeChopWork`（本任务仅建骨架 + 抛 TODO）
+         - `pick-up-resource`：调用 `completePickUpWork`（stub）
+         - `haul-to-zone`：调用 `completeHaulWork`（stub）
+      4. stub 函数返回 `{ world, outcome: { kind: "completed" } }`，无实质逻辑（下一任务填充）。
+      5. **单元测试**：
+         a. 新建 `tests/domain/work-item-kind-routing.test.ts`：
+            - 构建最小 WorldCore + 手动创建 chop-tree / pick-up-resource / haul-to-zone 三种工单 → 认领 → 调用 `completeWorkItem`。
+            - 断言：每种新工单 switch 分支均被命中，返回 `outcome.kind === "completed"`，不抛异常。
+            - 断言：传入未知 kind 时行为符合预期（抛错或返回 fallback）。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/domain/work-item-kind-routing.test.ts` 全部通过。
+      - [ ] Grep: `WorkItemKind` 包含 `"chop-tree"`、`"pick-up-resource"`、`"haul-to-zone"`。
+      - [ ] Grep: `completeWorkItem` 函数体包含 `case "chop-tree"`。
+      - [ ] Read: `work-operations.ts` 导出 `completeChopWork`、`completePickUpWork`、`completeHaulWork`。
+      - [ ] Read: 测试覆盖三种新 kind 的 switch 路由 + 返回值断言。
+
+  - id: "T-03"
+    title: "world-internal 适配：createEntity / getWorldSnapshot 支持新实体字段"
+    status: "completed"
+    dependencies: ["T-01"]
+    context:
+      read_files:
+        - "src/game/world-internal.ts"
+        - "src/game/world-core.ts"
+    action: |
+      1. `world-internal.ts` 的 `createEntity` 函数需要把 T-01 新增的 draft 字段（materialKind / containerKind / loggingMarked / zoneKind 等）透传到生成的 `WorldEntitySnapshot`。
+      2. `world-core.ts` 的 `getWorldSnapshot` 函数在 entities map 转数组时，需要拷贝新增字段（与现有 occupiedCells / interactionCapabilities 拷贝模式一致）。
+      3. 确保 `tsc --noEmit` 通过。
+      4. **单元测试**：
+         a. 新建 `tests/domain/entity-field-passthrough.test.ts`：
+            - 调用 `createEntity` 传入包含全部新增字段的 draft（materialKind:"wood", containerKind:"ground", loggingMarked:true, zoneKind:"storage", coveredCells:[{row:0,col:0}], pickupAllowed:true, carriedByPawnId:"p1", reservedByPawnId:"p2", acceptedMaterialKinds:["wood"]）。
+            - 断言：返回的 entity snapshot 中每个新字段值与 draft 一致。
+            - 调用 `getWorldSnapshot` → 断言：输出的 entities 数组中对应实体包含全部新字段，值未丢失。
+            - 边界用例：draft 中新字段均为 undefined → snapshot 中对应字段为 undefined（不引入意外默认值）。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/domain/entity-field-passthrough.test.ts` 全部通过。
+      - [ ] Grep: `createEntity` 函数体中出现 `materialKind` 赋值。
+      - [ ] Grep: `getWorldSnapshot` 函数体中出现 `loggingMarked` 或 `materialKind` 拷贝。
+      - [ ] Read: 测试覆盖全字段透传 + 空字段不引入默认值两条路径。
+
+  - id: "T-03b"
+    title: "扩展 ScenarioExpectation 类型以支持新实体/工单验证"
+    status: "completed"
+    dependencies: ["T-01", "T-02"]
+    context:
+      read_files:
+        - "src/headless/scenario-types.ts"
+        - "src/headless/scenario-runner.ts"
+        - "src/headless/scenario-helpers.ts"
+        - "src/headless/sim-event-log.ts"
+    action: |
+      1. 在 `scenario-types.ts` 的 `ScenarioExpectation.type` 联合中追加：
+         - `"entity-kind-exists"`：params 含 `{ entityKind: string, count?: number }`，验证 world.entities 中存在指定 kind 的实体。
+         - `"entity-kind-absent"`：params 含 `{ entityKind: string }`，验证不存在指定 kind。
+         - `"resource-in-container"`：params 含 `{ containerKind: string }`，验证至少一个 resource 的 containerKind 匹配。
+         - `"work-item-completed-kind"`：params 含 `{ workKind: string }`，验证存在 status=completed 且 kind 匹配的工单。
+      2. 在 `scenario-runner.ts` 的 `expectationSatisfied` switch 中实现上述四种新分支。
+      3. 在 `scenario-helpers.ts` 中新增对应的 assert 函数：
+         - `assertEntityKindExists(sim, kind, minCount?)`
+         - `assertEntityKindAbsent(sim, kind)`
+         - `assertResourceInContainer(sim, containerKind)`
+      4. 在 `ScenarioDefinition` 中增加可选字段：
+         - `trees?: Array<{ cell: GridCoord }>` — hydrate 时 spawn tree 实体。
+         - `resources?: Array<{ cell: GridCoord; materialKind: string; pickupAllowed?: boolean }>` — hydrate 时 spawn resource 实体。
+         - `zones?: Array<{ cells: GridCoord[]; zoneKind?: string }>` — hydrate 时 spawn zone 实体。
+      5. 在 `scenario-runner.ts` 的 `hydrateScenario` 中添加对 trees / resources / zones 的 spawn 逻辑。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/headless/scenario-runner.test.ts` 通过（现有测试不回归）。
+      - [ ] Grep: `scenario-types.ts` 中 type 联合包含 `"entity-kind-exists"` 和 `"resource-in-container"`。
+      - [ ] Grep: `scenario-runner.ts` 的 switch 中包含 `case "entity-kind-exists"` 分支。
+      - [ ] Read: `hydrateScenario` 函数中出现 `def.trees` 遍历 + spawn 逻辑。
+
+# ====================================================================
+#  Phase 2：地图初始化 — 播种树木、散落物资
+# ====================================================================
+  - id: "T-04"
+    title: "WorldCore 实体播种：树木 + 散落食物 + 初始格配置"
+    status: "completed"
+    dependencies: ["T-03", "T-03b"]
+    context:
+      read_files:
+        - "src/game/world-bootstrap.ts"
+        - "src/game/map/world-seed.ts"
+        - "src/game/map/world-grid.ts"
+      reference_docs:
+        - "oh-acceptance/地图系统.yaml (MAP-001)"
+    action: |
+      1. 在 `world-bootstrap.ts` 的 `bootstrapWorldForScene` 中（seedBlockedCellsAsObstacles 之后）调用新函数 `seedInitialTreesAndResources`。
+      2. 新函数在 `world-seed.ts`（或新建 `world-seed-entities.ts`）实现：
+         a. 随机挑选 8-12 个空闲格（非阻挡、非出生点）生成 `kind:"tree"` 实体。
+         b. 随机挑选 3-5 个空闲格生成 `kind:"resource"` 实体（materialKind:"food", containerKind:"ground", pickupAllowed:false）。
+         c. 树木实体不阻挡通行（不占 occupancy）但标记了 `loggingMarked:false`。
+      3. 使用传入的 rng 函数保证测试可重现。
+      4. **Headless 测试**：
+         a. 新建 `scenarios/map-initial-state.scenario.ts`，定义场景：seed=固定值，不含自定义 pawns/trees（依赖 bootstrap 自动播种），空 expectations 先用 custom。
+         b. 新建 `tests/headless/map-initial-state.test.ts`：使用 `createHeadlessSim` + `bootstrapWorldForScene` 或直接读取世界快照，断言 world.entities 中存在 >= 8 个 `kind==="tree"` 和 >= 3 个 `kind==="resource"` 且 `materialKind==="food"` 的实体。
+         c. 注册 scenario 到 `scenarios/index.ts`。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/headless/map-initial-state.test.ts` 全部通过。
+      - [ ] Grep: `world-bootstrap.ts` 或 `world-seed.ts` 中出现 `kind: "tree"` spawn 调用。
+      - [ ] Grep: 出现 `materialKind` 和 `"food"` 的组合。
+      - [ ] Read: 测试文件断言 tree 实体 >= 8 个、food resource >= 3 个。
+
+  - id: "T-05"
+    title: "world-sim-bridge 同步树木为可交互目标（食物交互点从 WorldCore resource 生成）"
+    status: "completed"
+    dependencies: ["T-04"]
+    context:
+      read_files:
+        - "src/game/world-sim-bridge.ts"
+        - "src/game/map/world-grid.ts"
+    action: |
+      1. `simulationInteractionPoints` 目前从 template 获取 food/bed/recreation 静态点。
+         增加逻辑：遍历 `world.entities`，对 `kind==="resource"` 且 `containerKind==="ground"` 且 `pickupAllowed===true` 且 `materialKind==="food"` 的实体，生成 `kind:"food"` 交互点（id 使用 `"world-food-{entityId}"`）。
+      2. 同理：对已完成建造的 `kind==="building"` 且 `buildingKind==="bed"` 的实体（当前已通过 restSpots 实现），保持现状即可。
+      3. 确保模板中的静态 food 点仍然保留（或决策性迁移——保留更安全）。
+      4. **Headless 测试**：在 `tests/headless/map-initial-state.test.ts` 中追加 it case：
+         - 手动 spawn 一个 `pickupAllowed:true` 的 food resource → 调用 `simulationInteractionPoints` → 断言返回数组中存在 `id` 以 `"world-food-"` 开头的交互点。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/headless/map-initial-state.test.ts` 全部通过。
+      - [ ] Grep: `simulationInteractionPoints` 函数体中出现 `"world-food-"` 字符串。
+
+# ====================================================================
+#  Phase 3：玩家命令层补全 — apply-domain-command 处理全部动词
+# ====================================================================
+  - id: "T-06"
+    title: "apply-domain-command 实现 zone_create 动词"
+    status: "completed"
+    dependencies: ["T-03"]
+    context:
+      read_files:
+        - "src/player/apply-domain-command.ts"
+        - "src/game/world-core.ts"
+        - "src/game/map/zone-manager.ts"
+      reference_docs:
+        - "oh-acceptance/地图系统.yaml (MAP-002)"
+        - "oh-acceptance/交互系统.yaml (INTERACT-001)"
+    action: |
+      1. 在 `applyDomainCommandToWorldCore` 中增加 `cmd.verb === "zone_create"` 分支。
+      2. 逻辑：解析 targetCellKeys 为 GridCoord 数组 → 校验不与阻挡格重叠 → 在 WorldCore 中 spawn 一个 `kind:"zone"` 实体，`zoneKind:"storage"`。
+      3. 返回 `{ accepted:true, messages: ["领域：已创建存储区 ..."] }`。
+      4. zone 实体不写 occupancy（存储区不阻挡通行）。
+      5. **Headless 测试**：
+         a. 新建 `scenarios/zone-create.scenario.ts`：seed 固定，1 pawn，无蓝图。
+         b. 新建 `tests/headless/zone-create.test.ts`：
+            - 创建 headless sim → 手动构造 zone_create DomainCommand 并 submit 到 worldPort → 断言 world.entities 中出现 `kind==="zone"` 实体。
+            - 第二个 it：submit zone_create 到阻挡格 → 断言被拒绝。
+         c. 注册到 `scenarios/index.ts`。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/headless/zone-create.test.ts` 全部通过。
+      - [ ] Grep: `applyDomainCommandToWorldCore` 函数体包含 `"zone_create"` 字符串。
+      - [ ] Read: 测试验证了合法格创建 zone + 阻挡格拒绝两个路径。
+
+  - id: "T-07"
+    title: "apply-domain-command 实现 assign_tool_task:lumber → 生成 chop-tree 工单"
+    status: "completed"
+    dependencies: ["T-02", "T-04"]
+    context:
+      read_files:
+        - "src/player/apply-domain-command.ts"
+        - "src/game/world-core.ts"
+        - "src/game/world-internal.ts"
+      reference_docs:
+        - "oh-acceptance/工作系统.yaml (WORK-001)"
+    action: |
+      1. 在 `applyDomainCommandToWorldCore` 中，当 `toolId === "lumber"` 时：
+         a. 遍历 targetCellKeys，对每个格查找 `kind==="tree"` 实体。
+         b. 若找到且 loggingMarked 为 false，标记为 true 并创建 `chop-tree` 工单（anchorCell=tree.cell, targetEntityId=tree.id, status:"open"）。
+         c. 若该格无树木，跳过（不报错）。
+      2. 替换原先的通用分支（"已登记意图 暂无对应工单"），改为真正落地领域。
+      3. **Headless 测试**：
+         a. 新建 `scenarios/chop-tree-command.scenario.ts`：seed 固定，包含 1 棵 tree（使用 T-03b 的 `trees` 字段）和 1 pawn，expectations 包含 `work-item-exists: { workKind: "chop-tree", status: "open" }`。
+         b. 新建 `tests/headless/chop-tree-command.test.ts`：
+            - 创建 headless sim + hydrateScenario → submit lumber 命令 → 断言 tree 实体 `loggingMarked===true` + chop-tree 工单存在。
+            - 第二个 it：对无树格发 lumber → 断言无新工单。
+         c. 注册到 `scenarios/index.ts`。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/headless/chop-tree-command.test.ts` 全部通过。
+      - [ ] Grep: `applyDomainCommandToWorldCore` 中 `toolId === "lumber"` 分支包含 `"chop-tree"` 字符串。
+      - [ ] Read: 测试断言了 `loggingMarked === true` 和 chop-tree 工单创建。
+
+  - id: "T-08"
+    title: "apply-domain-command 实现 build_wall_blueprint 动词 → 墙体蓝图放置"
+    status: "completed"
+    dependencies: ["T-01"]
+    context:
+      read_files:
+        - "src/player/apply-domain-command.ts"
+        - "src/game/building/blueprint-placement.ts"
+      reference_docs:
+        - "oh-acceptance/建筑系统.yaml (BUILD-001)"
+        - "oh-acceptance/交互系统.yaml (INTERACT-002)"
+    action: |
+      1. 当 `cmd.verb === "build_wall_blueprint"` 时，遍历 targetCellKeys：
+         a. 对每个格调用 `safePlaceBlueprint(world, { buildingKind: "wall", cell })`.
+         b. 若成功则累积 world；若失败则跳过该格（局部失败不阻断）。
+      2. 返回 accepted:true 及放置数量。
+      3. **Headless 测试**：
+         a. 新建 `scenarios/build-wall-flow.scenario.ts`：seed 固定，1 pawn，无初始蓝图，expectations 含 `work-item-exists: { workKind: "construct-blueprint" }`。
+         b. 新建 `tests/headless/build-wall-flow.test.ts`：
+            - 创建 sim → submit build_wall_blueprint 命令（3 格连续）→ 断言 3 个 blueprint 实体 + 3 个 construct-blueprint 工单。
+            - claimConstructBlueprintAsPawnName 认领 → runUntil work-completed → 断言 building 实体 buildingKind==="wall" 出现。
+         c. 注册到 `scenarios/index.ts`。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/headless/build-wall-flow.test.ts` 全部通过。
+      - [ ] Grep: `applyDomainCommandToWorldCore` 函数体包含 `"build_wall_blueprint"` 字符串。
+      - [ ] Read: 测试验证了墙体蓝图放置 + 认领 + 落成全链路。
+
+  - id: "T-09"
+    title: "apply-domain-command 实现 place_furniture:bed 动词（与现有 build 工具分离）"
+    status: "completed"
+    dependencies: ["T-01"]
+    context:
+      read_files:
+        - "src/player/apply-domain-command.ts"
+        - "src/player/build-domain-command.ts"
+      reference_docs:
+        - "oh-acceptance/交互系统.yaml (INTERACT-003)"
+    action: |
+      1. 当 `cmd.verb === "place_furniture:bed"` 时，对每个 targetCellKey 调用 `safePlaceBlueprint(world, { buildingKind: "bed", cell })`。
+      2. 将原有 `toolId === "build"` 分支保持为 bed（兼容），或重定向到此新动词。
+      3. 在 `build-domain-command.ts` 的 `buildDomainCommand` 中：当 `toolId === "build"` 时判断 inputShape：`brush-stroke` 生成 `build_wall_blueprint`，`single-cell` 生成 `place_furniture:bed`。
+      4. **Headless 测试**：在现有 `tests/headless/build-bed-flow.test.ts` 中追加 it case：
+         - 使用 `place_furniture:bed` 动词 submit → 断言蓝图和工单创建成功（与已有 build 工具路径行为一致）。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/headless/build-bed-flow.test.ts` 全部通过（含新增用例）。
+      - [ ] Grep: `applyDomainCommandToWorldCore` 中包含 `"place_furniture:bed"` 字符串。
+      - [ ] Read: `buildDomainCommand` 对 `build` toolId 区分 inputShape 生成不同动词。
+
+  - id: "T-10"
+    title: "增加物资拾取标记工具 (haul) 及对应命令处理"
+    status: "completed"
+    dependencies: ["T-02", "T-03b"]
+    context:
+      read_files:
+        - "src/data/villager-tools.ts"
+        - "src/player/apply-domain-command.ts"
+        - "src/data/task-markers.ts"
+      reference_docs:
+        - "oh-acceptance/交互系统.yaml (INTERACT-001)"
+        - "oh-acceptance/工作系统.yaml (WORK-002)"
+    action: |
+      1. `villager-tools.ts` 中已有 `haul` 工具（U 键），保持不变。
+      2. 在 `applyDomainCommandToWorldCore` 中，当 `toolId === "haul"` 时：
+         a. 遍历 targetCellKeys，对每个格查找 `kind==="resource"` 且 `containerKind==="ground"` 的实体。
+         b. 将其 `pickupAllowed` 设为 true。
+         c. 为该 resource 创建 `pick-up-resource` 工单（targetEntityId=resource.id, anchorCell=resource.cell）。
+      3. 在 `task-markers.ts` 的 `issuedTaskLabelForToolId` 中确保 `haul` 返回有效标签（如 "搬运"）。
+      4. **Headless 测试**：
+         a. 新建 `scenarios/haul-mark-pickup.scenario.ts`：seed 固定，1 pawn，使用 T-03b 的 `resources` 字段放 2 个 ground food（pickupAllowed:false），expectations: `work-item-exists: { workKind: "pick-up-resource" }`。
+         b. 新建 `tests/headless/haul-mark-pickup.test.ts`：
+            - 创建 sim + hydrate → submit haul 命令覆盖 resource 所在格 → 断言 resource.pickupAllowed===true + pick-up-resource 工单存在。
+         c. 注册到 `scenarios/index.ts`。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/headless/haul-mark-pickup.test.ts` 全部通过。
+      - [ ] Grep: `applyDomainCommandToWorldCore` 中 `toolId === "haul"` 分支创建 `"pick-up-resource"` 工单。
+      - [ ] Read: 测试断言 pickupAllowed 从 false 变为 true。
+
+# ====================================================================
+#  Phase 4：工单完成逻辑 — 填充 work-operations 骨架
+# ====================================================================
+  - id: "T-11"
+    title: "completeChopWork 实现：树木实体移除 + 生成木头 resource + 派生 pick-up 工单"
+    status: "completed"
+    dependencies: ["T-02", "T-03"]
+    context:
+      read_files:
+        - "src/game/work/work-operations.ts"
+        - "src/game/world-internal.ts"
+        - "src/game/entity/lifecycle-rules.ts"
+      reference_docs:
+        - "oh-acceptance/实体系统.yaml (ENTITY-001)"
+        - "oh-acceptance/工作系统.yaml (WORK-001)"
+    action: |
+      1. 在 `completeChopWork` 中：
+         a. 获取 targetEntityId 对应的 tree 实体；若不存在返回 `target-missing`。
+         b. 移除 tree 实体（removeEntityMutable）。
+         c. 在原格 spawn `kind:"resource"` 实体（materialKind:"wood", containerKind:"ground", pickupAllowed:true）。
+         d. 创建一条 `pick-up-resource` 工单（status:"open", targetEntityId=新 resource.id, anchorCell=原格, derivedFromWorkId=当前 chop 工单 id）。
+         e. 将当前 chop 工单标记为 completed。
+      2. 返回 `{ kind:"completed", createdEntityId: resourceEntityId }`。
+      3. **Headless 测试**：
+         a. 新建 `tests/headless/chop-work-complete.test.ts`：
+            - 直接构建 WorldCore + 手动 spawn tree → 手动创建 chop-tree workItem → claimWorkItem → completeWorkItem。
+            - 断言：tree 实体不存在 + resource（wood）实体存在 + pick-up-resource 工单存在且 status=open。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/headless/chop-work-complete.test.ts` 全部通过。
+      - [ ] Read: `completeChopWork` 中存在 `removeEntityMutable` + `kind: "resource"` spawn。
+      - [ ] Grep: 函数体中出现 `"pick-up-resource"` 工单创建。
+
+  - id: "T-12"
+    title: "completePickUpWork 实现：resource 状态变为携带 + 自动派生 haul 工单"
+    status: "completed"
+    dependencies: ["T-02", "T-03"]
+    context:
+      read_files:
+        - "src/game/work/work-operations.ts"
+        - "src/game/world-internal.ts"
+      reference_docs:
+        - "oh-acceptance/实体系统.yaml (ENTITY-002)"
+    action: |
+      1. 在 `completePickUpWork` 中：
+         a. 获取 targetEntityId 对应的 resource 实体。
+         b. 将 resource 的 `containerKind` 改为 `"pawn"`，`carriedByPawnId` 设为 claimedBy。
+         c. 检查是否存在任意 `kind:"zone"` 且 `zoneKind:"storage"` 实体，若存在则自动创建 `haul-to-zone` 工单（目标=resource, haulTargetZoneId=zone.id, haulDropCell=zone 第一个格, derivedFromWorkId=当前 pick-up 工单 id），status:"open"。
+         d. 标记 pick-up 工单为 completed。
+      2. 返回 `{ kind:"completed" }`。
+      3. **Headless 测试**：
+         a. 新建 `tests/headless/pickup-work-complete.test.ts`：
+            - 构建 WorldCore + spawn resource(ground) + spawn zone(storage) → 创建并认领 pick-up-resource 工单 → completeWorkItem。
+            - 断言：resource.containerKind==="pawn" + resource.carriedByPawnId===pawnId + haul-to-zone 工单存在。
+            - 第二个 it：无存储区时 complete → 断言无 haul 工单生成。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/headless/pickup-work-complete.test.ts` 全部通过。
+      - [ ] Read: `completePickUpWork` 中 resource `containerKind` 被设为 `"pawn"`。
+      - [ ] Grep: 函数体中出现 `"haul-to-zone"` 工单创建。
+
+  - id: "T-13"
+    title: "completeHaulWork 实现：resource 状态变为存储"
+    status: "completed"
+    dependencies: ["T-02", "T-03"]
+    context:
+      read_files:
+        - "src/game/work/work-operations.ts"
+        - "src/game/world-internal.ts"
+      reference_docs:
+        - "oh-acceptance/实体系统.yaml (ENTITY-002)"
+    action: |
+      1. 在 `completeHaulWork` 中：
+         a. 获取 resource 实体。
+         b. 将 `containerKind` 改为 `"zone"`，`containerEntityId` 设为 `haulTargetZoneId`。
+         c. 将 resource 的 `cell` 更新为 `haulDropCell`。
+         d. 清除 `carriedByPawnId`。
+         e. 标记工单为 completed。
+      2. 返回 `{ kind:"completed" }`。
+      3. **Headless 测试**：
+         a. 新建 `tests/headless/haul-work-complete.test.ts`：
+            - 构建 WorldCore + spawn resource(pawn 携带) + spawn zone → 创建并认领 haul-to-zone 工单 → completeWorkItem。
+            - 断言：resource.containerKind==="zone" + resource.containerEntityId===zoneId + resource.cell===haulDropCell + carriedByPawnId===undefined。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/headless/haul-work-complete.test.ts` 全部通过。
+      - [ ] Read: `completeHaulWork` 中 resource `containerKind` 被设为 `"zone"`。
+      - [ ] Grep: `carriedByPawnId` 被清除（设为 undefined）。
+
+# ====================================================================
+#  Phase 5：行为系统与工单桥接 — 小人自动发现并执行工作
+# ====================================================================
+  - id: "T-14"
+    title: "GameOrchestrator.tick 中增加工单自动认领逻辑"
+    status: "completed"
+    dependencies: ["T-07", "T-11", "T-12", "T-13"]
+    context:
+      read_files:
+        - "src/game/game-orchestrator.ts"
+        - "src/game/world-construct-tick.ts"
+        - "src/game/work/work-operations.ts"
+      reference_docs:
+        - "oh-acceptance/行为系统.yaml (BEHAVIOR-002)"
+        - "oh-acceptance/工作系统.yaml (WORK-004)"
+    action: |
+      1. 新建 `src/game/world-work-tick.ts`，导出 `autoClaimOpenWorkItems(world, pawns): WorldCore`：
+         a. 遍历 `world.workItems`，筛选 `status==="open"` 且未被认领的工单。
+         b. 对每个空闲小人（无 construct 目标、无正在使用交互点），按曼哈顿距离排序找最近的 open 工单。
+         c. 调用 `claimWorkItem(world, workItemId, pawnId)` 认领。
+         d. 每个工单只能被一个小人认领（互斥锁）。
+      2. 在 `GameOrchestrator.tick` 中，在 `tickSimulation` 之前调用 `autoClaimOpenWorkItems`。
+      3. 扩展 `buildConstructWalkTargets` 为通用的 `buildWorkWalkTargets`，除 construct-blueprint 外也为 chop-tree / pick-up-resource / haul-to-zone 生成步行目标。
+      4. **Headless 测试**：
+         a. 新建 `tests/headless/auto-claim-work.test.ts`：
+            - 创建 headless sim → spawn 1 pawn + spawn 1 tree + submit lumber 命令（生成 chop-tree open 工单）→ tick 数次 → 断言 work-claimed 事件出现（通过 simEventCollector）。
+            - 第二个 it：spawn 2 pawn + 1 open 工单 → tick → 断言只有 1 个 claimed 事件（互斥）。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/headless/auto-claim-work.test.ts` 全部通过。
+      - [ ] Read: `world-work-tick.ts` 导出 `autoClaimOpenWorkItems`。
+      - [ ] Grep: `game-orchestrator.ts` 调用 `autoClaimOpenWorkItems`。
+      - [ ] Grep: `buildWorkWalkTargets` 覆盖 `"chop-tree"` 和 `"pick-up-resource"` 和 `"haul-to-zone"`。
+
+  - id: "T-15"
+    title: "小人到达工单锚格后自动完成工作（增加读条计时）"
+    status: "completed"
+    dependencies: ["T-14"]
+    context:
+      read_files:
+        - "src/game/world-construct-tick.ts"
+        - "src/game/pawn-state.ts"
+        - "src/game/game-orchestrator.ts"
+      reference_docs:
+        - "oh-acceptance/行为系统.yaml (BEHAVIOR-002)"
+        - "oh-acceptance/UI系统.yaml (UI-002)"
+    action: |
+      1. 扩展 `PawnState` 增加 `workTimerSec: number`（默认 0）和 `activeWorkItemId?: string`。
+      2. 在 `GameOrchestrator.tick` 中（simulationDt > 0 时），在 tickSimulation 之后：
+         a. 遍历已认领工单的小人，若小人到达 anchorCell：
+            - 若 `workTimerSec < 所需时长`（chop-tree:3s, pick-up:0.5s, haul:0.5s, construct:2s），累加 simulationDt。
+            - 若 `workTimerSec >= 所需时长`，调用 `completeWorkItem`，重置 workTimerSec 和 activeWorkItemId。
+      3. 使用配置表或常量定义各工单类型的读条时长。
+      4. **Headless 测试**：
+         a. 新建 `scenarios/chop-tree-full-flow.scenario.ts`：seed 固定，1 pawn 紧邻 1 tree（距离=1），无存储区。
+            expectations:
+              - `event-occurred: { eventKind: "work-claimed" }`
+              - `event-occurred: { eventKind: "work-completed" }` (maxTicks: 1000)
+              - `entity-kind-absent: { entityKind: "tree" }`
+              - `entity-kind-exists: { entityKind: "resource" }`
+         b. 新建 `tests/headless/chop-tree-full-flow.test.ts`：
+            - 创建 sim + hydrate → submit lumber 命令 → runScenarioHeadless 或 runUntil → 断言所有 expectations passed。
+            - 额外断言：resource 实体 materialKind==="wood"，tree 实体不存在。
+         c. 注册到 `scenarios/index.ts`。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/headless/chop-tree-full-flow.test.ts` 全部通过。
+      - [ ] Grep: `PawnState` 类型包含 `workTimerSec` 字段。
+      - [ ] Read: `game-orchestrator.ts` 中存在工作计时逻辑（`workTimerSec` 累加和比较）。
+
+  - id: "T-16"
+    title: "伐木→拾取→搬运完整链路无头验证"
+    status: "completed"
+    dependencies: ["T-11", "T-12", "T-13", "T-15"]
+    context:
+      read_files:
+        - "src/game/work/work-operations.ts"
+        - "src/game/game-orchestrator.ts"
+      reference_docs:
+        - "oh-acceptance/工作系统.yaml (WORK-001, WORK-002)"
+    action: |
+      1. 确认 `completeChopWork`（T-11）已自动创建 pick-up-resource 工单。
+      2. 确认 `completePickUpWork`（T-12）已自动创建 haul-to-zone 工单（若有存储区）。
+      3. 在 `autoClaimOpenWorkItems`（T-14）中确保派生工单在下一 tick 会被空闲小人认领。
+      4. **Headless 测试**（核心验收场景）：
+         a. 新建 `scenarios/chop-haul-full-chain.scenario.ts`：
+            - seed 固定，1 pawn 紧邻 1 tree，场景包含 1 个 storage zone。
+            - expectations:
+              - `entity-kind-absent: { entityKind: "tree" }` (maxTicks: 2000)
+              - `resource-in-container: { containerKind: "zone" }` (maxTicks: 5000)
+              - `work-item-completed-kind: { workKind: "chop-tree" }`
+              - `work-item-completed-kind: { workKind: "pick-up-resource" }`
+              - `work-item-completed-kind: { workKind: "haul-to-zone" }`
+         b. 新建 `tests/headless/chop-haul-full-chain.test.ts`：
+            - hydrate + submit lumber → runScenarioHeadless → 断言全部 expectations passed。
+            - 额外断言：resource.cell 与 zone 的覆盖格匹配。
+         c. 注册到 `scenarios/index.ts`。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/headless/chop-haul-full-chain.test.ts` 全部通过。
+      - [ ] Read: 测试场景中 resource 最终 containerKind==="zone" 且位于存储区格。
+
+# ====================================================================
+#  Phase 6：需求系统运行时集成
+# ====================================================================
+  - id: "T-17"
+    title: "sim-loop 集成需求中断：工作中饥饿时放弃工单去进食"
+    status: "completed"
+    dependencies: ["T-15"]
+    context:
+      read_files:
+        - "src/game/behavior/sim-loop.ts"
+        - "src/game/behavior/goal-driven-planning.ts"
+        - "src/game/need/threshold-rules.ts"
+        - "src/game/flows/need-interrupt-flow.ts"
+      reference_docs:
+        - "oh-acceptance/行为系统.yaml (BEHAVIOR-003)"
+        - "oh-acceptance/需求系统.yaml (NEED-001)"
+    action: |
+      1. 在 `SimTickInput` 中增加可选的 `worldWorkItems?: ReadonlyMap<string, WorkItemSnapshot>` 引用。
+      2. 在阶段 1（需求推进）之后、阶段 3（目标评估）之前，增加需求中断检查：
+         a. 对正在执行工作（有 activeWorkItemId）的小人，检查 `needs.hunger > 紧急阈值`（如 70）。
+         b. 若触发：调用 `failWorkItem(world, workItemId, pawnId, "need-interrupt-hunger")` 释放工单。
+         c. 清除小人的 `activeWorkItemId` 和 `workTimerSec`，使其在下一决策周期去 eat。
+      3. 吃完后（hunger 降低），自动通过阶段 3 的 `chooseGoalDecision` 回到 wander/work 循环。
+      4. **Headless 测试**：
+         a. 新建 `scenarios/need-interrupt-during-work.scenario.ts`：
+            - seed 固定，1 pawn（satiety:5, hunger:92），1 tree，有静态 food 交互点可达。
+            - expectations:
+              - `pawn-reaches-goal: { goalKind: "eat", pawnId: "pawn-0" }` (maxTicks: 2000)
+              - `no-pawn-starved: { minSatiety: 1 }` (maxTicks: 5000)
+         b. 新建 `tests/headless/need-interrupt-during-work.test.ts`：
+            - hydrate → submit lumber → tick 足够让小人认领并开始工作 → 手动将 satiety 压低到 5 → 继续 tick → 断言小人中断伐木、转为 eat 目标。
+            - 使用 simEventCollector 验证出现 pawn-goal-changed 事件（从 work 到 eat）。
+         c. 注册到 `scenarios/index.ts`。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/headless/need-interrupt-during-work.test.ts` 全部通过。
+      - [ ] Grep: `sim-loop.ts` 或 orchestrator 中出现 `need-interrupt` 或 `hunger` 阈值检查逻辑。
+      - [ ] Read: 中断后工单 status 变回 `"open"`（使其他小人可认领）。
+
+  - id: "T-18"
+    title: "夜晚事件订阅 → 精力低时强制休息"
+    status: "completed"
+    dependencies: ["T-15"]
+    context:
+      read_files:
+        - "src/game/game-orchestrator.ts"
+        - "src/game/time/time-event-bus.ts"
+        - "src/game/behavior/goal-driven-planning.ts"
+      reference_docs:
+        - "oh-acceptance/需求系统.yaml (NEED-002)"
+        - "oh-acceptance/时间系统.yaml (TIME-001)"
+    action: |
+      1. 在 `GameOrchestrator` constructor 中订阅 `timeBus` 的 `night-start` 事件。
+      2. 当夜晚开始时，对所有精力低于阈值（如 rest > 50）的小人：
+         a. 若有 activeWorkItemId，释放工单。
+         b. 使行为系统在下一决策周期优先选择 sleep 目标。
+      3. 方案：在 `chooseGoalDecision` 中，当时段为 night 且 rest 高时（>50），sleep 得分乘以额外系数（如 ×3），使其胜过 wander。
+      4. 需在 `SimTickInput` 中传入当前时段信息。
+      5. **Headless 测试**：修改已有 `scenarios/pawn-sleeps-when-tired.scenario.ts`，或新建 `scenarios/night-forces-sleep.scenario.ts`：
+         a. seed 固定，1 pawn（energy 低、rest 高），startMinuteOfDay 接近夜晚。
+         b. expectations: `pawn-reaches-goal: { goalKind: "sleep", pawnId: "pawn-0" }` (maxTicks: 3000)。
+         c. 新建 `tests/headless/night-forces-sleep.test.ts`：runScenarioHeadless → 断言全部 passed。
+         d. 注册到 `scenarios/index.ts`。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/headless/night-forces-sleep.test.ts` 全部通过。
+      - [ ] Grep: `game-orchestrator.ts` 中存在 `night` 或 `subscribe` 关键字与 timeBus 的交互。
+      - [ ] Read: `chooseGoalDecision` 或相关函数中存在时段对 sleep 评分的加权逻辑。
+
+  - id: "T-19"
+    title: "床铺建成后自动分配给无床小人"
+    status: "completed"
+    dependencies: ["T-15"]
+    context:
+      read_files:
+        - "src/game/work/work-operations.ts"
+        - "src/game/world-core-types.ts"
+      reference_docs:
+        - "oh-acceptance/建筑系统.yaml (BUILD-002, BUILD-004)"
+    action: |
+      1. 在 `completeBlueprintWork` 中，当 `buildingKind === "bed"` 时：
+         a. 建成后在 `restSpots` 写入 `ownerPawnId:undefined`。
+         b. 在 `GameOrchestrator.tick` 末尾增加 `assignUnownedBeds(world, pawns)` 函数。
+      2. `assignUnownedBeds` 逻辑：遍历 restSpots，若 `ownerPawnId===undefined`，找一个尚未拥有床的小人（检查所有 restSpots 的 ownerPawnId 不包含该 pawnId），写入归属。
+      3. **Headless 测试**：
+         a. 新建 `scenarios/bed-auto-assign.scenario.ts`：seed 固定，2 pawn，放置 1 个 bed 蓝图，claimConstructBlueprintAsPawnName 认领。
+            expectations:
+              - `building-present: { buildingKind: "bed", cell: {...} }` (maxTicks: 2000)
+         b. 新建 `tests/headless/bed-auto-assign.test.ts`：
+            - runScenarioHeadless → 断言 building-present passed。
+            - 额外断言：world.restSpots 中该 bed 的 ownerPawnId !== undefined。
+            - 第二个 it（BUILD-004 边界）：所有小人都有床 → 新建造的床 ownerPawnId === undefined。
+         c. 注册到 `scenarios/index.ts`。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/headless/bed-auto-assign.test.ts` 全部通过。
+      - [ ] Grep: `game-orchestrator.ts` 或新文件中存在 `assignUnownedBeds` 或等效分配逻辑。
+      - [ ] Read: 测试断言 restSpots 中 ownerPawnId 被填充 + 多余床保持无归属。
+
+# ====================================================================
+#  Phase 7：渲染层与 UI 补全
+# ====================================================================
+  - id: "T-20"
+    title: "树木与地面物资的渲染"
+    status: "completed"
+    dependencies: ["T-04"]
+    context:
+      read_files:
+        - "src/scenes/renderers/grid-renderer.ts"
+        - "src/scenes/renderers/ground-items-renderer.ts"
+        - "src/scenes/GameScene.ts"
+    action: |
+      1. 在 GameScene hooks 或 update 中，从 WorldCore entities 读取 tree 和 ground resource 实体。
+      2. 在 `grid-renderer.ts` 或新建 `tree-renderer.ts` 中实现树木渲染：在 tree 实体所在格绘制绿色三角或简易树图形。
+      3. 修改 `ground-items-renderer.ts`：读取 WorldCore 中 `kind==="resource"` 且 `containerKind==="ground"` 的实体位置绘制物资图形。
+      4. 伐木标记（loggingMarked=true）的树木用不同颜色或图标标识。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Grep: 存在从 `world.entities` 过滤 `kind === "tree"` 的渲染逻辑。
+      - [ ] Read: 伐木标记的树木有不同视觉表现（颜色或样式区分）。
+
+  - id: "T-21"
+    title: "工作进度条叠加层渲染"
+    status: "completed"
+    dependencies: ["T-15"]
+    context:
+      read_files:
+        - "src/scenes/renderers/pawn-renderer.ts"
+        - "src/scenes/GameScene.ts"
+      reference_docs:
+        - "oh-acceptance/UI系统.yaml (UI-002)"
+    action: |
+      1. 在 `PawnView` 中增加进度条 Graphics 对象（或 Rectangle）。
+      2. 在 `syncPawnViews` 中：若小人 `workTimerSec > 0` 且有 `activeWorkItemId`：
+         a. 计算 progress = workTimerSec / 该工单类型的总时长。
+         b. 在小人上方渲染横向进度条（背景灰色 + 前景绿色填充）。
+         c. 进度条在 progress >= 1 或 workTimerSec === 0 时隐藏。
+      3. 进度条跟随小人位置移动。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Grep: `pawn-renderer.ts` 中存在 `workTimerSec` 或 `progress` 相关渲染逻辑。
+      - [ ] Read: PawnView 类型定义中包含进度条相关的 Phaser 对象引用。
+
+  - id: "T-22"
+    title: "层级建造菜单 UI（建造→墙/床分支）"
+    status: "completed"
+    dependencies: ["T-08", "T-09"]
+    context:
+      read_files:
+        - "src/ui/hud-manager.ts"
+        - "src/ui/menu-model.ts"
+        - "src/data/villager-tools.ts"
+        - "src/scenes/GameScene.ts"
+      reference_docs:
+        - "oh-acceptance/UI系统.yaml (UI-001)"
+    action: |
+      1. 在 `menu-model.ts` 中定义层级菜单数据结构（或增加子菜单概念）。
+      2. 修改 `VILLAGER_TOOLS` 中 `build` 工具：点击后展开子菜单（"木墙"、"木床"），选择后设置对应 inputShape 和动词。
+      3. 在 `HudManager` 中实现子菜单 DOM 元素的展开/收起。
+      4. 选中"木墙"后：inputShape 切换为 brush-stroke、动词为 build_wall_blueprint。
+         选中"木床"后：inputShape 切换为 single-cell、动词为 place_furniture:bed。
+      5. **Markup 测试**：
+         a. 在 `tests/scene-hud-markup.test.ts` 中追加 describe("层级建造菜单")：
+            - 模拟选中 build 工具 → 断言 HUD DOM 中存在子菜单容器元素，包含"木墙"和"木床"两个子选项。
+            - 模拟选中"木墙" → 断言 activeToolState 的 inputShape === "brush-stroke" 且 verb === "build_wall_blueprint"。
+            - 模拟选中"木床" → 断言 activeToolState 的 inputShape === "single-cell" 且 verb === "place_furniture:bed"。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/scene-hud-markup.test.ts` 全部通过。
+      - [ ] Grep: `hud-manager.ts` 中存在"木墙"或"wall"子菜单逻辑。
+      - [ ] Read: 点击 build 工具后会展开子选项而非直接激活单一模式。
+      - [ ] Read: markup 测试覆盖子菜单展开 + 两种子选项的 inputShape/verb 切换。
+
+  - id: "T-23"
+    title: "小人状态面板行为标签同步"
+    status: "completed"
+    dependencies: ["T-15"]
+    context:
+      read_files:
+        - "src/ui/hud-manager.ts"
+        - "src/ui/status-display-model.ts"
+        - "src/scenes/GameScene.ts"
+      reference_docs:
+        - "oh-acceptance/UI系统.yaml (UI-003)"
+    action: |
+      1. 在 `syncPawnDetail` 中，读取小人的 `activeWorkItemId`，从 WorldCore workItems 查出工单类型。
+      2. 映射为中文行为标签：chop-tree→"伐木中"，pick-up-resource→"拾取物资"，haul-to-zone→"搬运物资"，construct-blueprint→"建造中"，无工单→读 currentGoal 和 currentAction（eat→"进食中"，sleep→"休息中"，wander→"空闲"）。
+      3. 显示到小人详情面板的行为文本区域。
+      4. **Markup 测试**：
+         a. 在 `tests/scene-hud-markup.test.ts` 中追加 describe("行为标签同步")：
+            - 构造 pawn 状态 activeWorkItemId 指向 chop-tree 工单 → 调用 syncPawnDetail → 断言面板行为文本区域包含 "伐木中"。
+            - 构造 pawn 状态 activeWorkItemId 指向 haul-to-zone 工单 → 断言行为文本包含 "搬运物资"。
+            - 构造 pawn 无 activeWorkItemId、currentGoal="eat" → 断言行为文本包含 "进食中"。
+            - 构造 pawn 无 activeWorkItemId、currentGoal="wander" → 断言行为文本包含 "空闲"。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/scene-hud-markup.test.ts` 全部通过。
+      - [ ] Grep: `hud-manager.ts` 中存在 "伐木中" 或 "chop-tree" 映射。
+      - [ ] Read: syncPawnDetail 展示了基于工单类型的行为标签。
+      - [ ] Read: markup 测试覆盖至少 4 种行为标签映射（工单类型 + 无工单目标）。
+
+# ====================================================================
+#  Phase 8：边界保护与验收兜底
+# ====================================================================
+  - id: "T-24"
+    title: "工单目标消失时的清理机制"
+    status: "completed"
+    dependencies: ["T-14"]
+    context:
+      read_files:
+        - "src/game/game-orchestrator.ts"
+        - "src/game/work/work-operations.ts"
+      reference_docs:
+        - "oh-acceptance/工作系统.yaml (WORK-003)"
+    action: |
+      1. 在 `autoClaimOpenWorkItems` 或 tick 循环中，对每个 claimed 工单：
+         a. 检查 targetEntityId 对应的实体是否仍存在于 world.entities 中。
+         b. 若不存在：调用 `failWorkItem` 标记工单失败，清除小人的 activeWorkItemId / workTimerSec。
+      2. 对 open 状态的工单同理：若 targetEntity 不存在则直接删除工单。
+      3. **Headless 测试**：
+         a. 新建 `tests/headless/stale-work-cleanup.test.ts`：
+            - 创建 sim → spawn tree + submit lumber 命令 → 手动从 world.entities 中移除 tree → tick 数次 → 断言 chop-tree 工单被移除或 status=failed。
+            - 断言小人的 activeWorkItemId 被清除，回到空闲行为。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/headless/stale-work-cleanup.test.ts` 全部通过。
+      - [ ] Read: tick 循环中存在 `targetEntityId` 存在性校验。
+      - [ ] Grep: 出现 target 实体缺失时的 failWorkItem 或 delete 调用。
+
+  - id: "T-25"
+    title: "时间上限保护：极端 deltaMs 截断"
+    status: "completed"
+    dependencies: []
+    context:
+      read_files:
+        - "src/game/time/time-of-day.ts"
+        - "src/game/game-orchestrator.ts"
+      reference_docs:
+        - "oh-acceptance/时间系统.yaml (TIME-004)"
+    action: |
+      1. 在 `effectiveSimulationDeltaSeconds` 中增加上限截断：若 realDt > MAX_FRAME_DT_SEC（如 0.5 秒），截断为 MAX_FRAME_DT_SEC。
+      2. 或在 `GameOrchestrator.tick` 入口处 clamp `deltaMs`。
+      3. 确保配置可调（常量即可）。
+      4. **Headless 测试**：
+         a. 在 `tests/headless/headless-sim-basic.test.ts` 中追加 it case：
+            - 创建 sim → 调用 `tick(10_000)`（10秒，远超正常帧间隔）→ 断言世界时间推进量 <= MAX_FRAME_DT_SEC × speedMultiplier。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Shell: `npx vitest run tests/headless/headless-sim-basic.test.ts` 全部通过。
+      - [ ] Grep: 存在 `MAX_FRAME_DT` 或等效截断常量及 Math.min 调用。
+
+  - id: "T-26"
+    title: "存储区 zone 的可视化渲染"
+    status: "completed"
+    dependencies: ["T-06"]
+    context:
+      read_files:
+        - "src/scenes/renderers/grid-renderer.ts"
+        - "src/scenes/GameScene.ts"
+    action: |
+      1. 在 GameScene 的渲染 hook 中，从 WorldCore entities 读取 `kind==="zone"` 实体。
+      2. 对每个 zone 的 coveredCells，绘制半透明蓝色底色 + 浅色边框（与 taskMarker 层分开）。
+      3. 使用 Phaser Graphics 或 Rectangle 实现。
+    acceptance_criteria: |
+      - [ ] Shell: `npx tsc --noEmit` 无新增报错。
+      - [ ] Grep: 存在从 `world.entities` 过滤 `kind === "zone"` 的渲染逻辑。
+
+  - id: "T-27"
+    title: "Headless 集成验证：Story-1 第一天完整流程自动测试"
+    status: "completed"
+    dependencies: ["T-16", "T-17", "T-18", "T-19", "T-20", "T-24"]
+    context:
+      read_files:
+        - "src/headless/headless-sim.ts"
+        - "src/headless/scenario-runner.ts"
+        - "scenarios/index.ts"
+        - "tests/headless/"
+      reference_docs:
+        - "oh-story/story-1.md"
+        - "oh-acceptance/工作系统.yaml"
+        - "oh-acceptance/行为系统.yaml"
+        - "oh-acceptance/需求系统.yaml"
+        - "oh-acceptance/建筑系统.yaml"
+    action: |
+      1. 新建 `scenarios/story-1-day-one.scenario.ts`：
+         - seed 固定，3 pawns，含树木、散落食物、存储区的完整初始世界。
+         - 不使用 bootstrapWorldForScene（避免随机性），手动指定 trees/resources/zones/blueprints。
+         - expectations 覆盖整条 Story-1 链路（下列顺序执行，maxTicks 逐步递增）。
+      2. 新建 `tests/headless/story-1-day-one.test.ts`，逐步 submit 命令并验证：
+         a. 初始化 → 验证存在树木和散落食物（MAP-001）。
+            断言：world.entities 含 tree + food resource。
+         b. Submit zone_create → 验证 zone 实体被创建（MAP-002）。
+            断言：entity-kind-exists: zone。
+         c. Submit haul 标记物资可拾取 → tick N 次 → 验证物资被搬运到存储区（WORK-002）。
+            断言：resource-in-container: { containerKind: "zone" }。
+         d. Submit lumber 标记伐木 → tick N 次 → 验证树→木头→拾取→搬运（WORK-001）。
+            断言：entity-kind-absent: tree + work-completed: chop-tree + resource containerKind zone。
+         e. Submit build_wall_blueprint → tick N 次 → 验证蓝图转建筑（BUILD-001）。
+            断言：building-present: { buildingKind: "wall" }。
+         f. Submit place_furniture:bed → 建成 → 验证自动分配给无床小人（BUILD-002）。
+            断言：building-present: bed + restSpots.ownerPawnId !== undefined。
+         g. 时间推进到夜晚 → 验证精力低的小人去床休息（NEED-002）。
+            断言：pawn-reaches-goal: sleep。
+         h. 饥饿打断工作 → 验证小人中断工作去进食（BEHAVIOR-003）。
+            断言：pawn-reaches-goal: eat（在工作中被打断）。
+      3. 使用 seeded RNG 确保测试确定性。
+      4. 注册 scenario 到 `scenarios/index.ts`。
+    acceptance_criteria: |
+      - [ ] Shell: `npx vitest run tests/headless/story-1-day-one.test.ts` 全部通过。
+      - [ ] Shell: `npx vitest run tests/headless/` 全部通过（无回归）。
+      - [ ] Read: 测试文件覆盖上述 a-h 所有场景。
+      - [ ] Grep: 测试文件包含 `MAP-001`、`WORK-001`、`BUILD-001`、`BEHAVIOR-003` 等场景 ID 注释。
+      - [ ] Read: `scenarios/index.ts` 的 ALL_SCENARIOS 包含 story-1-day-one scenario。
