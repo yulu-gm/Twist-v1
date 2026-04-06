@@ -1,5 +1,5 @@
-# 主控需求单目录
+# 主控需求单历史参考目录
 
-本目录存放经过 `route-demand` 路由之后的主控需求单。
+本目录保留历史参考资料。当前 `route-demand` 的主控路由单已经统一写入 `working-plan/route-demand/<yyyy-mm-dd>-<topic>.md`。
 
-每一篇新的需求对应一篇文档，命名格式为 `<yyyy-mm-dd>-<topic>.md`，文档内容应当基于 [request-template.md](/D:/Twist_V1/docs/ai/templates/request-template.md) 进行填写。
+如果需要补读旧资料，可以继续查看本目录；新增主控路由单不再写回这里。

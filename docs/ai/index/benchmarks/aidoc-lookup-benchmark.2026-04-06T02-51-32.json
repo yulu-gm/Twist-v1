@@ -1,0 +1,488 @@
+{
+  "meta": {
+    "timestamp": "2026-04-06T02:51:32.227Z",
+    "rootDir": "D:/Twist_V1",
+    "iterations": 7,
+    "warmupIterations": 1,
+    "minSpeedupRatio": 1.05
+  },
+  "scenarios": [
+    {
+      "id": "module_lookup",
+      "title": "Module Entry Lookup",
+      "prompt": "grid",
+      "variants": {
+        "skill_query": {
+          "runs": [
+            {
+              "iteration": 1,
+              "variant": "skill_query",
+              "wall_ms_to_first_correct_answer": 1.153,
+              "files_opened": 2,
+              "bytes_read": 17927,
+              "answer_correct": true,
+              "error": ""
+            },
+            {
+              "iteration": 2,
+              "variant": "skill_query",
+              "wall_ms_to_first_correct_answer": 0.684,
+              "files_opened": 2,
+              "bytes_read": 17927,
+              "answer_correct": true,
+              "error": ""
+            },
+            {
+              "iteration": 3,
+              "variant": "skill_query",
+              "wall_ms_to_first_correct_answer": 0.506,
+              "files_opened": 2,
+              "bytes_read": 17927,
+              "answer_correct": true,
+              "error": ""
+            },
+            {
+              "iteration": 4,
+              "variant": "skill_query",
+              "wall_ms_to_first_correct_answer": 0.519,
+              "files_opened": 2,
+              "bytes_read": 17927,
+              "answer_correct": true,
+              "error": ""
+            },
+            {
+              "iteration": 5,
+              "variant": "skill_query",
+              "wall_ms_to_first_correct_answer": 0.648,
+              "files_opened": 2,
+              "bytes_read": 17927,
+              "answer_correct": true,
+              "error": ""
+            },
+            {
+              "iteration": 6,
+              "variant": "skill_query",
+              "wall_ms_to_first_correct_answer": 0.533,
+              "files_opened": 2,
+              "bytes_read": 17927,
+              "answer_correct": true,
+              "error": ""
+            },
+            {
+              "iteration": 7,
+              "variant": "skill_query",
+              "wall_ms_to_first_correct_answer": 0.625,
+              "files_opened": 2,
+              "bytes_read": 17927,
+              "answer_correct": true,
+              "error": ""
+            }
+          ],
+          "medianWallMs": 0.625,
+          "p95WallMs": 1.153,
+          "accuracy": 1,
+          "filesOpenedAvg": 2,
+          "bytesReadAvg": 17927
+        },
+        "direct_code_read": {
+          "runs": [
+            {
+              "iteration": 1,
+              "variant": "direct_code_read",
+              "wall_ms_to_first_correct_answer": 4.408,
+              "files_opened": 64,
+              "bytes_read": 226808,
+              "answer_correct": true,
+              "error": ""
+            },
+            {
+              "iteration": 2,
+              "variant": "direct_code_read",
+              "wall_ms_to_first_correct_answer": 4.256,
+              "files_opened": 64,
+              "bytes_read": 226808,
+              "answer_correct": true,
+              "error": ""
+            },
+            {
+              "iteration": 3,
+              "variant": "direct_code_read",
+              "wall_ms_to_first_correct_answer": 3.852,
+              "files_opened": 64,
+              "bytes_read": 226808,
+              "answer_correct": true,
+              "error": ""
+            },
+            {
+              "iteration": 4,
+              "variant": "direct_code_read",
+              "wall_ms_to_first_correct_answer": 4.147,
+              "files_opened": 64,
+              "bytes_read": 226808,
+              "answer_correct": true,
+              "error": ""
+            },
+            {
+              "iteration": 5,
+              "variant": "direct_code_read",
+              "wall_ms_to_first_correct_answer": 3.81,
+              "files_opened": 64,
+              "bytes_read": 226808,
+              "answer_correct": true,
+              "error": ""
+            },
+            {
+              "iteration": 6,
+              "variant": "direct_code_read",
+              "wall_ms_to_first_correct_answer": 3.707,
+              "files_opened": 64,
+              "bytes_read": 226808,
+              "answer_correct": true,
+              "error": ""
+            },
+            {
+              "iteration": 7,
+              "variant": "direct_code_read",
+              "wall_ms_to_first_correct_answer": 4.318,
+              "files_opened": 64,
+              "bytes_read": 226808,
+              "answer_correct": true,
+              "error": ""
+            }
+          ],
+          "medianWallMs": 4.147,
+          "p95WallMs": 4.408,
+          "accuracy": 1,
+          "filesOpenedAvg": 64,
+          "bytesReadAvg": 226808
+        }
+      },
+      "speedupRatio": 6.635,
+      "pass": true
+    },
+    {
+      "id": "changed_files_impact_lookup",
+      "title": "Changed Files Impact Lookup",
+      "prompt": "src/game/map/world-grid.ts, src/scenes/GameScene.ts",
+      "variants": {
+        "skill_query": {
+          "runs": [
+            {
+              "iteration": 1,
+              "variant": "skill_query",
+              "wall_ms_to_first_correct_answer": 0.354,
+              "files_opened": 2,
+              "bytes_read": 17927,
+              "answer_correct": true,
+              "error": ""
+            },
+            {
+              "iteration": 2,
+              "variant": "skill_query",
+              "wall_ms_to_first_correct_answer": 0.306,
+              "files_opened": 2,
+              "bytes_read": 17927,
+              "answer_correct": true,
+              "error": ""
+            },
+            {
+              "iteration": 3,
+              "variant": "skill_query",
+              "wall_ms_to_first_correct_answer": 0.277,
+              "files_opened": 2,
+              "bytes_read": 17927,
+              "answer_correct": true,
+              "error": ""
+            },
+            {
+              "iteration": 4,
+              "variant": "skill_query",
+              "wall_ms_to_first_correct_answer": 0.255,
+              "files_opened": 2,
+              "bytes_read": 17927,
+              "answer_correct": true,
+              "error": ""
+            },
+            {
+              "iteration": 5,
+              "variant": "skill_query",
+              "wall_ms_to_first_correct_answer": 0.261,
+              "files_opened": 2,
+              "bytes_read": 17927,
+              "answer_correct": true,
+              "error": ""
+            },
+            {
+              "iteration": 6,
+              "variant": "skill_query",
+              "wall_ms_to_first_correct_answer": 0.268,
+              "files_opened": 2,
+              "bytes_read": 17927,
+              "answer_correct": true,
+              "error": ""
+            },
+            {
+              "iteration": 7,
+              "variant": "skill_query",
+              "wall_ms_to_first_correct_answer": 0.412,
+              "files_opened": 2,
+              "bytes_read": 17927,
+              "answer_correct": true,
+              "error": ""
+            }
+          ],
+          "medianWallMs": 0.277,
+          "p95WallMs": 0.412,
+          "accuracy": 1,
+          "filesOpenedAvg": 2,
+          "bytesReadAvg": 17927
+        },
+        "direct_code_read": {
+          "runs": [
+            {
+              "iteration": 1,
+              "variant": "direct_code_read",
+              "wall_ms_to_first_correct_answer": 5.706,
+              "files_opened": 87,
+              "bytes_read": 389038,
+              "answer_correct": true,
+              "error": ""
+            },
+            {
+              "iteration": 2,
+              "variant": "direct_code_read",
+              "wall_ms_to_first_correct_answer": 5.132,
+              "files_opened": 87,
+              "bytes_read": 389038,
+              "answer_correct": true,
+              "error": ""
+            },
+            {
+              "iteration": 3,
+              "variant": "direct_code_read",
+              "wall_ms_to_first_correct_answer": 5.046,
+              "files_opened": 87,
+              "bytes_read": 389038,
+              "answer_correct": true,
+              "error": ""
+            },
+            {
+              "iteration": 4,
+              "variant": "direct_code_read",
+              "wall_ms_to_first_correct_answer": 4.994,
+              "files_opened": 87,
+              "bytes_read": 389038,
+              "answer_correct": true,
+              "error": ""
+            },
+            {
+              "iteration": 5,
+              "variant": "direct_code_read",
+              "wall_ms_to_first_correct_answer": 5.515,
+              "files_opened": 87,
+              "bytes_read": 389038,
+              "answer_correct": true,
+              "error": ""
+            },
+            {
+              "iteration": 6,
+              "variant": "direct_code_read",
+              "wall_ms_to_first_correct_answer": 5.258,
+              "files_opened": 87,
+              "bytes_read": 389038,
+              "answer_correct": true,
+              "error": ""
+            },
+            {
+              "iteration": 7,
+              "variant": "direct_code_read",
+              "wall_ms_to_first_correct_answer": 5.349,
+              "files_opened": 87,
+              "bytes_read": 389038,
+              "answer_correct": true,
+              "error": ""
+            }
+          ],
+          "medianWallMs": 5.258,
+          "p95WallMs": 5.706,
+          "accuracy": 1,
+          "filesOpenedAvg": 87,
+          "bytesReadAvg": 389038
+        }
+      },
+      "speedupRatio": 18.982,
+      "pass": true
+    },
+    {
+      "id": "routed_system_lookup",
+      "title": "Routed System Lookup",
+      "prompt": "地图系统",
+      "variants": {
+        "skill_query": {
+          "runs": [
+            {
+              "iteration": 1,
+              "variant": "skill_query",
+              "wall_ms_to_first_correct_answer": 0.076,
+              "files_opened": 1,
+              "bytes_read": 2969,
+              "answer_correct": true,
+              "error": ""
+            },
+            {
+              "iteration": 2,
+              "variant": "skill_query",
+              "wall_ms_to_first_correct_answer": 0.075,
+              "files_opened": 1,
+              "bytes_read": 2969,
+              "answer_correct": true,
+              "error": ""
+            },
+            {
+              "iteration": 3,
+              "variant": "skill_query",
+              "wall_ms_to_first_correct_answer": 0.068,
+              "files_opened": 1,
+              "bytes_read": 2969,
+              "answer_correct": true,
+              "error": ""
+            },
+            {
+              "iteration": 4,
+              "variant": "skill_query",
+              "wall_ms_to_first_correct_answer": 0.067,
+              "files_opened": 1,
+              "bytes_read": 2969,
+              "answer_correct": true,
+              "error": ""
+            },
+            {
+              "iteration": 5,
+              "variant": "skill_query",
+              "wall_ms_to_first_correct_answer": 0.066,
+              "files_opened": 1,
+              "bytes_read": 2969,
+              "answer_correct": true,
+              "error": ""
+            },
+            {
+              "iteration": 6,
+              "variant": "skill_query",
+              "wall_ms_to_first_correct_answer": 0.066,
+              "files_opened": 1,
+              "bytes_read": 2969,
+              "answer_correct": true,
+              "error": ""
+            },
+            {
+              "iteration": 7,
+              "variant": "skill_query",
+              "wall_ms_to_first_correct_answer": 0.062,
+              "files_opened": 1,
+              "bytes_read": 2969,
+              "answer_correct": true,
+              "error": ""
+            }
+          ],
+          "medianWallMs": 0.067,
+          "p95WallMs": 0.076,
+          "accuracy": 1,
+          "filesOpenedAvg": 1,
+          "bytesReadAvg": 2969
+        },
+        "direct_code_read": {
+          "runs": [
+            {
+              "iteration": 1,
+              "variant": "direct_code_read",
+              "wall_ms_to_first_correct_answer": 0.779,
+              "files_opened": 9,
+              "bytes_read": 30779,
+              "answer_correct": true,
+              "error": ""
+            },
+            {
+              "iteration": 2,
+              "variant": "direct_code_read",
+              "wall_ms_to_first_correct_answer": 0.873,
+              "files_opened": 9,
+              "bytes_read": 30779,
+              "answer_correct": true,
+              "error": ""
+            },
+            {
+              "iteration": 3,
+              "variant": "direct_code_read",
+              "wall_ms_to_first_correct_answer": 0.665,
+              "files_opened": 9,
+              "bytes_read": 30779,
+              "answer_correct": true,
+              "error": ""
+            },
+            {
+              "iteration": 4,
+              "variant": "direct_code_read",
+              "wall_ms_to_first_correct_answer": 0.653,
+              "files_opened": 9,
+              "bytes_read": 30779,
+              "answer_correct": true,
+              "error": ""
+            },
+            {
+              "iteration": 5,
+              "variant": "direct_code_read",
+              "wall_ms_to_first_correct_answer": 0.681,
+              "files_opened": 9,
+              "bytes_read": 30779,
+              "answer_correct": true,
+              "error": ""
+            },
+            {
+              "iteration": 6,
+              "variant": "direct_code_read",
+              "wall_ms_to_first_correct_answer": 0.654,
+              "files_opened": 9,
+              "bytes_read": 30779,
+              "answer_correct": true,
+              "error": ""
+            },
+            {
+              "iteration": 7,
+              "variant": "direct_code_read",
+              "wall_ms_to_first_correct_answer": 0.656,
+              "files_opened": 9,
+              "bytes_read": 30779,
+              "answer_correct": true,
+              "error": ""
+            }
+          ],
+          "medianWallMs": 0.665,
+          "p95WallMs": 0.873,
+          "accuracy": 1,
+          "filesOpenedAvg": 9,
+          "bytesReadAvg": 30779
+        }
+      },
+      "speedupRatio": 9.925,
+      "pass": true
+    }
+  ],
+  "aggregate": {
+    "skill_query": {
+      "medianWallMs": 0.277,
+      "p95WallMs": 0.684,
+      "accuracy": 1,
+      "filesOpenedAvg": 1.667,
+      "bytesReadAvg": 12941
+    },
+    "direct_code_read": {
+      "medianWallMs": 4.147,
+      "p95WallMs": 5.515,
+      "accuracy": 1,
+      "filesOpenedAvg": 53.333,
+      "bytesReadAvg": 215541.667
+    },
+    "speedupRatio": 14.971
+  },
+  "pass": true
+}

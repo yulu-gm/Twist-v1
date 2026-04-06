@@ -4,6 +4,14 @@
 
 `pawn-state` 负责角色基础状态、名字、逻辑格子位置、移动过渡和供场景层读取的显示派生字段。当前它仍是角色状态权威源，tick 级编排由 `sim-loop` 接手，场景消费改为通过渲染器读取显示状态。
 
+## 路由桥接
+
+- `routedSystems`：`实体系统`、`行为系统`
+- `lookupAliases`：`pawn-state`、`pawn`、`villager-state`、`character-state`
+- `sharedEntryFiles`：`src/game/behavior/sim-loop.ts`、`src/scenes/renderers/pawn-renderer.ts`
+
+这页仍然是 legacy implementation lookup，不是 `route-demand` 的权威注册表。只要 Pawn 的显示与行为仍然共享这两个入口，就继续在这里维护桥接字段。
+
 ## 标准文档
 
 - `docs/ai/system-standards/pawn-state.md`
@@ -11,7 +19,7 @@
 ## 当前关键实现文件
 
 - `src/game/pawn-state.ts`
-- `src/game/sim-loop.ts`
+- `src/game/behavior/sim-loop.ts`
 - `src/scenes/renderers/pawn-renderer.ts`
 
 ## 当前关键测试文件
@@ -20,6 +28,7 @@
 
 ## 当前接入场景文件
 
+- `src/scenes/GameScene.ts`
 - `src/scenes/renderers/pawn-renderer.ts`
 
 ## 最新/历史 aidoc

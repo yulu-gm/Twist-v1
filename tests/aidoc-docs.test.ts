@@ -23,6 +23,8 @@ const registryFile = path.join(
 
 const pushSkillDir = path.join(rootDir, ".agent", "skills", "push-with-aidoc");
 const pushSkillFile = path.join(pushSkillDir, "SKILL.md");
+const lookupSkillDir = path.join(rootDir, ".agent", "skills", "lookup-module-with-aidoc");
+const lookupSkillFile = path.join(lookupSkillDir, "SKILL.md");
 
 function readUtf8(filePath: string): string {
   return readFileSync(filePath, "utf8");
@@ -116,6 +118,22 @@ describe("aidoc index and push workflow", () => {
     for (const file of entryDocs) {
       const content = readUtf8(file);
       expect(content).toContain("push-with-aidoc");
+    }
+  });
+
+  it("provides a project-local lookup-module-with-aidoc skill and bridge metadata", () => {
+    expect(existsSync(lookupSkillFile)).toBe(true);
+
+    const skill = readUtf8(lookupSkillFile);
+    expect(skill).toContain("name: lookup-module-with-aidoc");
+    expect(skill).toContain("先查 aidoc 索引");
+    expect(skill).toContain("只有索引不足时才读源码");
+    expect(skill).toContain("不替代 route-demand");
+
+    const systemIndex = readSystemIndex(rootDir);
+    for (const system of systemIndex.systems) {
+      expect(system.routedSystems?.length ?? 0).toBeGreaterThan(0);
+      expect(system.lookupAliases?.length ?? 0).toBeGreaterThan(0);
     }
   });
 

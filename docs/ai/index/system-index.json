@@ -1,16 +1,24 @@
 {
   "routeDemandRole": "legacy-reference-only",
   "routeDemandSourceOfTruth": false,
-  "routeDemandNote": "route-demand now routes against oh-gen-doc, oh-code-design, and oh-acceptance. This file remains a legacy implementation index for existing docs/ai assets.",
+  "routeDemandNote": "route-demand now routes against oh-gen-doc, oh-code-design, and oh-acceptance. This file stays a legacy implementation index; routedSystems, lookupAliases, and sharedEntryFiles only bridge existing docs/ai assets into that workflow.",
   "systems": [
     {
       "key": "time-of-day",
       "summary": "维护世界时间、跨天归一化、时间文案和昼夜调色板。",
+      "routedSystems": ["时间系统"],
+      "lookupAliases": ["time-of-day", "time", "world-time", "day-night"],
+      "sharedEntryFiles": [
+        "src/game/time/index.ts",
+        "src/scenes/game-scene-presentation.ts",
+        "src/scenes/game-scene-hud-sync.ts"
+      ],
       "standardDoc": "docs/ai/system-standards/time-of-day.md",
       "aidocDir": "docs/ai/systems/time-of-day",
       "systemReadme": "docs/ai/systems/time-of-day/README.md",
       "sourceFiles": [
         "src/game/time/time-of-day.ts",
+        "src/game/time/world-time.ts",
         "src/ui/hud-manager.ts",
         "src/scenes/renderers/grid-renderer.ts",
         "src/scenes/renderers/pawn-renderer.ts"
@@ -33,6 +41,14 @@
     {
       "key": "world-core",
       "summary": "维护统一世界真相源、实体快照、占用索引、工作闭环和建造落地。",
+      "routedSystems": ["实体系统", "工作系统", "建筑系统", "时间系统"],
+      "lookupAliases": ["world-core", "world", "world-state", "entity-core"],
+      "sharedEntryFiles": [
+        "src/game/world-bootstrap.ts",
+        "src/game/world-sim-bridge.ts",
+        "src/game/map/index.ts",
+        "src/game/time/index.ts"
+      ],
       "standardDoc": "docs/ai/system-standards/world-core.md",
       "aidocDir": "docs/ai/systems/world-core",
       "systemReadme": "docs/ai/systems/world-core/README.md",
@@ -64,6 +80,9 @@
     {
       "key": "pawn-state",
       "summary": "维护角色基础状态、名字、移动过渡和供场景读取的派生显示信息。",
+      "routedSystems": ["实体系统", "行为系统"],
+      "lookupAliases": ["pawn-state", "pawn", "villager-state", "character-state"],
+      "sharedEntryFiles": ["src/game/behavior/sim-loop.ts", "src/scenes/renderers/pawn-renderer.ts"],
       "standardDoc": "docs/ai/system-standards/pawn-state.md",
       "aidocDir": "docs/ai/systems/pawn-state",
       "systemReadme": "docs/ai/systems/pawn-state/README.md",
@@ -94,6 +113,14 @@
     {
       "key": "scene-hud",
       "summary": "维护 HUD、状态卡、按钮和场景内信息展示的组织方式。",
+      "routedSystems": ["UI系统"],
+      "lookupAliases": ["scene-hud", "hud", "ui", "villager-tool-bar"],
+      "sharedEntryFiles": [
+        "src/ui/hud-manager.ts",
+        "src/scenes/game-scene-hud-sync.ts",
+        "src/scenes/game-scene-acceptance-ui.ts",
+        "src/scenes/game-scene-keyboard-bindings.ts"
+      ],
       "standardDoc": "docs/ai/system-standards/scene-hud.md",
       "aidocDir": "docs/ai/systems/scene-hud",
       "systemReadme": "docs/ai/systems/scene-hud/README.md",
@@ -164,6 +191,13 @@
     {
       "key": "selection-ui",
       "summary": "维护选中、高亮、焦点切换和目标对象的交互反馈。",
+      "routedSystems": ["UI系统", "交互系统", "地图系统"],
+      "lookupAliases": ["selection-ui", "selection", "floor-selection", "brush"],
+      "sharedEntryFiles": [
+        "src/game/interaction/index.ts",
+        "src/scenes/game-scene-floor-interaction.ts",
+        "src/scenes/renderers/selection-renderer.ts"
+      ],
       "standardDoc": "docs/ai/system-standards/selection-ui.md",
       "aidocDir": "docs/ai/systems/selection-ui",
       "systemReadme": "docs/ai/systems/selection-ui/README.md",
@@ -200,6 +234,13 @@
     {
       "key": "task-planning",
       "summary": "维护目标评估、工作选择、游荡决策和可执行动作候选。",
+      "routedSystems": ["行为系统", "需求系统", "工作系统"],
+      "lookupAliases": ["task-planning", "behavior", "planner", "wander-planning"],
+      "sharedEntryFiles": [
+        "src/game/behavior/index.ts",
+        "src/game/game-orchestrator.ts",
+        "src/game/world-sim-bridge.ts"
+      ],
       "standardDoc": "docs/ai/system-standards/task-planning.md",
       "aidocDir": "docs/ai/systems/task-planning",
       "systemReadme": "docs/ai/systems/task-planning/README.md",
@@ -236,6 +277,14 @@
     {
       "key": "world-grid",
       "summary": "维护格子地图尺寸、格坐标、邻格、边界、出生点和占用查询。",
+      "routedSystems": ["地图系统", "交互系统"],
+      "lookupAliases": ["world-grid", "grid", "map", "occupancy"],
+      "sharedEntryFiles": [
+        "src/game/map/index.ts",
+        "src/scenes/renderers/grid-renderer.ts",
+        "src/scenes/renderers/ground-items-renderer.ts",
+        "src/scenes/renderers/selection-renderer.ts"
+      ],
       "standardDoc": "docs/ai/system-standards/world-grid.md",
       "aidocDir": "docs/ai/systems/world-grid",
       "systemReadme": "docs/ai/systems/world-grid/README.md",

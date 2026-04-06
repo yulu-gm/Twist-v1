@@ -4,16 +4,24 @@
 
 `task-planning` 负责目标评估、工作选择、游荡决策和可执行动作候选，是当前角色自主行为的规则入口。现在目标驱动规划、游荡规划、配置常量和 tick 编排分别由独立模块承载。
 
+## 路由桥接
+
+- `routedSystems`：`行为系统`、`需求系统`、`工作系统`
+- `lookupAliases`：`task-planning`、`behavior`、`planner`、`wander-planning`
+- `sharedEntryFiles`：`src/game/behavior/index.ts`、`src/game/game-orchestrator.ts`、`src/game/world-sim-bridge.ts`
+
+这页仍然是 legacy implementation lookup，不是 `route-demand` 的权威注册表。只要行为规划、需求驱动和工作派发还共享这批入口，就继续在这里维护桥接字段。
+
 ## 标准文档
 
 - `docs/ai/system-standards/task-planning.md`
 
 ## 当前关键实现文件
 
-- `src/game/goal-driven-planning.ts`
-- `src/game/wander-planning.ts`
-- `src/game/sim-config.ts`
-- `src/game/sim-loop.ts`
+- `src/game/behavior/wander-planning.ts`
+- `src/game/behavior/goal-driven-planning.ts`
+- `src/game/behavior/sim-config.ts`
+- `src/game/behavior/sim-loop.ts`
 - `src/game/world-sim-bridge.ts`（由 `GameScene` 调用：将 `WorldCore` 障碍与 `restSpots` 写入传入本系统 tick 的 `WorldGridConfig`）
 
 ## 当前关键测试文件

@@ -17,6 +17,14 @@
 - 再按 `oh-gen-doc -> oh-code-design -> oh-acceptance -> TDD/实现` 顺序推进
 - 路由结果统一写入 `working-plan/route-demand/<yyyy-mm-dd>-<topic>.md`
 
+**模块定位、模块阅读、归属判断、找入口文件时，优先走 `lookup-module-with-aidoc`：**
+
+- 入口：`.agent/skills/lookup-module-with-aidoc/SKILL.md`
+- 先用 `docs/ai/index/system-index.json`、系统 README 和 routed system 映射查实现入口、关键测试、场景入口与 `oh-*` 文档
+- 只有 aidoc 索引不足时，才继续扩散到源码
+- 必须扩散到源码查询时，优先使用 `rg`进行文本和文件检索
+- 这个流程只负责模块检索，不替代 `route-demand`
+
 **准备推送远端前，必须走 `.agent/skills/push-with-aidoc/SKILL.md`，先校验受影响系统的 aidoc 与索引，再推送**
 
 产品方向、架构目标与近期规格见 `docs/ai/project-overview.md`。

@@ -140,6 +140,30 @@ describe("route-demand oh-doc workflow", () => {
     }
   });
 
+  it("documents lookup-module-with-aidoc as the preferred module lookup entrypoint", () => {
+    const twistDoc = readUtf8(path.join(rootDir, "TWIST.md"));
+    const agentDoc = readUtf8(path.join(rootDir, "Agent.md"));
+    const claudeDoc = readUtf8(path.join(rootDir, "CLAUDE.md"));
+    const taskWorkflowDoc = readUtf8(path.join(rootDir, ".agent", "task-workflow.md"));
+    const contributingDoc = readUtf8(path.join(rootDir, "docs", "human", "contributing.md"));
+    const requestsReadme = readUtf8(path.join(rootDir, "docs", "ai", "requests", "README.md"));
+
+    for (const content of [twistDoc, taskWorkflowDoc, contributingDoc]) {
+      expect(content).toContain("lookup-module-with-aidoc");
+      expect(content).toContain("模块定位");
+      expect(content).toContain("模块阅读");
+    }
+
+    for (const content of [agentDoc, claudeDoc]) {
+      expect(content).toContain("lookup-module-with-aidoc");
+    }
+
+    expect(twistDoc).toContain("route-demand");
+    expect(twistDoc).toContain("push-with-aidoc");
+    expect(requestsReadme).toContain("working-plan/route-demand/<yyyy-mm-dd>-<topic>.md");
+    expect(requestsReadme).toContain("历史参考");
+  });
+
   it("marks docs/ai index as legacy for route-demand instead of the source of truth", () => {
     const systemIndex = readUtf8(path.join(rootDir, "docs", "ai", "index", "system-index.json"));
 

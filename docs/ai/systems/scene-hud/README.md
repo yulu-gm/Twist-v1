@@ -4,6 +4,14 @@
 
 `scene-hud` 负责 HUD、状态卡、按钮和场景内信息展示。当前 GameScene 运行时已拆成场景编排 + 抽出的 HUD/data 模块，玩家可见行为不变。
 
+## 路由桥接
+
+- `routedSystems`：`UI系统`
+- `lookupAliases`：`scene-hud`、`hud`、`ui`、`villager-tool-bar`
+- `sharedEntryFiles`：`src/ui/hud-manager.ts`、`src/scenes/game-scene-hud-sync.ts`、`src/scenes/game-scene-acceptance-ui.ts`、`src/scenes/game-scene-keyboard-bindings.ts`
+
+这页仍然是 legacy implementation lookup，不是 `route-demand` 的权威注册表。UI 或面板能力如果被新的一级 routedSystem 吸走，只回填桥接字段，不在这里改成新注册表。
+
 ## 标准文档
 
 - `docs/ai/system-standards/scene-hud.md`
@@ -19,13 +27,9 @@
 - `src/data/task-markers.ts`
 - `src/data/pawn-profiles.ts`
 - `src/scenes/GameScene.ts`（仅负责布局、输入和状态 wiring）
-- `src/scenes/villager-tool-bar-config.ts`（已弃用的兼容前向）
-- `src/scenes/mock-villager-tools.ts`（已弃用的兼容前向）
-- `src/scenes/mock-ground-items.ts`（已弃用的兼容前向）
-- `src/scenes/mock-grid-cell-info.ts`（已弃用的兼容前向）
-- `src/scenes/mock-task-marker-commands.ts`（已弃用的兼容前向）
-- `src/scenes/mock-task-marker-selection.ts`（已弃用的兼容前向）
-- `src/scenes/mock-pawn-profile-data.ts`（已弃用的兼容前向）
+- `src/scenes/game-scene-hud-sync.ts`
+- `src/scenes/game-scene-acceptance-ui.ts`
+- `src/scenes/game-scene-keyboard-bindings.ts`
 
 ## 当前关键测试文件
 
