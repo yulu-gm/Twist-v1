@@ -23,6 +23,7 @@ import {
   createReservationSnapshot,
   DEFAULT_WORLD_GRID,
   seedBlockedCellsAsObstacles,
+  type InteractionPoint,
   type ReservationSnapshot,
   type WorldGridConfig
 } from "../game/map";
@@ -123,6 +124,10 @@ export class GameScene extends Phaser.Scene {
   private debugSelectedEntryId: string | null = null;
   private debugPausedSeq: number | null = null;
   private runtimeTickCount = 0;
+  /**
+   * 本局「地形」不可走格快照（首次 bootstrap 后）：`cleanupRuntimeBeforeNextScenario` 用它把网格从上一场景的同步产物里剥离开。
+   */
+  private initialSimBlockedCellKeys = new Set<string>();
 
   public constructor() {
     super("game");
@@ -356,6 +361,7 @@ export class GameScene extends Phaser.Scene {
     this.floorInteraction.bind();
 
     this.orchestrator.bootstrapSimulationGrid();
+    this.initialSimBlockedCellKeys = new Set(this.worldGrid.blockedCellKeys ?? []);
     this.syncTreesAndGroundLayer();
     this.syncPlayerChannelUi();
     this.setupPawnRosterUi();
@@ -633,8 +639,32 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
+   * 切换 YAML 场景前：集中做与「上一场景 / 上一帧模拟」的解耦。
+   * 新增强制重置逻辑时优先放在这里，而不是散落在载入语句之间。
+   *
+   * - **网格**：`syncWorldGridForSimulation` 会把世界里的墙体等写回 `blockedCellKeys`；不清理则 baseline 会与下一场景抢占同一批格子。
+   * - **交互点**：恢复为与编排器 `interactionTemplate`（{@link DEFAULT_WORLD_GRID}）一致的样板，避免沿用上一世界合并后的列表。
+   * - **同步游标**：`simGridSyncState` 置空，下一轮 `bootstrapSimulationGrid` 必须从 `WorldCore` 完整重算，禁止沿用旧快照。
+   */
+  private cleanupRuntimeBeforeNextScenario(): void {
+    const blocked = this.worldGrid.blockedCellKeys;
+    if (blocked instanceof Set) {
+      blocked.clear();
+      for (const k of this.initialSimBlockedCellKeys) {
+        blocked.add(k);
+      }
+    }
+    (this.worldGrid as WorldGridConfig & { interactionPoints: InteractionPoint[] }).interactionPoints = [
+      ...DEFAULT_WORLD_GRID.interactionPoints
+    ];
+    this.simGridSyncState = null;
+  }
+
+  /**
    * 将 `scenarios/*.scenario.ts` 写入当前 WorldCore 与小人列表（不重启 Phaser 场景）。
    * `expectations` 不会自动判定，仅便于人工对照 Vitest 中的同一定义。
+   *
+   * 流程分三段：**清理** → **领域载入** → **表现与 HUD 对齐**。
    */
   private applyHeadlessScenarioDefinition(def: ScenarioDefinition): void {
     try {
@@ -643,6 +673,11 @@ export class GameScene extends Phaser.Scene {
         window.alert("当前世界端口不是 WorldCoreWorldPort，无法载入测试场景。");
         return;
       }
+
+      // --- 1) 切换前清理：与上一场景 runtime 解耦 ---
+      this.cleanupRuntimeBeforeNextScenario();
+
+      // --- 2) 领域载入：空白 baseline（不占上一场景实体），再叠场景定义 ---
       /** 不用当前 port 里的世界叠加载入，否则上一场景的实体仍占格会与新 pawn/蓝图冲突。 */
       const baselineWorld = seedBlockedCellsAsObstacles(
         createWorldCore({
@@ -670,6 +705,7 @@ export class GameScene extends Phaser.Scene {
 
       this.orchestrator.bootstrapSimulationGrid();
 
+      // --- 3) 表现与 HUD：视图、标绘、调试与工具条与新世界一致 ---
       this.views = createPawnViews(
         this,
         this.pawns,
