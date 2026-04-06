@@ -53,6 +53,18 @@ function findGroundResourceCoveringCell(world: WorldCore, cellKey: string): Worl
   return undefined;
 }
 
+function findUnmarkedStoneObstacleCoveringCell(world: WorldCore, cellKey: string): WorldEntitySnapshot | undefined {
+  for (const entity of world.entities.values()) {
+    if (entity.kind !== "obstacle") continue;
+    if (entity.label !== "stone") continue;
+    if (entity.miningMarked) continue;
+    if (entity.occupiedCells.some((c) => coordKey(c) === cellKey)) {
+      return entity;
+    }
+  }
+  return undefined;
+}
+
 function buildBlueprintKind(
   toolId: string,
   inputShape: "rect-selection" | "brush-stroke" | "single-cell"
@@ -110,6 +122,13 @@ export function filterCellKeysForToolbarTaskMarkers(
   if (toolId === "demolish") {
     for (const key of cellKeys) {
       if (findObstacleCoveringCell(world, key)) out.add(key);
+    }
+    return out;
+  }
+
+  if (toolId === "mine") {
+    for (const key of cellKeys) {
+      if (findUnmarkedStoneObstacleCoveringCell(world, key)) out.add(key);
     }
     return out;
   }

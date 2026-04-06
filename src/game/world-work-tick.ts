@@ -8,6 +8,7 @@ import type { WorldCore } from "./world-core-types";
 import { cloneWorld } from "./world-internal";
 import { workItemAnchorDurationSeconds } from "./work/work-item-duration";
 import { claimWorkItem, completeWorkItem, failWorkItem } from "./work/work-operations";
+import { minManhattanToWorkOperatorStand } from "./world-construct-tick";
 
 function relabelWorkFields(pawn: PawnState): PawnState {
   return { ...pawn, debugLabel: describePawnDebugLabel(pawn) };
@@ -28,7 +29,7 @@ function pawnHasClaimedWork(world: WorldCore, pawnId: string): boolean {
  * 可否参与 open 工单认领：不得已有 claimed 走向单、不得正在 use-target（吃睡娱乐）。
  * 不要求「未在移动」：游荡时每帧开始时常 `isMoving===true`，若仅此才不认领，
  * 则玩家放下新蓝图后工单会永远保持 open（小人一直在两格间闲逛）。
- * 认领时会清掉位移意图，当帧 `tickSimulation` 会改沿工单锚格行走。
+ * 认领时会清掉位移意图，当帧 `tickSimulation` 会改沿锚格四邻操作站立格行走。
  */
 function canPawnAutoClaimOpenWork(world: WorldCore, pawn: PawnState): boolean {
   if (pawnHasClaimedWork(world, pawn.id)) return false;
@@ -133,7 +134,7 @@ export function autoClaimOpenWorkItems(
     let bestD = Infinity;
     for (const w of next.workItems.values()) {
       if (w.status !== "open" || w.claimedBy) continue;
-      const d = manhattan(pawn.logicalCell, w.anchorCell);
+      const d = minManhattanToWorkOperatorStand(next.grid, w.anchorCell, pawn.logicalCell);
       if (d < bestD) {
         bestD = d;
         bestId = w.id;
@@ -167,7 +168,7 @@ export function autoClaimOpenWorkItems(
 }
 
 /**
- * tickSimulation 之后：已认领工单且站在锚格上的小人对照 {@link workItemAnchorDurationSeconds} 累加读条，达标则落成工单。
+ * tickSimulation 之后：已认领工单且与锚格四向邻接的小人对照 {@link workItemAnchorDurationSeconds} 累加读条，达标则落成工单。
  */
 export function tickAnchoredWorkProgress(
   world: WorldCore,
@@ -203,11 +204,10 @@ export function tickAnchoredWorkProgress(
       continue;
     }
 
-    const atAnchor =
-      pawn.logicalCell.col === claimed.anchorCell.col &&
-      pawn.logicalCell.row === claimed.anchorCell.row;
+    const orthoAdjacentToAnchor =
+      manhattan(pawn.logicalCell, claimed.anchorCell) === 1;
 
-    if (!atAnchor) {
+    if (!orthoAdjacentToAnchor) {
       if (pawn.workTimerSec !== 0 || pawn.activeWorkItemId !== undefined) {
         out.push(
           relabelWorkFields({

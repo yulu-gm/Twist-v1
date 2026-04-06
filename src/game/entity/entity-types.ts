@@ -48,6 +48,8 @@ export type WorldEntitySnapshot = Readonly<{
   pickupAllowed?: boolean;
   reservedByPawnId?: string;
   loggingMarked?: boolean;
+  /** 地图石料障碍是否已登记开采工单（与 trees 的 loggingMarked 对称）。 */
+  miningMarked?: boolean;
   zoneKind?: ZoneKind;
   coveredCells?: readonly GridCoord[];
   acceptedMaterialKinds?: readonly ResourceMaterialKind[];
@@ -69,7 +71,7 @@ export type EntityId = string & { readonly [entityIdBrand]: typeof entityIdBrand
 export type EntityKind = "pawn" | "resource" | "tree" | "blueprint" | "building" | "zone";
 
 /** 物资细分类型（树木转木头等流程会用到具体种类）。 */
-export type ResourceMaterialKind = "wood" | "food" | "generic";
+export type ResourceMaterialKind = "wood" | "food" | "stone" | "generic";
 
 /** 物资所在容器类别（地面、小人携带、区域、建筑内存储等）。 */
 export type ResourceContainerKind = "ground" | "pawn" | "zone" | "building";

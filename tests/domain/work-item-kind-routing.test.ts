@@ -48,6 +48,39 @@ describe("completeWorkItem kind routing", () => {
     expect(result?.outcome.kind).toBe("completed");
   });
 
+  it("routes mine-stone：有石料障碍则 completed 并衍生 pick-up-resource", () => {
+    let world = createWorldCore({ grid: DEFAULT_WORLD_GRID });
+    const spawned = spawnWorldEntity(world, {
+      kind: "obstacle",
+      cell: { col: 2, row: 2 },
+      occupiedCells: [{ col: 2, row: 2 }],
+      label: "stone",
+      miningMarked: true
+    });
+    expect(spawned.outcome.kind).toBe("created");
+    world = spawned.world;
+    const rockId = spawned.entityId;
+    const item: WorkItemSnapshot = {
+      id: "w-mine",
+      kind: "mine-stone",
+      anchorCell: { col: 2, row: 2 },
+      targetEntityId: rockId,
+      status: "claimed",
+      claimedBy: "pawn-a",
+      failureCount: 0
+    };
+    world.workItems.set(item.id, item);
+    const result = completeWorkItem(world, "w-mine", "pawn-a");
+    expect(result?.outcome.kind).toBe("completed");
+    const stoneRes = [...result!.world.entities.values()].find(
+      (e) => e.kind === "resource" && e.materialKind === "stone" && e.containerKind === "ground"
+    );
+    expect(stoneRes).toBeDefined();
+    expect(
+      [...result!.world.workItems.values()].some((w) => w.kind === "pick-up-resource" && w.status === "open")
+    ).toBe(true);
+  });
+
   it("routes pick-up-resource：有地面物资则 completed", () => {
     let world = createWorldCore({ grid: DEFAULT_WORLD_GRID });
     const spawned = spawnWorldEntity(world, {

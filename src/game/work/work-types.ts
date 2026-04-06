@@ -4,6 +4,7 @@ export type WorkItemKind =
   | "deconstruct-obstacle"
   | "construct-blueprint"
   | "chop-tree"
+  | "mine-stone"
   | "pick-up-resource"
   | "haul-to-zone";
 export type WorkItemStatus = "open" | "claimed" | "completed";

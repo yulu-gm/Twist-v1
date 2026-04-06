@@ -83,6 +83,7 @@ export function createEntity(world: WorldCore, draft: EntityDraft): WorldEntityS
     pickupAllowed: draft.pickupAllowed,
     reservedByPawnId: draft.reservedByPawnId,
     loggingMarked: draft.loggingMarked,
+    miningMarked: draft.miningMarked,
     zoneKind: draft.zoneKind,
     coveredCells: draft.coveredCells?.map((c) => ({ ...c })),
     acceptedMaterialKinds: draft.acceptedMaterialKinds

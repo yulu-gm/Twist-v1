@@ -9,6 +9,7 @@ import type { WorldGridConfig } from "../../game/map/world-grid";
 const MATERIAL_DISPLAY: Record<ResourceMaterialKind, string> = {
   wood: "木材",
   food: "食物",
+  stone: "石材",
   generic: "物资"
 };
 

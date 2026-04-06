@@ -5,12 +5,14 @@ import {
   clearTaskMarkersAtCells,
   placeTaskMarker,
   registerChopTreeWork,
+  registerMineStoneWork,
   registerPickUpResourceWork,
   safePlaceBlueprint,
   spawnWorldEntity,
   type WorldCore
 } from "../game/world-core";
 import type { DomainCommand, MockWorldSubmitResult } from "./s0-contract";
+import type { WorkItemKind } from "../game/work/work-types";
 
 /** 阻挡格：`grid.blockedCellKeys` 与障碍实体 + 墙体建筑占格合并（与模拟层可走性一致）。 */
 function mergedBlockedCellKeys(world: WorldCore): ReadonlySet<string> {
@@ -41,6 +43,35 @@ function findObstacleCoveringCell(world: WorldCore, cellKey: string): string | u
     if (entity.kind !== "obstacle") continue;
     if (entity.occupiedCells.some((occupantCell) => coordKey(occupantCell) === k)) {
       return entity.id;
+    }
+  }
+  return undefined;
+}
+
+function hasNonCompletedWorkForTarget(
+  world: WorldCore,
+  kind: WorkItemKind,
+  targetEntityId: string
+): boolean {
+  for (const w of world.workItems.values()) {
+    if (w.kind !== kind) continue;
+    if (w.targetEntityId !== targetEntityId) continue;
+    if (w.status !== "completed") return true;
+  }
+  return false;
+}
+
+/** 选中格上未登记开采的地图石料（`label === "stone"`，与 {@link seedBlockedCellsAsObstacles} 一致）。 */
+function findUnmarkedStoneObstacleCoveringCell(
+  world: WorldCore,
+  cellKey: string
+): WorldEntitySnapshot | undefined {
+  for (const entity of world.entities.values()) {
+    if (entity.kind !== "obstacle") continue;
+    if (entity.label !== "stone") continue;
+    if (entity.miningMarked) continue;
+    if (entity.occupiedCells.some((c) => coordKey(c) === cellKey)) {
+      return entity;
     }
   }
   return undefined;
@@ -269,6 +300,21 @@ export function applyDomainCommandToWorldCore(
           }
         };
       }
+      const obstacleEnt = next.entities.get(targetEntityId);
+      if (
+        obstacleEnt?.kind === "obstacle" &&
+        obstacleEnt.label === "stone" &&
+        hasNonCompletedWorkForTarget(next, "mine-stone", targetEntityId)
+      ) {
+        return {
+          world,
+          result: {
+            accepted: false,
+            messages: [`领域：格 ${key} 已登记开采，无法用拆除覆盖`],
+            conflictCellKeys: [key]
+          }
+        };
+      }
       const cell = parseCoordKey(key);
       if (!cell) {
         return {
@@ -335,21 +381,16 @@ export function applyDomainCommandToWorldCore(
   }
 
   if (toolId === "lumber") {
-    const blockedHit = firstBlockedTargetCell(world, cmd.targetCellKeys);
-    if (blockedHit) {
-      return {
-        world,
-        result: {
-          accepted: false,
-          messages: [`领域：格 ${blockedHit} 为障碍格，无法指派 ${toolId}`],
-          conflictCellKeys: [blockedHit]
-        }
-      };
-    }
+    const blocked = mergedBlockedCellKeys(world);
+    let skippedBlocked = 0;
     let next = world;
     const workIds: string[] = [];
     let marked = 0;
     for (const key of cmd.targetCellKeys) {
+      if (blocked.has(key)) {
+        skippedBlocked += 1;
+        continue;
+      }
       const tree = findUnmarkedTreeCoveringCell(next, key);
       if (!tree) continue;
       const placed = registerChopTreeWork(next, tree.id);
@@ -357,15 +398,51 @@ export function applyDomainCommandToWorldCore(
       workIds.push(placed.workItemId);
       marked += 1;
     }
+    let msg: string;
+    if (marked > 0) {
+      msg =
+        skippedBlocked > 0
+          ? `领域：已登记 ${marked} 处伐木工单（chop-tree），跳过 ${skippedBlocked} 个障碍格`
+          : `领域：已登记 ${marked} 处伐木工单（chop-tree）`;
+    } else if (skippedBlocked > 0 && skippedBlocked === cmd.targetCellKeys.length) {
+      msg = "领域：所选区域均为障碍格，无可登记伐木目标";
+    } else if (skippedBlocked > 0) {
+      msg = `领域：所选格无未标记树木（已跳过 ${skippedBlocked} 个障碍格）`;
+    } else {
+      msg = "领域：所选格无未标记树木";
+    }
     return {
       world: next,
       result: {
         accepted: true,
-        messages: [
-          marked > 0
-            ? `领域：已登记 ${marked} 处伐木工单（chop-tree）`
-            : "领域：所选格无未标记树木"
-        ],
+        messages: [msg],
+        workOrderId: workIds.length > 0 ? workIds[workIds.length - 1] : undefined
+      }
+    };
+  }
+
+  if (toolId === "mine") {
+    let next = world;
+    const workIds: string[] = [];
+    let marked = 0;
+    for (const key of cmd.targetCellKeys) {
+      const stone = findUnmarkedStoneObstacleCoveringCell(next, key);
+      if (!stone) continue;
+      if (hasNonCompletedWorkForTarget(next, "deconstruct-obstacle", stone.id)) continue;
+      const placed = registerMineStoneWork(next, stone.id);
+      next = placed.world;
+      workIds.push(placed.workItemId);
+      marked += 1;
+    }
+    const msg =
+      marked > 0
+        ? `领域：已登记 ${marked} 处开采工单（mine-stone）`
+        : "领域：所选格无未标记石料（或已与拆除工单冲突）";
+    return {
+      world: next,
+      result: {
+        accepted: true,
+        messages: [msg],
         workOrderId: workIds.length > 0 ? workIds[workIds.length - 1] : undefined
       }
     };

@@ -199,11 +199,12 @@ export function syncTaskMarkerView(
           strokeThickness: 3
         })
         .setOrigin(0.5, 0.5)
-        .setDepth(36);
+        .setDepth(41);
       textMap.set(key, text);
     } else {
       text.setText(taskName);
       text.setPosition(cx, cy);
+      text.setDepth(41);
     }
   }
 }

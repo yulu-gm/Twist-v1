@@ -59,7 +59,8 @@ export type SimTickInput = Readonly<{
   config: SimConfig;
   rng: WanderRng;
   /**
-   * 已认领工单锚格（建造/伐木/拾取/搬运）：优先于吃睡闲逛，沿格邻接走向锚格（与 WorldCore 工单一致）。
+   * 已认领工单的操作站立格（锚格四邻可走格之一，由 {@link buildWorkWalkTargets} 注入）：
+   * 优先于吃睡闲逛，沿格邻接走向该格（与 WorldCore 工单一致）。
    */
   workWalkTargets?: ReadonlyMap<PawnId, GridCoord>;
   /** 当前世界工单快照；传入时才能在饥饿紧急时调用方側 {@link failWorkItem} 释放工单。 */

@@ -24,7 +24,7 @@ import {
 
 const DEFAULT_EXPECTATION_MAX_TICKS = 500;
 
-const RESOURCE_MATERIAL_KINDS = new Set<ResourceMaterialKind>(["wood", "food", "generic"]);
+const RESOURCE_MATERIAL_KINDS = new Set<ResourceMaterialKind>(["wood", "food", "stone", "generic"]);
 
 const ZONE_KINDS = new Set<ZoneKind>(["storage", "forbidden", "priority-build", "custom"]);
 

@@ -1,5 +1,5 @@
 /**
- * 小人站在工单锚格上时的读条时长（秒），与 GameOrchestrator 工单推进一致。
+ * 小人与工单锚格四向邻接时的读条时长（秒），与 GameOrchestrator 工单推进一致。
  */
 
 import type { WorkItemKind } from "./work-types";
@@ -8,6 +8,7 @@ import type { WorkItemKind } from "./work-types";
 export const WORK_ITEM_ANCHOR_DURATION_SEC = {
   "construct-blueprint": 2,
   "chop-tree": 3,
+  "mine-stone": 3,
   "pick-up-resource": 0.5,
   "haul-to-zone": 0.5
 } as const;

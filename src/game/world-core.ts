@@ -349,6 +349,40 @@ export function registerChopTreeWork(
 }
 
 /**
+ * 标记地图石料为待开采并确保存在 {@link WorkItemKind} `mine-stone` 开放工单（与既有开放/认领单合并）。
+ */
+export function registerMineStoneWork(
+  world: WorldCore,
+  stoneObstacleEntityId: string
+): Readonly<{ world: WorldCore; workItemId: string }> {
+  const entity = world.entities.get(stoneObstacleEntityId);
+  if (!entity || entity.kind !== "obstacle" || entity.label !== "stone") {
+    throw new Error(`registerMineStoneWork: 实体 ${stoneObstacleEntityId} 不是石料障碍`);
+  }
+
+  const nextWorld = cloneWorld(world);
+  const stone = nextWorld.entities.get(stoneObstacleEntityId)!;
+  nextWorld.entities.set(stoneObstacleEntityId, { ...stone, miningMarked: true });
+
+  const existingWorkItem = findExistingWorkItem(nextWorld, "mine-stone", stoneObstacleEntityId);
+  const workItemId = existingWorkItem?.id ?? makeWorkItemId(nextWorld);
+  if (!existingWorkItem) {
+    nextWorld.nextWorkItemId += 1;
+    nextWorld.workItems.set(workItemId, {
+      id: workItemId,
+      kind: "mine-stone",
+      anchorCell: { ...stone.cell },
+      targetEntityId: stoneObstacleEntityId,
+      status: "open",
+      failureCount: 0
+    });
+  }
+
+  attachWorkItemToEntityMutable(nextWorld, stoneObstacleEntityId, workItemId);
+  return { world: nextWorld, workItemId };
+}
+
+/**
  * 将地面物资标为可拾取并确保存在 {@link WorkItemKind} `pick-up-resource` 开放工单（与既有开放/认领单合并）。
  */
 export function registerPickUpResourceWork(

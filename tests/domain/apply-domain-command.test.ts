@@ -48,20 +48,70 @@ describe("applyDomainCommandToWorldCore", () => {
     expect(r.world).toBe(world);
   });
 
-  it("generic intent tool rejects when target includes blocked grid cell", () => {
+  it("lumber skips blocked cells and registers chop work on remaining tree cells", () => {
+    const stoneKey = "2,2";
+    const treeCell = { col: 3, row: 3 };
+    const treeKey = coordKey(treeCell);
+    const grid = {
+      ...DEFAULT_WORLD_GRID,
+      blockedCellKeys: new Set<string>([stoneKey])
+    };
+    let world = createWorldCore({ grid });
+    const treeSpawn = spawnWorldEntity(world, {
+      kind: "tree",
+      cell: treeCell,
+      occupiedCells: [treeCell],
+      loggingMarked: false
+    });
+    expect(treeSpawn.outcome.kind).toBe("created");
+    world = treeSpawn.world;
+    const r = applyDomainCommandToWorldCore(world, demoCmd("assign_tool_task:lumber", [stoneKey, treeKey]));
+    expect(r.result.accepted).toBe(true);
+    expect(r.result.messages[0]).toContain("跳过 1 个障碍格");
+    expect(getWorldSnapshot(r.world).workItems.some((w) => w.kind === "chop-tree")).toBe(true);
+  });
+
+  it("mine registers mine-stone on seeded stone obstacles（含障碍格，不与 lumber 同属阻挡拒绝逻辑）", () => {
+    const stoneKey = "3,3";
+    const grid = {
+      ...DEFAULT_WORLD_GRID,
+      blockedCellKeys: new Set<string>([stoneKey])
+    };
+    let world = seedBlockedCellsAsObstacles(createWorldCore({ grid }), grid.blockedCellKeys!);
+    const r = applyDomainCommandToWorldCore(world, {
+      commandId: "test-cmd-mine-stone",
+      verb: "assign_tool_task:mine",
+      targetCellKeys: [stoneKey, "4,4"],
+      targetEntityIds: [],
+      sourceMode: {
+        source: { kind: "toolbar", toolId: "mine" },
+        selectionModifier: "replace",
+        inputShape: "rect-selection"
+      },
+      issuedAtMs: 0
+    });
+    expect(r.result.accepted).toBe(true);
+    expect(r.result.messages[0]).toContain("mine-stone");
+    world = r.world;
+    expect(getWorldSnapshot(world).workItems.some((w) => w.kind === "mine-stone" && w.status === "open")).toBe(true);
+    const stoneEnt = [...world.entities.values()].find(
+      (e) => e.kind === "obstacle" && e.label === "stone"
+    );
+    expect(stoneEnt?.miningMarked).toBe(true);
+  });
+
+  it("demolish rejects stone cell when mine-stone work is pending", () => {
     const stoneKey = "2,2";
     const grid = {
       ...DEFAULT_WORLD_GRID,
       blockedCellKeys: new Set<string>([stoneKey])
     };
-    const world = createWorldCore({ grid });
-    const r = applyDomainCommandToWorldCore(
-      world,
-      demoCmd("assign_tool_task:lumber", [stoneKey, "3,3"])
-    );
+    let world = seedBlockedCellsAsObstacles(createWorldCore({ grid }), grid.blockedCellKeys!);
+    const mined = applyDomainCommandToWorldCore(world, demoCmd("assign_tool_task:mine", [stoneKey]));
+    expect(mined.result.accepted).toBe(true);
+    const r = applyDomainCommandToWorldCore(mined.world, demoCmd("assign_tool_task:demolish", [stoneKey]));
     expect(r.result.accepted).toBe(false);
     expect(r.result.conflictCellKeys?.[0]).toBe(stoneKey);
-    expect(r.world).toBe(world);
   });
 
   it("clear_task_markers removes markers and orphan open work items", () => {

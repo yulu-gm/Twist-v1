@@ -183,9 +183,13 @@ export class GameScene extends Phaser.Scene {
     this.zoneOverlayGraphics.setDepth(30);
 
     this.floorSelectionGraphics = this.add.graphics();
+    /** 须高于树木（13），否则框选/拖动时预览环与填充会被树冠遮住（伐木最明显）。 */
+    this.floorSelectionGraphics.setDepth(32);
     this.floorSelectionDraftGraphics = this.add.graphics();
+    this.floorSelectionDraftGraphics.setDepth(34);
     this.taskMarkerGraphics = this.add.graphics();
-    this.taskMarkerGraphics.setDepth(35);
+    /** 高于选区草稿，保证已下达任务标记始终可读。 */
+    this.taskMarkerGraphics.setDepth(40);
     syncTaskMarkerView(
       this.taskMarkerGraphics,
       this.taskMarkerTexts,

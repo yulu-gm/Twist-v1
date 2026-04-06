@@ -84,6 +84,16 @@ function worldDerivedTaskLabelForCell(cellKey: string, snap: WorldSnapshot): str
     }
   }
   for (const w of snap.workItems) {
+    if (w.kind === "chop-tree" && w.status !== "completed" && coordKey(w.anchorCell) === cellKey) {
+      return issuedTaskLabelForToolId("lumber") ?? undefined;
+    }
+  }
+  for (const w of snap.workItems) {
+    if (w.kind === "mine-stone" && w.status !== "completed" && coordKey(w.anchorCell) === cellKey) {
+      return issuedTaskLabelForToolId("mine") ?? undefined;
+    }
+  }
+  for (const w of snap.workItems) {
     if (w.kind !== "pick-up-resource") continue;
     if (w.status === "completed") continue;
     if (coordKey(w.anchorCell) === cellKey) {
@@ -123,6 +133,12 @@ export function mergeTaskMarkerOverlayWithWorldSnapshot(
     if (ent.kind !== "blueprint") continue;
     for (const c of ent.occupiedCells) {
       keys.add(coordKey(c));
+    }
+  }
+  for (const w of snap.workItems) {
+    if (w.status === "completed") continue;
+    if (w.kind === "mine-stone" || w.kind === "chop-tree") {
+      keys.add(coordKey(w.anchorCell));
     }
   }
 

@@ -292,6 +292,69 @@ export function completeChopWork(
   };
 }
 
+export function completeMineStoneWork(
+  world: WorldCore,
+  workItem: WorkItemSnapshot
+): Readonly<{ world: WorldCore; outcome: CompleteOutcome }> {
+  const obstacleId = workItem.targetEntityId;
+  const obstacle = obstacleId ? world.entities.get(obstacleId) : undefined;
+  if (!obstacle || obstacle.kind !== "obstacle" || obstacle.label !== "stone") {
+    return {
+      world,
+      outcome: { kind: "target-missing" }
+    };
+  }
+
+  const anchor = obstacle.cell;
+  const blockingResource = findGroundResourceBlockingCell(world, anchor, obstacle.id);
+  if (blockingResource) {
+    return {
+      world,
+      outcome: {
+        kind: "conflict",
+        blockingEntityId: blockingResource.id,
+        blockingCell: anchor
+      }
+    };
+  }
+
+  const nextWorld = cloneWorld(world);
+  removeEntityMutable(nextWorld, obstacle.id);
+
+  const stoneResource = createEntity(nextWorld, {
+    kind: "resource",
+    cell: { ...anchor },
+    materialKind: "stone",
+    containerKind: "ground",
+    pickupAllowed: true
+  });
+  upsertEntityMutable(nextWorld, stoneResource);
+
+  const pickWorkId = makeWorkItemId(nextWorld);
+  nextWorld.nextWorkItemId += 1;
+  nextWorld.workItems.set(pickWorkId, {
+    id: pickWorkId,
+    kind: "pick-up-resource",
+    anchorCell: { ...anchor },
+    targetEntityId: stoneResource.id,
+    status: "open",
+    failureCount: 0,
+    derivedFromWorkId: workItem.id
+  });
+  attachWorkItemToEntityMutable(nextWorld, stoneResource.id, pickWorkId);
+
+  nextWorld.workItems.set(workItem.id, {
+    ...workItem,
+    status: "completed",
+    claimedBy: workItem.claimedBy
+  });
+
+  return {
+    world: nextWorld,
+    outcome: { kind: "completed", createdEntityId: stoneResource.id }
+  };
+}
+
 function findFirstStorageZone(world: WorldCore): WorldEntitySnapshot | undefined {
   for (const entity of world.entities.values()) {
     if (entity.kind === "zone" && entity.zoneKind === "storage") {
@@ -462,6 +525,8 @@ export function completeWorkItem(
       return completeBlueprintWork(world, workItem);
     case "chop-tree":
       return completeChopWork(world, workItem);
+    case "mine-stone":
+      return completeMineStoneWork(world, workItem);
     case "pick-up-resource":
       return completePickUpWork(world, workItem);
     case "haul-to-zone":

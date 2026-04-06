@@ -65,6 +65,7 @@ export type EntityDraft = Readonly<{
   pickupAllowed?: boolean;
   reservedByPawnId?: string;
   loggingMarked?: boolean;
+  miningMarked?: boolean;
   zoneKind?: ZoneKind;
   coveredCells?: readonly GridCoord[];
   acceptedMaterialKinds?: readonly ResourceMaterialKind[];

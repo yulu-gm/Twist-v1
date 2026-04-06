@@ -15,6 +15,7 @@ import type {
 
 const WORK_ITEM_KIND_TO_BEHAVIOR_ZH: Readonly<Record<WorkItemKind, string>> = {
   "chop-tree": "伐木中",
+  "mine-stone": "开采中",
   "pick-up-resource": "拾取物资",
   "haul-to-zone": "搬运物资",
   "construct-blueprint": "建造中",

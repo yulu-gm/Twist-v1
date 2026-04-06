@@ -190,7 +190,7 @@ export class GameOrchestrator {
 
 
     const worldForSim = worldPort.getWorld();
-    const workWalkTargets = buildWorkWalkTargets(worldForSim);
+    const workWalkTargets = buildWorkWalkTargets(worldForSim, sim.getPawns());
     const result = tickSimulation({
       pawns: sim.getPawns(),
       reservations: sim.getReservations(),
