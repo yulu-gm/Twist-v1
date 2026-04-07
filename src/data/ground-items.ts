@@ -1,9 +1,9 @@
 /**
- * 地面掉落物 mock 数据（每格最多一种条目 + 数量）。
- * 未来接入真实库存系统时，只需换掉此文件的实现。
+ * 地面物资展示投影：数据来自实体目录中的地图容器物资。
  */
 
-import { coordKey, type GridCoord } from "../game/world-grid";
+import type { EntityRegistry } from "../game/entity-system";
+import type { GridCoord } from "../game/world-grid";
 
 export type GroundItemStack = Readonly<{
   cell: GridCoord;
@@ -11,21 +11,25 @@ export type GroundItemStack = Readonly<{
   quantity: number;
 }>;
 
-/** 固定散落（稳定 mock 布局）：地图左上角区域，用于验证/演示掉落物视图。 */
-export const MOCK_SCATTERED_GROUND_ITEMS: readonly GroundItemStack[] = [
-  { cell: { col: 1, row: 0 }, displayName: "木柴", quantity: 3 },
-  { cell: { col: 3, row: 1 }, displayName: "石块", quantity: 12 },
-  { cell: { col: 0, row: 2 }, displayName: "浆果", quantity: 5 },
-  { cell: { col: 2, row: 2 }, displayName: "绳结", quantity: 1 },
-  { cell: { col: 4, row: 0 }, displayName: "铁矿", quantity: 7 },
-  { cell: { col: 5, row: 2 }, displayName: "草药", quantity: 2 },
-  { cell: { col: 0, row: 1 }, displayName: "兽皮", quantity: 4 }
-];
+export function groundStacksFromRegistry(
+  registry: EntityRegistry
+): readonly GroundItemStack[] {
+  return registry.listMaterialsOnGround().map((m) => ({
+    cell: m.cell,
+    displayName: m.materialKind,
+    quantity: m.quantity
+  }));
+}
 
-const GROUND_ITEMS_BY_KEY: ReadonlyMap<string, GroundItemStack> = new Map(
-  MOCK_SCATTERED_GROUND_ITEMS.map((s) => [coordKey(s.cell), s])
-);
-
-export function groundItemAt(cell: GridCoord): GroundItemStack | undefined {
-  return GROUND_ITEMS_BY_KEY.get(coordKey(cell));
+export function groundItemAt(
+  registry: EntityRegistry,
+  cell: GridCoord
+): GroundItemStack | undefined {
+  const m = registry.groundMaterialAtCell(cell);
+  if (!m) return undefined;
+  return {
+    cell: m.cell,
+    displayName: m.materialKind,
+    quantity: m.quantity
+  };
 }

@@ -3,10 +3,16 @@
  * GameScene 通过此类的语义化方法更新 HUD，不再持有 DOM 引用。
  */
 
+import type { EntityRegistry } from "../game/entity-system";
 import type { PawnState } from "../game/pawn-state";
+import {
+  WORK_TYPE_FELLING,
+  WORK_TYPE_MINING,
+  WORK_TYPE_PICKUP
+} from "../game/work-generation";
+import type { WorkRegistry } from "../game/work-system";
 import type { TimeControlState, TimeOfDayPalette, TimeSpeed } from "../game/time-of-day";
 import { formatTimeOfDayLabel, type TimeOfDayState } from "../game/time-of-day";
-import { pawnProfileForId } from "../data/pawn-profiles";
 import { VILLAGER_TOOL_KEY_CODES, type VillagerTool } from "../data/villager-tools";
 import {
   DEFAULT_COMMAND_MENU,
@@ -49,6 +55,53 @@ function escapeHtml(raw: string): string {
     .replace(/"/g, "&quot;");
 }
 
+function workTypeLabelZh(workType: string): string {
+  switch (workType) {
+    case WORK_TYPE_FELLING:
+      return "伐木";
+    case WORK_TYPE_MINING:
+      return "开采";
+    case WORK_TYPE_PICKUP:
+      return "拾取";
+    default:
+      return workType;
+  }
+}
+
+function shortWorkId(id: string): string {
+  if (id.length <= 16) return id;
+  return `${id.slice(0, 8)}…${id.slice(-5)}`;
+}
+
+function workStatusLabelZh(
+  status: string,
+  inRegistry: boolean
+): string {
+  if (!inRegistry) return "已结束";
+  switch (status) {
+    case "pending":
+      return "待分配";
+    case "in_progress":
+      return "进行中";
+    default:
+      return status;
+  }
+}
+
+function pawnNameById(pawns: readonly PawnState[], pawnId: string): string {
+  return pawns.find((p) => p.id === pawnId)?.name ?? pawnId.slice(0, 8);
+}
+
+export type WorkHudSyncInput = Readonly<{
+  workRegistry: WorkRegistry;
+  pawns: readonly PawnState[];
+  treeCellCount: number;
+  rockCellCount: number;
+  resourceWarning: string | null;
+  debugWorkHud: boolean;
+  workAiEvents: readonly string[];
+}>;
+
 export class HudManager {
   // 时间 HUD
   private sceneHudEl: HTMLElement | null;
@@ -77,6 +130,13 @@ export class HudManager {
   private pawnRosterSlotEls: HTMLElement[] = [];
   private pawnRosterAbort: AbortController | null = null;
 
+  // 工单摘要（PT008 人工验收）
+  private workHudRoot: HTMLElement | null;
+  private workHudSummaryEl: HTMLElement | null;
+  private workHudListEl: HTMLElement | null;
+  private workHudEventsEl: HTMLElement | null;
+  private workHudHintEl: HTMLElement | null;
+
   // 场景变体
   private variantSelectAbort: AbortController | null = null;
 
@@ -96,6 +156,11 @@ export class HudManager {
     this.toolBarRoot = document.getElementById("villager-tool-bar");
     this.rosterRoot = document.getElementById("pawn-roster");
     this.pawnDetailEl = document.getElementById("pawn-detail-panel");
+    this.workHudRoot = document.getElementById("work-hud-panel");
+    this.workHudSummaryEl = document.getElementById("work-hud-summary");
+    this.workHudListEl = document.getElementById("work-hud-list");
+    this.workHudEventsEl = document.getElementById("work-hud-events");
+    this.workHudHintEl = document.getElementById("work-hud-hint");
   }
 
   // ── 时间 HUD ──────────────────────────────────────────────
@@ -446,7 +511,12 @@ export class HudManager {
 
   // ── Pawn 详情面板 ─────────────────────────────────────────
 
-  public syncPawnDetail(pawn: PawnState | undefined): void {
+  public syncPawnDetail(
+    pawn: PawnState | undefined,
+    registry: EntityRegistry,
+    workRegistry: WorkRegistry,
+    workPerformDurationSec: number
+  ): void {
     const panel = this.pawnDetailEl;
     if (!panel) return;
 
@@ -457,7 +527,7 @@ export class HudManager {
     }
 
     panel.hidden = false;
-    const profile = pawnProfileForId(pawn.id);
+    const profile = registry.getPawn(pawn.id)?.displayProfile;
     const tags = profile
       ? profile.mockTags
           .map((t) => `<span class="pawn-detail-tag">${escapeHtml(t)}</span>`)
@@ -468,15 +538,46 @@ export class HudManager {
     const action = pawn.currentAction?.kind ?? "—";
     const n = pawn.needs;
 
+    const workId = pawn.currentGoal?.workId;
+    const workOrder = workId ? workRegistry.getWork(workId) : undefined;
+    const workSection =
+      workId !== undefined
+        ? (() => {
+            const row = workOrder?.targetCell;
+            const cellTxt =
+              row !== undefined ? `(${row.col},${row.row})` : "—";
+            const typeZh = workOrder
+              ? workTypeLabelZh(workOrder.workType)
+              : "（未知类型）";
+            const st = workOrder
+              ? workStatusLabelZh(workOrder.status, true)
+              : workStatusLabelZh("", false);
+            const progressLine =
+              pawn.currentAction?.kind === "perform-work" && workPerformDurationSec > 0
+                ? `<div style="font-size:12px;color:#a89878;margin-top:4px">工单进度 ${(
+                    (100 * Math.min(1, pawn.actionTimerSec / workPerformDurationSec))
+                  ).toFixed(0)}%</div>`
+                : "";
+            return `
+      <div class="pawn-detail-section">
+        <div class="pawn-detail-label">当前工单</div>
+        <div style="font-size:12px">编号 <code style="color:#d4c4a8">${escapeHtml(shortWorkId(workId))}</code></div>
+        <div style="font-size:12px">类型 ${escapeHtml(typeZh)}　目标格 ${escapeHtml(cellTxt)}</div>
+        <div style="font-size:12px">登记 ${escapeHtml(st)}</div>
+        ${progressLine}
+      </div>`;
+          })()
+        : "";
+
     panel.innerHTML = `
       <h2>${escapeHtml(pawn.name)}</h2>
       <p class="pawn-detail-epithet">${escapeHtml(profile?.epithet ?? "（无档案）")}</p>
       <div class="pawn-detail-section">
-        <div class="pawn-detail-label">简介（mock）</div>
+        <div class="pawn-detail-label">简介</div>
         <div>${escapeHtml(profile?.bio ?? "暂无。")}</div>
       </div>
       <div class="pawn-detail-section">
-        <div class="pawn-detail-label">备注（mock）</div>
+        <div class="pawn-detail-label">备注</div>
         <div>${escapeHtml(profile?.notes ?? "—")}</div>
       </div>
       <div class="pawn-detail-section">
@@ -486,12 +587,73 @@ export class HudManager {
         　行动 <code style="font-size:12px;color:#d4c4a8">${escapeHtml(String(action))}</code></div>
         <div style="font-size:12px;color:#a89878;margin-top:4px">${escapeHtml(pawn.debugLabel)}</div>
       </div>
+      ${workSection}
       ${
         tags
-          ? `<div class="pawn-detail-section"><div class="pawn-detail-label">标签（mock）</div><div class="pawn-detail-tags">${tags}</div></div>`
+          ? `<div class="pawn-detail-section"><div class="pawn-detail-label">标签</div><div class="pawn-detail-tags">${tags}</div></div>`
           : ""
       }
     `;
+  }
+
+  public syncWorkHud(input: WorkHudSyncInput, palette: TimeOfDayPalette): void {
+    const root = this.workHudRoot;
+    const sumEl = this.workHudSummaryEl;
+    const listEl = this.workHudListEl;
+    const eventsEl = this.workHudEventsEl;
+    const hintEl = this.workHudHintEl;
+    if (!root || !sumEl || !listEl) return;
+
+    root.hidden = false;
+    const primaryColor = colorToCss(palette.primaryTextColor);
+    root.style.color = primaryColor;
+
+    const pending = input.workRegistry.listPending();
+    const prog = input.workRegistry.listInProgress();
+    const pendingN = pending.length;
+    const progN = prog.length;
+
+    sumEl.textContent = `工单 · 待分配 ${pendingN} · 进行中 ${progN}　登记资源 · 树 ${input.treeCellCount} · 岩 ${input.rockCellCount}`;
+    if (input.resourceWarning) {
+      sumEl.textContent += `　${input.resourceWarning}`;
+    }
+
+    const rows: string[] = [];
+    const sorted = [...pending, ...prog].sort((a, b) => {
+      const oa = a.status === "in_progress" ? 0 : 1;
+      const ob = b.status === "in_progress" ? 0 : 1;
+      if (oa !== ob) return oa - ob;
+      return b.priority - a.priority;
+    });
+    const maxRows = 5;
+    for (let i = 0; i < Math.min(maxRows, sorted.length); i++) {
+      const w = sorted[i]!;
+      const typeZh = workTypeLabelZh(w.workType);
+      const st = workStatusLabelZh(w.status, true);
+      const cell = w.targetCell;
+      const res = input.workRegistry.getReservation(w.id);
+      const assignee = res ? pawnNameById(input.pawns, res.pawnId) : "—";
+      const tid = w.targetEntityId ? shortWorkId(w.targetEntityId) : "—";
+      rows.push(
+        `${typeZh} ${st} · (${cell.col},${cell.row}) · 目标 ${tid} · ${assignee}`
+      );
+    }
+    listEl.textContent = rows.length ? rows.join("\n") : "（尚无工单）";
+
+    if (eventsEl) {
+      const showEvents = input.debugWorkHud && input.workAiEvents.length > 0;
+      eventsEl.hidden = !showEvents;
+      if (showEvents) {
+        eventsEl.textContent = input.workAiEvents.slice(-20).join("\n");
+      }
+    }
+
+    if (hintEl) {
+      hintEl.style.color = colorToCss(palette.secondaryTextColor);
+      hintEl.textContent = input.debugWorkHud
+        ? "调试工单 HUD 已开启（URL ?debugWorkHud=1 或 ?qaLayout=1）。"
+        : "领取失败、无路可达等说明：请使用 ?debugWorkHud=1 或 ?qaLayout=1 查看工单事件流。";
+    }
   }
 
   public teardownPawnDetail(): void {

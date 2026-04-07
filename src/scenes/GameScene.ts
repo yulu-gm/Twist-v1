@@ -31,16 +31,33 @@ import {
   blockedKeysFromCells,
   cellAtWorldPixel,
   coordKey,
-  createReservationSnapshot,
   DEFAULT_WORLD_GRID,
-  findInteractionPointById,
+  gridCoordFromKey,
   pickRandomBlockedCells,
   type GridCoord,
-  type ReservationSnapshot,
   type WorldGridConfig
 } from "../game/world-grid";
+import {
+  createSeededEntityRegistry,
+  needInteractionSpecForTarget,
+  ZONE_TYPE_STORAGE,
+  type EntityId,
+  type EntityRegistry,
+  type ZoneEntity
+} from "../game/entity-system";
+import {
+  filterCellKeysForNewStorageZone,
+  isCellEligibleForStorageZone,
+  isStorageZoneType,
+  nextStorageZoneEntityId,
+  storageZoneOccupiedCellKeys
+} from "../game/storage-zone";
+import { WorkRegistry } from "../game/work-system";
+import { syncTaskMarkersToEntities } from "../game/sync-task-markers";
+import { syncTreesAndRocksFromSceneLayout } from "../game/sync-scene-static-entities";
 import { DEFAULT_SIM_CONFIG } from "../game/sim-config";
 import { tickSimulation } from "../game/sim-loop";
+import { buildClaimablePendingWorks } from "../game/work-claim";
 import { formatGridCellHoverText } from "../data/grid-cell-info";
 import { applyTaskMarkersForSelection } from "../data/task-markers";
 import { HudManager } from "../ui/hud-manager";
@@ -52,10 +69,49 @@ import {
   type CommandMenuLeafId
 } from "../ui/command-menu";
 import type { UiInteractionMode } from "../ui/ui-modes";
-import { drawGridLines, drawStoneCells, drawInteractionPoints } from "./renderers/grid-renderer";
-import { createPawnViews, syncPawnViews, applyPaletteToViews, type PawnView } from "./renderers/pawn-renderer";
-import { drawGroundItemStacks } from "./renderers/ground-items-renderer";
+import { drawGridLines } from "./renderers/grid-renderer";
+import {
+  createPawnViews,
+  syncPawnViews,
+  syncPawnFellingMiningPresentation,
+  applyPaletteToViews,
+  type PawnView
+} from "./renderers/pawn-renderer";
+import { activeFellingMiningPerformAtTarget } from "../game/pawn-work-visual";
+import { WORK_TYPE_FELLING, WORK_TYPE_MINING } from "../game/work-generation";
+import { syncEntityViews } from "./renderers/entity-view-sync";
+import { STATIC_ENTITY_VIEW_REGISTRATIONS } from "./renderers/static-entity-view-registrations";
 import { redrawFloorSelection, syncTaskMarkerView } from "./renderers/selection-renderer";
+
+function parseBrowserWorkHudFlags(): { qaLayout: boolean; debugWorkHud: boolean } {
+  if (typeof window === "undefined" || typeof window.location === "undefined") {
+    return { qaLayout: false, debugWorkHud: false };
+  }
+  const p = new URLSearchParams(window.location.search);
+  const qa = p.get("qaLayout") === "1" || p.get("qaLayout") === "true";
+  const dbg =
+    qa ||
+    p.get("debugWorkHud") === "1" ||
+    p.get("debugWorkHud") === "true";
+  return { qaLayout: qa, debugWorkHud: dbg };
+}
+
+function createSeededRng(seed: number): () => number {
+  let s = seed >>> 0;
+  return () => {
+    s = (Math.imul(1664525, s) + 1013904223) >>> 0;
+    return s / 0x1_0000_0000;
+  };
+}
+
+function isWorkRelatedAiEvent(msg: string): boolean {
+  return (
+    msg.includes("completed work") ||
+    msg.includes("claim failed") ||
+    msg.includes("no anchor for work") ||
+    msg.includes("no step toward work")
+  );
+}
 
 export type GameSceneVariant = "default" | "alt-en";
 
@@ -66,8 +122,9 @@ export class GameScene extends Phaser.Scene {
   private worldGrid: WorldGridConfig = DEFAULT_WORLD_GRID;
 
   // Simulation state
+  private entityRegistry!: EntityRegistry;
+  private workRegistry!: WorkRegistry;
   private pawns: PawnState[] = [];
-  private reservations: ReservationSnapshot = createReservationSnapshot();
   private timeOfDayState: TimeOfDayState = createInitialTimeOfDayState(DEFAULT_TIME_OF_DAY_CONFIG);
   private timeOfDayPalette: TimeOfDayPalette = sampleTimeOfDayPalette(
     createInitialTimeOfDayState(DEFAULT_TIME_OF_DAY_CONFIG)
@@ -76,14 +133,15 @@ export class GameScene extends Phaser.Scene {
 
   // Phaser renderables
   private views = new Map<string, PawnView>();
+  private entityViews = new Map<EntityId, Phaser.GameObjects.GameObject>();
   private gridGraphics!: Phaser.GameObjects.Graphics;
-  private interactionGraphics!: Phaser.GameObjects.Graphics;
-  private interactionLabels = new Map<string, Phaser.GameObjects.Text>();
   private hoverHighlightFrame!: Phaser.GameObjects.Rectangle;
   private lastHoverKey: string | null = "\0";
   private floorSelectionGraphics!: Phaser.GameObjects.Graphics;
   private floorSelectionDraftGraphics!: Phaser.GameObjects.Graphics;
   private lumberTargetGraphics!: Phaser.GameObjects.Graphics;
+  private zoneStorageOverlayGraphics!: Phaser.GameObjects.Graphics;
+  private storageZoneDraftGraphics!: Phaser.GameObjects.Graphics;
   private taskMarkerGraphics!: Phaser.GameObjects.Graphics;
   private taskMarkerTexts = new Map<string, Phaser.GameObjects.Text>();
   private interactionProgressGraphics!: Phaser.GameObjects.Graphics;
@@ -99,6 +157,10 @@ export class GameScene extends Phaser.Scene {
   private taskMarkersByCell = new Map<string, string>();
   private uiMode: UiInteractionMode = "idle";
   private treeCellKeys = new Set<string>();
+  private debugWorkHud = false;
+  private resourceLayoutWarning: string | null = null;
+  private aiWorkEventRing: string[] = [];
+  private rockCellCountForHud = 0;
 
   // Keyboard key objects (for cleanup)
   private toolKeyObjects: Phaser.Input.Keyboard.Key[] = [];
@@ -125,41 +187,53 @@ export class GameScene extends Phaser.Scene {
 
   public create(): void {
     this.hud = new HudManager();
+    this.entityRegistry = createSeededEntityRegistry();
+    this.workRegistry = new WorkRegistry();
     this.cameras.main.setBackgroundColor(this.timeOfDayPalette.backgroundColor);
     this.layoutGrid();
     this.setupGridHoverHighlight();
 
-    // Build world grid with random blocked cells
+    const { qaLayout, debugWorkHud } = parseBrowserWorkHudFlags();
+    this.debugWorkHud = debugWorkHud;
+    const layoutRng = qaLayout ? createSeededRng(0x2a04eef1) : () => Math.random();
+
     const excludeSpawn = blockedKeysFromCells(DEFAULT_WORLD_GRID.defaultSpawnPoints);
+    const rockPickCount = Math.max(
+      DEFAULT_SIM_CONFIG.stoneCellCount,
+      DEFAULT_SIM_CONFIG.minSceneRockCount
+    );
     const stoneCells = pickRandomBlockedCells(
       DEFAULT_WORLD_GRID,
-      DEFAULT_SIM_CONFIG.stoneCellCount,
+      rockPickCount,
       excludeSpawn,
-      () => Math.random()
+      layoutRng
     );
     this.worldGrid = {
       ...DEFAULT_WORLD_GRID,
       blockedCellKeys: blockedKeysFromCells(stoneCells)
     };
-    this.initTreeCellKeys();
+    this.initTreeCellKeys(layoutRng);
+    syncTreesAndRocksFromSceneLayout(this.entityRegistry, this.treeCellKeys, stoneCells);
+    this.rockCellCountForHud = stoneCells.length;
+    this.resourceLayoutWarning =
+      this.treeCellKeys.size < DEFAULT_SIM_CONFIG.minSceneTreeCount ||
+      stoneCells.length < DEFAULT_SIM_CONFIG.minSceneRockCount
+        ? "资源格不足"
+        : null;
 
     // Grid graphics
     this.gridGraphics = this.add.graphics();
     drawGridLines(this.gridGraphics, this.worldGrid, this.gridOriginX, this.gridOriginY, this.timeOfDayPalette);
-    drawStoneCells(this, this.worldGrid, this.gridOriginX, this.gridOriginY, stoneCells);
-    this.interactionGraphics = this.add.graphics();
-    drawInteractionPoints(
-      this.interactionGraphics, this.interactionLabels, this,
-      this.worldGrid, this.gridOriginX, this.gridOriginY,
-      this.reservations, this.timeOfDayPalette
-    );
-    drawGroundItemStacks(this, this.worldGrid, this.gridOriginX, this.gridOriginY);
 
     // Selection graphics
     this.floorSelectionGraphics = this.add.graphics();
     this.floorSelectionDraftGraphics = this.add.graphics();
     this.lumberTargetGraphics = this.add.graphics();
     this.lumberTargetGraphics.setDepth(32);
+    this.zoneStorageOverlayGraphics = this.add.graphics();
+    this.zoneStorageOverlayGraphics.setDepth(30);
+    this.storageZoneDraftGraphics = this.add.graphics();
+    this.storageZoneDraftGraphics.setDepth(31);
     this.floorSelectionState = createFloorSelectionState();
     this.activeSelectionPointerId = undefined;
     redrawFloorSelection(
@@ -174,6 +248,7 @@ export class GameScene extends Phaser.Scene {
       this.taskMarkerGraphics, this.taskMarkerTexts, this,
       this.taskMarkersByCell, this.worldGrid, this.gridOriginX, this.gridOriginY
     );
+    this.syncStorageZoneOverlay();
 
     // UI overlay graphics
     this.interactionProgressGraphics = this.add.graphics();
@@ -187,10 +262,11 @@ export class GameScene extends Phaser.Scene {
         ? pickRandomAltPawnNames(DEFAULT_PAWN_NAMES.length)
         : [...DEFAULT_PAWN_NAMES];
     this.pawns = createDefaultPawnStates(this.worldGrid.defaultSpawnPoints, names);
-    this.reservations = createReservationSnapshot();
+    this.entityRegistry.syncPawnsFromStates(this.pawns);
     this.views = createPawnViews(
       this, this.pawns, this.worldGrid, this.gridOriginX, this.gridOriginY, this.timeOfDayPalette
     );
+    this.syncStaticEntityViews();
 
     // HUD setup
     this.hud.bindSceneVariantSelect(this.variant, (next) => {
@@ -210,6 +286,7 @@ export class GameScene extends Phaser.Scene {
 
     this.bindFloorSelectionInput();
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.onShutdown, this);
+    this.syncWorkHudPanel();
   }
 
   public update(_time: number, delta: number): void {
@@ -228,45 +305,84 @@ export class GameScene extends Phaser.Scene {
     this.hud.syncTimeOfDayHud(this.timeOfDayState, this.timeControlState, this.timeOfDayPalette);
 
     if (simulationDt <= 0) {
+      syncPawnViews(this.views, this.pawns, this.worldGrid, this.gridOriginX, this.gridOriginY);
+      syncPawnFellingMiningPresentation(
+        this.views,
+        this.pawns,
+        this.worldGrid,
+        this.gridOriginX,
+        this.gridOriginY,
+        this.workRegistry,
+        this.time.now
+      );
+      this.syncPawnStatusLabels();
       this.syncHoverFromPointer();
       this.syncPawnDetailPanel();
+      this.syncWorkHudPanel();
       this.syncInteractionProgressOverlays();
-      this.syncPawnStatusLabels();
+      this.syncStaticEntityViews();
       return;
     }
 
     // Run simulation tick
     const result = tickSimulation({
       pawns: this.pawns,
-      reservations: this.reservations,
       grid: this.worldGrid,
       simulationDt,
       config: DEFAULT_SIM_CONFIG,
-      rng: () => Math.random()
+      rng: () => Math.random(),
+      entityRegistry: this.entityRegistry,
+      workRegistry: this.workRegistry,
+      claimablePendingWorks: buildClaimablePendingWorks(
+        this.entityRegistry,
+        this.workRegistry,
+        this.worldGrid
+      )
     });
 
     for (const msg of result.aiEvents) {
       console.info(msg);
+      if (this.debugWorkHud && isWorkRelatedAiEvent(msg)) {
+        this.pushAiWorkEvent(msg);
+      }
     }
 
-    this.reservations = result.reservations;
     this.pawns = [...result.pawns];
+    this.entityRegistry.syncPawnsFromStates(this.pawns);
 
-    drawInteractionPoints(
-      this.interactionGraphics, this.interactionLabels, this,
-      this.worldGrid, this.gridOriginX, this.gridOriginY,
-      this.reservations, this.timeOfDayPalette
-    );
     syncPawnViews(this.views, this.pawns, this.worldGrid, this.gridOriginX, this.gridOriginY);
+    syncPawnFellingMiningPresentation(
+      this.views,
+      this.pawns,
+      this.worldGrid,
+      this.gridOriginX,
+      this.gridOriginY,
+      this.workRegistry,
+      this.time.now
+    );
     this.syncPawnStatusLabels();
     this.syncHoverFromPointer();
     this.syncPawnDetailPanel();
+    this.syncWorkHudPanel();
     this.syncInteractionProgressOverlays();
+    this.syncStaticEntityViews();
+  }
+
+  private syncStaticEntityViews(): void {
+    syncEntityViews(
+      this,
+      this.entityViews,
+      this.entityRegistry,
+      this.worldGrid,
+      this.gridOriginX,
+      this.gridOriginY,
+      STATIC_ENTITY_VIEW_REGISTRATIONS
+    );
   }
 
   // ── Layout ────────────────────────────────────────────────
 
-  private initTreeCellKeys(): void {
+  private initTreeCellKeys(rng: () => number): void {
     this.treeCellKeys.clear();
     const blocked = this.worldGrid.blockedCellKeys ?? new Set<string>();
     const spawn = blockedKeysFromCells(this.worldGrid.defaultSpawnPoints);
@@ -278,14 +394,18 @@ export class GameScene extends Phaser.Scene {
         candidates.push(key);
       }
     }
-    const want = Math.min(8, candidates.length);
+    const cap = Math.min(8, candidates.length);
+    const need = Math.min(
+      Math.max(cap, DEFAULT_SIM_CONFIG.minSceneTreeCount),
+      candidates.length
+    );
     for (let i = candidates.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      const j = Math.floor(rng() * (i + 1));
       const a = candidates[i]!;
       candidates[i] = candidates[j]!;
       candidates[j] = a;
     }
-    for (let k = 0; k < want; k++) {
+    for (let k = 0; k < need; k++) {
       this.treeCellKeys.add(candidates[k]!);
     }
   }
@@ -294,8 +414,14 @@ export class GameScene extends Phaser.Scene {
     for (const pawn of this.pawns) {
       const view = this.views.get(pawn.id);
       if (!view) continue;
-      const statusLine =
-        pawn.currentAction?.kind === "use-target" ? "建造中" : pawn.debugLabel;
+      let statusLine = pawn.debugLabel;
+      if (pawn.currentAction?.kind === "use-target") {
+        statusLine = "建造中";
+      } else if (pawn.currentAction?.kind === "perform-work") {
+        const fm = activeFellingMiningPerformAtTarget(pawn, this.workRegistry);
+        if (fm?.workType === WORK_TYPE_FELLING) statusLine = "伐木中";
+        else if (fm?.workType === WORK_TYPE_MINING) statusLine = "开采中";
+      }
       view.label.setText(`${pawn.name}\n${statusLine}`);
     }
   }
@@ -340,12 +466,9 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor(this.timeOfDayPalette.backgroundColor);
     drawGridLines(this.gridGraphics, this.worldGrid, this.gridOriginX, this.gridOriginY, this.timeOfDayPalette);
     applyPaletteToViews(this.views, this.timeOfDayPalette);
-    const secondaryColor = `#${(this.timeOfDayPalette.secondaryTextColor & 0xffffff).toString(16).padStart(6, "0")}`;
-    for (const label of this.interactionLabels.values()) {
-      label.setColor(secondaryColor);
-    }
     this.hud.setHoverInfoColor(this.timeOfDayPalette);
     this.hud.setModeHintColor(this.timeOfDayPalette);
+    this.syncWorkHudPanel();
   }
 
   // ── Hover sync ────────────────────────────────────────────
@@ -373,7 +496,9 @@ export class GameScene extends Phaser.Scene {
     this.hoverHighlightFrame.setPosition(cx, cy);
     this.hoverHighlightFrame.setSize(cs - 2, cs - 2);
     this.hoverHighlightFrame.setVisible(true);
-    this.hud.showHoverInfo(formatGridCellHoverText(cell, this.worldGrid));
+    this.hud.showHoverInfo(
+      formatGridCellHoverText(cell, this.worldGrid, this.entityRegistry)
+    );
   }
 
   private syncBlueprintPreview(cell: GridCoord | undefined): void {
@@ -409,20 +534,23 @@ export class GameScene extends Phaser.Scene {
   private syncInteractionProgressOverlays(): void {
     this.interactionProgressGraphics.clear();
     const cs = this.worldGrid.cellSizePx;
+    const workDur = DEFAULT_SIM_CONFIG.workPerformDurationSec;
 
     for (const pawn of this.pawns) {
       const action = pawn.currentAction;
       if (action?.kind !== "use-target") continue;
       const targetId = action.targetId ?? pawn.reservedTargetId;
       if (!targetId) continue;
-      const point = findInteractionPointById(this.worldGrid, targetId);
-      if (!point) continue;
+      const gk = pawn.currentGoal?.kind;
+      if (gk !== "eat" && gk !== "sleep" && gk !== "recreate") continue;
+      const spec = needInteractionSpecForTarget(this.entityRegistry, targetId, gk);
+      if (!spec) continue;
 
-      const progress01 = point.useDurationSec > 0
-        ? Phaser.Math.Clamp(pawn.actionTimerSec / point.useDurationSec, 0, 1)
+      const progress01 = spec.useDurationSec > 0
+        ? Phaser.Math.Clamp(pawn.actionTimerSec / spec.useDurationSec, 0, 1)
         : 0;
-      const x = this.gridOriginX + point.cell.col * cs;
-      const y = this.gridOriginY + point.cell.row * cs;
+      const x = this.gridOriginX + spec.cell.col * cs;
+      const y = this.gridOriginY + spec.cell.row * cs;
 
       const barW = cs - 10;
       const barH = 8;
@@ -436,6 +564,29 @@ export class GameScene extends Phaser.Scene {
       this.interactionProgressGraphics.lineStyle(1, 0xf4e3b2, 0.9);
       this.interactionProgressGraphics.strokeRoundedRect(bx, by, barW, barH, 3);
     }
+
+    for (const pawn of this.pawns) {
+      const fm = activeFellingMiningPerformAtTarget(pawn, this.workRegistry);
+      if (!fm) continue;
+      const progress01 =
+        workDur > 0 ? Phaser.Math.Clamp(pawn.actionTimerSec / workDur, 0, 1) : 0;
+      const cell = fm.targetCell;
+      const x = this.gridOriginX + cell.col * cs;
+      const y = this.gridOriginY + cell.row * cs;
+      const barW = cs - 10;
+      const barH = 8;
+      const bx = x + (cs - barW) / 2;
+      const by = y - 10;
+      const fill =
+        fm.workType === WORK_TYPE_FELLING ? 0x6b9e5f : 0x6e90a8;
+      const stroke = fm.workType === WORK_TYPE_FELLING ? 0xc8e6b8 : 0xb8d4e8;
+      this.interactionProgressGraphics.fillStyle(0x000000, 0.55);
+      this.interactionProgressGraphics.fillRoundedRect(bx, by, barW, barH, 3);
+      this.interactionProgressGraphics.fillStyle(fill, 0.92);
+      this.interactionProgressGraphics.fillRoundedRect(bx, by, Math.max(2, barW * progress01), barH, 3);
+      this.interactionProgressGraphics.lineStyle(1, stroke, 0.9);
+      this.interactionProgressGraphics.strokeRoundedRect(bx, by, barW, barH, 3);
+    }
   }
 
   // ── Pawn detail ───────────────────────────────────────────
@@ -444,7 +595,32 @@ export class GameScene extends Phaser.Scene {
     const pawn = this.selectedPawnId
       ? this.pawns.find((p) => p.id === this.selectedPawnId)
       : undefined;
-    this.hud.syncPawnDetail(pawn);
+    this.hud.syncPawnDetail(
+      pawn,
+      this.entityRegistry,
+      this.workRegistry,
+      DEFAULT_SIM_CONFIG.workPerformDurationSec
+    );
+  }
+
+  private syncWorkHudPanel(): void {
+    this.hud.syncWorkHud(
+      {
+        workRegistry: this.workRegistry,
+        pawns: this.pawns,
+        treeCellCount: this.treeCellKeys.size,
+        rockCellCount: this.rockCellCountForHud,
+        resourceWarning: this.resourceLayoutWarning,
+        debugWorkHud: this.debugWorkHud,
+        workAiEvents: this.aiWorkEventRing
+      },
+      this.timeOfDayPalette
+    );
+  }
+
+  private pushAiWorkEvent(msg: string): void {
+    this.aiWorkEventRing.push(msg);
+    if (this.aiWorkEventRing.length > 20) this.aiWorkEventRing.shift();
   }
 
   // ── Time controls ─────────────────────────────────────────
@@ -639,11 +815,33 @@ export class GameScene extends Phaser.Scene {
     this.redrawSelection();
 
     if (!draft) return;
+
+    if (this.selectedVillagerToolId() === "zone.storage.create") {
+      const keys = filterCellKeysForNewStorageZone(this.entityRegistry, this.worldGrid, draft.cellKeys);
+      if (keys.length > 0) {
+        const storageCount =
+          this.entityRegistry.listEntitiesByKind("zone").filter((z) => isStorageZoneType(z.zoneType))
+            .length + 1;
+        const zone: ZoneEntity = {
+          kind: "zone",
+          id: nextStorageZoneEntityId(this.entityRegistry),
+          zoneType: ZONE_TYPE_STORAGE,
+          cellKeys: keys,
+          name: `存储区 ${storageCount}`,
+          acceptedMaterialRules: []
+        };
+        this.entityRegistry.registerZone(zone);
+      }
+      this.syncStorageZoneOverlay();
+      return;
+    }
+
     this.taskMarkersByCell = applyTaskMarkersForSelection(this.taskMarkersByCell, {
       toolId: this.selectedVillagerToolId(),
       modifier: draft.modifier,
       cellKeys: draft.cellKeys
     });
+    syncTaskMarkersToEntities(this.entityRegistry, this.workRegistry, this.taskMarkersByCell);
     syncTaskMarkerView(
       this.taskMarkerGraphics, this.taskMarkerTexts, this,
       this.taskMarkersByCell, this.worldGrid, this.gridOriginX, this.gridOriginY
@@ -656,6 +854,7 @@ export class GameScene extends Phaser.Scene {
       this.floorSelectionState, this.worldGrid, this.gridOriginX, this.gridOriginY
     );
     this.drawLumberTargetHighlights();
+    this.drawStorageZoneDraftHighlights();
   }
 
   private drawLumberTargetHighlights(): void {
@@ -672,6 +871,52 @@ export class GameScene extends Phaser.Scene {
       const y = this.gridOriginY + coord.row * cs;
       this.lumberTargetGraphics.lineStyle(3, 0x6abf69, 0.95);
       this.lumberTargetGraphics.strokeRect(x + 3, y + 3, cs - 6, cs - 6);
+    }
+  }
+
+  private syncStorageZoneOverlay(): void {
+    this.zoneStorageOverlayGraphics.clear();
+    const cs = this.worldGrid.cellSizePx;
+    for (const z of this.entityRegistry.listEntitiesByKind("zone")) {
+      if (!isStorageZoneType(z.zoneType)) continue;
+      for (const key of z.cellKeys) {
+        const coord = gridCoordFromKey(key);
+        if (!coord) continue;
+        const x = this.gridOriginX + coord.col * cs;
+        const y = this.gridOriginY + coord.row * cs;
+        this.zoneStorageOverlayGraphics.fillStyle(0x3a7bd5, 0.38);
+        this.zoneStorageOverlayGraphics.fillRect(x + 2, y + 2, cs - 4, cs - 4);
+        this.zoneStorageOverlayGraphics.lineStyle(2, 0x8ec5ff, 0.7);
+        this.zoneStorageOverlayGraphics.strokeRect(x + 2, y + 2, cs - 4, cs - 4);
+      }
+    }
+  }
+
+  private drawStorageZoneDraftHighlights(): void {
+    this.storageZoneDraftGraphics.clear();
+    if (this.uiMode !== "storage-zone-create") return;
+    if (this.selectedVillagerToolId() !== "zone.storage.create") return;
+    const draft = this.floorSelectionState.draft;
+    if (!draft) return;
+    const occupied = storageZoneOccupiedCellKeys(this.entityRegistry);
+    const cs = this.worldGrid.cellSizePx;
+    for (const key of draft.cellKeys) {
+      const coord = gridCoordFromKey(key);
+      if (!coord) continue;
+      const ok = isCellEligibleForStorageZone(this.entityRegistry, this.worldGrid, key, occupied);
+      const x = this.gridOriginX + coord.col * cs;
+      const y = this.gridOriginY + coord.row * cs;
+      if (ok) {
+        this.storageZoneDraftGraphics.fillStyle(0x4499ee, 0.22);
+        this.storageZoneDraftGraphics.fillRect(x + 2, y + 2, cs - 4, cs - 4);
+        this.storageZoneDraftGraphics.lineStyle(2, 0x6eb5ff, 0.55);
+        this.storageZoneDraftGraphics.strokeRect(x + 2, y + 2, cs - 4, cs - 4);
+      } else {
+        this.storageZoneDraftGraphics.fillStyle(0x884444, 0.28);
+        this.storageZoneDraftGraphics.fillRect(x + 2, y + 2, cs - 4, cs - 4);
+        this.storageZoneDraftGraphics.lineStyle(2, 0xcc8888, 0.55);
+        this.storageZoneDraftGraphics.strokeRect(x + 2, y + 2, cs - 4, cs - 4);
+      }
     }
   }
 
@@ -709,6 +954,8 @@ export class GameScene extends Phaser.Scene {
   // ── Shutdown ──────────────────────────────────────────────
 
   private onShutdown(): void {
+    for (const [, v] of this.entityViews) v.destroy(true);
+    this.entityViews.clear();
     this.teardownTimeControls();
     this.teardownVillagerToolBarKeys();
     this.hud.teardownAll();

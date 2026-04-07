@@ -1,53 +1,70 @@
 /**
- * ground-items-renderer：地面掉落物线框 + 名称 + 数量绘制。
+ * ground-items-renderer：地图容器物资（掉落物堆）的 EntityRenderer。
  */
 
 import Phaser from "phaser";
+import type { MaterialEntity } from "../../game/entity-system";
 import type { WorldGridConfig } from "../../game/world-grid";
-import { MOCK_SCATTERED_GROUND_ITEMS } from "../../data/ground-items";
+import type { EntityRenderer } from "./entity-view-sync";
 
-export function drawGroundItemStacks(
-  scene: Phaser.Scene,
+type GroundStackView = Phaser.GameObjects.Container & {
+  __qty: Phaser.GameObjects.Text;
+  __name: Phaser.GameObjects.Text;
+  __g: Phaser.GameObjects.Graphics;
+};
+
+function layoutGroundStackView(
+  view: GroundStackView,
+  entity: MaterialEntity,
   grid: WorldGridConfig,
   ox: number,
   oy: number
 ): void {
-  const g = scene.add.graphics();
-  g.setDepth(25);
+  const { col, row } = entity.cell;
   const cs = grid.cellSizePx;
   const pad = 4;
-
-  for (const stack of MOCK_SCATTERED_GROUND_ITEMS) {
-    const { col, row } = stack.cell;
-    const left = ox + col * cs + pad;
-    const top = oy + row * cs + pad;
-    const w = cs - pad * 2;
-    const h = cs - pad * 2;
-
-    g.lineStyle(2, 0xc9b87a, 0.95);
-    g.strokeRect(left, top, w, h);
-
-    const cx = ox + (col + 0.5) * cs;
-    const cy = oy + (row + 0.5) * cs;
-    scene.add
-      .text(cx, cy, stack.displayName, {
-        fontFamily: "Segoe UI, sans-serif",
-        fontSize: "11px",
-        color: "#e8dcc8",
-        align: "center"
-      })
-      .setOrigin(0.5, 0.5)
-      .setDepth(25);
-
-    const rx = ox + (col + 1) * cs - pad;
-    const ry = oy + (row + 1) * cs - pad;
-    scene.add
-      .text(rx, ry, String(stack.quantity), {
-        fontFamily: "Segoe UI, sans-serif",
-        fontSize: "10px",
-        color: "#f0e6d2"
-      })
-      .setOrigin(1, 1)
-      .setDepth(25);
-  }
+  const w = cs - pad * 2;
+  const h = cs - pad * 2;
+  view.setPosition(ox + col * cs, oy + row * cs);
+  view.__g.clear();
+  view.__g.setPosition(pad, pad);
+  view.__g.lineStyle(2, 0xc9b87a, 0.95);
+  view.__g.strokeRect(0, 0, w, h);
+  view.__name.setPosition(cs / 2, cs / 2);
+  view.__qty.setPosition(cs - pad, cs - pad);
 }
+
+export const groundMapMaterialRenderer: EntityRenderer<MaterialEntity, GroundStackView> = {
+  shouldRender: (e) => e.containerKind === "map" || e.containerKind === "zone",
+  create(scene, entity, grid, ox, oy) {
+    const c = scene.add.container(0, 0) as GroundStackView;
+    const g = scene.add.graphics();
+    c.__g = g;
+    c.add(g);
+    const nameText = scene.add.text(0, 0, entity.materialKind, {
+      fontFamily: "Segoe UI, sans-serif",
+      fontSize: "11px",
+      color: "#e8dcc8",
+      align: "center"
+    });
+    nameText.setOrigin(0.5, 0.5);
+    c.__name = nameText;
+    c.add(nameText);
+    const qtyText = scene.add.text(0, 0, String(entity.quantity), {
+      fontFamily: "Segoe UI, sans-serif",
+      fontSize: "10px",
+      color: "#f0e6d2"
+    });
+    qtyText.setOrigin(1, 1);
+    c.__qty = qtyText;
+    c.add(qtyText);
+    c.setDepth(25);
+    layoutGroundStackView(c, entity, grid, ox, oy);
+    return c;
+  },
+  update(_scene, entity, view, grid, ox, oy) {
+    view.__name.setText(entity.materialKind);
+    view.__qty.setText(String(entity.quantity));
+    layoutGroundStackView(view, entity, grid, ox, oy);
+  }
+};

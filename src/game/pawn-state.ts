@@ -63,6 +63,7 @@ export type PawnGoalState = Readonly<{
   kind: GoalKind;
   reason: string;
   targetId?: string;
+  workId?: string;
 }>;
 
 export type PawnActionState = Readonly<{
@@ -243,7 +244,8 @@ export function setPawnIntent(
     currentGoal: goal,
     currentAction: action,
     reservedTargetId,
-    actionTimerSec: action?.kind === "use-target" ? 0 : pawn.actionTimerSec
+    actionTimerSec:
+      action?.kind === "use-target" || action?.kind === "perform-work" ? 0 : pawn.actionTimerSec
   });
 }
 
@@ -274,7 +276,11 @@ export function resetPawnActionTimer(pawn: PawnState): PawnState {
 export function describePawnDebugLabel(pawn: PawnState): string {
   const goal = pawn.currentGoal?.kind ?? "none";
   const action = pawn.currentAction?.kind ?? "idle";
-  const targetId = pawn.currentAction?.targetId ?? pawn.currentGoal?.targetId ?? pawn.reservedTargetId;
+  const targetId =
+    pawn.currentAction?.targetId ??
+    pawn.currentGoal?.workId ??
+    pawn.currentGoal?.targetId ??
+    pawn.reservedTargetId;
   return targetId
     ? `goal:${goal} action:${action} target:${targetId}`
     : `goal:${goal} action:${action}`;
