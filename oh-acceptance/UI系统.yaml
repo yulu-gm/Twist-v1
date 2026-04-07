@@ -1,0 +1,79 @@
+system_name: "UI系统"
+story_ref: "oh-story/story-1.md"
+gen_doc_ref: "oh-gen-doc/UI系统.yaml"
+code_design_ref: "oh-code-design/UI系统.yaml"
+
+scenarios:
+  - scenario_id: "UI-001"
+    name: "主菜单导航与模式切换"
+    type: "happy-path"
+    intent: "验证玩家点击左下角三级菜单项能正确切换底层交互模式并更新界面提示"
+    given:
+      - "游戏处于默认的空闲选择模式"
+    when: "玩家依次点击左下角菜单 '指令' -> '区域' -> '存储区' -> '新建'"
+    then:
+      domain_state:
+        - "界面动作转发层通知交互系统进入 '存储区创建模式'"
+        - "界面状态层更新当前展开菜单、选中工具和模式提示"
+      presentation:
+        - "菜单树正确展开（一级入口展开二级菜单，二级展开三级菜单），并高亮显示选中的 '新建' 项"
+        - "屏幕状态展示区出现 '正在创建存储区，请框选地图' 等模式提示文本"
+
+  - scenario_id: "UI-002"
+    name: "地图叠加反馈层实时更新"
+    type: "integration"
+    intent: "验证领域实体的状态变化能实时反映在地图的UI叠加层上"
+    given:
+      - "小人正在执行 '建造' 工作"
+    when: "工作系统推进建造进度（如从 10% 增加到 50%）"
+    then:
+      domain_state:
+        - "UI 系统的状态展示模型读取到最新的进度数据"
+      presentation:
+        - "蓝图上方的进度条 UI 实时填充至 50%"
+        - "小人头顶或状态面板显示 '建造中' 的状态图标或文本"
+
+  - scenario_id: "UI-003"
+    name: "无效操作的视觉拒绝"
+    type: "edge-case"
+    intent: "验证当玩家尝试在不可用区域进行操作时，UI能提供明确的拒绝反馈"
+    given:
+      - "玩家处于 '蓝图绘制模式'"
+      - "鼠标悬停在已经被墙体占用的地图格上"
+    when: "UI 系统请求地图系统校验当前悬停格的合法性"
+    then:
+      domain_state:
+        - "地图系统返回不可放置"
+        - "UI 界面状态层记录该位置为非法"
+      presentation:
+        - "鼠标指针下的蓝图虚影变为红色或显示禁止图标"
+        - "不显示正常的半透明建造预览"
+
+  - scenario_id: "UI-004"
+    name: "选区框的视觉渲染"
+    type: "happy-path"
+    intent: "验证玩家拖拽鼠标时，选区框能正确跟随鼠标渲染"
+    given:
+      - "玩家处于任意支持框选的模式（如伐木标记模式）"
+    when: "玩家在屏幕上按下鼠标并拖拽"
+    then:
+      domain_state:
+        - "UI 系统持续接收鼠标坐标并计算矩形区域"
+      presentation:
+        - "屏幕上绘制出带有半透明填充和边框的矩形选区框"
+        - "被选区框覆盖的合法目标（如树木）出现高亮轮廓"
+
+  - scenario_id: "UI-005"
+    name: "开采工具的UI响应"
+    type: "happy-path"
+    intent: "验证玩家通过三级菜单选择开采工具后UI的正确反馈"
+    given:
+      - "游戏处于默认的空闲选择模式"
+    when: "玩家依次点击左下角菜单 '指令' -> '命令' -> '开采'"
+    then:
+      domain_state:
+        - "界面动作转发层通知交互系统进入 '开采标记模式'"
+        - "界面状态层记录当前选中工具为 '开采工具'"
+      presentation:
+        - "三级菜单中的 '开采' 项保持高亮或选中状态"
+        - "鼠标指针可能变为开采工具的特定图标"
