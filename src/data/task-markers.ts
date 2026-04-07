@@ -4,7 +4,7 @@
  */
 
 import { type SelectionModifier } from "../game/floor-selection";
-import { VILLAGER_TOOLS } from "./villager-tools";
+import { TOOL_GROUPS } from "../ui/command-menu";
 
 export type TaskMarkerSelectionInput = Readonly<{
   toolId: string;
@@ -14,9 +14,12 @@ export type TaskMarkerSelectionInput = Readonly<{
 
 /** 「待机」不视为下达可标记的任务；未知 id 同空。 */
 export function issuedTaskLabelForToolId(toolId: string): string | null {
-  const tool = VILLAGER_TOOLS.find((t) => t.id === toolId);
-  if (!tool || tool.id === "idle") return null;
-  return tool.label;
+  if (toolId === "idle") return null;
+  for (const group of TOOL_GROUPS) {
+    const tool = group.tools.find((t) => t.id === toolId);
+    if (tool) return tool.label;
+  }
+  return null;
 }
 
 export function applyTaskMarkersForSelection(

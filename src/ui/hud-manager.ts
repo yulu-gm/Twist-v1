@@ -7,10 +7,21 @@ import type { PawnState } from "../game/pawn-state";
 import type { TimeControlState, TimeOfDayPalette, TimeSpeed } from "../game/time-of-day";
 import { formatTimeOfDayLabel, type TimeOfDayState } from "../game/time-of-day";
 import { pawnProfileForId } from "../data/pawn-profiles";
-import { VILLAGER_TOOLS, VILLAGER_TOOL_KEY_CODES, type VillagerTool } from "../data/villager-tools";
+import { VILLAGER_TOOL_KEY_CODES, type VillagerTool } from "../data/villager-tools";
+import {
+  DEFAULT_COMMAND_MENU,
+  TOOL_GROUPS,
+  createDefaultMainMenuState,
+  createDefaultToolbarState,
+  type CommandMenuLeafId,
+  type CommandMenuRoot,
+  type MainMenuState,
+  type ToolbarState,
+  type ToolItem
+} from "./command-menu";
 
 export type { VillagerTool };
-export { VILLAGER_TOOLS, VILLAGER_TOOL_KEY_CODES };
+export { VILLAGER_TOOL_KEY_CODES };
 
 /** 时间控制回调，由 GameScene 提供。 */
 export type TimeControlCallbacks = Readonly<{
@@ -23,6 +34,8 @@ export type ToolSelectCallback = (index: number) => void;
 
 /** Pawn 选中回调。 */
 export type PawnSelectCallback = (pawnId: string | null) => void;
+
+export type CommandMenuSelectCallback = (toolGroupId: string) => void;
 
 function colorToCss(color: number): string {
   return `#${(color & 0xffffff).toString(16).padStart(6, "0")}`;
@@ -45,6 +58,13 @@ export class HudManager {
 
   // Hover 信息
   private hoverHudEl: HTMLElement | null;
+
+  // 指令菜单 + 模式提示
+  private commandMenuRoot: HTMLElement | null;
+  private mainMenuState: MainMenuState = createDefaultMainMenuState();
+  private toolbarState: ToolbarState = createDefaultToolbarState();
+  private commandMenuAbort: AbortController | null = null;
+  private modeHintEl: HTMLElement | null;
 
   // 工具栏
   private toolBarRoot: HTMLElement | null;
@@ -71,6 +91,8 @@ export class HudManager {
       ]).filter((e): e is [TimeSpeed, HTMLButtonElement] => e[1] !== null)
     );
     this.hoverHudEl = document.getElementById("grid-hover-info");
+    this.modeHintEl = document.getElementById("mode-hint");
+    this.commandMenuRoot = document.getElementById("command-menu");
     this.toolBarRoot = document.getElementById("villager-tool-bar");
     this.rosterRoot = document.getElementById("pawn-roster");
     this.pawnDetailEl = document.getElementById("pawn-detail-panel");
@@ -157,34 +179,169 @@ export class HudManager {
     }
   }
 
+  // ── 模式提示 ────────────────────────────────────────────────
+
+  public showModeHint(text: string): void {
+    const el = this.modeHintEl;
+    if (!el) return;
+    el.hidden = false;
+    if (el.textContent !== text) el.textContent = text;
+  }
+
+  public hideModeHint(): void {
+    const el = this.modeHintEl;
+    if (!el) return;
+    el.hidden = true;
+  }
+
+  public setModeHintColor(palette: TimeOfDayPalette): void {
+    if (this.modeHintEl) {
+      this.modeHintEl.style.color = colorToCss(palette.primaryTextColor);
+    }
+  }
+
+  // ── 指令菜单 ────────────────────────────────────────────────
+
+  public setupCommandMenu(
+    onSelect: CommandMenuSelectCallback,
+    menu: readonly CommandMenuRoot[] = DEFAULT_COMMAND_MENU
+  ): AbortController {
+    this.teardownCommandMenu();
+    const abort = new AbortController();
+    this.commandMenuAbort = abort;
+    if (!this.commandMenuRoot) return abort;
+
+    this.mainMenuState = createDefaultMainMenuState();
+    this.commandMenuRoot.replaceChildren();
+    this.renderCommandMenu(menu, onSelect, abort.signal);
+    return abort;
+  }
+
+  public teardownCommandMenu(): void {
+    this.commandMenuAbort?.abort();
+    this.commandMenuAbort = null;
+    if (this.commandMenuRoot) this.commandMenuRoot.replaceChildren();
+    this.mainMenuState = createDefaultMainMenuState();
+  }
+
+  private renderCommandMenu(
+    menu: readonly CommandMenuRoot[],
+    onSelect: CommandMenuSelectCallback,
+    signal: AbortSignal
+  ): void {
+    const rootEl = this.commandMenuRoot;
+    if (!rootEl) return;
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "command-menu-level";
+
+    const title = document.createElement("div");
+    title.className = "command-menu-title";
+    title.textContent = "菜单";
+    wrapper.appendChild(title);
+
+    for (const root of menu) {
+      const rootBtn = document.createElement("button");
+      rootBtn.type = "button";
+      rootBtn.className = "command-menu-item";
+      rootBtn.textContent = root.label;
+      rootBtn.setAttribute("aria-expanded", "false");
+      rootBtn.addEventListener(
+        "click",
+        () => {
+          const nextExpanded = this.mainMenuState.expandedRootId === root.id ? null : root.id;
+          this.mainMenuState = {
+            expandedRootId: nextExpanded,
+            expandedSecondId: null
+          };
+          this.commandMenuRoot?.replaceChildren();
+          this.renderCommandMenu(menu, onSelect, signal);
+        },
+        { signal }
+      );
+      wrapper.appendChild(rootBtn);
+
+      const expanded = this.mainMenuState.expandedRootId === root.id;
+      rootBtn.setAttribute("aria-expanded", expanded ? "true" : "false");
+      if (!expanded) continue;
+
+      const secondsEl = document.createElement("div");
+      secondsEl.className = "command-menu-children";
+
+      for (const second of root.seconds) {
+        const secondBtn = document.createElement("button");
+        secondBtn.type = "button";
+        secondBtn.className = "command-menu-item";
+        secondBtn.textContent = second.label;
+        secondBtn.setAttribute("aria-expanded", "false");
+        secondBtn.addEventListener(
+          "click",
+          () => {
+            const nextExpanded = this.mainMenuState.expandedSecondId === second.id ? null : second.id;
+            this.mainMenuState = {
+              ...this.mainMenuState,
+              expandedSecondId: nextExpanded
+            };
+            this.commandMenuRoot?.replaceChildren();
+            this.renderCommandMenu(menu, onSelect, signal);
+            
+            // Notify that a second level menu was clicked, which should update the toolbar
+            if (nextExpanded) {
+              onSelect(second.toolGroupId);
+            }
+          },
+          { signal }
+        );
+        secondsEl.appendChild(secondBtn);
+
+        const secondExpanded = this.mainMenuState.expandedSecondId === second.id;
+        secondBtn.setAttribute("aria-expanded", secondExpanded ? "true" : "false");
+      }
+
+      wrapper.appendChild(secondsEl);
+    }
+
+    rootEl.appendChild(wrapper);
+  }
+
   // ── 工具栏 ────────────────────────────────────────────────
 
   public setupToolBar(
     onSelect: ToolSelectCallback,
-    initialIndex: number
+    toolGroupId: string
   ): AbortController {
     this.teardownToolBar();
     const abort = new AbortController();
     const { signal } = abort;
     this.toolUiAbort = abort;
+    
+    this.toolbarState = { ...this.toolbarState, toolGroupId };
 
     if (this.toolBarRoot) {
-      for (let i = 0; i < VILLAGER_TOOLS.length; i++) {
-        const tool = VILLAGER_TOOLS[i]!;
-        const slot = document.createElement("button");
-        slot.type = "button";
-        slot.className = "tool-slot";
-        slot.dataset.toolId = tool.id;
-        slot.title = `${tool.hint}（${tool.hotkey}）`;
-        slot.setAttribute("aria-label", `${tool.label}，快捷键 ${tool.hotkey}`);
-        slot.innerHTML = `<span class="tool-key">${tool.hotkey}</span><div class="tool-label">${tool.label}</div>`;
-        slot.addEventListener("click", () => onSelect(i), { signal });
-        this.toolBarRoot.appendChild(slot);
-        this.toolSlotEls.push(slot);
+      const group = TOOL_GROUPS.find((g) => g.id === toolGroupId);
+      if (group) {
+        for (let i = 0; i < group.tools.length; i++) {
+          const tool = group.tools[i]!;
+          const slot = document.createElement("button");
+          slot.type = "button";
+          slot.className = "tool-slot";
+          slot.dataset.toolId = tool.id;
+          if (tool.hotkey) {
+            slot.title = `${tool.modeHint || tool.label}（${tool.hotkey}）`;
+            slot.setAttribute("aria-label", `${tool.label}，快捷键 ${tool.hotkey}`);
+            slot.innerHTML = `<span class="tool-key">${tool.hotkey}</span><div class="tool-label">${tool.label}</div>`;
+          } else {
+            slot.title = tool.modeHint || tool.label;
+            slot.setAttribute("aria-label", tool.label);
+            slot.innerHTML = `<div class="tool-label">${tool.label}</div>`;
+          }
+          slot.addEventListener("click", () => onSelect(i), { signal });
+          this.toolBarRoot.appendChild(slot);
+          this.toolSlotEls.push(slot);
+        }
       }
     }
 
-    this.syncToolBarSelection(initialIndex);
     return abort;
   }
 
@@ -194,6 +351,11 @@ export class HudManager {
       const on = i === index;
       el.classList.toggle("selected", on);
       el.setAttribute("aria-pressed", on ? "true" : "false");
+    }
+    
+    const group = TOOL_GROUPS.find((g) => g.id === this.toolbarState.toolGroupId);
+    if (group && group.tools[index]) {
+      this.toolbarState = { ...this.toolbarState, selectedToolId: group.tools[index]!.id };
     }
   }
 
@@ -342,6 +504,7 @@ export class HudManager {
   // ── 全部清理 ──────────────────────────────────────────────
 
   public teardownAll(): void {
+    this.teardownCommandMenu();
     this.teardownToolBar();
     this.teardownPawnRoster();
     this.teardownPawnDetail();

@@ -11,7 +11,7 @@ export type GroundItemStack = Readonly<{
   quantity: number;
 }>;
 
-/** 临时固定散落：地图左上角区域，用于验证掉落物视图。 */
+/** 固定散落（稳定 mock 布局）：地图左上角区域，用于验证/演示掉落物视图。 */
 export const MOCK_SCATTERED_GROUND_ITEMS: readonly GroundItemStack[] = [
   { cell: { col: 1, row: 0 }, displayName: "木柴", quantity: 3 },
   { cell: { col: 3, row: 1 }, displayName: "石块", quantity: 12 },

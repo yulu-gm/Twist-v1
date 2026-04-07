@@ -33,6 +33,7 @@ import {
   coordKey,
   createReservationSnapshot,
   DEFAULT_WORLD_GRID,
+  findInteractionPointById,
   pickRandomBlockedCells,
   type GridCoord,
   type ReservationSnapshot,
@@ -43,7 +44,14 @@ import { tickSimulation } from "../game/sim-loop";
 import { formatGridCellHoverText } from "../data/grid-cell-info";
 import { applyTaskMarkersForSelection } from "../data/task-markers";
 import { HudManager } from "../ui/hud-manager";
-import { VILLAGER_TOOLS, VILLAGER_TOOL_KEY_CODES } from "../data/villager-tools";
+import { VILLAGER_TOOL_KEY_CODES } from "../data/villager-tools";
+import {
+  DEFAULT_COMMAND_MENU,
+  TOOL_GROUPS,
+  modeHintForCommandLeaf,
+  type CommandMenuLeafId
+} from "../ui/command-menu";
+import type { UiInteractionMode } from "../ui/ui-modes";
 import { drawGridLines, drawStoneCells, drawInteractionPoints } from "./renderers/grid-renderer";
 import { createPawnViews, syncPawnViews, applyPaletteToViews, type PawnView } from "./renderers/pawn-renderer";
 import { drawGroundItemStacks } from "./renderers/ground-items-renderer";
@@ -75,16 +83,22 @@ export class GameScene extends Phaser.Scene {
   private lastHoverKey: string | null = "\0";
   private floorSelectionGraphics!: Phaser.GameObjects.Graphics;
   private floorSelectionDraftGraphics!: Phaser.GameObjects.Graphics;
+  private lumberTargetGraphics!: Phaser.GameObjects.Graphics;
   private taskMarkerGraphics!: Phaser.GameObjects.Graphics;
   private taskMarkerTexts = new Map<string, Phaser.GameObjects.Text>();
+  private interactionProgressGraphics!: Phaser.GameObjects.Graphics;
+  private blueprintPreviewGraphics!: Phaser.GameObjects.Graphics;
 
   // Input / selection state
   private variant: GameSceneVariant = "default";
   private floorSelectionState: FloorSelectionState = createFloorSelectionState();
   private activeSelectionPointerId?: number;
   private selectedToolIndex = 0;
+  private currentToolGroupId = "group.default";
   private selectedPawnId: string | null = null;
   private taskMarkersByCell = new Map<string, string>();
+  private uiMode: UiInteractionMode = "idle";
+  private treeCellKeys = new Set<string>();
 
   // Keyboard key objects (for cleanup)
   private toolKeyObjects: Phaser.Input.Keyboard.Key[] = [];
@@ -102,6 +116,8 @@ export class GameScene extends Phaser.Scene {
     const v = data.variant;
     this.variant = v === "alt-en" ? "alt-en" : "default";
     this.selectedToolIndex = 0;
+    this.currentToolGroupId = "group.default";
+    this.uiMode = "idle";
     this.timeOfDayState = createInitialTimeOfDayState(DEFAULT_TIME_OF_DAY_CONFIG);
     this.timeOfDayPalette = sampleTimeOfDayPalette(this.timeOfDayState);
     this.timeControlState = DEFAULT_TIME_CONTROL_STATE;
@@ -125,6 +141,7 @@ export class GameScene extends Phaser.Scene {
       ...DEFAULT_WORLD_GRID,
       blockedCellKeys: blockedKeysFromCells(stoneCells)
     };
+    this.initTreeCellKeys();
 
     // Grid graphics
     this.gridGraphics = this.add.graphics();
@@ -141,6 +158,8 @@ export class GameScene extends Phaser.Scene {
     // Selection graphics
     this.floorSelectionGraphics = this.add.graphics();
     this.floorSelectionDraftGraphics = this.add.graphics();
+    this.lumberTargetGraphics = this.add.graphics();
+    this.lumberTargetGraphics.setDepth(32);
     this.floorSelectionState = createFloorSelectionState();
     this.activeSelectionPointerId = undefined;
     redrawFloorSelection(
@@ -155,6 +174,12 @@ export class GameScene extends Phaser.Scene {
       this.taskMarkerGraphics, this.taskMarkerTexts, this,
       this.taskMarkersByCell, this.worldGrid, this.gridOriginX, this.gridOriginY
     );
+
+    // UI overlay graphics
+    this.interactionProgressGraphics = this.add.graphics();
+    this.interactionProgressGraphics.setDepth(70);
+    this.blueprintPreviewGraphics = this.add.graphics();
+    this.blueprintPreviewGraphics.setDepth(75);
 
     // Spawn pawns
     const names =
@@ -172,11 +197,16 @@ export class GameScene extends Phaser.Scene {
       this.scene.restart({ variant: next });
     });
     this.hud.setHoverInfoColor(this.timeOfDayPalette);
+    this.hud.setModeHintColor(this.timeOfDayPalette);
     this.hud.syncTimeOfDayHud(this.timeOfDayState, this.timeControlState, this.timeOfDayPalette);
     this.setupTimeControls();
     this.setupVillagerToolBarKeys();
-    this.hud.setupToolBar((i) => this.selectVillagerTool(i), this.selectedToolIndex);
+    this.hud.setupToolBar((i) => this.selectVillagerTool(i), this.currentToolGroupId);
+    this.hud.syncToolBarSelection(this.selectedToolIndex);
     this.setupPawnRosterUi();
+    this.hud.setupCommandMenu((groupId) => this.selectCommandGroup(groupId), DEFAULT_COMMAND_MENU);
+    this.hud.hideModeHint();
+    this.syncMenuCursor();
 
     this.bindFloorSelectionInput();
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.onShutdown, this);
@@ -200,6 +230,8 @@ export class GameScene extends Phaser.Scene {
     if (simulationDt <= 0) {
       this.syncHoverFromPointer();
       this.syncPawnDetailPanel();
+      this.syncInteractionProgressOverlays();
+      this.syncPawnStatusLabels();
       return;
     }
 
@@ -226,11 +258,63 @@ export class GameScene extends Phaser.Scene {
       this.reservations, this.timeOfDayPalette
     );
     syncPawnViews(this.views, this.pawns, this.worldGrid, this.gridOriginX, this.gridOriginY);
+    this.syncPawnStatusLabels();
     this.syncHoverFromPointer();
     this.syncPawnDetailPanel();
+    this.syncInteractionProgressOverlays();
   }
 
   // ── Layout ────────────────────────────────────────────────
+
+  private initTreeCellKeys(): void {
+    this.treeCellKeys.clear();
+    const blocked = this.worldGrid.blockedCellKeys ?? new Set<string>();
+    const spawn = blockedKeysFromCells(this.worldGrid.defaultSpawnPoints);
+    const candidates: string[] = [];
+    for (let row = 0; row < this.worldGrid.rows; row++) {
+      for (let col = 0; col < this.worldGrid.columns; col++) {
+        const key = coordKey({ col, row });
+        if (blocked.has(key) || spawn.has(key)) continue;
+        candidates.push(key);
+      }
+    }
+    const want = Math.min(8, candidates.length);
+    for (let i = candidates.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const a = candidates[i]!;
+      candidates[i] = candidates[j]!;
+      candidates[j] = a;
+    }
+    for (let k = 0; k < want; k++) {
+      this.treeCellKeys.add(candidates[k]!);
+    }
+  }
+
+  private syncPawnStatusLabels(): void {
+    for (const pawn of this.pawns) {
+      const view = this.views.get(pawn.id);
+      if (!view) continue;
+      const statusLine =
+        pawn.currentAction?.kind === "use-target" ? "建造中" : pawn.debugLabel;
+      view.label.setText(`${pawn.name}\n${statusLine}`);
+    }
+  }
+
+  private syncMenuCursor(): void {
+    const canvas = this.game.canvas;
+    if (!canvas) return;
+    if (
+      this.uiMode === "mine-mark" ||
+      this.uiMode === "lumber-mark" ||
+      this.uiMode === "haul-mark" ||
+      this.uiMode === "storage-zone-create" ||
+      this.uiMode === "blueprint-draw"
+    ) {
+      canvas.style.cursor = "crosshair";
+    } else {
+      canvas.style.cursor = "default";
+    }
+  }
 
   private layoutGrid(): void {
     const { width, height } = this.scale;
@@ -261,6 +345,7 @@ export class GameScene extends Phaser.Scene {
       label.setColor(secondaryColor);
     }
     this.hud.setHoverInfoColor(this.timeOfDayPalette);
+    this.hud.setModeHintColor(this.timeOfDayPalette);
   }
 
   // ── Hover sync ────────────────────────────────────────────
@@ -273,6 +358,8 @@ export class GameScene extends Phaser.Scene {
     const key = cell ? coordKey(cell) : null;
     if (key === this.lastHoverKey) return;
     this.lastHoverKey = key;
+
+    this.syncBlueprintPreview(cell ?? undefined);
 
     if (!cell) {
       this.hoverHighlightFrame.setVisible(false);
@@ -287,6 +374,68 @@ export class GameScene extends Phaser.Scene {
     this.hoverHighlightFrame.setSize(cs - 2, cs - 2);
     this.hoverHighlightFrame.setVisible(true);
     this.hud.showHoverInfo(formatGridCellHoverText(cell, this.worldGrid));
+  }
+
+  private syncBlueprintPreview(cell: GridCoord | undefined): void {
+    this.blueprintPreviewGraphics.clear();
+    if (this.uiMode !== "blueprint-draw") return;
+    if (!cell) return;
+    const blocked = this.worldGrid.blockedCellKeys?.has(coordKey(cell)) ?? false;
+    const cs = this.worldGrid.cellSizePx;
+    const x = this.gridOriginX + cell.col * cs;
+    const y = this.gridOriginY + cell.row * cs;
+
+    if (blocked) {
+      this.blueprintPreviewGraphics.fillStyle(0xc1666b, 0.25);
+      this.blueprintPreviewGraphics.fillRect(x + 2, y + 2, cs - 4, cs - 4);
+      this.blueprintPreviewGraphics.lineStyle(2, 0xffd6d9, 0.95);
+      this.blueprintPreviewGraphics.strokeRect(x + 2, y + 2, cs - 4, cs - 4);
+      this.blueprintPreviewGraphics.lineStyle(3, 0xff6b6b, 0.9);
+      this.blueprintPreviewGraphics.beginPath();
+      this.blueprintPreviewGraphics.moveTo(x + 10, y + 10);
+      this.blueprintPreviewGraphics.lineTo(x + cs - 10, y + cs - 10);
+      this.blueprintPreviewGraphics.moveTo(x + cs - 10, y + 10);
+      this.blueprintPreviewGraphics.lineTo(x + 10, y + cs - 10);
+      this.blueprintPreviewGraphics.strokePath();
+      return;
+    }
+
+    this.blueprintPreviewGraphics.fillStyle(0x81b29a, 0.18);
+    this.blueprintPreviewGraphics.fillRect(x + 2, y + 2, cs - 4, cs - 4);
+    this.blueprintPreviewGraphics.lineStyle(2, 0xb8e0d2, 0.85);
+    this.blueprintPreviewGraphics.strokeRect(x + 2, y + 2, cs - 4, cs - 4);
+  }
+
+  private syncInteractionProgressOverlays(): void {
+    this.interactionProgressGraphics.clear();
+    const cs = this.worldGrid.cellSizePx;
+
+    for (const pawn of this.pawns) {
+      const action = pawn.currentAction;
+      if (action?.kind !== "use-target") continue;
+      const targetId = action.targetId ?? pawn.reservedTargetId;
+      if (!targetId) continue;
+      const point = findInteractionPointById(this.worldGrid, targetId);
+      if (!point) continue;
+
+      const progress01 = point.useDurationSec > 0
+        ? Phaser.Math.Clamp(pawn.actionTimerSec / point.useDurationSec, 0, 1)
+        : 0;
+      const x = this.gridOriginX + point.cell.col * cs;
+      const y = this.gridOriginY + point.cell.row * cs;
+
+      const barW = cs - 10;
+      const barH = 8;
+      const bx = x + (cs - barW) / 2;
+      const by = y - 10;
+
+      this.interactionProgressGraphics.fillStyle(0x000000, 0.55);
+      this.interactionProgressGraphics.fillRoundedRect(bx, by, barW, barH, 3);
+      this.interactionProgressGraphics.fillStyle(0x81b29a, 0.9);
+      this.interactionProgressGraphics.fillRoundedRect(bx, by, Math.max(2, barW * progress01), barH, 3);
+      this.interactionProgressGraphics.lineStyle(1, 0xf4e3b2, 0.9);
+      this.interactionProgressGraphics.strokeRoundedRect(bx, by, barW, barH, 3);
+    }
   }
 
   // ── Pawn detail ───────────────────────────────────────────
@@ -346,7 +495,12 @@ export class GameScene extends Phaser.Scene {
     for (let i = 0; i < VILLAGER_TOOL_KEY_CODES.length; i++) {
       const code = VILLAGER_TOOL_KEY_CODES[i]!;
       const key = this.input.keyboard.addKey(code);
-      key.on("down", () => this.selectVillagerTool(i));
+      key.on("down", () => {
+        const group = TOOL_GROUPS.find((g) => g.id === this.currentToolGroupId);
+        if (group && i < group.tools.length) {
+          this.selectVillagerTool(i);
+        }
+      });
       this.toolKeyObjects.push(key);
     }
   }
@@ -356,14 +510,55 @@ export class GameScene extends Phaser.Scene {
     this.toolKeyObjects = [];
   }
 
-  private selectVillagerTool(index: number): void {
-    if (index < 0 || index >= VILLAGER_TOOLS.length) return;
+  private selectVillagerTool(
+    index: number
+  ): void {
+    const group = TOOL_GROUPS.find((g) => g.id === this.currentToolGroupId);
+    if (!group) return;
+    if (index < 0 || index >= group.tools.length) return;
+    
     this.selectedToolIndex = index;
     this.hud.syncToolBarSelection(index);
+
+    const toolId = group.tools[index]?.id ?? "idle";
+
+    if (toolId === "idle") {
+      this.uiMode = "idle";
+      this.hud.hideModeHint();
+      this.syncMenuCursor();
+      return;
+    }
+
+    if (toolId === "build.wall.wood" || toolId === "build.furniture.bed") {
+      this.uiMode = "blueprint-draw";
+      this.hud.showModeHint(group.tools[index]?.modeHint ?? "蓝图绘制模式：选择可放置位置");
+      this.syncMenuCursor();
+      return;
+    }
+
+    if (toolId === "order.mine") {
+      this.uiMode = "mine-mark";
+      this.hud.showModeHint(group.tools[index]?.modeHint ?? "正在标记开采目标，请框选地图");
+    } else if (toolId === "order.lumber") {
+      this.uiMode = "lumber-mark";
+      this.hud.showModeHint(group.tools[index]?.modeHint ?? "正在标记伐木目标，请框选地图");
+    } else if (toolId === "order.haul") {
+      this.uiMode = "haul-mark";
+      this.hud.showModeHint(group.tools[index]?.modeHint ?? "正在标记可拾取物资，请框选地图");
+    } else if (toolId === "zone.storage.create") {
+      this.uiMode = "storage-zone-create";
+      this.hud.showModeHint(group.tools[index]?.modeHint ?? "正在创建存储区，请框选地图");
+    } else {
+      this.uiMode = "idle";
+      this.hud.hideModeHint();
+    }
+
+    this.syncMenuCursor();
   }
 
   private selectedVillagerToolId(): string {
-    return VILLAGER_TOOLS[this.selectedToolIndex]?.id ?? "idle";
+    const group = TOOL_GROUPS.find((g) => g.id === this.currentToolGroupId);
+    return group?.tools[this.selectedToolIndex]?.id ?? "idle";
   }
 
   // ── Pawn roster ───────────────────────────────────────────
@@ -378,6 +573,21 @@ export class GameScene extends Phaser.Scene {
     this.selectedPawnId = pawnId;
     this.hud.syncRosterSelection(pawnId);
     this.syncPawnDetailPanel();
+  }
+
+  // ── Command menu / UI mode ─────────────────────────────────
+
+  private selectCommandGroup(groupId: string): void {
+    this.currentToolGroupId = groupId;
+    this.hud.setupToolBar((i) => this.selectVillagerTool(i), groupId);
+    
+    // Select the first tool by default, or idle if present
+    const group = TOOL_GROUPS.find((g) => g.id === groupId);
+    if (group && group.tools.length > 0) {
+      const idleIndex = group.tools.findIndex((t) => t.id === "idle");
+      const indexToSelect = idleIndex >= 0 ? idleIndex : 0;
+      this.selectVillagerTool(indexToSelect);
+    }
   }
 
   // ── Floor selection input ─────────────────────────────────
@@ -445,6 +655,24 @@ export class GameScene extends Phaser.Scene {
       this.floorSelectionGraphics, this.floorSelectionDraftGraphics,
       this.floorSelectionState, this.worldGrid, this.gridOriginX, this.gridOriginY
     );
+    this.drawLumberTargetHighlights();
+  }
+
+  private drawLumberTargetHighlights(): void {
+    this.lumberTargetGraphics.clear();
+    if (this.selectedVillagerToolId() !== "lumber") return;
+    const draft = this.floorSelectionState.draft;
+    if (!draft || draft.modifier === "toggle") return;
+    const cs = this.worldGrid.cellSizePx;
+    for (const key of draft.cellKeys) {
+      if (!this.treeCellKeys.has(key)) continue;
+      const coord = parseCoordKeyForUi(key);
+      if (!coord) continue;
+      const x = this.gridOriginX + coord.col * cs;
+      const y = this.gridOriginY + coord.row * cs;
+      this.lumberTargetGraphics.lineStyle(3, 0x6abf69, 0.95);
+      this.lumberTargetGraphics.strokeRect(x + 3, y + 3, cs - 6, cs - 6);
+    }
   }
 
   // ── Pointer helpers ───────────────────────────────────────
@@ -484,10 +712,21 @@ export class GameScene extends Phaser.Scene {
     this.teardownTimeControls();
     this.teardownVillagerToolBarKeys();
     this.hud.teardownAll();
+    const canvas = this.game.canvas;
+    if (canvas) canvas.style.cursor = "default";
   }
 }
 
 // ── Pure helper ───────────────────────────────────────────────
+
+function parseCoordKeyForUi(key: string): GridCoord | null {
+  const comma = key.indexOf(",");
+  if (comma <= 0) return null;
+  const col = Number(key.slice(0, comma));
+  const row = Number(key.slice(comma + 1));
+  if (!Number.isInteger(col) || !Number.isInteger(row)) return null;
+  return { col, row };
+}
 
 function sameTimeOfDayPalette(left: TimeOfDayPalette, right: TimeOfDayPalette): boolean {
   return (
