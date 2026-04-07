@@ -155,16 +155,22 @@ describe("三层命令菜单", () => {
     const categoryButtons = Array.from(
       document.querySelectorAll<HTMLButtonElement>("#villager-command-categories button")
     );
-    expect(categoryButtons).toHaveLength(3);
-    expect(categoryButtons.map((button) => button.textContent)).toContain("结构");
-    expect(categoryButtons.map((button) => button.textContent)).toContain("家具");
+    expect(categoryButtons).toHaveLength(4);
+    const categoryLabels = categoryButtons.map((button) => button.textContent);
+    expect(categoryLabels).toEqual(expect.arrayContaining(["区域", "建造", "家具", "工具"]));
 
-    (categoryButtons.find((button) => button.textContent === "结构") as HTMLButtonElement).click();
+    (categoryButtons.find((button) => button.textContent === "建造") as HTMLButtonElement).click();
 
-    const commandLabels = Array.from(
+    const buildingCommandLabels = Array.from(
       document.querySelectorAll<HTMLButtonElement>("#villager-command-list .command-item-button")
     ).map((button) => button.querySelector(".command-item-label")?.textContent);
-    expect(commandLabels).toEqual(["木墙", "储存区"]);
+    expect(buildingCommandLabels).toEqual(["木墙"]);
+
+    (categoryButtons.find((button) => button.textContent === "区域") as HTMLButtonElement).click();
+    const zoneCommandLabels = Array.from(
+      document.querySelectorAll<HTMLButtonElement>("#villager-command-list .command-item-button")
+    ).map((button) => button.querySelector(".command-item-label")?.textContent);
+    expect(zoneCommandLabels).toEqual(["存储区"]);
   });
 
   it("keeps the clicked command highlighted after switching categories", () => {
@@ -184,9 +190,29 @@ describe("三层命令菜单", () => {
     expect(bedButton).toBeDefined();
     bedButton!.click();
 
-    const selected = document.querySelector("#villager-command-list .command-item-button.selected");
+    const selected = document.querySelector<HTMLButtonElement>(
+      "#villager-command-list .command-item-button.selected"
+    );
     expect(selected?.dataset.commandId).toBe("place-bed");
     expect(document.getElementById("villager-command-primary")?.textContent).toContain("木床");
+  });
+});
+
+describe("player channel hint", () => {
+  it("syncPlayerChannelHint 将 usesBrushStroke 同步到玩家通道根节点 data-uses-brush-stroke", () => {
+    document.body.innerHTML = `
+      <div id="player-channel-hint">
+        <div id="player-channel-mode"></div>
+        <div id="player-channel-result"></div>
+        <div id="player-channel-contract"></div>
+      </div>
+    `;
+    const hud = new HudManager();
+    const root = document.getElementById("player-channel-hint");
+    hud.syncPlayerChannelHint("笔刷模式", "脚注", true);
+    expect(root?.dataset.usesBrushStroke).toBe("true");
+    hud.syncPlayerChannelHint("单击模式", "脚注", false);
+    expect(root?.dataset.usesBrushStroke).toBe("false");
   });
 });
 
@@ -200,6 +226,8 @@ describe("行为标签同步", () => {
       anchorCell: { col: 0, row: 0 },
       status: "claimed",
       failureCount: 0,
+      priority: 5,
+      sourceReason: "test-ui",
       ...partial
     };
   }

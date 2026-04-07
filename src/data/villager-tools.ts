@@ -14,7 +14,12 @@ export const VILLAGER_TOOLS: readonly VillagerTool[] = [
   { id: "lumber", hotkey: "R", label: "伐木", hint: "砍伐树木" },
   { id: "build", hotkey: "T", label: "建造", hint: "木墙笔刷 / 木床放置（见命令菜单）" },
   { id: "farm", hotkey: "Y", label: "耕种", hint: "翻土与播种" },
-  { id: "haul", hotkey: "U", label: "搬运", hint: "运输物资" },
+  {
+    id: "haul",
+    hotkey: "U",
+    label: "物资拾取标记",
+    hint: "框选散落物资，标记为可拾取"
+  },
   { id: "patrol", hotkey: "I", label: "巡逻", hint: "沿路线警戒" },
   { id: "idle", hotkey: "O", label: "待机", hint: "停止主动指令" },
   { id: "zone_create", hotkey: "P", label: "区域", hint: "划定储存区" }

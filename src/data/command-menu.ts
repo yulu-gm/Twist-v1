@@ -1,6 +1,14 @@
+import type { DomainVerb } from "../game/contracts/domain-command-types";
 import { VILLAGER_TOOLS, VILLAGER_TOOL_KEY_CODES } from "./villager-tools";
 
-export type CommandMenuCategoryId = "orders" | "structures" | "furniture";
+/**
+ * 命令菜单分组与 `oh-gen-doc/UI系统.yaml`「主菜单结构」、`oh-gen-doc/交互系统.yaml`「菜单选择 → 菜单层级」对齐：
+ * - `zones`（区域）：策划「区域 → 存储区 → 新建」——本条命令为进入存储区创建模式。
+ * - `building`（建造）：策划「建造 → 墙 → 木墙」——`layout: "grouped"`，中间「墙」为 {@link CommandMenuSubgroupDefinition}，下挂 `build-wall`（木墙）。
+ * - `furniture`（家具）：与策划「家具 → 木床」一致。
+ * - `tools`（工具）：对应策划「工具栏/交互组件」中的选区类工具（伐木、物资拾取标记等），非主菜单三本柱，但与热键栏一致。
+ */
+export type CommandMenuCategoryId = "zones" | "building" | "furniture" | "tools";
 
 export type CommandMenuCommandId =
   | "mine"
@@ -24,21 +32,40 @@ export interface CommandMenuCommandDefinition {
   readonly inputShape: CommandMenuInputShape;
   readonly modeKey: string;
   /** 领域命令 `verb` 字段的完整字符串。 */
-  readonly domainVerb: string;
+  readonly domainVerb: DomainVerb;
   /** 任务标记叠加层用 id（与 {@link task-markers} / 可接单格过滤一致）。 */
   readonly markerToolId: string;
 }
 
-export interface CommandMenuCategoryDefinition {
-  readonly id: CommandMenuCategoryId;
+/** 中间分组（如「墙」），与策划三级菜单「建造 → 墙 → 木墙」一致。 */
+export interface CommandMenuSubgroupDefinition {
+  readonly id: string;
   readonly label: string;
   readonly commands: readonly CommandMenuCommandDefinition[];
 }
 
-const ORDER_COMMANDS = [
+/** 扁平分类：一级分类下直接挂命令。 */
+export type CommandMenuCategoryDefinitionFlat = Readonly<{
+  readonly id: CommandMenuCategoryId;
+  readonly label: string;
+  readonly layout: "flat";
+  readonly commands: readonly CommandMenuCommandDefinition[];
+}>;
+
+/** 分组分类：一级分类下含若干中间组，每组下挂命令。 */
+export type CommandMenuCategoryDefinitionGrouped = Readonly<{
+  readonly id: CommandMenuCategoryId;
+  readonly label: string;
+  readonly layout: "grouped";
+  readonly subgroups: readonly CommandMenuSubgroupDefinition[];
+}>;
+
+export type CommandMenuCategoryDefinition = CommandMenuCategoryDefinitionFlat | CommandMenuCategoryDefinitionGrouped;
+
+const TOOL_COMMANDS = [
   {
     id: "mine",
-    categoryId: "orders",
+    categoryId: "tools",
     label: "开采",
     inputShape: "rect-selection",
     modeKey: "mine",
@@ -47,7 +74,7 @@ const ORDER_COMMANDS = [
   },
   {
     id: "demolish",
-    categoryId: "orders",
+    categoryId: "tools",
     label: "拆除",
     inputShape: "rect-selection",
     modeKey: "demolish",
@@ -56,7 +83,7 @@ const ORDER_COMMANDS = [
   },
   {
     id: "mow",
-    categoryId: "orders",
+    categoryId: "tools",
     label: "割草",
     inputShape: "rect-selection",
     modeKey: "mow",
@@ -65,7 +92,7 @@ const ORDER_COMMANDS = [
   },
   {
     id: "lumber",
-    categoryId: "orders",
+    categoryId: "tools",
     label: "伐木",
     inputShape: "rect-selection",
     modeKey: "lumber",
@@ -74,7 +101,7 @@ const ORDER_COMMANDS = [
   },
   {
     id: "farm",
-    categoryId: "orders",
+    categoryId: "tools",
     label: "耕种",
     inputShape: "rect-selection",
     modeKey: "farm",
@@ -83,8 +110,8 @@ const ORDER_COMMANDS = [
   },
   {
     id: "haul",
-    categoryId: "orders",
-    label: "搬运",
+    categoryId: "tools",
+    label: "物资拾取标记",
     inputShape: "rect-selection",
     modeKey: "haul",
     domainVerb: "assign_tool_task:haul",
@@ -92,7 +119,7 @@ const ORDER_COMMANDS = [
   },
   {
     id: "patrol",
-    categoryId: "orders",
+    categoryId: "tools",
     label: "巡逻",
     inputShape: "rect-selection",
     modeKey: "patrol",
@@ -101,7 +128,7 @@ const ORDER_COMMANDS = [
   },
   {
     id: "idle",
-    categoryId: "orders",
+    categoryId: "tools",
     label: "待机",
     inputShape: "rect-selection",
     modeKey: "idle",
@@ -110,20 +137,23 @@ const ORDER_COMMANDS = [
   }
 ] as const satisfies readonly CommandMenuCommandDefinition[];
 
-const STRUCTURE_COMMANDS = [
+const BUILDING_COMMANDS = [
   {
     id: "build-wall",
-    categoryId: "structures",
+    categoryId: "building",
     label: "木墙",
     inputShape: "brush-stroke",
     modeKey: "build-wall",
     domainVerb: "build_wall_blueprint",
     markerToolId: "build"
-  },
+  }
+] as const satisfies readonly CommandMenuCommandDefinition[];
+
+const ZONE_COMMANDS = [
   {
     id: "storage-zone",
-    categoryId: "structures",
-    label: "储存区",
+    categoryId: "zones",
+    label: "存储区",
     inputShape: "rect-selection",
     modeKey: "zone-create",
     domainVerb: "zone_create",
@@ -143,34 +173,63 @@ const FURNITURE_COMMANDS = [
   }
 ] as const satisfies readonly CommandMenuCommandDefinition[];
 
+const BUILDING_SUBGROUPS = [
+  {
+    id: "walls",
+    label: "墙",
+    commands: BUILDING_COMMANDS
+  }
+] as const satisfies readonly CommandMenuSubgroupDefinition[];
+
 export const COMMAND_MENU_CATEGORIES = [
   {
-    id: "orders",
-    label: "指令",
-    commands: ORDER_COMMANDS
+    id: "zones",
+    label: "区域",
+    layout: "flat",
+    commands: ZONE_COMMANDS
   },
   {
-    id: "structures",
-    label: "结构",
-    commands: STRUCTURE_COMMANDS
+    id: "building",
+    label: "建造",
+    layout: "grouped",
+    subgroups: BUILDING_SUBGROUPS
   },
   {
     id: "furniture",
     label: "家具",
+    layout: "flat",
     commands: FURNITURE_COMMANDS
+  },
+  {
+    id: "tools",
+    label: "工具",
+    layout: "flat",
+    commands: TOOL_COMMANDS
   }
 ] as const satisfies readonly CommandMenuCategoryDefinition[];
 
 export type CommandMenuCategory = (typeof COMMAND_MENU_CATEGORIES)[number];
-export type CommandMenuCommand = CommandMenuCategory["commands"][number];
+export type CommandMenuCommand =
+  | (typeof TOOL_COMMANDS)[number]
+  | (typeof BUILDING_COMMANDS)[number]
+  | (typeof ZONE_COMMANDS)[number]
+  | (typeof FURNITURE_COMMANDS)[number];
+
+function flatCommandsInCategory(category: CommandMenuCategory): readonly CommandMenuCommand[] {
+  if (category.layout === "flat") return category.commands;
+  return category.subgroups.flatMap((sub) => [...sub.commands]);
+}
 
 const CATEGORY_BY_ID = new Map<CommandMenuCategoryId, CommandMenuCategory>();
 const COMMAND_BY_ID = new Map<CommandMenuCommandId, CommandMenuCommand>();
+/** `modeKey` 与交互模式注册表中的 `modeId` 对齐，一对一。 */
+const COMMAND_BY_MODE_KEY = new Map<string, CommandMenuCommand>();
 
 for (const category of COMMAND_MENU_CATEGORIES) {
   CATEGORY_BY_ID.set(category.id, category);
-  for (const command of category.commands) {
+  for (const command of flatCommandsInCategory(category)) {
     COMMAND_BY_ID.set(command.id, command);
+    COMMAND_BY_MODE_KEY.set(command.modeKey, command);
   }
 }
 
@@ -182,8 +241,35 @@ export function getCommandMenuCommand(commandId: CommandMenuCommandId): CommandM
   return COMMAND_BY_ID.get(commandId);
 }
 
+export function getCommandMenuCommandByModeKey(modeKey: string): CommandMenuCommand | undefined {
+  return COMMAND_BY_MODE_KEY.get(modeKey);
+}
+
 export function commandMenuCommandsForCategory(categoryId: CommandMenuCategoryId): readonly CommandMenuCommand[] {
-  return CATEGORY_BY_ID.get(categoryId)?.commands ?? [];
+  const category = CATEGORY_BY_ID.get(categoryId);
+  if (!category) return [];
+  return [...flatCommandsInCategory(category)];
+}
+
+/** 供 HUD 渲染：含中间组标题行（如「墙」）与命令行，顺序一致。 */
+export type CommandMenuListRow =
+  | Readonly<{ kind: "subgroup-heading"; label: string }>
+  | Readonly<{ kind: "command"; command: CommandMenuCommand }>;
+
+export function commandMenuListRowsForCategory(categoryId: CommandMenuCategoryId): readonly CommandMenuListRow[] {
+  const category = CATEGORY_BY_ID.get(categoryId);
+  if (!category) return [];
+  if (category.layout === "flat") {
+    return category.commands.map((command) => ({ kind: "command" as const, command }));
+  }
+  const rows: CommandMenuListRow[] = [];
+  for (const sub of category.subgroups) {
+    rows.push({ kind: "subgroup-heading", label: sub.label });
+    for (const command of sub.commands) {
+      rows.push({ kind: "command", command });
+    }
+  }
+  return rows;
 }
 
 export function defaultCommandMenuCategoryId(): CommandMenuCategoryId {
@@ -191,11 +277,12 @@ export function defaultCommandMenuCategoryId(): CommandMenuCategoryId {
 }
 
 export function defaultCommandMenuCommandId(): CommandMenuCommandId {
-  return COMMAND_MENU_CATEGORIES[0]!.commands[0]!.id;
+  const first = COMMAND_MENU_CATEGORIES[0]!;
+  return flatCommandsInCategory(first)[0]!.id;
 }
 
 /**
- * 与 {@link VILLAGER_TOOL_KEY_CODES}（Q W E R T Y U I O P）一一对应：第 5 槽为「木墙」笔刷，第 10 槽为储存区。
+ * 与 {@link VILLAGER_TOOL_KEY_CODES}（Q W E R T Y U I O P）一一对应：第 5 槽为「木墙」笔刷，第 10 槽为存储区。
  */
 export const COMMAND_MENU_HOTKEY_COMMAND_IDS: readonly CommandMenuCommandId[] = [
   "mine",
@@ -231,7 +318,7 @@ export function commandMenuHotkeyLabel(commandId: CommandMenuCommandId): string 
 export type CommandMenuDomainSemantics = Readonly<{
   commandId: CommandMenuCommandId;
   categoryId: CommandMenuCategoryId;
-  domainVerb: string;
+  domainVerb: DomainVerb;
   markerToolId: string;
   inputShape: CommandMenuInputShape;
   modeKey: string;

@@ -6,11 +6,9 @@
 import { commandMenuDomainSemantics, type CommandMenuCommandId } from "../data/command-menu";
 import { applyTaskMarkersForSelection } from "../data/task-markers";
 import type { SelectionModifier } from "../game/interaction/floor-selection";
-import type { OrchestratorWorldBridge } from "../game/orchestrator-world-bridge";
 import { buildDomainCommand, taskMarkerToolIdForDomainCommand } from "./build-domain-command";
-import type { PlayerWorldPort } from "./world-port-types";
-import type { DomainCommand, MockWorldSubmitResult } from "./s0-contract";
-import { filterCellKeysForToolbarTaskMarkers } from "./task-marker-target-cells";
+import type { PlayerTaskMarkerOverlayPort, PlayerWorldCommandPort } from "./world-port-types";
+import type { DomainCommand, WorldSubmitResult } from "./s0-contract";
 
 export type PlayerSelectionCommitInput = Readonly<{
   /** 主语义：当前激活的菜单命令。 */
@@ -23,12 +21,12 @@ export type PlayerSelectionCommitInput = Readonly<{
 }>;
 
 /**
- * 在 {@link PlayerWorldPort.replayAll} 等场景下，仅用「命令 + 逐条提交结果」重建格上任务标记图，
+ * 在 {@link PlayerWorldCommandPort.replayAll} 等场景下，仅用「命令 + 逐条提交结果」重建格上任务标记图，
  * 避免 WorldCore 已重放而 Phaser 侧 `taskMarkersByCell` 仍滞留旧态。
  */
 export function rebuildTaskMarkersFromCommandResults(
   log: readonly DomainCommand[],
-  results: readonly MockWorldSubmitResult[]
+  results: readonly WorldSubmitResult[]
 ): Map<string, string> {
   let markers = new Map<string, string>();
   const n = Math.min(log.length, results.length);
@@ -49,7 +47,7 @@ export type PlayerSelectionCommitOutcome = Readonly<{
   /** 是否调用了网关 submit（命令已构造成功） */
   didSubmitToWorld: boolean;
   command: DomainCommand | null;
-  submitResult: MockWorldSubmitResult | null;
+  submitResult: WorldSubmitResult | null;
   /** 网关接受后的标记图；拒绝时与 `currentMarkers` 快照一致 */
   nextMarkers: Map<string, string>;
   /** 非 null 时可刷新玩家通道结果 HUD */
@@ -57,7 +55,7 @@ export type PlayerSelectionCommitOutcome = Readonly<{
 }>;
 
 export function commitPlayerSelectionToWorld(
-  port: PlayerWorldPort,
+  port: PlayerWorldCommandPort & PlayerTaskMarkerOverlayPort,
   input: PlayerSelectionCommitInput
 ): PlayerSelectionCommitOutcome {
   const { commandId, selectionModifier, cellKeys, inputShape, currentMarkers, nowMs } = input;
@@ -82,11 +80,7 @@ export function commitPlayerSelectionToWorld(
     };
   }
 
-  const bridge = port as Partial<OrchestratorWorldBridge>;
-  const markerCellKeys =
-    typeof bridge.getWorld === "function"
-      ? filterCellKeysForToolbarTaskMarkers(bridge.getWorld(), markerToolId, inputShape, cellKeys)
-      : port.filterTaskMarkerTargetCells(markerToolId, inputShape, cellKeys);
+  const markerCellKeys = port.filterTaskMarkerTargetCells(markerToolId, inputShape, cellKeys);
 
   const submitResult = port.submit(cmd, nowMs);
   if (!submitResult.accepted) {

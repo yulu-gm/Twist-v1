@@ -1,7 +1,10 @@
 import {
   advanceTimeOfDay,
+  DEFAULT_TIME_OF_DAY_CONFIG,
   effectiveSimulationDeltaSeconds,
+  getDayNightPhase,
   type TimeControlState,
+  type TimeOfDayConfig,
   type TimeOfDayState
 } from "./time-of-day";
 import type { WorldCore } from "../world-core";
@@ -17,37 +20,24 @@ export type WorldTimeSnapshot = Readonly<{
   speed: TimeControlState["speed"];
 }>;
 
-export type WorldTimeEvent =
-  | Readonly<{
-      kind: "time-advanced";
-      dayNumber: number;
-      minuteOfDay: number;
-      currentPeriod: TimePeriod;
-    }>
-  | Readonly<{
-      kind: "period-changed";
-      dayNumber: number;
-      period: TimePeriod;
-    }>
-  | Readonly<{
-      kind: "day-changed";
-      dayNumber: number;
-    }>;
-
-/** 与日内分钟数一致的时段判定：白天 [6:00, 18:00)，其余为夜。 */
-export function timePeriodForMinute(minuteOfDay: number): TimePeriod {
-  return minuteOfDay >= 6 * 60 && minuteOfDay < 18 * 60 ? "day" : "night";
+/** 与 {@link getDayNightPhase} 一致：阈值来自 `TimeOfDayConfig`（缺省仍为 [6:00, 18:00) 白天窗）。 */
+export function timePeriodForMinute(
+  minuteOfDay: number,
+  timeConfig: TimeOfDayConfig = DEFAULT_TIME_OF_DAY_CONFIG
+): TimePeriod {
+  return getDayNightPhase({ dayNumber: 1, minuteOfDay }, timeConfig);
 }
 
 export function toWorldTimeSnapshot(
   state: TimeOfDayState,
-  controls: TimeControlState
+  controls: TimeControlState,
+  timeConfig: TimeOfDayConfig = DEFAULT_TIME_OF_DAY_CONFIG
 ): WorldTimeSnapshot {
   return {
     dayNumber: state.dayNumber,
     minuteOfDay: state.minuteOfDay,
     dayProgress01: state.minuteOfDay / (24 * 60),
-    currentPeriod: timePeriodForMinute(state.minuteOfDay),
+    currentPeriod: getDayNightPhase(state, timeConfig),
     paused: controls.paused,
     speed: controls.speed
   };
@@ -64,7 +54,7 @@ export function advanceWorldClock(
   world: WorldCore,
   deltaSeconds: number,
   controls: TimeControlState
-): Readonly<{ world: WorldCore; elapsedSimulationSeconds: number; events: readonly WorldTimeEvent[] }> {
+): Readonly<{ world: WorldCore; elapsedSimulationSeconds: number }> {
   const effectiveDeltaSeconds = effectiveSimulationDeltaSeconds(deltaSeconds, controls);
   if (effectiveDeltaSeconds === 0) {
     return {
@@ -76,8 +66,7 @@ export function advanceWorldClock(
           speed: controls.speed
         }
       },
-      elapsedSimulationSeconds: 0,
-      events: []
+      elapsedSimulationSeconds: 0
     };
   }
 
@@ -87,39 +76,13 @@ export function advanceWorldClock(
     effectiveDeltaSeconds,
     world.timeConfig
   );
-  const nextTime = toWorldTimeSnapshot(nextState, controls);
-  const events: WorldTimeEvent[] = [
-    {
-      kind: "time-advanced",
-      dayNumber: nextTime.dayNumber,
-      minuteOfDay: nextTime.minuteOfDay,
-      currentPeriod: nextTime.currentPeriod
-    }
-  ];
-
-  if (previousTime.dayNumber !== nextTime.dayNumber || previousTime.currentPeriod !== nextTime.currentPeriod) {
-    events.push({
-      kind: "period-changed",
-      dayNumber: nextTime.dayNumber,
-      period: nextTime.currentPeriod
-    });
-  }
-
-  if (nextTime.dayNumber !== previousTime.dayNumber) {
-    for (let dayNumber = previousTime.dayNumber + 1; dayNumber <= nextTime.dayNumber; dayNumber++) {
-      events.push({
-        kind: "day-changed",
-        dayNumber
-      });
-    }
-  }
+  const nextTime = toWorldTimeSnapshot(nextState, controls, world.timeConfig);
 
   return {
     world: {
       ...world,
       time: nextTime
     },
-    elapsedSimulationSeconds: effectiveDeltaSeconds,
-    events
+    elapsedSimulationSeconds: effectiveDeltaSeconds
   };
 }

@@ -1,10 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { advanceNeeds, applyNeedDelta } from "../../src/game/need/need-utils";
 import {
   ALT_ENGLISH_NAME_POOL,
   DEFAULT_PAWN_NAMES,
-  advanceNeeds,
   advanceMoveTowardTarget,
-  applyNeedDelta,
   beginMove,
   createDefaultPawnStates,
   describePawnDebugLabel,
@@ -89,7 +88,7 @@ describe("pawn-state", () => {
     expect(updated.energy).toBe(0);
   });
 
-  it("satiety 随饥饿速率递减并与 needs.hunger 同步上升（双写）", () => {
+  it("satiety 随饥饿速率递减且 needs.hunger 由饱食度派生", () => {
     const [spawn] = DEFAULT_WORLD_GRID.defaultSpawnPoints;
     const pawn = createDefaultPawnStates([spawn!], ["T"])[0]!;
     const updated = advanceNeeds(pawn, 10, {
@@ -101,7 +100,7 @@ describe("pawn-state", () => {
     expect(updated.needs.hunger).toBe(40);
   });
 
-  it("energy 随休息速率递减并与 needs.rest 同步上升（双写）", () => {
+  it("energy 随休息速率递减且 needs.rest 由精力派生", () => {
     const [spawn] = DEFAULT_WORLD_GRID.defaultSpawnPoints;
     const pawn = createDefaultPawnStates([spawn!], ["T"])[0]!;
     const updated = advanceNeeds(pawn, 10, {
@@ -123,8 +122,8 @@ describe("pawn-state", () => {
     });
 
     expect(updated.needs).toEqual({
-      hunger: 0,
-      rest: 0,
+      hunger: 20,
+      rest: 10,
       recreation: 25
     });
   });

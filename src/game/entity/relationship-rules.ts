@@ -7,7 +7,16 @@
  * - **`ok === true` 当且仅当 `violations.length === 0`**，便于调用方用布尔或明细任一方式判断。
  */
 
-import type { EntityId, BuildingEntity, EntityKind, EntityOwnership, GameEntity, PawnEntity, ResourceEntity } from "./entity-types";
+import type {
+  AssignmentReason,
+  EntityId,
+  BuildingEntity,
+  EntityKind,
+  EntityOwnership,
+  GameEntity,
+  PawnEntity,
+  ResourceEntity
+} from "./entity-types";
 import type { EntityRegistry } from "./entity-registry";
 
 /** “床铺”语义：与 world-core 床建筑一致——`buildingKind === "bed"` 或具备 `rest` 交互能力。 */
@@ -327,8 +336,8 @@ export type AssignBedOutcome =
   | { kind: "bed-not-bedlike"; bedId: EntityId }
   | { kind: "wrong-entity-kind"; entityId: EntityId; expected: "pawn"; actual: EntityKind };
 
-function ownershipAssigned(pawnId: EntityId): EntityOwnership {
-  return { ownerPawnId: pawnId, assignmentReason: "unassigned" };
+function ownershipAssigned(pawnId: EntityId, reason: Exclude<AssignmentReason, "unassigned">): EntityOwnership {
+  return { ownerPawnId: pawnId, assignmentReason: reason };
 }
 
 function ownershipUnassigned(): EntityOwnership {
@@ -337,8 +346,14 @@ function ownershipUnassigned(): EntityOwnership {
 
 /**
  * 将床铺分配给小人：更新建筑 `ownership` 与 `pawn.bedBuildingId`，并解除此前与该床/该人冲突的分配。
+ * @param assignmentReason 写入建筑 `ownership.assignmentReason`，默认 `manual`（显式分配）；建成链路请用 `auto-after-construction`。
  */
-export function assignBedToPawn(registry: EntityRegistry, bedId: EntityId, pawnId: EntityId): AssignBedOutcome {
+export function assignBedToPawn(
+  registry: EntityRegistry,
+  bedId: EntityId,
+  pawnId: EntityId,
+  assignmentReason: Exclude<AssignmentReason, "unassigned"> = "manual"
+): AssignBedOutcome {
   const bedEntity = registry.get(bedId);
   if (!bedEntity) {
     return { kind: "entity-not-found", entityId: bedId };
@@ -407,7 +422,7 @@ export function assignBedToPawn(registry: EntityRegistry, bedId: EntityId, pawnI
     cell: { ...bed.cell },
     coveredCells: bed.coveredCells.map((c) => ({ ...c })),
     interactionCapabilities: [...bed.interactionCapabilities],
-    ownership: ownershipAssigned(pawnId)
+    ownership: ownershipAssigned(pawnId, assignmentReason)
   });
 
   pawn = registry.get(pawnId) as PawnEntity;

@@ -18,13 +18,11 @@ import {
   type WorldCore
 } from "../game/world-core";
 import { coordKey, isInsideGrid, type WorldGridConfig } from "../game/map";
-import {
-  DEFAULT_PAWN_NEEDS,
-  describePawnDebugLabel,
-  type PawnState
-} from "../game/pawn-state";
-import { toWorldTimeSnapshot } from "../game/time/world-time";
-import { ALL_SCENARIOS } from "../../scenarios";
+import { DEFAULT_PAWN_NEEDS, normalizePawnNeedSnapshot } from "../game/need/need-utils";
+import { evaluateFatigueStage, evaluateHungerStage } from "../game/need/threshold-rules";
+import { describePawnDebugLabel, type PawnState } from "../game/pawn-state";
+import { toWorldTimeSnapshot } from "../game/time";
+import { applyScenarioResourcesToWorld, applyScenarioZonesToWorld } from "./scenario-zone-resource-spawn";
 
 const PAWN_FILL_PALETTE = [0xe07a5f, 0x81b29a, 0x3d405b, 0xf2cc8f, 0x9b5de5] as const;
 
@@ -41,7 +39,8 @@ function applyScenarioTime(world: WorldCore, timeConfig: ScenarioDefinition["tim
   world.timeConfig = { ...world.timeConfig, startMinuteOfDay: timeConfig.startMinuteOfDay };
   world.time = toWorldTimeSnapshot(
     { dayNumber: world.time.dayNumber, minuteOfDay: timeConfig.startMinuteOfDay },
-    { paused: world.time.paused, speed: world.time.speed }
+    { paused: world.time.paused, speed: world.time.speed },
+    world.timeConfig
   );
 }
 
@@ -57,6 +56,8 @@ function buildPawnStatesForScenario(def: ScenarioDefinition): PawnState[] {
       satiety: 100,
       energy: 100,
       needs: DEFAULT_PAWN_NEEDS,
+      hungerStage: evaluateHungerStage(100),
+      fatigueStage: evaluateFatigueStage(100),
       currentGoal: undefined,
       currentAction: undefined,
       reservedTargetId: undefined,
@@ -68,10 +69,10 @@ function buildPawnStatesForScenario(def: ScenarioDefinition): PawnState[] {
     const merged: PawnState = p.overrides
       ? { ...base, ...p.overrides, id: base.id, logicalCell: base.logicalCell, name: base.name }
       : base;
-    return {
+    return normalizePawnNeedSnapshot({
       ...merged,
       debugLabel: describePawnDebugLabel(merged)
-    };
+    });
   });
 }
 
@@ -83,13 +84,13 @@ export type ScenarioLoadResult = Readonly<{
 }>;
 
 /**
- * 将场景定义载入世界：`pawns` / `blueprints` / `obstacles` / 可调时间；忽略 `expectations`。
+ * 将场景定义载入世界：`pawns` / `blueprints` / `obstacles` / `zones` / `resources` / 可调时间；忽略 `expectations`。
  *
  * 在写入 obstacle / tree / blueprint / pawn 前，会先对对应 footprint **移除已有占格实体**（与单测 headless、浏览器热切换共用），
  * 避免随机地形石、上一状态残留或与定义顺序冲突导致占格失败（后写入的格点覆盖前者）。
  *
  * `domainCommandsAfterHydrate` / `playerSelectionAfterHydrate` 在认领前应用，与无头 `hydrateScenario` 一致；
- * `playerSelectionAfterHydrate` 走 `commitPlayerSelectionToWorld`（与实机命令菜单 `commandId` + 选区形态一致）。
+ * `playerSelectionAfterHydrate` 走 `commitPlayerSelectionToWorld`，并在多条记录间串联 `outcome.nextMarkers`（与无头侧一致）。
  * `claimConstructBlueprintAsPawnName`：按小人名认领首个 open 的 construct-blueprint（`pawnStates` 的 id 为 `pawn-${索引}`）。
  * `def.seed` 仅影响 headless RNG，WorldCore 无对应字段，此处不处理。
  */
@@ -121,11 +122,15 @@ export function loadScenarioIntoGame(world: WorldCore, def: ScenarioDefinition):
       const reason =
         spawned.outcome.kind === "conflict"
           ? `与 ${spawned.outcome.blockingEntityId} 占格冲突`
-          : `越界 (${spawned.outcome.cell.col},${spawned.outcome.cell.row})`;
+          : spawned.outcome.kind === "invalid-draft"
+            ? spawned.outcome.reason
+            : `越界 (${spawned.outcome.cell.col},${spawned.outcome.cell.row})`;
       throw new Error(`scenario-loader: 无法生成 obstacle — ${reason}`);
     }
     w = spawned.world;
   }
+
+  w = applyScenarioZonesToWorld(w, def.zones, grid, "scenario-loader");
 
   for (let ti = 0; ti < (def.trees ?? []).length; ti++) {
     const t = def.trees![ti]!;
@@ -141,11 +146,15 @@ export function loadScenarioIntoGame(world: WorldCore, def: ScenarioDefinition):
       const reason =
         spawned.outcome.kind === "conflict"
           ? `与 ${spawned.outcome.blockingEntityId} 占格冲突`
-          : `越界 (${spawned.outcome.cell.col},${spawned.outcome.cell.row})`;
+          : spawned.outcome.kind === "invalid-draft"
+            ? spawned.outcome.reason
+            : `越界 (${spawned.outcome.cell.col},${spawned.outcome.cell.row})`;
       throw new Error(`scenario-loader: 无法生成 tree — ${reason}`);
     }
     w = spawned.world;
   }
+
+  w = applyScenarioResourcesToWorld(w, def.resources, grid, "scenario-loader");
 
   for (const bp of def.blueprints ?? []) {
     if (!isInsideGrid(grid, bp.cell)) {
@@ -171,7 +180,9 @@ export function loadScenarioIntoGame(world: WorldCore, def: ScenarioDefinition):
       const reason =
         spawned.outcome.kind === "conflict"
           ? `与 ${spawned.outcome.blockingEntityId} 占格冲突`
-          : `越界 (${spawned.outcome.cell.col},${spawned.outcome.cell.row})`;
+          : spawned.outcome.kind === "invalid-draft"
+            ? spawned.outcome.reason
+            : `越界 (${spawned.outcome.cell.col},${spawned.outcome.cell.row})`;
       throw new Error(`scenario-loader: 无法生成 pawn「${p.name}」— ${reason}`);
     }
     w = spawned.world;
@@ -181,15 +192,17 @@ export function loadScenarioIntoGame(world: WorldCore, def: ScenarioDefinition):
   for (const cmd of def.domainCommandsAfterHydrate ?? []) {
     port.submit(cmd, 0);
   }
+  let currentMarkers = new Map<string, string>();
   for (const sel of def.playerSelectionAfterHydrate ?? []) {
-    commitPlayerSelectionToWorld(port, {
+    const outcome = commitPlayerSelectionToWorld(port, {
       commandId: sel.commandId,
       selectionModifier: sel.selectionModifier,
       cellKeys: new Set(sel.cellKeys),
       inputShape: sel.inputShape,
-      currentMarkers: new Map(),
+      currentMarkers,
       nowMs: 0
     });
+    currentMarkers = outcome.nextMarkers;
   }
   w = port.getWorld();
 
@@ -214,9 +227,4 @@ export function loadScenarioIntoGame(world: WorldCore, def: ScenarioDefinition):
     world: w,
     pawnStates: buildPawnStatesForScenario(def)
   };
-}
-
-/** 自 `scenarios/index` 静态汇总的导出列表（无运行时 fs）。 */
-export function listAvailableScenarios(): ScenarioDefinition[] {
-  return [...ALL_SCENARIOS];
 }

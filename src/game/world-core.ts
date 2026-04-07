@@ -6,9 +6,9 @@ import {
 } from "./time/time-of-day";
 import { toWorldTimeSnapshot, type WorldTimeSnapshot } from "./time/world-time";
 
-export type { TimePeriod, WorldTimeEvent, WorldTimeSnapshot } from "./time/world-time";
+export type { TimePeriod, WorldTimeSnapshot } from "./time/world-time";
 export { advanceWorldClock } from "./time/world-time";
-import { createOccupancyMap } from "./map/occupancy-manager";
+import { createOccupancyMap, findBlockingOccupant } from "./map/occupancy-manager";
 import { coordKey, type GridCoord, type WorldGridConfig } from "./map/world-grid";
 import type {
   AssignmentReason,
@@ -37,15 +37,21 @@ import type { MarkerSnapshot, WorldCore, WorldSnapshot } from "./world-core-type
 export type { MarkerSnapshot, WorldCore, WorldSnapshot } from "./world-core-types";
 
 import type { WorkItemKind } from "./work/work-types";
+import {
+  workItemSnapshotForChopTree,
+  workItemSnapshotForDeconstructObstacle,
+  workItemSnapshotForMineStone,
+  workItemSnapshotForPickUpResource
+} from "./work/work-generator";
 
 export type { WorkItemKind, WorkItemStatus, WorkItemSnapshot } from "./work/work-types";
 
 export { claimWorkItem, completeWorkItem, failWorkItem } from "./work/work-operations";
 
+import { computeTreeLoggingViewProjection } from "./entity/tree-logging-projection";
 import {
   attachWorkItemToEntityMutable,
   cloneWorld,
-  findBlockingOccupant,
   findExistingWorkItem,
   firstInvalidCell,
   makeWorkItemId,
@@ -101,7 +107,7 @@ export function createWorldCore(options: CreateWorldCoreOptions): WorldCore {
 
   return {
     grid: options.grid,
-    time: toWorldTimeSnapshot(timeState, DEFAULT_TIME_CONTROL_STATE),
+    time: toWorldTimeSnapshot(timeState, DEFAULT_TIME_CONTROL_STATE, timeConfig),
     timeConfig,
     entities: new Map(),
     occupancy: createOccupancyMap(),
@@ -115,33 +121,43 @@ export function createWorldCore(options: CreateWorldCoreOptions): WorldCore {
 }
 
 export function getWorldSnapshot(world: WorldCore): WorldSnapshot {
-  const entities = [...world.entities.values()].map((entity) => ({
-    ...entity,
-    occupiedCells: entity.occupiedCells.map((cell) => ({ ...cell })),
-    relatedWorkItemIds: [...entity.relatedWorkItemIds],
-    interactionCapabilities: entity.interactionCapabilities
-      ? [...entity.interactionCapabilities]
-      : undefined,
-    ownership: entity.ownership ? { ...entity.ownership } : undefined,
-    coveredCells: entity.coveredCells?.map((cell) => ({ ...cell })),
-    acceptedMaterialKinds: entity.acceptedMaterialKinds
-      ? [...entity.acceptedMaterialKinds]
-      : undefined,
-    stackCount: entity.stackCount,
-    stackable: entity.stackable,
-    storageFilterMode: entity.storageFilterMode,
-    storageGroupDisplayName: entity.storageGroupDisplayName,
-    allowedMaterialKinds: entity.allowedMaterialKinds
-      ? [...entity.allowedMaterialKinds]
-      : undefined
-  }));
+  const workMap = world.workItems;
+  const entities = [...world.entities.values()].map((entity) => {
+    const base = {
+      ...entity,
+      cell: { ...entity.cell },
+      occupiedCells: entity.occupiedCells.map((cell) => ({ ...cell })),
+      relatedWorkItemIds: [...entity.relatedWorkItemIds],
+      interactionCapabilities: entity.interactionCapabilities
+        ? [...entity.interactionCapabilities]
+        : undefined,
+      ownership: entity.ownership ? { ...entity.ownership } : undefined,
+      coveredCells: entity.coveredCells?.map((cell) => ({ ...cell })),
+      acceptedMaterialKinds: entity.acceptedMaterialKinds
+        ? [...entity.acceptedMaterialKinds]
+        : undefined,
+      stackCount: entity.stackCount,
+      stackable: entity.stackable,
+      storageFilterMode: entity.storageFilterMode,
+      storageGroupDisplayName: entity.storageGroupDisplayName,
+      allowedMaterialKinds: entity.allowedMaterialKinds
+        ? [...entity.allowedMaterialKinds]
+        : undefined
+    };
+    if (entity.kind === "tree") {
+      const treeView = computeTreeLoggingViewProjection(entity, workMap);
+      return { ...base, ...treeView };
+    }
+    return base;
+  });
   const markers = [...world.markers.values()].map((marker) => ({
     ...marker,
     cell: { ...marker.cell }
   }));
   const workItems = [...world.workItems.values()].map((workItem) => ({
     ...workItem,
-    anchorCell: { ...workItem.anchorCell }
+    anchorCell: { ...workItem.anchorCell },
+    haulDropCell: workItem.haulDropCell ? { ...workItem.haulDropCell } : undefined
   }));
   const restSpots = world.restSpots.map((spot) => ({
     ...spot,
@@ -150,12 +166,35 @@ export function getWorldSnapshot(world: WorldCore): WorldSnapshot {
 
   return {
     time: { ...world.time },
+    timeConfig: { ...world.timeConfig },
     entities,
-    occupancy: Object.fromEntries(world.occupancy),
+    occupancy: Object.fromEntries(
+      [...world.occupancy.entries()].map(([k, v]) => [k, [...v].sort()])
+    ),
     markers,
     workItems,
     restSpots
   };
+}
+
+/**
+ * 为地图树渲染附加与 {@link getWorldSnapshot} 一致的伐木只读投影（浅拷贝树实体，不含全量世界快照）。
+ */
+export function projectTreeSnapshotsForRender(world: WorldCore): WorldEntitySnapshot[] {
+  const workMap = world.workItems;
+  const out: WorldEntitySnapshot[] = [];
+  for (const entity of world.entities.values()) {
+    if (entity.kind !== "tree") continue;
+    const treeView = computeTreeLoggingViewProjection(entity, workMap);
+    out.push({
+      ...entity,
+      cell: { ...entity.cell },
+      occupiedCells: entity.occupiedCells.map((cell) => ({ ...cell })),
+      relatedWorkItemIds: [...entity.relatedWorkItemIds],
+      ...treeView
+    });
+  }
+  return out;
 }
 
 export function moveWorldEntity(
@@ -230,8 +269,8 @@ export function removeWorldEntitiesOccupyingCells(
 ): WorldCore {
   const ids = new Set<string>();
   for (const c of cells) {
-    const id = world.occupancy.get(coordKey(c));
-    if (id) ids.add(id);
+    const set = world.occupancy.get(coordKey(c));
+    if (set) for (const id of set) ids.add(id);
   }
   let w = world;
   for (const id of ids) {
@@ -288,21 +327,25 @@ export function placeTaskMarker(
   }>
 ): Readonly<{ world: WorldCore; markerId: string; workItemId: string }> {
   const nextWorld = cloneWorld(world);
-  const existingWorkItem = findExistingWorkItem(nextWorld, "deconstruct-obstacle", input.targetEntityId);
+  const existingWorkItem = findExistingWorkItem(nextWorld, {
+    kind: "deconstruct-obstacle",
+    targetEntityId: input.targetEntityId,
+    anchorCell: input.cell
+  });
   const workItemId = existingWorkItem?.id ?? makeWorkItemId(nextWorld);
   if (!existingWorkItem) {
     nextWorld.nextWorkItemId += 1;
-    nextWorld.workItems.set(workItemId, {
-      id: workItemId,
-      kind: "deconstruct-obstacle",
-      anchorCell: input.cell,
-      targetEntityId: input.targetEntityId,
-      status: "open",
-      failureCount: 0
-    });
+    nextWorld.workItems.set(
+      workItemId,
+      workItemSnapshotForDeconstructObstacle(workItemId, input.cell, input.targetEntityId)
+    );
   }
 
-  attachWorkItemToEntityMutable(nextWorld, input.targetEntityId, workItemId);
+  if (!attachWorkItemToEntityMutable(nextWorld, input.targetEntityId, workItemId)) {
+    throw new Error(
+      `placeTaskMarker: 目标实体 ${input.targetEntityId} 不存在，无法关联工单 ${workItemId}`
+    );
+  }
 
   const markerId = makeMarkerId(nextWorld);
   nextWorld.nextMarkerId += 1;
@@ -337,21 +380,25 @@ export function registerChopTreeWork(
   const tree = nextWorld.entities.get(treeEntityId)!;
   nextWorld.entities.set(treeEntityId, { ...tree, loggingMarked: true });
 
-  const existingWorkItem = findExistingWorkItem(nextWorld, "chop-tree", treeEntityId);
+  const existingWorkItem = findExistingWorkItem(nextWorld, {
+    kind: "chop-tree",
+    targetEntityId: treeEntityId,
+    anchorCell: tree.cell
+  });
   const workItemId = existingWorkItem?.id ?? makeWorkItemId(nextWorld);
   if (!existingWorkItem) {
     nextWorld.nextWorkItemId += 1;
-    nextWorld.workItems.set(workItemId, {
-      id: workItemId,
-      kind: "chop-tree",
-      anchorCell: { ...tree.cell },
-      targetEntityId: treeEntityId,
-      status: "open",
-      failureCount: 0
-    });
+    nextWorld.workItems.set(
+      workItemId,
+      workItemSnapshotForChopTree(workItemId, treeEntityId, tree.cell)
+    );
   }
 
-  attachWorkItemToEntityMutable(nextWorld, treeEntityId, workItemId);
+  if (!attachWorkItemToEntityMutable(nextWorld, treeEntityId, workItemId)) {
+    throw new Error(
+      `registerChopTreeWork: 克隆世界中缺失树实体 ${treeEntityId}，无法关联工单 ${workItemId}`
+    );
+  }
   return { world: nextWorld, workItemId };
 }
 
@@ -371,21 +418,25 @@ export function registerMineStoneWork(
   const stone = nextWorld.entities.get(stoneObstacleEntityId)!;
   nextWorld.entities.set(stoneObstacleEntityId, { ...stone, miningMarked: true });
 
-  const existingWorkItem = findExistingWorkItem(nextWorld, "mine-stone", stoneObstacleEntityId);
+  const existingWorkItem = findExistingWorkItem(nextWorld, {
+    kind: "mine-stone",
+    targetEntityId: stoneObstacleEntityId,
+    anchorCell: stone.cell
+  });
   const workItemId = existingWorkItem?.id ?? makeWorkItemId(nextWorld);
   if (!existingWorkItem) {
     nextWorld.nextWorkItemId += 1;
-    nextWorld.workItems.set(workItemId, {
-      id: workItemId,
-      kind: "mine-stone",
-      anchorCell: { ...stone.cell },
-      targetEntityId: stoneObstacleEntityId,
-      status: "open",
-      failureCount: 0
-    });
+    nextWorld.workItems.set(
+      workItemId,
+      workItemSnapshotForMineStone(workItemId, stoneObstacleEntityId, stone.cell)
+    );
   }
 
-  attachWorkItemToEntityMutable(nextWorld, stoneObstacleEntityId, workItemId);
+  if (!attachWorkItemToEntityMutable(nextWorld, stoneObstacleEntityId, workItemId)) {
+    throw new Error(
+      `registerMineStoneWork: 克隆世界中缺失石料实体 ${stoneObstacleEntityId}，无法关联工单 ${workItemId}`
+    );
+  }
   return { world: nextWorld, workItemId };
 }
 
@@ -408,20 +459,24 @@ export function registerPickUpResourceWork(
   const resource = nextWorld.entities.get(resourceEntityId)!;
   nextWorld.entities.set(resourceEntityId, { ...resource, pickupAllowed: true });
 
-  const existingWorkItem = findExistingWorkItem(nextWorld, "pick-up-resource", resourceEntityId);
+  const existingWorkItem = findExistingWorkItem(nextWorld, {
+    kind: "pick-up-resource",
+    targetEntityId: resourceEntityId,
+    anchorCell: resource.cell
+  });
   const workItemId = existingWorkItem?.id ?? makeWorkItemId(nextWorld);
   if (!existingWorkItem) {
     nextWorld.nextWorkItemId += 1;
-    nextWorld.workItems.set(workItemId, {
-      id: workItemId,
-      kind: "pick-up-resource",
-      anchorCell: { ...resource.cell },
-      targetEntityId: resourceEntityId,
-      status: "open",
-      failureCount: 0
-    });
+    nextWorld.workItems.set(
+      workItemId,
+      workItemSnapshotForPickUpResource(workItemId, resourceEntityId, resource.cell)
+    );
   }
 
-  attachWorkItemToEntityMutable(nextWorld, resourceEntityId, workItemId);
+  if (!attachWorkItemToEntityMutable(nextWorld, resourceEntityId, workItemId)) {
+    throw new Error(
+      `registerPickUpResourceWork: 克隆世界中缺失物资实体 ${resourceEntityId}，无法关联工单 ${workItemId}`
+    );
+  }
   return { world: nextWorld, workItemId };
 }

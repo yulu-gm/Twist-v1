@@ -7,7 +7,8 @@ import {
   generatePickUpWork,
   getAvailableWork,
   isWorkClaimed,
-  releaseWork
+  releaseWork,
+  replaceWorkRegistryOrders
 } from "../../src/game/work";
 import type { WorkOrder } from "../../src/game/work/work-types";
 
@@ -28,7 +29,7 @@ describe("work-scheduler", () => {
     addWork(registry, high);
     addWork(registry, midB);
     addWork(registry, midA);
-    const avail = getAvailableWork(registry, "pawn-1");
+    const avail = getAvailableWork(registry);
     expect(avail.map((w) => w.workId)).toEqual([
       high.workId,
       midA.workId,
@@ -41,7 +42,9 @@ describe("work-scheduler", () => {
     const registry = createWorkRegistry();
     const w = generateChopWork("tree-1", cell);
     addWork(registry, w);
-    expect(claimWork(registry, w.workId, "p1")).toEqual({ kind: "claimed" });
+    const step = claimWork(registry, w.workId, "p1");
+    replaceWorkRegistryOrders(registry, step.registry);
+    expect(step.outcome).toEqual({ kind: "claimed" });
     const stored = registry.orders.get(w.workId);
     expect(stored?.status).toBe("claimed");
     expect(stored?.claimedByPawnId).toBe("p1");
@@ -52,9 +55,12 @@ describe("work-scheduler", () => {
     const registry = createWorkRegistry();
     const w = generatePickUpWork("res-1", cell);
     addWork(registry, w);
-    expect(claimWork(registry, w.workId, "alice")).toEqual({ kind: "claimed" });
-    const r = claimWork(registry, w.workId, "bob");
-    expect(r).toEqual({ kind: "already-claimed", claimedByPawnId: "alice" });
+    const a = claimWork(registry, w.workId, "alice");
+    replaceWorkRegistryOrders(registry, a.registry);
+    expect(a.outcome).toEqual({ kind: "claimed" });
+    const b = claimWork(registry, w.workId, "bob");
+    replaceWorkRegistryOrders(registry, b.registry);
+    expect(b.outcome).toEqual({ kind: "already-claimed", claimedByPawnId: "alice" });
     expect(registry.orders.get(w.workId)?.claimedByPawnId).toBe("alice");
   });
 
@@ -62,11 +68,14 @@ describe("work-scheduler", () => {
     const registry = createWorkRegistry();
     const w = generateChopWork("tree-2", cell);
     addWork(registry, w);
-    claimWork(registry, w.workId, "owner");
-    releaseWork(registry, w.workId, "stranger");
+    const c = claimWork(registry, w.workId, "owner");
+    replaceWorkRegistryOrders(registry, c.registry);
+    const r0 = releaseWork(registry, w.workId, "stranger");
+    replaceWorkRegistryOrders(registry, r0.registry);
     expect(registry.orders.get(w.workId)?.status).toBe("claimed");
     expect(registry.orders.get(w.workId)?.claimedByPawnId).toBe("owner");
-    releaseWork(registry, w.workId, "owner");
+    const r1 = releaseWork(registry, w.workId, "owner");
+    replaceWorkRegistryOrders(registry, r1.registry);
     const after = registry.orders.get(w.workId);
     expect(after?.status).toBe("open");
     expect(after?.claimedByPawnId).toBeUndefined();
@@ -75,13 +84,13 @@ describe("work-scheduler", () => {
 
   it("claimWork returns missing-work for unknown id", () => {
     const registry = createWorkRegistry();
-    expect(claimWork(registry, "no-such-work", "p1")).toEqual({ kind: "missing-work" });
+    expect(claimWork(registry, "no-such-work", "p1").outcome).toEqual({ kind: "missing-work" });
   });
 
   it("claimWork returns not-open for terminal status", () => {
     const registry = createWorkRegistry();
     const w = { ...generateChopWork("tree-3", cell), status: "completed" as const };
     addWork(registry, w);
-    expect(claimWork(registry, w.workId, "p1")).toEqual({ kind: "not-open" });
+    expect(claimWork(registry, w.workId, "p1").outcome).toEqual({ kind: "not-open" });
   });
 });

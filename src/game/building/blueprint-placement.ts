@@ -1,6 +1,7 @@
 import type { BuildingKind } from "../entity/entity-types";
 import type { GridCoord } from "../map/world-grid";
 import type { WorldCore } from "../world-core-types";
+import { workItemSnapshotForConstructBlueprint } from "../work/work-generator";
 import {
   attachWorkItemToEntityMutable,
   cloneWorld,
@@ -35,25 +36,33 @@ export function safePlaceBlueprint(
         ? `与实体 ${spawned.outcome.blockingEntityId} 占用冲突`
         : spawned.outcome.kind === "out-of-bounds"
           ? "蓝图超出地图边界"
-          : "无法放置蓝图";
+          : spawned.outcome.kind === "invalid-draft"
+            ? spawned.outcome.reason
+            : "无法放置蓝图";
     return { ok: false, world, reason };
   }
 
   const nextWorld = cloneWorld(spawned.world);
-  const existingWorkItem = findExistingWorkItem(nextWorld, "construct-blueprint", spawned.entityId);
+  const existingWorkItem = findExistingWorkItem(nextWorld, {
+    kind: "construct-blueprint",
+    targetEntityId: spawned.entityId,
+    anchorCell: input.cell
+  });
   const workItemId = existingWorkItem?.id ?? makeWorkItemId(nextWorld);
   if (!existingWorkItem) {
     nextWorld.nextWorkItemId += 1;
-    nextWorld.workItems.set(workItemId, {
-      id: workItemId,
-      kind: "construct-blueprint",
-      anchorCell: input.cell,
-      targetEntityId: spawned.entityId,
-      status: "open",
-      failureCount: 0
-    });
+    nextWorld.workItems.set(
+      workItemId,
+      workItemSnapshotForConstructBlueprint(workItemId, spawned.entityId, input.cell)
+    );
   }
-  attachWorkItemToEntityMutable(nextWorld, spawned.entityId, workItemId);
+  if (!attachWorkItemToEntityMutable(nextWorld, spawned.entityId, workItemId)) {
+    return {
+      ok: false,
+      world,
+      reason: "蓝图实体在关联建造工单时缺失（内部不一致）"
+    };
+  }
 
   return {
     ok: true,

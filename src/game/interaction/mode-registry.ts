@@ -2,6 +2,14 @@ import type { DomainCommand, InteractionSource } from "./domain-command-types";
 import type { SelectionModifier } from "./floor-selection";
 import { coordKey, type GridCoord } from "../map/world-grid";
 
+/**
+ * 本模块实现 `oh-code-design/交互系统.yaml` 中「模式注册表」的**输入规则**侧：
+ * 登记各模式的 `explainRule`、`inputShape` 与 `interactionSource`，供命令生成对齐。
+ *
+ * **进入条件 / 退出条件**不在此类型上建模：由选区会话、笔刷会话等管理器与 UI 模式切换状态机
+ * 在切模式时落实；注册表仅提供「当前模式下如何把格集合解释成领域命令载荷」。
+ */
+
 /** 模式解释函数的输入：格集合与选区修饰键语义。 */
 export type ModeExplainInput = Readonly<{
   cells: readonly GridCoord[];
@@ -16,7 +24,10 @@ export type ModeExplainResult =
 export type InteractionMode = Readonly<{
   modeId: string;
   displayName: string;
-  /** 将采集到的输入解释为领域命令载荷（可不含 commandId / issuedAtMs）。 */
+  /**
+   * 将采集到的输入解释为领域命令载荷（可不含 commandId / issuedAtMs）。
+   * 对应设计文档中模式注册表的「输入规则」；进入/退出由会话层与 UI 负责，见文件头说明。
+   */
   explainRule: (input: ModeExplainInput) => ModeExplainResult;
   /** 输入形态提示，供会话与回放对齐 {@link DomainCommand.sourceMode.inputShape}。 */
   inputShape: "rect-selection" | "brush-stroke" | "single-cell";
@@ -27,7 +38,7 @@ export type InteractionMode = Readonly<{
 }>;
 
 export type ModeRegistry = Readonly<{
-  /** 模式 id → 模式定义（可变 Map，由 registerMode 写入）。 */
+  /** 模式 id → 模式定义（可变 Map，由 registerMode 写入）；仅承载解释规则登记，非会话生命周期。 */
   modes: Map<string, InteractionMode>;
 }>;
 
@@ -58,16 +69,32 @@ function seedDefaultModes(registry: ModeRegistry): void {
       })
     },
     {
-      modeId: "chop",
+      modeId: "lumber",
       displayName: "伐木标记",
       inputShape: "rect-selection",
-      interactionSource: interactionModeSource("chop"),
+      interactionSource: interactionModeSource("lumber"),
       explainRule: (input) => ({
-        verb: "assign_tool_task:chop",
+        verb: "assign_tool_task:lumber",
         targetCellKeys: targetKeysFromCells(input.cells),
         targetEntityIds: [],
         sourceMode: {
-          source: interactionModeSource("chop"),
+          source: interactionModeSource("lumber"),
+          selectionModifier: input.modifier,
+          inputShape: "rect-selection"
+        }
+      })
+    },
+    {
+      modeId: "haul",
+      displayName: "物资拾取标记",
+      inputShape: "rect-selection",
+      interactionSource: interactionModeSource("haul"),
+      explainRule: (input) => ({
+        verb: "assign_tool_task:haul",
+        targetCellKeys: targetKeysFromCells(input.cells),
+        targetEntityIds: [],
+        sourceMode: {
+          source: interactionModeSource("haul"),
           selectionModifier: input.modifier,
           inputShape: "rect-selection"
         }

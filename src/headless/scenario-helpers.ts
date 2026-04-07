@@ -3,12 +3,11 @@
  */
 
 import type { GoalKind } from "../game/behavior/goal-driven-planning";
-import type { ResourceContainerKind } from "../game/entity/entity-types";
-import type { GridCoord } from "../game/map/world-grid";
-import { coordKey, isWalkableCell } from "../game/map/world-grid";
+import { isResourceContainerKind } from "../game/entity/entity-types";
+import { coordKey, isWalkableCell, type GridCoord } from "../game/map";
 import { DEFAULT_PAWN_NAMES, type PawnId, type PawnState } from "../game/pawn-state";
-import { getWorldSnapshot } from "../game/world-core";
-import { cloneWorld, removeEntityMutable } from "../game/world-internal";
+import { getWorldSnapshot, removeWorldEntity } from "../game/world-core";
+import { cleanupStaleTargetWorkItems } from "../game/world-work-tick";
 import type { HeadlessSim } from "./headless-sim";
 import type { SimEvent, SimEventKind } from "./sim-event-log";
 import type { AssertionResult } from "./sim-reporter";
@@ -72,10 +71,6 @@ export function dayReaches(sim: HeadlessSim, dayNumber: number): () => boolean {
 }
 
 const defaultAssertLabel = (prefix: string, detail: string): string => `${prefix}: ${detail}`;
-
-function isResourceContainerKind(value: string): value is ResourceContainerKind {
-  return value === "ground" || value === "pawn" || value === "zone" || value === "building";
-}
 
 export function assertEntityKindExists(
   sim: HeadlessSim,
@@ -240,24 +235,29 @@ export function assertNoPawnStarved(
 }
 
 /**
- * 在世界网格上于可走、边界内格子上生成若干默认小人；优先使用 `grid.defaultSpawnPoints` 前 `count` 格。
- * @param count 默认 3
- */
-/**
- * Scenario-only helper to simulate an external invalidation, such as a target
- * entity disappearing while a pawn is already working on it.
+ * 场景用：模拟目标实体在作业中途被外部移除。经 {@link removeWorldEntity} 写入世界（与运行时一致：
+ * 占用格、`restSpots` 等与实体移除对齐），并立即执行 {@link cleanupStaleTargetWorkItems}，等同
+ * {@link GameOrchestrator} 每 tick 开头的 stale-target 工单清理与小人工单字段复位。
  */
 export function invalidateScenarioEntity(sim: HeadlessSim, entityId: string): boolean {
   const world = sim.getWorldPort().getWorld();
-  if (!world.entities.has(entityId)) {
+  const { world: afterRemove, outcome } = removeWorldEntity(world, entityId);
+  if (outcome.kind === "missing-entity") {
     return false;
   }
-  const next = cloneWorld(world);
-  removeEntityMutable(next, entityId);
-  sim.getWorldPort().setWorld(next);
+  sim.getWorldPort().setWorld(afterRemove);
+  const stale = cleanupStaleTargetWorkItems(afterRemove, sim.getPawns());
+  if (stale.changed) {
+    sim.getWorldPort().setWorld(stale.world);
+    sim.getSimAccess().setPawns(stale.pawns);
+  }
   return true;
 }
 
+/**
+ * 在世界网格上于可走、边界内格子上生成若干默认小人；优先使用 `grid.defaultSpawnPoints` 前 `count` 格。
+ * @param count 默认 3
+ */
 export function spawnDefaultColony(sim: HeadlessSim, count: number = 3): readonly PawnState[] {
   if (count < 0) {
     throw new Error("spawnDefaultColony: count must be non-negative");

@@ -8,13 +8,34 @@ import type {
   ResourceMaterialKind,
   WorldEntitySnapshot
 } from "../../game/entity/entity-types";
-import type { WorldGridConfig } from "../../game/map/world-grid";
+import type { WorldGridConfig } from "../../game/map";
 
-const MATERIAL_DISPLAY: Record<ResourceMaterialKind, string> = {
-  wood: "木材",
-  food: "食物",
-  stone: "石材",
-  generic: "物资"
+/** 呈现层主题：便于对齐策划文案、对比度与深度分层验收（审计行动点 #0338）。 */
+export type GroundResourceRenderTheme = Readonly<{
+  materialLabels: Record<ResourceMaterialKind, string>;
+  depths: Readonly<{ resourceLabel: number; stackBadge: number }>;
+  colors: Readonly<{
+    resourceLabel: string;
+    stackBadge: string;
+    borderPickupAllowed: number;
+    borderPickupBlocked: number;
+  }>;
+}>;
+
+export const DEFAULT_GROUND_RESOURCE_RENDER_THEME: GroundResourceRenderTheme = {
+  materialLabels: {
+    wood: "木材",
+    food: "食物",
+    stone: "石材",
+    generic: "物资"
+  },
+  depths: { resourceLabel: 33, stackBadge: 34 },
+  colors: {
+    resourceLabel: "#e8dcc8",
+    stackBadge: "#f7f1df",
+    borderPickupAllowed: 0xc9b87a,
+    borderPickupBlocked: 0x8a8a8a
+  }
 };
 
 export type RenderableResourceItem = Readonly<{
@@ -28,7 +49,8 @@ export type RenderableResourceItem = Readonly<{
 }>;
 
 export function collectRenderableResourceItems(
-  entities: Iterable<WorldEntitySnapshot>
+  entities: Iterable<WorldEntitySnapshot>,
+  theme: GroundResourceRenderTheme = DEFAULT_GROUND_RESOURCE_RENDER_THEME
 ): RenderableResourceItem[] {
   const out: RenderableResourceItem[] = [];
   for (const e of entities) {
@@ -37,7 +59,7 @@ export function collectRenderableResourceItems(
 
     const stackCount = Math.max(1, e.stackCount ?? 1);
     const mat = e.materialKind ?? "generic";
-    const centerText = e.label?.trim() ? e.label : MATERIAL_DISPLAY[mat] ?? mat;
+    const centerText = e.label?.trim() ? e.label : theme.materialLabels[mat] ?? mat;
     out.push({
       id: e.id,
       containerKind: e.containerKind,
@@ -45,7 +67,10 @@ export function collectRenderableResourceItems(
       centerText,
       stackCount,
       stackBadgeText: stackCount > 1 ? `×${stackCount}` : undefined,
-      borderColor: e.pickupAllowed !== false ? 0xc9b87a : 0x8a8a8a
+      borderColor:
+        e.pickupAllowed !== false
+          ? theme.colors.borderPickupAllowed
+          : theme.colors.borderPickupBlocked
     });
   }
 
@@ -61,13 +86,14 @@ export function syncGroundResourceItems(
   grid: WorldGridConfig,
   ox: number,
   oy: number,
-  entities: Iterable<WorldEntitySnapshot>
+  entities: Iterable<WorldEntitySnapshot>,
+  theme: GroundResourceRenderTheme = DEFAULT_GROUND_RESOURCE_RENDER_THEME
 ): void {
   g.clear();
   const cs = grid.cellSizePx;
   const pad = 4;
 
-  const items = collectRenderableResourceItems(entities);
+  const items = collectRenderableResourceItems(entities, theme);
   const activeIds = new Set<string>();
   const activeCountIds = new Set<string>();
   for (const item of items) {
@@ -79,8 +105,12 @@ export function syncGroundResourceItems(
     const wBox = cs - pad * 2;
     const hBox = cs - pad * 2;
 
-    g.lineStyle(2, item.borderColor, 0.95);
-    g.strokeRect(left, top, wBox, hBox);
+    // 交互系统.yaml：「标记显示」针对散落/可标记物资；「存储区显示」为区边界（由 zone overlay 负责）。
+    // 区内堆叠仅保留文字与数量角标，避免与散落物资拾取线框语义重复（审计行动点 #0339）。
+    if (item.containerKind === "ground") {
+      g.lineStyle(2, item.borderColor, 0.95);
+      g.strokeRect(left, top, wBox, hBox);
+    }
 
     const cx = ox + (col + 0.5) * cs;
     const cy = oy + (row + 0.5) * cs;
@@ -92,17 +122,17 @@ export function syncGroundResourceItems(
         .text(cx, cy, item.centerText, {
           fontFamily: "Segoe UI, sans-serif",
           fontSize: "11px",
-          color: "#e8dcc8",
+          color: theme.colors.resourceLabel,
           align: "center"
         })
         .setOrigin(0.5, 0.5)
-        .setDepth(33);
+        .setDepth(theme.depths.resourceLabel);
       labelMap.set(item.id, label);
     }
     label.setText(item.centerText);
     label.setPosition(cx, cy);
-    label.setColor("#e8dcc8");
-    label.setDepth(33);
+    label.setColor(theme.colors.resourceLabel);
+    label.setDepth(theme.depths.resourceLabel);
 
     if (item.stackBadgeText) {
       activeCountIds.add(item.id);
@@ -113,17 +143,17 @@ export function syncGroundResourceItems(
           .text(ox + (col + 1) * cs - 4, oy + (row + 1) * cs - 4, item.stackBadgeText, {
             fontFamily: "Segoe UI, sans-serif",
             fontSize: "10px",
-            color: "#f7f1df",
+            color: theme.colors.stackBadge,
             align: "right"
           })
           .setOrigin(1, 1)
-          .setDepth(34);
+          .setDepth(theme.depths.stackBadge);
         countLabelMap.set(item.id, countLabel);
       }
       countLabel.setText(item.stackBadgeText);
       countLabel.setPosition(ox + (col + 1) * cs - 4, oy + (row + 1) * cs - 4);
-      countLabel.setColor("#f7f1df");
-      countLabel.setDepth(34);
+      countLabel.setColor(theme.colors.stackBadge);
+      countLabel.setDepth(theme.depths.stackBadge);
     }
   }
 

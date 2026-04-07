@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest";
 import type { EntityId } from "../../src/game/entity";
 import { createEntityRegistry } from "../../src/game/entity";
-import { createOccupancyMap, createZone, getZoneAtCell, getZonesByType, occupy, removeZone, validateZoneCells } from "../../src/game/map";
+import {
+  axisAlignedBoundsFromCoveredCells,
+  connectedComponentCountFromCoveredCells,
+  createOccupancyMap,
+  createZone,
+  getZoneAtCell,
+  getZonesByType,
+  occupy,
+  removeZone,
+  validateZoneCells
+} from "../../src/game/map";
 
 describe("zone-manager", () => {
   it("createZone registers a ZoneEntity with expected fields", () => {
@@ -12,6 +22,7 @@ describe("zone-manager", () => {
         { col: 0, row: 0 },
         { col: 1, row: 0 }
       ],
+      createOccupancyMap(),
       "storage",
       "木材区",
       ["wood", "generic"]
@@ -38,6 +49,7 @@ describe("zone-manager", () => {
         { col: 2, row: 3 },
         { col: 3, row: 3 }
       ],
+      createOccupancyMap(),
       "custom",
       "dedup",
       []
@@ -50,25 +62,33 @@ describe("zone-manager", () => {
 
   it("createZone throws when input is empty after deduplication", () => {
     const registry = createEntityRegistry();
-    expect(() => createZone(registry, [], "storage", "x", [])).toThrow(/non-empty/);
+    expect(() => createZone(registry, [], createOccupancyMap(), "storage", "x", [])).toThrow(/non-empty/);
+  });
+
+  it("createZone throws when a covered cell is occupied", () => {
+    const registry = createEntityRegistry();
+    const map = createOccupancyMap();
+    occupy(map, { col: 0, row: 0 }, "entity-blocker");
+    expect(() => createZone(registry, [{ col: 0, row: 0 }], map, "storage", "z", [])).toThrow(/occupied/);
   });
 
   it("getZoneAtCell returns the zone covering the cell", () => {
     const registry = createEntityRegistry();
-    const z = createZone(registry, [{ col: 5, row: 5 }], "forbidden", "f", []);
+    const z = createZone(registry, [{ col: 5, row: 5 }], createOccupancyMap(), "forbidden", "f", []);
     expect(getZoneAtCell(registry, { col: 5, row: 5 })).toBe(z);
     expect(getZoneAtCell(registry, { col: 0, row: 0 })).toBeUndefined();
   });
 
   it("getZoneAtCell picks lexicographically smallest id when multiple zones overlap", () => {
     const registry = createEntityRegistry();
-    createZone(registry, [{ col: 1, row: 1 }], "storage", "first", []);
+    createZone(registry, [{ col: 1, row: 1 }], createOccupancyMap(), "storage", "first", []);
     const later = createZone(
       registry,
       [
         { col: 1, row: 1 },
         { col: 2, row: 2 }
       ],
+      createOccupancyMap(),
       "custom",
       "second",
       []
@@ -81,9 +101,9 @@ describe("zone-manager", () => {
 
   it("getZonesByType returns only matching zoneKind", () => {
     const registry = createEntityRegistry();
-    createZone(registry, [{ col: 0, row: 0 }], "storage", "a", []);
-    const b = createZone(registry, [{ col: 1, row: 0 }], "priority-build", "b", []);
-    createZone(registry, [{ col: 2, row: 0 }], "storage", "c", []);
+    createZone(registry, [{ col: 0, row: 0 }], createOccupancyMap(), "storage", "a", []);
+    const b = createZone(registry, [{ col: 1, row: 0 }], createOccupancyMap(), "priority-build", "b", []);
+    createZone(registry, [{ col: 2, row: 0 }], createOccupancyMap(), "storage", "c", []);
     const storage = getZonesByType(registry, "storage");
     expect(storage).toHaveLength(2);
     expect(storage.every((z) => z.zoneKind === "storage")).toBe(true);
@@ -92,7 +112,7 @@ describe("zone-manager", () => {
 
   it("removeZone removes only zone entities", () => {
     const registry = createEntityRegistry();
-    const z = createZone(registry, [{ col: 0, row: 0 }], "storage", "z", []);
+    const z = createZone(registry, [{ col: 0, row: 0 }], createOccupancyMap(), "storage", "z", []);
     const pawn = registry.create({
       kind: "pawn",
       cell: { col: 3, row: 3 },
@@ -160,5 +180,28 @@ describe("zone-manager", () => {
         map
       )
     ).toEqual({ ok: true });
+  });
+
+  it("axisAlignedBoundsFromCoveredCells returns undefined for empty and min/max for non-empty", () => {
+    expect(axisAlignedBoundsFromCoveredCells([])).toBeUndefined();
+    expect(
+      axisAlignedBoundsFromCoveredCells([
+        { col: 2, row: 1 },
+        { col: 0, row: 3 },
+        { col: 2, row: 3 }
+      ])
+    ).toEqual({ minCol: 0, maxCol: 2, minRow: 1, maxRow: 3 });
+  });
+
+  it("connectedComponentCountFromCoveredCells counts 4-neighbor components", () => {
+    expect(connectedComponentCountFromCoveredCells([])).toBe(0);
+    expect(connectedComponentCountFromCoveredCells([{ col: 0, row: 0 }])).toBe(1);
+    expect(
+      connectedComponentCountFromCoveredCells([
+        { col: 0, row: 0 },
+        { col: 1, row: 0 },
+        { col: 5, row: 5 }
+      ])
+    ).toBe(2);
   });
 });

@@ -3,8 +3,7 @@
  */
 
 import type { GoalKind } from "../game/behavior/goal-driven-planning";
-import { formatTimeOfDayLabel } from "../game/time";
-import type { WorldTimeSnapshot } from "../game/time/world-time";
+import { formatTimeOfDayLabel, type WorldTimeSnapshot } from "../game/time";
 import type { PawnState } from "../game/pawn-state";
 import type { WorkRegistry } from "../game/work/work-registry";
 import type {

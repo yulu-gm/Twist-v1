@@ -1,5 +1,5 @@
 /**
- * 在世界中加入可行走格上的装饰实体（树木、地面食物资源等），与 {@link seedBlockedCellsAsObstacles} 顺序衔接。
+ * 在世界中加入可行走格上的装饰实体（树木、地面食物资源等）；须在 {@link ../world-seed-obstacles!seedBlockedCellsAsObstacles} 之后调用。
  */
 
 import {
@@ -10,8 +10,11 @@ import {
   type GridRand,
   type WorldGridConfig
 } from "./world-grid";
+import { createGameplayGroundFoodDraft } from "../entity/gameplay-ground-food-spawn";
 import { createGameplayTreeDraft } from "../entity/gameplay-tree-spawn";
 import { spawnWorldEntity, type WorldCore } from "../world-core";
+import type { SpawnOutcome } from "../world-internal";
+import { initialSeedEntityCounts } from "./world-seed-entities-config";
 
 function collectFreeCells(grid: WorldGridConfig, excludeSpawn: ReadonlySet<string>): GridCoord[] {
   const out: GridCoord[] = [];
@@ -37,10 +40,25 @@ function shuffleInPlace<T>(items: T[], rng: GridRand): void {
   }
 }
 
+function warnIfInitialSeedEntityFailed(
+  kindLabel: string,
+  cell: GridCoord,
+  outcome: Exclude<SpawnOutcome, Readonly<{ kind: "created" }>>
+): void {
+  if (process.env.NODE_ENV === "production") return;
+  const detail =
+    outcome.kind === "conflict"
+      ? `conflict with ${outcome.blockingEntityId} at (${outcome.blockingCell.col},${outcome.blockingCell.row})`
+      : outcome.kind === "invalid-draft"
+        ? outcome.reason
+        : `out of bounds at (${outcome.cell.col},${outcome.cell.row})`;
+  console.warn(`[world-seed-entities] ${kindLabel} at (${cell.col},${cell.row}) did not spawn: ${detail}`);
+}
+
 /**
  * 在已通过障碍播种的世界上追加树木与食物资源。
  * - 树木：8–12 棵，经 {@link createGameplayTreeDraft} 与场景/领域一致。
- * - 资源：3–5 个，`materialKind: food`，`containerKind: ground`，`pickupAllowed: false`。
+ * - 资源：3–5 个，经 {@link createGameplayGroundFoodDraft} 与场景/领域一致。
  * 候选格为可行走、非默认出生点；`rng` 建议为 {@link createSeededRng} 以满足同种子可复现。
  */
 export function seedInitialTreesAndResources(
@@ -50,8 +68,9 @@ export function seedInitialTreesAndResources(
 ): WorldCore {
   const spawnKeys = blockedKeysFromCells(grid.defaultSpawnPoints);
   const candidates = collectFreeCells(grid, spawnKeys);
-  const treeCount = 8 + Math.floor(rng() * 5);
-  const resourceCount = 3 + Math.floor(rng() * 3);
+  const { treeMin, treeRngSpan, resourceMin, resourceRngSpan } = initialSeedEntityCounts;
+  const treeCount = treeMin + Math.floor(rng() * treeRngSpan);
+  const resourceCount = resourceMin + Math.floor(rng() * resourceRngSpan);
   const total = treeCount + resourceCount;
   const n = Math.min(total, candidates.length);
   const treeN = Math.min(treeCount, n);
@@ -66,19 +85,16 @@ export function seedInitialTreesAndResources(
     const spawned = spawnWorldEntity(w, createGameplayTreeDraft(cell));
     if (spawned.outcome.kind === "created") {
       w = spawned.world;
+    } else {
+      warnIfInitialSeedEntityFailed("tree", cell, spawned.outcome);
     }
   }
   for (const cell of resourceCells) {
-    const spawned = spawnWorldEntity(w, {
-      kind: "resource",
-      cell,
-      occupiedCells: [cell],
-      materialKind: "food",
-      containerKind: "ground",
-      pickupAllowed: false
-    });
+    const spawned = spawnWorldEntity(w, createGameplayGroundFoodDraft(cell));
     if (spawned.outcome.kind === "created") {
       w = spawned.world;
+    } else {
+      warnIfInitialSeedEntityFailed("ground food", cell, spawned.outcome);
     }
   }
   return w;

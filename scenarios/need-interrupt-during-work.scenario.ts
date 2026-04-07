@@ -1,6 +1,6 @@
 import { coordKey, DEFAULT_WORLD_GRID } from "../src/game/map";
 import type { ScenarioDefinition } from "../src/headless/scenario-types";
-import type { DomainCommand } from "../src/player/s0-contract";
+import type { DomainCommand } from "../src/game/interaction/domain-command-types";
 
 const TREE_CELL = { col: 10, row: 5 } as const;
 
@@ -10,7 +10,7 @@ const LUMBER_ON_TREE: DomainCommand = {
   targetCellKeys: [coordKey(TREE_CELL)],
   targetEntityIds: [],
   sourceMode: {
-    source: { kind: "menu", menuId: "orders", itemId: "lumber" },
+    source: { kind: "menu", menuId: "tools", itemId: "lumber" },
     selectionModifier: "replace",
     inputShape: "rect-selection"
   }

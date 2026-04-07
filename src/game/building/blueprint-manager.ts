@@ -17,7 +17,8 @@ function clamp01(value: number): number {
   return value;
 }
 
-function resolvedCoveredCells(anchor: GridCoord, spec: BuildingSpec): GridCoord[] {
+/** 由锚点与规格解析蓝图占格（去重），供蓝图创建与放置校验共用。 */
+export function resolveBlueprintCoveredCells(anchor: GridCoord, spec: BuildingSpec): GridCoord[] {
   const seen = new Set<string>();
   const out: GridCoord[] = [];
   for (const off of spec.cellOffsetsFromAnchor) {
@@ -42,7 +43,7 @@ export function createBlueprint(
   cells: BlueprintPlacementCells
 ): BlueprintEntity {
   const anchor: GridCoord = { col: cells.anchor.col, row: cells.anchor.row };
-  const coveredCells = resolvedCoveredCells(anchor, spec);
+  const coveredCells = resolveBlueprintCoveredCells(anchor, spec);
   const created = registry.create({
     kind: "blueprint",
     blueprintKind: spec.buildingKind,

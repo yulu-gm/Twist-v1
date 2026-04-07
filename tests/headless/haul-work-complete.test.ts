@@ -64,6 +64,8 @@ describe("completeHaulWork（WorldCore 直接工单完成）", () => {
       targetEntityId: resourceId,
       status: "open",
       failureCount: 0,
+      priority: 6,
+      sourceReason: "test",
       haulTargetZoneId: zoneId,
       haulDropCell: { ...dropCell }
     });
@@ -136,6 +138,8 @@ describe("completeHaulWork（WorldCore 直接工单完成）", () => {
       targetEntityId: carriedId,
       status: "open",
       failureCount: 0,
+      priority: 6,
+      sourceReason: "test",
       haulTargetZoneId: zoneId,
       haulDropCell: { ...dropCell }
     });
@@ -158,7 +162,7 @@ describe("completeHaulWork（WorldCore 直接工单完成）", () => {
     const storedId = storedSpawn.entityId;
 
     const completed = completeWorkItem(world, haulId, pawnId);
-    expect(completed?.outcome.kind).toBe("completed");
+    expect(completed?.outcome.kind).toBe("haul-reopened");
 
     const finalWorld = completed!.world;
     const carried = finalWorld.entities.get(carriedId);
@@ -238,6 +242,8 @@ describe("completeHaulWork（WorldCore 直接工单完成）", () => {
       targetEntityId: resourceId,
       status: "open",
       failureCount: 0,
+      priority: 6,
+      sourceReason: "test",
       haulTargetZoneId: zoneId,
       haulDropCell: { ...dropCell }
     });
@@ -246,7 +252,7 @@ describe("completeHaulWork（WorldCore 直接工单完成）", () => {
     expect(claimed.outcome.kind).toBe("claimed");
 
     const completed = completeWorkItem(claimed.world, haulId, pawnId);
-    expect(completed?.outcome.kind).toBe("completed");
+    expect(completed?.outcome.kind).toBe("haul-reopened");
 
     const finalWorld = completed!.world;
     const resource = finalWorld.entities.get(resourceId);
@@ -339,6 +345,8 @@ describe("completeHaulWork（WorldCore 直接工单完成）", () => {
       targetEntityId: carriedId,
       status: "open",
       failureCount: 0,
+      priority: 6,
+      sourceReason: "test",
       haulTargetZoneId: zoneId,
       haulDropCell: { ...storageCellA }
     });
@@ -347,7 +355,7 @@ describe("completeHaulWork（WorldCore 直接工单完成）", () => {
     expect(claimed.outcome.kind).toBe("claimed");
 
     const completed = completeWorkItem(claimed.world, haulId, pawnId);
-    expect(completed?.outcome.kind).toBe("completed");
+    expect(completed?.outcome.kind).toBe("haul-reopened");
 
     const finalWorld = completed!.world;
     const carried = finalWorld.entities.get(carriedId);
@@ -357,7 +365,7 @@ describe("completeHaulWork（WorldCore 直接工单完成）", () => {
     expect(carried?.cell).toEqual(pawnCell);
     expect(carried?.occupiedCells).toEqual([]);
     expect(carried?.carriedByPawnId).toBeUndefined();
-    expect(finalWorld.occupancy.get(coordKey(pawnCell))).toBe(pawnId);
+    expect(finalWorld.occupancy.get(coordKey(pawnCell))?.has(pawnId)).toBe(true);
 
     const haul = finalWorld.workItems.get(haulId);
     expect(haul?.status).toBe("open");

@@ -12,7 +12,11 @@ import {
 } from "../game/interaction/floor-selection";
 import type { WorldGridConfig, GridCoord } from "../game/map";
 import { cellAtWorldPixel } from "../game/map";
-import { getCommandMenuCommand, type CommandMenuCommandId } from "../data/command-menu";
+import {
+  defaultCommandMenuCommandId,
+  getCommandMenuCommand,
+  type CommandMenuCommandId
+} from "../data/command-menu";
 import {
   beginBrushStroke,
   endBrushStroke,
@@ -21,6 +25,7 @@ import {
   type BrushStrokeState
 } from "../player/brush-stroke";
 import type { GameOrchestrator } from "../game/game-orchestrator";
+import type { PlayerTaskMarkerOverlayPort } from "../player/world-port-types";
 import type { HudManager } from "../ui/hud-manager";
 import { redrawBrushStrokeDraft, redrawFloorSelection } from "./renderers/selection-renderer";
 import { redrawTaskMarkers, type TaskMarkerViewDeps } from "./game-scene-presentation";
@@ -45,6 +50,8 @@ export class GameSceneFloorInteraction {
   private brushState: BrushStrokeState = inactiveBrushStroke();
   private brushGestureModifier: SelectionModifier = "replace";
   private activeSelectionPointerId?: number;
+  /** 本次按下解析后的命令（含无效 ID 回退默认），与 pointerup 提交一致。 */
+  private gestureResolvedCommandId?: CommandMenuCommandId;
 
   public constructor(private readonly host: GameSceneFloorInteractionHost) {}
 
@@ -55,6 +62,7 @@ export class GameSceneFloorInteraction {
   public resetForToolChange(): void {
     this.brushState = inactiveBrushStroke();
     this.activeSelectionPointerId = undefined;
+    this.gestureResolvedCommandId = undefined;
     this.floorSelectionState = {
       selectedCellKeys: new Set(this.floorSelectionState.selectedCellKeys)
     };
@@ -65,6 +73,7 @@ export class GameSceneFloorInteraction {
     this.floorSelectionState = createFloorSelectionState();
     this.brushState = inactiveBrushStroke();
     this.activeSelectionPointerId = undefined;
+    this.gestureResolvedCommandId = undefined;
     this.host.onRedrawSelection();
   }
 
@@ -72,6 +81,7 @@ export class GameSceneFloorInteraction {
     this.brushState = inactiveBrushStroke();
     this.floorSelectionState = clearFloorSelection(this.floorSelectionState);
     this.activeSelectionPointerId = undefined;
+    this.gestureResolvedCommandId = undefined;
     this.host.onRedrawSelection();
   }
 
@@ -79,7 +89,7 @@ export class GameSceneFloorInteraction {
     const grid = this.host.getWorldGrid();
     const { ox, oy } = this.host.getGridOrigin();
     const orchestrator = this.host.getOrchestrator();
-    const port = orchestrator.getPlayerWorldPort();
+    const port: PlayerTaskMarkerOverlayPort = orchestrator.getPlayerWorldPort();
     const activeCommand = getCommandMenuCommand(this.host.getActiveCommandId());
     const markerToolId = activeCommand?.markerToolId ?? "idle";
 
@@ -146,10 +156,19 @@ export class GameSceneFloorInteraction {
       return;
     }
 
-    const command = getCommandMenuCommand(this.host.getActiveCommandId());
+    const commandId = this.host.getActiveCommandId();
+    let command = getCommandMenuCommand(commandId);
+    if (!command) {
+      const fallback = getCommandMenuCommand(defaultCommandMenuCommandId());
+      this.host
+        .getHud()
+        .syncPlayerChannelLastResult(`无效命令「${String(commandId)}」，已回退默认工具`);
+      command = fallback;
+    }
     if (!command) return;
 
     if (command.inputShape === "brush-stroke") {
+      this.gestureResolvedCommandId = command.id;
       this.brushGestureModifier = modifier;
       const grid = this.host.getWorldGrid();
       this.brushState = beginBrushStroke(pointer.id, grid, cell);
@@ -159,6 +178,7 @@ export class GameSceneFloorInteraction {
     }
 
     if (command.inputShape === "single-cell" || command.inputShape === "rect-selection") {
+      this.gestureResolvedCommandId = command.id;
       const grid = this.host.getWorldGrid();
       this.floorSelectionState = beginFloorSelection(this.floorSelectionState, grid, cell, modifier);
       this.activeSelectionPointerId = pointer.id;
@@ -187,31 +207,26 @@ export class GameSceneFloorInteraction {
   private handleFloorPointerUp = (pointer: Phaser.Input.Pointer): void => {
     if (this.activeSelectionPointerId !== pointer.id) return;
     const grid = this.host.getWorldGrid();
-    const hud = this.host.getHud();
-    const orchestrator = this.host.getOrchestrator();
-    const commandId = this.host.getActiveCommandId();
+    const commandId =
+      this.gestureResolvedCommandId ?? this.host.getActiveCommandId();
 
     if (this.brushState.active) {
       const keys = endBrushStroke(this.brushState);
       this.brushState = inactiveBrushStroke();
       this.activeSelectionPointerId = undefined;
       this.host.onRedrawSelection();
-      if (keys.size === 0) return;
+      if (keys.size === 0) {
+        this.gestureResolvedCommandId = undefined;
+        return;
+      }
 
-      const taskMarkers = this.host.getTaskMarkers();
-      const brushOutcome = orchestrator.commitPlayerSelection({
+      this.applyCommitPlayerSelectionOutcome({
         commandId,
         selectionModifier: this.brushGestureModifier,
         cellKeys: keys,
-        inputShape: "brush-stroke",
-        currentMarkers: taskMarkers,
-        nowMs: performance.now()
+        inputShape: "brush-stroke"
       });
-      this.host.setTaskMarkers(brushOutcome.nextMarkers);
-      redrawTaskMarkers(this.host.getTaskMarkers(), this.host.getTaskMarkerView());
-      if (brushOutcome.resultSummaryLine !== null) {
-        hud.syncPlayerChannelLastResult(brushOutcome.resultSummaryLine);
-      }
+      this.gestureResolvedCommandId = undefined;
       return;
     }
 
@@ -226,23 +241,41 @@ export class GameSceneFloorInteraction {
 
     if (!draft) return;
     const shape = draft.cellKeys.size === 1 ? ("single-cell" as const) : ("rect-selection" as const);
-    const taskMarkers = this.host.getTaskMarkers();
-    const rectOutcome = orchestrator.commitPlayerSelection({
+    this.applyCommitPlayerSelectionOutcome({
       commandId,
       selectionModifier: draft.modifier,
       cellKeys: draft.cellKeys,
-      inputShape: shape,
-      currentMarkers: taskMarkers,
-      nowMs: performance.now()
+      inputShape: shape
     });
-    this.host.setTaskMarkers(rectOutcome.nextMarkers);
-    redrawTaskMarkers(this.host.getTaskMarkers(), this.host.getTaskMarkerView());
-    if (rectOutcome.resultSummaryLine !== null) {
-      hud.syncPlayerChannelLastResult(rectOutcome.resultSummaryLine);
-    }
+    this.gestureResolvedCommandId = undefined;
     this.floorSelectionState = clearFloorSelection(this.floorSelectionState);
     this.host.onRedrawSelection();
   };
+
+  /** 单一入口：领域提交 + 标记视图刷新 + 玩家通道反馈（AP-0313 最小门面）。 */
+  private applyCommitPlayerSelectionOutcome(args: Readonly<{
+    commandId: CommandMenuCommandId;
+    selectionModifier: SelectionModifier;
+    cellKeys: ReadonlySet<string>;
+    inputShape: "brush-stroke" | "single-cell" | "rect-selection";
+  }>): void {
+    const orchestrator = this.host.getOrchestrator();
+    const hud = this.host.getHud();
+    const taskMarkers = this.host.getTaskMarkers();
+    const outcome = orchestrator.commitPlayerSelection({
+      commandId: args.commandId,
+      selectionModifier: args.selectionModifier,
+      cellKeys: args.cellKeys,
+      inputShape: args.inputShape,
+      currentMarkers: taskMarkers,
+      nowMs: performance.now()
+    });
+    this.host.setTaskMarkers(outcome.nextMarkers);
+    redrawTaskMarkers(this.host.getTaskMarkers(), this.host.getTaskMarkerView());
+    if (outcome.resultSummaryLine !== null) {
+      hud.syncPlayerChannelLastResult(outcome.resultSummaryLine);
+    }
+  }
 
   private pointerCell(pointer: Phaser.Input.Pointer, clampToGrid = false): GridCoord | undefined {
     const { ox, oy } = this.host.getGridOrigin();

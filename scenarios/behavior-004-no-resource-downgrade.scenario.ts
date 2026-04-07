@@ -1,11 +1,11 @@
-import { coordKey, DEFAULT_WORLD_GRID } from "../src/game/map/world-grid";
+import { coordKey, DEFAULT_SCENARIO_INTERACTION_POINTS, DEFAULT_WORLD_GRID } from "../src/game/map";
 import type { ScenarioDefinition } from "../src/headless/scenario-types";
 
 const PAWN_CELL = DEFAULT_WORLD_GRID.defaultSpawnPoints[0]!;
 
 const NO_BED_GRID = {
   ...DEFAULT_WORLD_GRID,
-  interactionPoints: DEFAULT_WORLD_GRID.interactionPoints.filter((point) => point.kind !== "bed")
+  interactionPoints: DEFAULT_SCENARIO_INTERACTION_POINTS.filter((point) => point.kind !== "bed")
 };
 
 /** 夜间高疲劳但无床可用时，不应伪装成正常 sleep，而应降级为 wander / 等待类行为。 */

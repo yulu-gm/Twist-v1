@@ -4,11 +4,13 @@
 
 import Phaser from "phaser";
 import {
+  formatPawnMapHudBody,
   pawnDisplayWorldCenter,
   type PawnState
 } from "../../game/pawn-state";
-import type { WorldGridConfig } from "../../game/map/world-grid";
-import type { TimeOfDayPalette } from "../../game/time";
+import type { SimConfig } from "../../game/behavior/sim-config";
+import { cellCenterWorld, type WorldGridConfig } from "../../game/map";
+import type { TimeOfDayPalette } from "../../ui/time-of-day-palette";
 import { workItemAnchorDurationSeconds } from "../../game/work/work-item-duration";
 import type { WorkItemSnapshot } from "../../game/work/work-types";
 
@@ -21,7 +23,8 @@ export type PawnView = Readonly<{
 
 const WORK_BAR_WIDTH_PX = 36;
 const WORK_BAR_HEIGHT_PX = 5;
-const WORK_BAR_ABOVE_CIRCLE_TOP_PX = 4;
+/** 读条相对锚点（小人圆顶或工单锚格顶边）向上的间距。 */
+const WORK_BAR_ABOVE_ANCHOR_PX = 4;
 
 export function createPawnViews(
   scene: Phaser.Scene,
@@ -40,7 +43,7 @@ export function createPawnViews(
     const radius = Math.max(10, cell * 0.32);
     const circle = scene.add.circle(pos.x, pos.y, radius, pawn.fillColor, 1);
     circle.setStrokeStyle(2, 0x1a1a1a, 0.85);
-    const barY = pos.y - radius - WORK_BAR_ABOVE_CIRCLE_TOP_PX - WORK_BAR_HEIGHT_PX / 2;
+    const barY = pos.y - radius - WORK_BAR_ABOVE_ANCHOR_PX - WORK_BAR_HEIGHT_PX / 2;
     const workBarBg = scene.add.rectangle(pos.x, barY, WORK_BAR_WIDTH_PX, WORK_BAR_HEIGHT_PX, 0x6b7280);
     workBarBg.setStrokeStyle(1, 0x374151, 0.9);
     const workBarFill = scene.add.rectangle(
@@ -54,7 +57,7 @@ export function createPawnViews(
     workBarBg.setVisible(false);
     workBarFill.setVisible(false);
     const label = scene.add
-      .text(pos.x, pos.y - radius - 10, `${pawn.name}\n${pawn.debugLabel}`, {
+      .text(pos.x, pos.y - radius - 10, `${pawn.name}\n${formatPawnMapHudBody(pawn)}`, {
         fontFamily: "Segoe UI, sans-serif",
         fontSize: "12px",
         align: "center",
@@ -84,7 +87,8 @@ export function syncPawnViews(
   grid: WorldGridConfig,
   ox: number,
   oy: number,
-  workItems: ReadonlyMap<string, WorkItemSnapshot>
+  workItems: ReadonlyMap<string, WorkItemSnapshot>,
+  workItemAnchorDurationSec: SimConfig["workItemAnchorDurationSec"]
 ): void {
   for (const pawn of pawns) {
     const view = views.get(pawn.id);
@@ -92,16 +96,24 @@ export function syncPawnViews(
     const pos = pawnDisplayWorldCenter(pawn, grid, ox, oy);
     const r = view.circle.radius;
     view.circle.setPosition(pos.x, pos.y);
-    const barY = pos.y - r - WORK_BAR_ABOVE_CIRCLE_TOP_PX - WORK_BAR_HEIGHT_PX / 2;
-    view.workBarBg.setPosition(pos.x, barY);
-    view.workBarFill.setPosition(pos.x - WORK_BAR_WIDTH_PX / 2, barY);
     view.label.setPosition(pos.x, pos.y - r - 10);
-    view.label.setText(`${pawn.name}\n${pawn.debugLabel}`);
+    view.label.setText(`${pawn.name}\n${formatPawnMapHudBody(pawn)}`);
 
     const wid = pawn.activeWorkItemId;
     const item = wid ? workItems.get(wid) : undefined;
+    const anchorCenter =
+      item !== undefined ? cellCenterWorld(grid, item.anchorCell, ox, oy) : pos;
+    const barTopY =
+      item !== undefined
+        ? anchorCenter.y -
+          grid.cellSizePx * 0.5 -
+          WORK_BAR_ABOVE_ANCHOR_PX -
+          WORK_BAR_HEIGHT_PX / 2
+        : pos.y - r - WORK_BAR_ABOVE_ANCHOR_PX - WORK_BAR_HEIGHT_PX / 2;
+    view.workBarBg.setPosition(anchorCenter.x, barTopY);
+    view.workBarFill.setPosition(anchorCenter.x - WORK_BAR_WIDTH_PX / 2, barTopY);
     const totalSec =
-      item !== undefined ? workItemAnchorDurationSeconds(item.kind) : undefined;
+      item !== undefined ? workItemAnchorDurationSeconds(workItemAnchorDurationSec, item.kind) : undefined;
     const showWorkBar =
       pawn.workTimerSec > 0 &&
       wid !== undefined &&

@@ -2,7 +2,9 @@ import type Phaser from "phaser";
 import { formatGridCellHoverText } from "../data/grid-cell-info";
 import { taskMarkerMapsEqual } from "../data/task-markers";
 import { cellAtWorldPixel, coordKey, type WorldGridConfig } from "../game/map";
-import type { TimeOfDayPalette } from "../game/time";
+import type { WorldCore } from "../game/world-core";
+import { buildGridCellHoverReadModel } from "../game/world-sim-bridge";
+import type { TimeOfDayPalette } from "../ui/time-of-day-palette";
 import type { GameOrchestrator } from "../game/game-orchestrator";
 import type { HudManager } from "../ui/hud-manager";
 import { drawGridLines } from "./renderers/grid-renderer";
@@ -52,11 +54,21 @@ export type HoverSyncDeps = Readonly<{
   hoverHighlightFrame: Phaser.GameObjects.Rectangle;
   hud: HudManager;
   lastHoverKeyRef: { current: string | null };
+  getWorld: () => WorldCore;
 }>;
 
 export function syncHoverFromPointerState(deps: HoverSyncDeps): void {
-  const { camera, activePointer, worldGrid, gridOriginX, gridOriginY, hoverHighlightFrame, hud, lastHoverKeyRef } =
-    deps;
+  const {
+    camera,
+    activePointer,
+    worldGrid,
+    gridOriginX,
+    gridOriginY,
+    hoverHighlightFrame,
+    hud,
+    lastHoverKeyRef,
+    getWorld
+  } = deps;
   const w = camera.getWorldPoint(activePointer.x, activePointer.y);
   const cell = cellAtWorldPixel(worldGrid, gridOriginX, gridOriginY, w.x, w.y);
   const key = cell ? coordKey(cell) : null;
@@ -75,7 +87,9 @@ export function syncHoverFromPointerState(deps: HoverSyncDeps): void {
   hoverHighlightFrame.setPosition(cx, cy);
   hoverHighlightFrame.setSize(cs - 2, cs - 2);
   hoverHighlightFrame.setVisible(true);
-  hud.showHoverInfo(formatGridCellHoverText(cell, worldGrid));
+  const world = getWorld();
+  const hoverModel = buildGridCellHoverReadModel(world, cell);
+  hud.showHoverInfo(formatGridCellHoverText(hoverModel, world.entities.values()));
 }
 
 export function mergeMarkerOverlayIfChanged(

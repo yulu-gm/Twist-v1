@@ -12,7 +12,7 @@ import {
 import { coordKey, listStorageGroupLabels } from "../../src/game/map";
 import { createHeadlessSim } from "../../src/headless";
 import { hydrateScenario } from "../../src/headless/scenario-runner";
-import type { DomainCommand } from "../../src/player/s0-contract";
+import type { DomainCommand } from "../../src/game/interaction/domain-command-types";
 import { ZONE_CREATE_SCENARIO } from "../../scenarios/zone-create.scenario";
 
 function sortedKeys(keys: Iterable<string>): string[] {

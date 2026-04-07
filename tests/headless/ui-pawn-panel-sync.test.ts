@@ -27,10 +27,15 @@ describe("UI-003 pawn panel sync (read model)", () => {
   it("饥饿需求达 critical 时，警示等级与摘要行可见（与面板内需求信号同源）", () => {
     const sim = createHeadlessSim({ seed: 0x55_49_30_33 });
     sim.spawnPawn("Hungry", { col: 2, row: 2 }, {
+      satiety: 15,
       needs: { hunger: 85, rest: 10, recreation: 10 }
     });
     const p = sim.getPawns()[0]!;
-    const sig = needSignalsFromNeeds(p.needs);
+    const sig = needSignalsFromNeeds({
+      ...p.needs,
+      satiety: p.satiety,
+      energy: p.energy
+    });
     expect(sig.hungerUrgency).toBe("critical");
     expect(sig.allowInterruptWorkForHunger).toBe(true);
     expect(sig.summaryLine).toContain("饥饿");

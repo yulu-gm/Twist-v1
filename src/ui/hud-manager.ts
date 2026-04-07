@@ -5,7 +5,8 @@
 
 import type { PawnState } from "../game/pawn-state";
 import type { WorkItemSnapshot } from "../game/work/work-types";
-import type { TimeControlState, TimeOfDayPalette, TimeSpeed } from "../game/time";
+import type { TimeControlState, TimeSpeed } from "../game/time";
+import type { TimeOfDayPalette } from "./time-of-day-palette";
 import { formatTimeOfDayLabel, type TimeOfDayState } from "../game/time";
 import { pawnProfileForId } from "../data/pawn-profiles";
 import { pawnDetailBehaviorLabelZh } from "./status-display-model";
@@ -13,15 +14,15 @@ import type { RuntimeLogPanelEntry } from "../runtime-log/runtime-log";
 import { VILLAGER_TOOLS, VILLAGER_TOOL_KEY_CODES, type VillagerTool } from "../data/villager-tools";
 import {
   COMMAND_MENU_CATEGORIES,
-  commandMenuCommandsForCategory,
   commandMenuHotkeyLabel,
+  commandMenuListRowsForCategory,
   defaultCommandMenuCommandId,
   getCommandMenuCategory,
   getCommandMenuCommand,
   type CommandMenuCategoryId,
   type CommandMenuCommandId
 } from "../data/command-menu";
-import { needSignalsFromNeeds } from "../player/need-signals";
+import { needSignalsFromNeeds } from "../game/need";
 import type { ScenarioDefinition } from "../headless/scenario-types";
 
 export type { VillagerTool };
@@ -53,6 +54,8 @@ export type DebugPanelState = Readonly<{
   filter: string;
   selectedEntryId: string | null;
   entries: readonly RuntimeLogPanelEntry[];
+  /** 开发服 NDJSON 落盘路径（无则空串不展示）。 */
+  devNdjsonFilePath?: string;
 }>;
 
 function colorToCss(color: number): string {
@@ -118,6 +121,7 @@ export class HudManager {
   private debugPauseEl: HTMLButtonElement | null;
   private debugFilterEl: HTMLInputElement | null;
   private debugCountEl: HTMLElement | null;
+  private debugNdjsonPathEl: HTMLElement | null;
   private debugLogListEl: HTMLElement | null;
   private debugDetailEl: HTMLElement | null;
   private debugUiAbort: AbortController | null = null;
@@ -157,6 +161,7 @@ export class HudManager {
     this.debugPauseEl = document.getElementById("scene-debug-pause") as HTMLButtonElement | null;
     this.debugFilterEl = document.getElementById("scene-debug-filter") as HTMLInputElement | null;
     this.debugCountEl = document.getElementById("scene-debug-count");
+    this.debugNdjsonPathEl = document.getElementById("scene-debug-ndjson-path");
     this.debugLogListEl = document.getElementById("scene-debug-log-list");
     this.debugDetailEl = document.getElementById("scene-debug-detail");
   }
@@ -244,9 +249,22 @@ export class HudManager {
 
   // ── B 线：玩家通道提示（模式文案 + mock 网关反馈）────────────────
 
-  public syncPlayerChannelHint(modeLine: string, contractFootnote: string): void {
-    if (this.playerChannelModeEl && this.playerChannelModeEl.textContent !== modeLine) {
-      this.playerChannelModeEl.textContent = modeLine;
+  public syncPlayerChannelHint(
+    modeLine: string,
+    contractFootnote: string,
+    usesBrushStroke = false
+  ): void {
+    if (this.playerChannelModeEl) {
+      if (this.playerChannelModeEl.textContent !== modeLine) {
+        this.playerChannelModeEl.textContent = modeLine;
+      }
+      const hintRoot = this.playerChannelModeEl.parentElement;
+      if (hintRoot) {
+        const next = usesBrushStroke ? "true" : "false";
+        if (hintRoot.dataset.usesBrushStroke !== next) {
+          hintRoot.dataset.usesBrushStroke = next;
+        }
+      }
     }
     if (this.playerChannelContractEl) {
       this.playerChannelContractEl.textContent = contractFootnote;
@@ -443,6 +461,12 @@ export class HudManager {
     if (this.debugCountEl) {
       this.debugCountEl.textContent = `${state.entries.length}`;
     }
+    if (this.debugNdjsonPathEl) {
+      const path = state.devNdjsonFilePath?.trim() ?? "";
+      this.debugNdjsonPathEl.textContent =
+        path.length > 0 ? `NDJSON 落盘：${path}` : "";
+      this.debugNdjsonPathEl.hidden = path.length === 0;
+    }
     if (this.debugLogListEl) {
       this.debugLogListEl.replaceChildren();
       for (const entry of state.entries) {
@@ -484,9 +508,10 @@ export class HudManager {
     this.toolSlotEls = [];
     this.commandCategoryEls = [];
 
-    const selectedEntry =
-      (this.commandMenuSelectedId && getCommandMenuCommand(this.commandMenuSelectedId as CommandMenuCommandId)) ??
-      getCommandMenuCommand(defaultCommandMenuCommandId())!;
+    const fromSelectedId = this.commandMenuSelectedId
+      ? getCommandMenuCommand(this.commandMenuSelectedId as CommandMenuCommandId)
+      : undefined;
+    const selectedEntry = fromSelectedId ?? getCommandMenuCommand(defaultCommandMenuCommandId())!;
     const activeCategoryId =
       this.commandMenuCategoryForId(this.commandMenuActiveCategoryId)?.id ?? selectedEntry.categoryId;
     this.commandMenuActiveCategoryId = activeCategoryId;
@@ -550,8 +575,17 @@ export class HudManager {
     list.setAttribute("aria-label", "命令列表");
     list.hidden = !this.commandMenuOpen;
 
-    const commands = commandMenuCommandsForCategory(activeCategoryId as CommandMenuCategoryId);
-    for (const entry of commands) {
+    const rows = commandMenuListRowsForCategory(activeCategoryId as CommandMenuCategoryId);
+    for (const row of rows) {
+      if (row.kind === "subgroup-heading") {
+        const heading = document.createElement("div");
+        heading.className = "command-subgroup-heading";
+        heading.setAttribute("role", "presentation");
+        heading.textContent = row.label;
+        list.appendChild(heading);
+        continue;
+      }
+      const entry = row.command;
       const button = document.createElement("button");
       button.type = "button";
       button.className = "command-item-button";
@@ -706,7 +740,11 @@ export class HudManager {
     const goal = pawn.currentGoal?.kind ?? "—";
     const action = pawn.currentAction?.kind ?? "—";
     const n = pawn.needs;
-    const needSig = needSignalsFromNeeds(n);
+    const needSig = needSignalsFromNeeds({
+      ...n,
+      satiety: pawn.satiety,
+      energy: pawn.energy
+    });
 
     panel.innerHTML = `
       <h2>${escapeHtml(pawn.name)}</h2>
@@ -726,7 +764,7 @@ export class HudManager {
       <div class="pawn-detail-section">
         <div class="pawn-detail-label">当前状态</div>
         <div>饥饿 ${n.hunger.toFixed(1)}　休息 ${n.rest.toFixed(1)}　娱乐 ${n.recreation.toFixed(1)}</div>
-        <div style="font-size:11px;color:#c4b8a4;margin-top:4px">需求信号（B-M2 桩）${escapeHtml(needSig.summaryLine)}</div>
+        <div style="font-size:11px;color:#c4b8a4;margin-top:4px">需求信号 ${escapeHtml(needSig.summaryLine)}</div>
         <div style="font-size:11px;color:#a89878;margin-top:2px">饥饿 ${escapeHtml(
       needSig.hungerUrgency
     )} · 疲劳 ${escapeHtml(needSig.restUrgency)} · 打断许可 饥${needSig.allowInterruptWorkForHunger ? "是" : "否"}

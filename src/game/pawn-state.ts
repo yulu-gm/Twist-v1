@@ -3,14 +3,19 @@
 import type { GridCoord, WorldGridConfig } from "./map/world-grid";
 import { cellCenterWorld } from "./map/world-grid";
 import type { ActionKind, GoalKind } from "./behavior/goal-driven-planning";
-import { DEFAULT_PAWN_NEEDS, formatPawnDebugLabel } from "./need/need-utils";
-
-export {
-  advanceNeeds,
-  applyNeedDelta,
+import {
+  evaluateFatigueStage,
+  evaluateHungerStage,
+  type NeedStage
+} from "./need/threshold-rules";
+import {
   DEFAULT_PAWN_NEEDS,
-  withPawnNeeds
+  formatPawnDebugLabel,
+  normalizePawnNeedSnapshot,
+  pawnNeedsFromScalars
 } from "./need/need-utils";
+
+export type { NeedStage } from "./need/threshold-rules";
 
 export const DEFAULT_PAWN_NAMES = [
   "Alex",
@@ -94,10 +99,14 @@ export type PawnState = Readonly<{
   /** 精力 0..100，满为 100，越低越困（与实体侧 `PawnEntity.energy` 量纲一致）。 */
   energy: number;
   /**
-   * 需求值统一为 0..100，数值越高表示越急迫。
-   * @deprecated 请优先使用 `satiety` / `energy`；保留用于过渡期与 `advanceNeeds` 双写。
+   * 需求紧迫度 0..100（越高越急迫）。`hunger`/`rest` 由 `satiety`/`energy` 与锚点派生；
+   * `recreation` 仍独立累计，见 {@link pawnNeedsFromScalars}。
    */
   needs: PawnNeeds;
+  /** 与 `NeedSnapshot` 及 `createNeedProfile` 同源：由 `satiety` 经 `threshold-rules` 派生。 */
+  hungerStage: NeedStage;
+  /** 由 `energy` 派生，语义同上。 */
+  fatigueStage: NeedStage;
   currentGoal: PawnGoalState | undefined;
   currentAction: PawnActionState | undefined;
   reservedTargetId: string | undefined;
@@ -113,6 +122,55 @@ export type PawnState = Readonly<{
   debugLabel: string;
 }>;
 
+/** 与 headless 夹具及 {@link createDefaultPawnStates} 共用的小人占位色板。 */
+export const FIXTURE_PAWN_FILL_PALETTE = [
+  0xe07a5f, 0x81b29a, 0x3d405b, 0xf2cc8f, 0x9b5de5
+] as const;
+
+/**
+ * 单一领域工厂：构造满字段 `PawnState`（含需求快照归一化与 debugLabel），供无头/单测经 SimAccess 注册。
+ * 与 `createDefaultPawnStates` 语义对齐，避免 headless 侧手写拼装并与实体系统分层脱节（行动点 #0217）。
+ */
+export function createFixturePawnState(
+  name: string,
+  cell: GridCoord,
+  fixture: Readonly<{
+    id: string;
+    fillColor: number;
+    overrides?: Partial<PawnState>;
+  }>
+): PawnState {
+  const base: PawnState = {
+    id: fixture.id,
+    name,
+    logicalCell: { col: cell.col, row: cell.row },
+    moveTarget: undefined,
+    moveProgress01: 0,
+    fillColor: fixture.fillColor,
+    satiety: 100,
+    energy: 100,
+    needs: DEFAULT_PAWN_NEEDS,
+    hungerStage: evaluateHungerStage(100),
+    fatigueStage: evaluateFatigueStage(100),
+    currentGoal: undefined,
+    currentAction: undefined,
+    reservedTargetId: undefined,
+    actionTimerSec: 0,
+    workTimerSec: 0,
+    activeWorkItemId: undefined,
+    pathTarget: undefined,
+    pathCells: undefined,
+    debugLabel: "goal:none action:idle"
+  };
+  const merged: PawnState = fixture.overrides
+    ? { ...base, ...fixture.overrides, id: base.id }
+    : base;
+  return normalizePawnNeedSnapshot({
+    ...merged,
+    debugLabel: describePawnDebugLabel(merged)
+  });
+}
+
 export function createDefaultPawnStates(
   spawnPoints: readonly GridCoord[],
   names: readonly string[] = DEFAULT_PAWN_NAMES
@@ -120,7 +178,7 @@ export function createDefaultPawnStates(
   if (spawnPoints.length !== names.length) {
     throw new Error("pawn-state: spawn points count must match names count");
   }
-  const palette = [0xe07a5f, 0x81b29a, 0x3d405b, 0xf2cc8f, 0x9b5de5];
+  const palette = FIXTURE_PAWN_FILL_PALETTE;
   return names.map((name, i) => ({
     id: `pawn-${i}`,
     name,
@@ -130,7 +188,9 @@ export function createDefaultPawnStates(
     fillColor: palette[i % palette.length]!,
     satiety: 100,
     energy: 100,
-    needs: DEFAULT_PAWN_NEEDS,
+    needs: pawnNeedsFromScalars(100, 100, DEFAULT_PAWN_NEEDS.recreation),
+    hungerStage: evaluateHungerStage(100),
+    fatigueStage: evaluateFatigueStage(100),
     currentGoal: undefined,
     currentAction: undefined,
     reservedTargetId: undefined,
@@ -259,6 +319,8 @@ export function pawnDisplayWorldCenter(
 function withDebugLabel(pawn: PawnState): PawnState {
   return {
     ...pawn,
+    hungerStage: evaluateHungerStage(pawn.satiety),
+    fatigueStage: evaluateFatigueStage(pawn.energy),
     debugLabel: formatPawnDebugLabel(pawn)
   };
 }
@@ -306,4 +368,42 @@ export function resetPawnActionTimer(pawn: PawnState): PawnState {
 
 export function describePawnDebugLabel(pawn: PawnState): string {
   return formatPawnDebugLabel(pawn);
+}
+
+const GOAL_MAP_HUD_LABEL: Record<GoalKind, string> = {
+  eat: "进食",
+  sleep: "休息",
+  recreate: "娱乐",
+  wander: "闲逛"
+};
+
+const ACTION_MAP_HUD_LABEL: Record<ActionKind, string> = {
+  "reserve-target": "准备目标",
+  "move-to-target": "移动中",
+  "use-target": "使用中",
+  idle: "待机"
+};
+
+function appendNeedStageHints(hunger: NeedStage, fatigue: NeedStage): string {
+  const parts: string[] = [];
+  if (hunger === "critical") parts.push("饥饿");
+  else if (hunger === "warning") parts.push("略饿");
+  if (fatigue === "critical") parts.push("困倦");
+  else if (fatigue === "warning") parts.push("略困");
+  return parts.length > 0 ? ` · ${parts.join("、")}` : "";
+}
+
+/**
+ * 地图叠加层小人标签正文：玩家可读「当前意图 + 动作」与饱食/精力摘要（oh-code-design/UI系统「状态展示模型」「小人行为展示」）。
+ */
+export function formatPawnMapHudBody(pawn: PawnState): string {
+  const g = pawn.currentGoal?.kind;
+  const a = pawn.currentAction?.kind ?? "idle";
+  const goalLine = g ? GOAL_MAP_HUD_LABEL[g] : "无明确目标";
+  const actionLine = ACTION_MAP_HUD_LABEL[a];
+  const needLine = `饱食 ${Math.round(pawn.satiety)}% · 精力 ${Math.round(pawn.energy)}%${appendNeedStageHints(
+    evaluateHungerStage(pawn.satiety),
+    evaluateFatigueStage(pawn.energy)
+  )}`;
+  return `${goalLine} · ${actionLine}\n${needLine}`;
 }

@@ -8,7 +8,7 @@ export function syncPlayerChannelHintLines(
   orchestrator: GameOrchestrator,
   activeCommandId: CommandMenuCommandId
 ): void {
-  const { modeLine } = presentationForCommandMenuCommand(activeCommandId);
+  const { modeLine, usesBrushStroke } = presentationForCommandMenuCommand(activeCommandId);
   const foot = `世界快照：${orchestrator.getPlayerWorldPort().lineA.snapshotLabel}`;
-  hud.syncPlayerChannelHint(modeLine, foot);
+  hud.syncPlayerChannelHint(modeLine, foot, usesBrushStroke);
 }

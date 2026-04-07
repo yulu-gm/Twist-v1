@@ -5,11 +5,10 @@
  * 调用方（GameScene）负责传入当前状态并写回返回值。
  */
 
+import { advancePawnNeedsWithBehavior, applyNeedDelta } from "../need/need-utils";
 import {
   advanceMoveTowardTarget,
-  advanceNeeds,
   advancePawnActionTimer,
-  applyNeedDelta,
   beginMove,
   clearPawnPath,
   clearPawnIntent,
@@ -20,6 +19,7 @@ import {
   setPawnPath,
   setPawnIntent,
   syncPawnPathToLogicalCell,
+  type PawnGoalState,
   type PawnId,
   type PawnState
 } from "../pawn-state";
@@ -39,17 +39,19 @@ import {
   type ReservationSnapshot,
   type WorldGridConfig
 } from "../map/world-grid";
+import type { BehaviorState } from "./behavior-state-machine";
 import type { SimConfig } from "./sim-config";
 import type { WanderRng } from "./wander-planning";
-import { HUNGER_INTERRUPT_THRESHOLD } from "../need/threshold-rules";
+import { HUNGER_INTERRUPT_THRESHOLD, REST_INTERRUPT_THRESHOLD } from "../need/threshold-rules";
 import type { WorkItemSnapshot } from "../work/work-types";
-import { WORK_WALK_KINDS } from "../world-construct-tick";
+import type { RestSpotOwnershipForPlanning } from "./goal-driven-planning";
+import { WORK_WALK_KINDS } from "../work-walk-targets";
 import { timePeriodForMinute } from "../time/world-time";
 import {
   clonePawnDecisionState,
   type PawnDecisionResult,
   type PawnDecisionTrace
-} from "../../headless/sim-debug-trace";
+} from "./pawn-decision-trace";
 
 export type SimTickInput = Readonly<{
   pawns: readonly PawnState[];
@@ -63,12 +65,19 @@ export type SimTickInput = Readonly<{
    * 优先于吃睡闲逛，沿格邻接走向该格（与 WorldCore 工单一致）。
    */
   workWalkTargets?: ReadonlyMap<PawnId, GridCoord>;
-  /** 当前世界工单快照；传入时才能在饥饿紧急时调用方側 {@link failWorkItem} 释放工单。 */
+  /**
+   * 当前世界工单快照。
+   * 若 tick 内存在已认领的走向类工单且需在需求紧迫时通过 {@link SimTickOutput.workInterrupts} 释放，
+   * **编排层主 tick（如 GameScene / WorldCore 桥接）必须传入**；未传入时 `findClaimedWalkWorkIdForPawn` 无法解析工单 id，
+   * 饥饿/疲劳等需求中断将静默不生成 `workInterrupts`。
+   */
   worldWorkItems?: ReadonlyMap<string, WorkItemSnapshot>;
   /** 当前日内时段；与 {@link minuteOfDay} 二选一或同时传入时以本字段为准。 */
   timePeriod?: "day" | "night";
   /** 当前世界 `minuteOfDay`（0..1439）；用于推导时段或行为侧调试。 */
   minuteOfDay?: number;
+  /** 与 `WorldCore.restSpots` 一致时启用「自己的床」睡眠候选过滤；省略则不在此层过滤归属。 */
+  restSpots?: readonly RestSpotOwnershipForPlanning[];
 }>;
 
 export type SimWorkInterruptRequest = Readonly<{
@@ -80,7 +89,7 @@ export type SimWorkInterruptRequest = Readonly<{
 export type SimTickOutput = Readonly<{
   pawns: readonly PawnState[];
   reservations: ReservationSnapshot;
-  /** AI 事件日志，供调用方 console.info 输出。 */
+  /** AI 事件日志；编排器可在开启调试开关时用 `console.debug` 输出。 */
   aiEvents: readonly string[];
   pawnDecisionTraces: readonly PawnDecisionTrace[];
   /** 本帧因需求中断产生的工单失败请求，由编排器写入 WorldCore。 */
@@ -135,6 +144,44 @@ function sameCell(left: GridCoord | undefined, right: GridCoord | undefined): bo
   return left.col === right.col && left.row === right.row;
 }
 
+/** 已站在交互点对应格：清空路径、重置使用计时并切换为 `use-target`（阶段 2 与阶段 3 共用）。 */
+function switchToUseTargetAtInteractionPoint(
+  pawn: PawnState,
+  goal: PawnGoalState | undefined,
+  interactionPointId: string
+): PawnState {
+  return setPawnIntent(
+    clearPawnPath(resetPawnActionTimer(pawn)),
+    goal,
+    { kind: "use-target", targetId: interactionPointId },
+    interactionPointId
+  );
+}
+
+/** 将当前小人姿态映射为 {@link evolveNeeds} 用的 {@link BehaviorState}（与 sim tick 阶段 1 一致）。 */
+function behaviorStateForNeedEvolution(
+  pawn: PawnState,
+  workWalkAnchor: GridCoord | undefined
+): BehaviorState {
+  if (pawn.moveTarget !== undefined || pawn.currentAction?.kind === "move-to-target") {
+    return "moving";
+  }
+  if (pawn.currentAction?.kind === "use-target") {
+    if (pawn.currentGoal?.kind === "eat") return "eating";
+    if (pawn.currentGoal?.kind === "sleep") return "resting";
+  }
+  if (pawn.activeWorkItemId !== undefined) {
+    return "working";
+  }
+  if (workWalkAnchor && sameCell(pawn.logicalCell, workWalkAnchor)) {
+    return "working";
+  }
+  if (pawn.currentGoal?.kind === "wander") {
+    return "wandering";
+  }
+  return "idle";
+}
+
 type PlannedStepResult = Readonly<{
   pawn: PawnState;
   step?: GridCoord;
@@ -145,15 +192,52 @@ type PlannedStepResult = Readonly<{
   blockerCell?: GridCoord;
 }>;
 
+/** 若 `step` 格上已有其他小人（按 logical 格），返回阻塞者信息供 trace 归因。 */
+function pawnOccupyingStepCell(
+  step: GridCoord,
+  selfId: PawnId,
+  logicalCells: ReadonlyMap<PawnId, GridCoord>,
+  pawnsById: ReadonlyMap<PawnId, PawnState>
+): Readonly<{ blockerPawnId: PawnId; blockerPawnName: string; blockerCell: GridCoord }> | undefined {
+  for (const [otherId, cell] of logicalCells) {
+    if (otherId === selfId) continue;
+    if (cell.col !== step.col || cell.row !== step.row) continue;
+    const other = pawnsById.get(otherId);
+    return {
+      blockerPawnId: otherId,
+      blockerPawnName: other?.name ?? String(otherId),
+      blockerCell: { col: step.col, row: step.row }
+    };
+  }
+  return undefined;
+}
+
+/**
+ * @param ignorePawnStepConflict 为 true 时允许路径上下一步落在其他小人所在格（走向工单锚点专用，避免多小人路口对认领工单的互斥死锁）。
+ *   闲逛/走向食物与床等仍应默认 false，以减少逻辑格叠层与入库链异常。
+ */
 function planNextStepTowardCell(
   grid: WorldGridConfig,
   pawn: PawnState,
   logicalCells: ReadonlyMap<PawnId, GridCoord>,
-  _pawnsById: ReadonlyMap<PawnId, PawnState>,
-  targetCell: GridCoord
+  pawnsById: ReadonlyMap<PawnId, PawnState>,
+  targetCell: GridCoord,
+  ignorePawnStepConflict: boolean
 ): PlannedStepResult {
+  const considerConflict = !ignorePawnStepConflict;
   const cached = nextStepFromPath(grid, pawn, logicalCells, targetCell);
   if (cached) {
+    if (considerConflict) {
+      const conflict = pawnOccupyingStepCell(cached, pawn.id, logicalCells, pawnsById);
+      if (conflict) {
+        return {
+          pawn: clearPawnPath(pawn),
+          attemptedStep: cached,
+          blockedReason: "step-conflict",
+          ...conflict
+        };
+      }
+    }
     return { pawn, step: cached };
   }
 
@@ -162,16 +246,29 @@ function planNextStepTowardCell(
     return { pawn: clearPawnPath(pawn), blockedReason: "step-blocked" };
   }
 
-  const repathedPawn = setPawnPath(pawn, targetCell, replannedPath);
   const [step] = replannedPath;
   if (!step) {
-    return { pawn: repathedPawn, blockedReason: "step-blocked" };
+    return { pawn: clearPawnPath(pawn), blockedReason: "step-blocked" };
   }
+
+  if (considerConflict) {
+    const conflict = pawnOccupyingStepCell(step, pawn.id, logicalCells, pawnsById);
+    if (conflict) {
+      return {
+        pawn: clearPawnPath(pawn),
+        attemptedStep: step,
+        blockedReason: "step-conflict",
+        ...conflict
+      };
+    }
+  }
+
+  const repathedPawn = setPawnPath(pawn, targetCell, replannedPath);
   return { pawn: repathedPawn, step };
 }
 
 export function tickSimulation(input: SimTickInput): SimTickOutput {
-  const { grid, simulationDt, config, rng, workWalkTargets, worldWorkItems } = input;
+  const { grid, simulationDt, config, rng, workWalkTargets, worldWorkItems, restSpots } = input;
   const timePeriod = resolveSimTimePeriod(input);
   const aiEvents: string[] = [];
   const pawnDecisionTraces: PawnDecisionTrace[] = [];
@@ -180,8 +277,17 @@ export function tickSimulation(input: SimTickInput): SimTickOutput {
   const interruptReasons = new Map<PawnId, string>();
 
   // --- 阶段 1：推进需求 + 移动 + 使用计时 ---
+  // 需求：`advancePawnNeedsWithBehavior` → evolveNeeds；进食/休息恢复仅在此逐 dt 结算，勿与同 dt 的 settleEating/settleResting 叠加（AP-0139）。
   let nextPawns = input.pawns.map((pawn) => {
-    let updated = advanceNeeds(pawn, simulationDt, config.needGrowthPerSec);
+    const workAnchor = workWalkTargets?.get(pawn.id);
+    const behavior = behaviorStateForNeedEvolution(pawn, workAnchor);
+    let updated = advancePawnNeedsWithBehavior(
+      pawn,
+      simulationDt,
+      behavior,
+      config.needGrowthPerSec,
+      timePeriod
+    );
     updated = syncPawnPathToLogicalCell(
       finishMoveIfComplete(advanceMoveTowardTarget(updated, simulationDt, config.moveDurationSec))
     );
@@ -223,31 +329,29 @@ export function tickSimulation(input: SimTickInput): SimTickOutput {
       pawn.logicalCell.col === point.cell.col &&
       pawn.logicalCell.row === point.cell.row
     ) {
-      return setPawnIntent(
-        clearPawnPath(resetPawnActionTimer(pawn)),
-        pawn.currentGoal,
-        { kind: "use-target", targetId: point.id },
-        point.id
-      );
+      return switchToUseTargetAtInteractionPoint(pawn, pawn.currentGoal, point.id);
     }
 
     return pawn;
   });
 
-  // --- 阶段 2.5：饥饿紧急 → 放弃走向类工单（释放工单由编排器 failWorkItem）---
+  // --- 阶段 2.5：饥饿或疲劳紧迫 → 放弃走向类工单（释放工单由编排器 failWorkItem）---
   const hungerInterruptedPawnIds = new Set<PawnId>();
   nextPawns = nextPawns.map((pawn) => {
     const walkWorkId = findClaimedWalkWorkIdForPawn(pawn.id, worldWorkItems);
     if (walkWorkId === undefined) return pawn;
-    if (pawn.needs.hunger <= HUNGER_INTERRUPT_THRESHOLD) return pawn;
+    const hungerUrgent = pawn.needs.hunger > HUNGER_INTERRUPT_THRESHOLD;
+    const restUrgent = pawn.needs.rest > REST_INTERRUPT_THRESHOLD;
+    if (!hungerUrgent && !restUrgent) return pawn;
+    const reason = hungerUrgent ? "need-interrupt-hunger" : "need-interrupt-rest";
     workInterrupts.push({
       workItemId: walkWorkId,
       pawnId: pawn.id,
-      reason: "need-interrupt-hunger"
+      reason
     });
     hungerInterruptedPawnIds.add(pawn.id);
-    interruptReasons.set(pawn.id, "need-interrupt-hunger");
-    aiEvents.push(`[AI] ${pawn.name}: need-interrupt-hunger → release work ${walkWorkId}`);
+    interruptReasons.set(pawn.id, reason);
+    aiEvents.push(`[AI] ${pawn.name}: ${reason} → release work ${walkWorkId}`);
     return clearPawnIntent({
       ...pawn,
       moveTarget: undefined,
@@ -264,7 +368,8 @@ export function tickSimulation(input: SimTickInput): SimTickOutput {
       grid,
       pawn,
       reservations: nextReservations,
-      timePeriod
+      timePeriod,
+      restSpots
     } as const;
     const candidates = collectGoalDecisionCandidates(candidateInput);
     const previousLabel = pawn.debugLabel;
@@ -300,7 +405,7 @@ export function tickSimulation(input: SimTickInput): SimTickOutput {
         });
         return arrived;
       }
-      const planned = planNextStepTowardCell(grid, pawn, logicalCells, pawnsById, anchor);
+      const planned = planNextStepTowardCell(grid, pawn, logicalCells, pawnsById, anchor, true);
       if (!planned.step) {
         const waiting = setPawnIntent(
           planned.pawn,
@@ -359,12 +464,7 @@ export function tickSimulation(input: SimTickInput): SimTickOutput {
       : undefined;
     if (pawn.currentAction?.kind === "move-to-target" && currentMovePoint && pawn.currentGoal) {
       if (sameCell(pawn.logicalCell, currentMovePoint.cell)) {
-        const using = setPawnIntent(
-          clearPawnPath(resetPawnActionTimer(pawn)),
-          pawn.currentGoal,
-          { kind: "use-target", targetId: currentMovePoint.id },
-          currentMovePoint.id
-        );
+        const using = switchToUseTargetAtInteractionPoint(pawn, pawn.currentGoal, currentMovePoint.id);
         pawnDecisionTraces.push({
           pawnId: pawn.id,
           pawnName: pawn.name,
@@ -379,7 +479,14 @@ export function tickSimulation(input: SimTickInput): SimTickOutput {
         return using;
       }
 
-      const planned = planNextStepTowardCell(grid, pawn, logicalCells, pawnsById, currentMovePoint.cell);
+      const planned = planNextStepTowardCell(
+        grid,
+        pawn,
+        logicalCells,
+        pawnsById,
+        currentMovePoint.cell,
+        false
+      );
       if (!planned.step) {
         const waiting = setPawnIntent(
           planned.pawn,
@@ -438,7 +545,7 @@ export function tickSimulation(input: SimTickInput): SimTickOutput {
       pawn.currentGoal?.kind === "wander" &&
       pawn.pathTarget
     ) {
-      const planned = planNextStepTowardCell(grid, pawn, logicalCells, pawnsById, pawn.pathTarget);
+      const planned = planNextStepTowardCell(grid, pawn, logicalCells, pawnsById, pawn.pathTarget, false);
       if (!planned.step) {
         const waiting = setPawnIntent(
           planned.pawn,
@@ -495,7 +602,7 @@ export function tickSimulation(input: SimTickInput): SimTickOutput {
     const decisionSource = interruptReasons.has(pawn.id) ? "need-interrupt" : "goal-planner";
 
     if (decision.goal === "wander") {
-      const wanderPath = chooseWanderPath(grid, pawn, rng);
+      const wanderPath = chooseWanderPath(grid, pawn, logicalCells, rng);
       const target = wanderPath?.[wanderPath.length - 1];
       if (!wanderPath || !target) {
         const wandered = setPawnIntent(
@@ -611,12 +718,11 @@ export function tickSimulation(input: SimTickInput): SimTickOutput {
     nextReservations = reserved;
 
     if (sameCell(pawn.logicalCell, targetCell)) {
-      const using = setPawnIntent(
-        clearPawnPath(resetPawnActionTimer(pawn)),
-        { kind: decision.goal, reason: decision.reason, targetId: point.id },
-        { kind: "use-target", targetId: point.id },
-        point.id
-      );
+      const using = switchToUseTargetAtInteractionPoint(pawn, {
+        kind: decision.goal,
+        reason: decision.reason,
+        targetId: point.id
+      }, point.id);
       if (using.debugLabel !== previousLabel) {
         aiEvents.push(`[AI] ${using.name}: ${using.debugLabel} (${decision.reason})`);
       }
@@ -634,7 +740,7 @@ export function tickSimulation(input: SimTickInput): SimTickOutput {
       return using;
     }
 
-    const planned = planNextStepTowardCell(grid, pawn, logicalCells, pawnsById, targetCell);
+    const planned = planNextStepTowardCell(grid, pawn, logicalCells, pawnsById, targetCell, false);
     if (!planned.step) {
       aiEvents.push(`[AI] ${pawn.name}: wait: no step toward ${point.id}`);
       const waiting = setPawnIntent(

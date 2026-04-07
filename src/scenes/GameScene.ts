@@ -9,26 +9,27 @@ import {
   createInitialTimeOfDayState,
   DEFAULT_TIME_CONTROL_STATE,
   DEFAULT_TIME_OF_DAY_CONFIG,
-  sampleTimeOfDayPalette,
   type TimeControlState,
-  type TimeOfDayPalette,
   type TimeOfDayState,
   type TimeSpeed
 } from "../game/time";
+import { sampleTimeOfDayPalette, type TimeOfDayPalette } from "../ui/time-of-day-palette";
 import { GameOrchestrator } from "../game/game-orchestrator";
-import type { OrchestratorWorldBridge } from "../game/orchestrator-world-bridge";
 import { bootstrapWorldForScene } from "../game/world-bootstrap";
 import { createWorldCore } from "../game/world-core";
 import {
   createReservationSnapshot,
+  DEFAULT_INTERACTION_TEMPLATE_GRID,
+  DEFAULT_SCENARIO_INTERACTION_POINTS,
   DEFAULT_WORLD_GRID,
-  seedBlockedCellsAsObstacles,
   type InteractionPoint,
   type ReservationSnapshot,
   type WorldGridConfig
 } from "../game/map";
+import { seedBlockedCellsAsObstacles } from "../game/world-seed-obstacles";
 import type { SimGridSyncState } from "../game/world-sim-bridge";
-import { DEFAULT_SIM_CONFIG, type SimConfig } from "../game/behavior";
+import { type SimConfig } from "../game/behavior";
+import { createInteractiveClientSimConfig } from "./main-scene-sim-config";
 import { HudManager } from "../ui/hud-manager";
 import { defaultCommandMenuCommandId, type CommandMenuCommandId } from "../data/command-menu";
 import { createCommandMenuState, selectCommandMenuCommand as selectCommandMenuStateCommand } from "../ui/menu-model";
@@ -48,6 +49,7 @@ import { drawTreesToGraphics } from "./renderers/tree-renderer";
 import { drawZoneOverlaysToGraphics } from "./renderers/zone-overlay-renderer";
 import { drawBuildingsAndBlueprintsToGraphics } from "./renderers/building-renderer";
 import { syncTaskMarkerView } from "./renderers/selection-renderer";
+import { MAP_OVERLAY_DEPTH } from "./map-overlay-depths";
 import { GameSceneCameraControls } from "./game-scene-camera-controls";
 import { GameSceneFloorInteraction } from "./game-scene-floor-interaction";
 import {
@@ -59,15 +61,13 @@ import {
 } from "./game-scene-presentation";
 import { syncPlayerChannelHintLines } from "./game-scene-hud-sync";
 import { GameSceneKeyboardBindings } from "./game-scene-keyboard-bindings";
-import { listAvailableScenarios, loadScenarioIntoGame } from "../player/scenario-loader";
+import { loadScenarioIntoGame } from "../player/scenario-loader";
+import { ALL_SCENARIOS } from "../../scenarios";
 import { WorldCoreWorldPort } from "../player/world-core-world-port";
 import type { ScenarioDefinition } from "../headless/scenario-types";
-import { getWorldSnapshot } from "../game/world-core";
-import {
-  diffWorkLifecycleEvents,
-  type PawnDecisionTrace,
-  type WorkLifecycleTraceEvent
-} from "../headless/sim-debug-trace";
+import { getWorldSnapshot, projectTreeSnapshotsForRender } from "../game/world-core";
+import { diffWorkLifecycleEvents, type WorkLifecycleTraceEvent } from "../headless/sim-debug-trace";
+import type { PawnDecisionTrace } from "../game/behavior/pawn-decision-trace";
 import { getRuntimeLogSession } from "../runtime-log/runtime-log-session";
 import { selectRuntimeDebugLogEntries } from "../ui/runtime-debug-log-store";
 
@@ -115,7 +115,7 @@ export class GameScene extends Phaser.Scene {
 
   private readonly keyboard = new GameSceneKeyboardBindings();
 
-  private simConfig: SimConfig = DEFAULT_SIM_CONFIG;
+  private simConfig: SimConfig = createInteractiveClientSimConfig();
   private simGridSyncState: SimGridSyncState | null = null;
   private orchestrator!: GameOrchestrator;
   private floorInteraction!: GameSceneFloorInteraction;
@@ -152,12 +152,13 @@ export class GameScene extends Phaser.Scene {
     this.layoutGrid();
     this.setupGridHoverHighlight();
 
-    this.simConfig = DEFAULT_SIM_CONFIG;
-    const { worldGrid, worldPort } = bootstrapWorldForScene({
+    this.simConfig = createInteractiveClientSimConfig();
+    const { worldGrid, worldCore } = bootstrapWorldForScene({
       simConfig: this.simConfig,
       timeOfDayState: this.timeOfDayState
     });
     this.worldGrid = worldGrid;
+    const worldPort = new WorldCoreWorldPort(worldCore);
 
     this.gridGraphics = this.add.graphics();
     drawGridLines(this.gridGraphics, this.worldGrid, this.gridOriginX, this.gridOriginY, this.timeOfDayPalette);
@@ -192,12 +193,12 @@ export class GameScene extends Phaser.Scene {
 
     this.floorSelectionGraphics = this.add.graphics();
     /** 须高于树木（13），否则框选/拖动时预览环与填充会被树冠遮住（伐木最明显）。 */
-    this.floorSelectionGraphics.setDepth(32);
+    this.floorSelectionGraphics.setDepth(MAP_OVERLAY_DEPTH.floorSelection);
     this.floorSelectionDraftGraphics = this.add.graphics();
-    this.floorSelectionDraftGraphics.setDepth(34);
+    this.floorSelectionDraftGraphics.setDepth(MAP_OVERLAY_DEPTH.floorSelectionDraft);
     this.taskMarkerGraphics = this.add.graphics();
     /** 高于选区草稿，保证已下达任务标记始终可读。 */
-    this.taskMarkerGraphics.setDepth(40);
+    this.taskMarkerGraphics.setDepth(MAP_OVERLAY_DEPTH.taskMarkerGraphics);
     syncTaskMarkerView(
       this.taskMarkerGraphics,
       this.taskMarkerTexts,
@@ -241,6 +242,9 @@ export class GameScene extends Phaser.Scene {
     this.hud.bindSceneVariantSelect(this.variant, (next) => {
       this.scene.restart({ variant: next });
     });
+    this.runtimeLogSession.setOnDevNdjsonPathReady(() => {
+      this.syncDebugPanel();
+    });
     this.hud.setupDebugPanel({
       onToggleOpen: () => {
         this.debugPanelOpen = !this.debugPanelOpen;
@@ -274,14 +278,14 @@ export class GameScene extends Phaser.Scene {
       }
     });
 
-    this.hud.setupYamlScenarioPanel(listAvailableScenarios(), (def) => {
+    this.hud.setupYamlScenarioPanel([...ALL_SCENARIOS], (def) => {
       this.applyHeadlessScenarioDefinition(def);
     });
 
     this.orchestrator = new GameOrchestrator({
       worldPort,
       worldGrid: this.worldGrid,
-      interactionTemplate: DEFAULT_WORLD_GRID,
+      interactionTemplate: DEFAULT_INTERACTION_TEMPLATE_GRID,
       sim: {
         getPawns: () => this.pawns,
         setPawns: (next) => {
@@ -299,7 +303,10 @@ export class GameScene extends Phaser.Scene {
         setTimeOfDayPalette: (next) => {
           this.timeOfDayPalette = next;
         },
-        getTimeControlState: () => this.timeControlState,
+        getTimeControlState: () => ({ ...this.timeControlState }),
+        setTimeControlState: (next) => {
+          this.timeControlState = { ...next };
+        },
         getSimGridSyncState: () => this.simGridSyncState,
         setSimGridSyncState: (next) => {
           this.simGridSyncState = next;
@@ -338,7 +345,8 @@ export class GameScene extends Phaser.Scene {
             this.worldGrid,
             this.gridOriginX,
             this.gridOriginY,
-            (this.orchestrator.getPlayerWorldPort() as OrchestratorWorldBridge).getWorld().workItems
+            this.orchestrator.getWorldSimAccess().getWorld().workItems,
+            this.simConfig.workItemAnchorDurationSec
           ),
         syncMarkerOverlay: () => this.syncMarkerOverlayWithWorld(),
         syncHoverFromPointer: () => this.syncHoverFromPointer(),
@@ -370,7 +378,7 @@ export class GameScene extends Phaser.Scene {
     this.floorInteraction.redrawFloorSelectionAndBrush();
     this.floorInteraction.bind();
 
-    this.cameraControls = new GameSceneCameraControls(this);
+    this.cameraControls = new GameSceneCameraControls(this, this.worldGrid.cellSizePx);
     this.cameraControls.bind();
 
     this.orchestrator.bootstrapSimulationGrid();
@@ -384,15 +392,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   public update(_time: number, delta: number): void {
-    const worldBefore = getWorldSnapshot(
-      (this.orchestrator.getPlayerWorldPort() as OrchestratorWorldBridge).getWorld()
-    );
+    const worldBefore = getWorldSnapshot(this.orchestrator.getWorldSimAccess().getWorld());
     this.orchestrator.tick(delta);
     if (this.orchestrator.didAdvanceSimulationLastTick()) {
       this.runtimeTickCount += 1;
-      const worldAfter = getWorldSnapshot(
-        (this.orchestrator.getPlayerWorldPort() as OrchestratorWorldBridge).getWorld()
-      );
+      const worldAfter = getWorldSnapshot(this.orchestrator.getWorldSimAccess().getWorld());
       this.captureRuntimeDebugEntries(
         this.runtimeTickCount,
         this.orchestrator.getLastAiEvents(),
@@ -404,14 +408,13 @@ export class GameScene extends Phaser.Scene {
   }
 
   private syncTreesAndGroundLayer(): void {
-    const port = this.orchestrator.getPlayerWorldPort() as OrchestratorWorldBridge;
-    const world = port.getWorld();
+    const world = this.orchestrator.getWorldSimAccess().getWorld();
     drawTreesToGraphics(
       this.treeGraphics,
       this.worldGrid,
       this.gridOriginX,
       this.gridOriginY,
-      world.entities.values()
+      projectTreeSnapshotsForRender(world)
     );
     syncGroundResourceItems(
       this,
@@ -493,7 +496,8 @@ export class GameScene extends Phaser.Scene {
       gridOriginY: this.gridOriginY,
       hoverHighlightFrame: this.hoverHighlightFrame,
       hud: this.hud,
-      lastHoverKeyRef: this.lastHoverKeyRef
+      lastHoverKeyRef: this.lastHoverKeyRef,
+      getWorld: () => this.orchestrator.getWorldSimAccess().getWorld()
     });
   }
 
@@ -506,8 +510,7 @@ export class GameScene extends Phaser.Scene {
 
   private syncPawnDetailPanel(): void {
     const pawn = this.selectedPawnId ? this.pawns.find((p) => p.id === this.selectedPawnId) : undefined;
-    const port = this.orchestrator.getPlayerWorldPort() as OrchestratorWorldBridge;
-    this.hud.syncPawnDetail(pawn, port.getWorld().workItems);
+    this.hud.syncPawnDetail(pawn, this.orchestrator.getWorldSimAccess().getWorld().workItems);
   }
 
   private toggleTimePaused(): void {
@@ -644,7 +647,8 @@ export class GameScene extends Phaser.Scene {
       paused: this.debugLogPaused,
       filter: this.debugFilter,
       selectedEntryId: this.debugSelectedEntryId,
-      entries
+      entries,
+      devNdjsonFilePath: this.runtimeLogSession.devNdjsonFilePath
     });
   }
 
@@ -655,7 +659,7 @@ export class GameScene extends Phaser.Scene {
    * - **`blockedCellKeys` 置空**：`syncWorldGridForSimulation` 会把墙体与障碍实体写回网格；若再叠「本局随机石格」，
    *   `seedBlockedCellsAsObstacles` 会先种一批石头实体，常与场景里写死的树/人出生格冲突（headless 从不带随机石头，浏览器却曾恢复它们）。
    *   YAML 热切换按**空地形**叠 `ScenarioDefinition`，载入后再由新世界同步回不可走格。
-   * - **交互点**：恢复为与编排器 `interactionTemplate`（{@link DEFAULT_WORLD_GRID}）一致的样板。
+   * - **交互点**：恢复为与编排器 `interactionTemplate`（默认关卡样板）一致的列表。
    * - **同步游标**：`simGridSyncState` 置空，下一轮 `bootstrapSimulationGrid` 必须从 `WorldCore` 完整重算。
    */
   private cleanupRuntimeBeforeNextScenario(): void {
@@ -666,7 +670,7 @@ export class GameScene extends Phaser.Scene {
       (this.worldGrid as WorldGridConfig & { blockedCellKeys: Set<string> }).blockedCellKeys = new Set();
     }
     (this.worldGrid as WorldGridConfig & { interactionPoints: InteractionPoint[] }).interactionPoints = [
-      ...DEFAULT_WORLD_GRID.interactionPoints
+      ...DEFAULT_SCENARIO_INTERACTION_POINTS
     ];
     this.simGridSyncState = null;
   }

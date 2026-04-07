@@ -3,7 +3,13 @@
  * 与 Phaser 解耦；渲染/UI 通过 hooks 回调到场景。
  */
 
-import { findClaimedWalkWorkIdForPawn, tickSimulation, type SimConfig } from "./behavior";
+import {
+  createBehaviorFSM,
+  findClaimedWalkWorkIdForPawn,
+  tickSimulation,
+  type BehaviorFSM,
+  type SimConfig
+} from "./behavior";
 import {
   pruneReservationSnapshot,
   type ReservationSnapshot,
@@ -15,25 +21,26 @@ import {
   detectTimeEvents,
   effectiveSimulationDeltaSeconds,
   publish,
-  sampleTimeOfDayPalette,
+  timeSliceAdvancedEvent,
   subscribe,
   type TimeControlState,
   type TimeEvent,
   type TimeEventBus,
-  type TimeOfDayPalette,
   type TimeOfDayState
 } from "./time";
+import { sampleTimeOfDayPalette, type TimeOfDayPalette } from "../ui/time-of-day-palette";
 import { syncWorldGridForSimulation, type SimGridSyncState } from "./world-sim-bridge";
 import { autoClaimOpenWorkItems, cleanupStaleTargetWorkItems, tickAnchoredWorkProgress } from "./world-work-tick";
-import { buildWorkWalkTargets } from "./world-construct-tick";
+import { buildWorkWalkTargets } from "./work-walk-targets";
 import { REST_SLEEP_PRIORITY_THRESHOLD } from "./need/threshold-rules";
-import { assignUnownedBeds } from "./bed-auto-assign";
-import { clearPawnIntent, type PawnState } from "./pawn-state";
+import { assignUnownedBeds, ENABLE_PER_FRAME_UNOWNED_BED_FALLBACK } from "./bed-auto-assign";
+import { setupNightRestFlow } from "./flows/night-rest-flow";
+import { clearPawnIntent, type PawnId, type PawnState } from "./pawn-state";
 import { failWorkItem } from "./work/work-operations";
 import { getWorldSnapshot } from "./world-core";
-import type { OrchestratorWorldBridge } from "./orchestrator-world-bridge";
+import type { OrchestratorWorldBridge, WorldSimAccess } from "../player/orchestrator-world-bridge";
 import type { PlayerWorldPort } from "../player/world-port-types";
-import type { PawnDecisionTrace } from "../headless/sim-debug-trace";
+import type { PawnDecisionTrace } from "./behavior/pawn-decision-trace";
 import {
   commitPlayerSelectionToWorld,
   type PlayerSelectionCommitInput,
@@ -50,9 +57,17 @@ export type GameOrchestratorSimAccess = Readonly<{
   getTimeOfDayPalette: () => TimeOfDayPalette;
   setTimeOfDayPalette: (next: TimeOfDayPalette) => void;
   getTimeControlState: () => TimeControlState;
+  setTimeControlState: (next: TimeControlState) => void;
   getSimGridSyncState: () => SimGridSyncState | null;
   setSimGridSyncState: (next: SimGridSyncState | null) => void;
 }>;
+
+/**
+ * 经 SimAccess 与编排器同源路径追加小人；夹具应调用本函数，而非对 `getPawnsRef().push`（行动点 #0217）。
+ */
+export function registerPawnWithSimAccess(sim: GameOrchestratorSimAccess, pawn: PawnState): void {
+  sim.setPawns([...sim.getPawns(), pawn]);
+}
 
 export type GameOrchestratorHooks = Readonly<{
   onPaletteChanged: () => void;
@@ -77,6 +92,8 @@ export type GameOrchestratorOptions = Readonly<{
   hooks: GameOrchestratorHooks;
   /** 若省略则使用内部新建的总线（可通过 {@link GameOrchestrator.getTimeEventBus} 订阅） */
   timeEventBus?: TimeEventBus;
+  /** 为 true 时以 `console.debug` 输出本帧 `tickSimulation` 的 AI 文本事件；默认关闭。 */
+  debugLogAiEvents?: boolean;
 }>;
 
 function sameTimeOfDayPalette(left: TimeOfDayPalette, right: TimeOfDayPalette): boolean {
@@ -91,16 +108,31 @@ function sameTimeOfDayPalette(left: TimeOfDayPalette, right: TimeOfDayPalette): 
 
 export class GameOrchestrator {
   private readonly timeBus: TimeEventBus;
+  private readonly nightRestFsmByPawn = new Map<PawnId, BehaviorFSM>();
   private advancedSimulationLastTick = false;
   private lastAiEvents: readonly string[] = [];
   private lastPawnDecisionTraces: readonly PawnDecisionTrace[] = [];
 
   public constructor(private readonly options: GameOrchestratorOptions) {
     this.timeBus = options.timeEventBus ?? createTimeEventBus();
+    // night-start：先释放困意高者的走向工单，再由夜间归宿流将有床小人的 FSM 切入 resting（订阅顺序即调用顺序）。
     subscribe(this.timeBus, (event: TimeEvent) => {
       if (event.kind !== "night-start") return;
       this.releaseWalkWorkForRestSeekingPawnsAtNightStart();
     });
+    setupNightRestFlow(this.timeBus, {
+      getWorld: () => this.options.worldPort.getWorld(),
+      getFsm: (pawnId) => this.ensureNightRestFsm(pawnId)
+    });
+  }
+
+  private ensureNightRestFsm(pawnId: PawnId): BehaviorFSM {
+    let fsm = this.nightRestFsmByPawn.get(pawnId);
+    if (!fsm) {
+      fsm = createBehaviorFSM(pawnId);
+      this.nightRestFsmByPawn.set(pawnId, fsm);
+    }
+    return fsm;
   }
 
   public getTimeEventBus(): TimeEventBus {
@@ -108,6 +140,11 @@ export class GameOrchestrator {
   }
 
   public getPlayerWorldPort(): PlayerWorldPort {
+    return this.options.worldPort;
+  }
+
+  /** 仅世界内核访问；UI/场景需要 `WorldCore` 时应调用此方法，而非将 {@link getPlayerWorldPort} 断言为整桥。 */
+  public getWorldSimAccess(): WorldSimAccess {
     return this.options.worldPort;
   }
 
@@ -144,9 +181,17 @@ export class GameOrchestrator {
     this.refreshSimulationGrid(interactionTemplate, false);
 
     const nextTimeSnapshot = clock.world.time;
-    const domainTimeEvents = detectTimeEvents(prevTimeSnapshot, nextTimeSnapshot);
-    if (domainTimeEvents.length > 0) {
-      publish(this.timeBus, domainTimeEvents);
+    const domainTimeEvents = detectTimeEvents(
+      prevTimeSnapshot,
+      nextTimeSnapshot,
+      clock.world.timeConfig
+    );
+    const timeBusBatch: TimeEvent[] =
+      clock.elapsedSimulationSeconds > 0
+        ? [...domainTimeEvents, timeSliceAdvancedEvent(nextTimeSnapshot)]
+        : [...domainTimeEvents];
+    if (timeBusBatch.length > 0) {
+      publish(this.timeBus, timeBusBatch);
     }
 
     const snapshotTime = getWorldSnapshot(clock.world).time;
@@ -208,13 +253,17 @@ export class GameOrchestrator {
       workWalkTargets,
       worldWorkItems: worldForSim.workItems,
       timePeriod: worldForSim.time.currentPeriod,
-      minuteOfDay: worldForSim.time.minuteOfDay
+      minuteOfDay: worldForSim.time.minuteOfDay,
+      restSpots: worldForSim.restSpots
     });
 
-    for (const msg of result.aiEvents) {
-      console.info(msg);
+    if (this.options.debugLogAiEvents) {
+      for (const msg of result.aiEvents) {
+        console.debug(msg);
+      }
     }
     this.lastAiEvents = result.aiEvents;
+    this.lastPawnDecisionTraces = result.pawnDecisionTraces;
 
     sim.setReservations(result.reservations);
     sim.setPawns([...result.pawns]);
@@ -242,7 +291,8 @@ export class GameOrchestrator {
     const { world: worldAfterProgress, pawns: pawnsAfterProgress } = tickAnchoredWorkProgress(
       worldBeforeProgress,
       sim.getPawns(),
-      simulationDt
+      simulationDt,
+      this.options.simConfig
     );
     if (worldAfterProgress !== worldBeforeProgress) {
       worldPort.setWorld(worldAfterProgress);
@@ -250,11 +300,13 @@ export class GameOrchestrator {
     }
     sim.setPawns(pawnsAfterProgress);
 
-    const worldBeforeBeds = worldPort.getWorld();
-    const worldAfterBeds = assignUnownedBeds(worldBeforeBeds, sim.getPawns());
-    if (worldAfterBeds !== worldBeforeBeds) {
-      worldPort.setWorld(worldAfterBeds);
-      this.refreshSimulationGrid(interactionTemplate, false);
+    if (ENABLE_PER_FRAME_UNOWNED_BED_FALLBACK) {
+      const worldBeforeBeds = worldPort.getWorld();
+      const worldAfterBeds = assignUnownedBeds(worldBeforeBeds, sim.getPawns());
+      if (worldAfterBeds !== worldBeforeBeds) {
+        worldPort.setWorld(worldAfterBeds);
+        this.refreshSimulationGrid(interactionTemplate, false);
+      }
     }
 
     // 须在 tickSimulation / tickAnchoredWorkProgress 等写入世界之后再同步，否则蓝图落成后仍一帧（或多帧）显示施工虚影。
@@ -344,8 +396,7 @@ export class GameOrchestrator {
   }
 
   /**
-   * 提供给 GameScene：上一帧的 pawn 决策追踪。
-   * 当前 sim-loop 仅输出 AI 文本事件，未产出结构化决策轨迹，先返回空数组保持 API 兼容。
+   * 提供给 GameScene：上一帧行为 sim-loop（tickSimulation）产出的 pawn 决策追踪（暂停帧为空）。
    */
   public getLastPawnDecisionTraces(): readonly PawnDecisionTrace[] {
     return this.lastPawnDecisionTraces;

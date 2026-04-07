@@ -1,6 +1,6 @@
 import { coordKey } from "../src/game/map";
 import type { ScenarioDefinition } from "../src/headless/scenario-types";
-import type { DomainCommand } from "../src/player/s0-contract";
+import type { DomainCommand } from "../src/game/interaction/domain-command-types";
 
 /** 树格；小人生成在相邻格（曼哈顿距离 1）。 */
 const TREE_CELL = { col: 12, row: 7 } as const;
@@ -19,7 +19,7 @@ const LUMBER_ON_TREE: DomainCommand = {
   targetCellKeys: [treeKey],
   targetEntityIds: [],
   sourceMode: {
-    source: { kind: "menu", menuId: "orders", itemId: "lumber" },
+    source: { kind: "menu", menuId: "tools", itemId: "lumber" },
     selectionModifier: "replace",
     inputShape: "rect-selection"
   }

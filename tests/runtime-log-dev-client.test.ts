@@ -45,4 +45,71 @@ describe("runtime log dev http batch sink", () => {
     expect(fetchMock.mock.calls[2]?.[0]).toBe("/__runtime-log/flush");
     expect(String(fetchMock.mock.calls[1]?.[1]?.body)).toContain('"runId":"run-1"');
   });
+
+  it("includes HTTP status and response body snippet when request fails", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce({
+      ok: false,
+      status: 502,
+      text: async () => '{"error":"bad"}'
+    });
+
+    const sink = createRuntimeLogDevHttpBatchSink({
+      runId: "run-1",
+      endpoint: "/__runtime-log",
+      fetchImpl: fetchMock
+    });
+
+    await expect(
+      sink.writeBatch([
+        createRuntimeLogEvent({
+          runId: "run-1",
+          seq: 1,
+          timestampIso: "2026-04-06T12:00:00.000Z",
+          tick: 1,
+          category: "Runtime.Session",
+          verbosity: "Display",
+          message: "x",
+          detail: { ok: true }
+        })
+      ])
+    ).rejects.toThrow(/HTTP 502.*bad/s);
+  });
+
+  it("invokes onStartAck with start response body", async () => {
+    const onStartAck = vi.fn();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ runId: "run-1", filePath: "/tmp/a.ndjson" })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ ok: true })
+      });
+
+    const sink = createRuntimeLogDevHttpBatchSink({
+      runId: "run-1",
+      endpoint: "/__runtime-log",
+      fetchImpl: fetchMock,
+      onStartAck
+    });
+
+    await sink.writeBatch([
+      createRuntimeLogEvent({
+        runId: "run-1",
+        seq: 1,
+        timestampIso: "2026-04-06T12:00:00.000Z",
+        tick: 1,
+        category: "Runtime.Session",
+        verbosity: "Display",
+        message: "x",
+        detail: { ok: true }
+      })
+    ]);
+
+    expect(onStartAck).toHaveBeenCalledWith(
+      expect.objectContaining({ filePath: "/tmp/a.ndjson", runId: "run-1" })
+    );
+  });
 });

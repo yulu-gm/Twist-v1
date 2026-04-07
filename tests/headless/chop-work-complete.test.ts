@@ -31,7 +31,9 @@ describe("completeChopWork（WorldCore 直接工单完成）", () => {
       anchorCell: { ...treeCell },
       targetEntityId: treeId,
       status: "open",
-      failureCount: 0
+      failureCount: 0,
+      priority: 10,
+      sourceReason: "test"
     });
 
     const claimed = claimWorkItem(world, chopId, "pawn-worker");

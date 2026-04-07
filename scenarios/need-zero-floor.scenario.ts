@@ -1,11 +1,11 @@
-import { coordKey, DEFAULT_WORLD_GRID } from "../src/game/map/world-grid";
+import { coordKey, DEFAULT_SCENARIO_INTERACTION_POINTS, DEFAULT_WORLD_GRID } from "../src/game/map";
 import type { ScenarioDefinition } from "../src/headless/scenario-types";
 
 const PAWN_CELL = DEFAULT_WORLD_GRID.defaultSpawnPoints[0]!;
 
 const NEED_ZERO_FLOOR_GRID = {
   ...DEFAULT_WORLD_GRID,
-  interactionPoints: DEFAULT_WORLD_GRID.interactionPoints.filter((point) => point.kind === "recreation")
+  interactionPoints: DEFAULT_SCENARIO_INTERACTION_POINTS.filter((point) => point.kind === "recreation")
 };
 
 /** 无食物兜底时把饱食度压到 0，验证需求数值锁底而不出现负数。 */

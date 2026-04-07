@@ -172,7 +172,6 @@
         "src/player/world-port-types.ts",
         "src/player/interaction-mode-presenter.ts",
         "src/player/mock-world-port.ts",
-        "src/player/need-signals.ts",
         "src/player/scenario-loader.ts",
         "src/player/s0-contract.ts",
         "src/player/tool-input-policy.ts",

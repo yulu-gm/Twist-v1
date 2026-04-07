@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { isCellOccupiedByOthers } from "../../src/game/map/occupancy-manager";
+import { DEFAULT_SCENARIO_INTERACTION_POINTS } from "../../src/game/map/default-scenario-interaction-points";
 import {
   blockedKeysFromCells,
   cellAtWorldPixel,
@@ -8,7 +10,6 @@ import {
   coordKey,
   rectCellKeysInclusive,
   isInteractionPointReservedByOther,
-  isCellOccupiedByOthers,
   isInsideGrid,
   isWalkableCell,
   orthogonalNeighbors,
@@ -85,13 +86,13 @@ describe("world-grid", () => {
       col: 1,
       row: 2
     });
-    expect(worldPointToCell(grid, originX - 1, originY + size, originX, originY)).toBeUndefined();
+    expect(worldPointToCell(grid, originX - 1, originY + size, originX, originY)).toBeNull();
     expect(
       worldPointToCell(grid, originX + grid.columns * size, originY + size, originX, originY)
-    ).toBeUndefined();
+    ).toBeNull();
     expect(
       worldPointToCell(grid, originX + size, originY + grid.rows * size, originX, originY)
-    ).toBeUndefined();
+    ).toBeNull();
   });
 
   it("expands inclusive rectangle keys between two cells in either drag direction", () => {
@@ -156,8 +157,8 @@ describe("world-grid", () => {
   it("provides default interaction points inside the grid", () => {
     const seen = new Set<string>();
 
-    expect(DEFAULT_WORLD_GRID.interactionPoints.length).toBeGreaterThanOrEqual(5);
-    for (const point of DEFAULT_WORLD_GRID.interactionPoints) {
+    expect(DEFAULT_SCENARIO_INTERACTION_POINTS.length).toBeGreaterThanOrEqual(5);
+    for (const point of DEFAULT_SCENARIO_INTERACTION_POINTS) {
       expect(isInsideGrid(DEFAULT_WORLD_GRID, point.cell)).toBe(true);
       expect(seen.has(point.id)).toBe(false);
       seen.add(point.id);
@@ -165,7 +166,7 @@ describe("world-grid", () => {
   });
 
   it("supports single-slot reservations for interaction points", () => {
-    const [point] = DEFAULT_WORLD_GRID.interactionPoints;
+    const [point] = DEFAULT_SCENARIO_INTERACTION_POINTS;
     const reservations = createReservationSnapshot();
     const reserved = reserveInteractionPoint(reservations, point!.id, "pawn-a");
 

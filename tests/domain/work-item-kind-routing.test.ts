@@ -17,7 +17,9 @@ describe("completeWorkItem kind routing", () => {
       anchorCell: { col: 0, row: 0 },
       status: "claimed",
       claimedBy: "pawn-a",
-      failureCount: 0
+      failureCount: 0,
+      priority: 10,
+      sourceReason: "test"
     };
     const result = completeWorkItem(worldWithClaimedWork(item), "w-1", "pawn-a");
     expect(result?.outcome.kind).toBe("target-missing");
@@ -41,7 +43,9 @@ describe("completeWorkItem kind routing", () => {
       targetEntityId: treeId,
       status: "claimed",
       claimedBy: "pawn-a",
-      failureCount: 0
+      failureCount: 0,
+      priority: 10,
+      sourceReason: "test"
     };
     world.workItems.set(item.id, item);
     const result = completeWorkItem(world, "w-chop", "pawn-a");
@@ -67,7 +71,9 @@ describe("completeWorkItem kind routing", () => {
       targetEntityId: rockId,
       status: "claimed",
       claimedBy: "pawn-a",
-      failureCount: 0
+      failureCount: 0,
+      priority: 7,
+      sourceReason: "test"
     };
     world.workItems.set(item.id, item);
     const result = completeWorkItem(world, "w-mine", "pawn-a");
@@ -100,7 +106,9 @@ describe("completeWorkItem kind routing", () => {
       targetEntityId: resourceId,
       status: "claimed",
       claimedBy: "pawn-a",
-      failureCount: 0
+      failureCount: 0,
+      priority: 8,
+      sourceReason: "test"
     };
     world.workItems.set(item.id, item);
     const result = completeWorkItem(world, "w-pick", "pawn-a");
@@ -138,6 +146,8 @@ describe("completeWorkItem kind routing", () => {
       status: "claimed",
       claimedBy: "pawn-a",
       failureCount: 0,
+      priority: 6,
+      sourceReason: "test",
       haulTargetZoneId: zoneId,
       haulDropCell: { col: 2, row: 3 },
       derivedFromWorkId: "parent-work"

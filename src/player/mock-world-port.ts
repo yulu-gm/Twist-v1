@@ -1,8 +1,12 @@
 /**
  * 线间 mock 网关：记录命令、返回固定结构，合并 A 线时替换实现即可。
+ *
+ * **装配约束**：仅供自动化 / B 线单测等验收注入；可玩主路径须使用 {@link WorldCoreWorldPort}
+ *（或等价、能写入 `WorldCore` 的真实网关），不得将本类作为唯一 `worldPort` 挂入 Phaser 场景。
+ * 依据：`oh-code-design/交互系统.yaml`「B 线 / Mock 世界网关」与主线输出边界说明。
  */
 
-import type { DomainCommand, MockLineAPort, MockWorldSubmitResult } from "./s0-contract";
+import type { DomainCommand, LineAReadPort, WorldSubmitResult } from "./s0-contract";
 import type { MockWorldPortConfig, PlayerWorldPort } from "./world-port-types";
 
 export type { MockWorldPortConfig } from "./world-port-types";
@@ -15,7 +19,7 @@ const DEFAULT_CONFIG: MockWorldPortConfig = {
 export class MockWorldPort implements PlayerWorldPort {
   private config: MockWorldPortConfig;
   private readonly log: DomainCommand[] = [];
-  private readonly results: MockWorldSubmitResult[] = [];
+  private readonly results: WorldSubmitResult[] = [];
 
   public constructor(config: Partial<MockWorldPortConfig> = {}) {
     this.config = {
@@ -33,7 +37,10 @@ export class MockWorldPort implements PlayerWorldPort {
     this.results.length = 0;
   }
 
-  /** 运行时切换 mock 规则；与当前配置按字段合并（未提供的字段保留原值）。 */
+  /**
+   * 运行时切换 mock 规则；与当前配置按字段合并（未提供的字段保留原值）。
+   * 与 {@link PlayerWorldPort.applyMockConfig} 一致：仅供测试/验收网关，非生产主循环 API。
+   */
   public applyMockConfig(partial: Partial<MockWorldPortConfig>): void {
     this.config = {
       alwaysAccept: partial.alwaysAccept ?? this.config.alwaysAccept,
@@ -44,7 +51,7 @@ export class MockWorldPort implements PlayerWorldPort {
     };
   }
 
-  public get lineA(): MockLineAPort {
+  public get lineA(): LineAReadPort {
     return { snapshotLabel: "mock-A-snapshot:v0" };
   }
 
@@ -52,11 +59,11 @@ export class MockWorldPort implements PlayerWorldPort {
     return this.log;
   }
 
-  public getSubmitResults(): readonly MockWorldSubmitResult[] {
+  public getSubmitResults(): readonly WorldSubmitResult[] {
     return this.results;
   }
 
-  public submit(raw: DomainCommand, nowMs: number): MockWorldSubmitResult {
+  public submit(raw: DomainCommand, nowMs: number): WorldSubmitResult {
     const cmd: DomainCommand = {
       ...raw,
       issuedAtMs: raw.issuedAtMs ?? nowMs
@@ -65,7 +72,7 @@ export class MockWorldPort implements PlayerWorldPort {
 
     for (const key of cmd.targetCellKeys) {
       if (this.config.rejectIfTouchesCellKeys.has(key)) {
-        const rejected: MockWorldSubmitResult = {
+        const rejected: WorldSubmitResult = {
           accepted: false,
           messages: [`网关：与注入冲突格重叠（${key}）`],
           conflictCellKeys: [key]
@@ -76,7 +83,7 @@ export class MockWorldPort implements PlayerWorldPort {
     }
 
     if (!this.config.alwaysAccept) {
-      const rejected: MockWorldSubmitResult = {
+      const rejected: WorldSubmitResult = {
         accepted: false,
         messages: ["网关：验收项关闭 alwaysAccept，未提交领域"]
       };
@@ -84,7 +91,7 @@ export class MockWorldPort implements PlayerWorldPort {
       return rejected;
     }
 
-    const ok: MockWorldSubmitResult = {
+    const ok: WorldSubmitResult = {
       accepted: true,
       messages: [`网关：已接收 ${cmd.verb}，格数 ${cmd.targetCellKeys.length}`],
       workOrderId: `mock-wo-${this.log.length}`
@@ -106,11 +113,11 @@ export class MockWorldPort implements PlayerWorldPort {
   }
 
   /** 将历史命令按顺序再次提交（用于回放验收）。 */
-  public replayAll(nowMsStart: number): readonly MockWorldSubmitResult[] {
+  public replayAll(nowMsStart: number): readonly WorldSubmitResult[] {
     const previous = [...this.log];
     this.log.length = 0;
     this.results.length = 0;
-    const out: MockWorldSubmitResult[] = [];
+    const out: WorldSubmitResult[] = [];
     let t = nowMsStart;
     for (const cmd of previous) {
       out.push(this.submit(cmd, t));

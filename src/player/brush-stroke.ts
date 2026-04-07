@@ -1,8 +1,12 @@
 /**
  * 笔刷会话：拖拽中累积网格线段覆盖格（与 Phaser 解耦）。
+ *
+ * 本会话只保证在网内累积路径（`isInsideGrid`）。`blockedCellKeys`、实体占用等「不可用」不在此剔除，
+ * 由提交/领域校验产生显式拒绝（如 MAP-003 / `map-blocked-placement` 的 `conflictCellKeys`）；
+ * 与 `game/interaction/floor-selection.ts` 矩形选区分层说明一致。
  */
 
-import { coordKey, gridLineCells, isInsideGrid, type GridCoord, type WorldGridConfig } from "../game/map/world-grid";
+import { coordKey, gridLineCells, isInsideGrid, type GridCoord, type WorldGridConfig } from "../game/map";
 
 export type BrushStrokeState = Readonly<
   | { active: false }
@@ -45,10 +49,10 @@ export function extendBrushStroke(
   if (cell.col === state.lastCell.col && cell.row === state.lastCell.row) {
     return state;
   }
-  const segment = gridLineCells(state.lastCell, cell);
+  const segment = gridLineCells(state.lastCell, cell, grid);
   const nextKeys = new Set(state.accumulatedKeys);
   for (const c of segment) {
-    if (isInsideGrid(grid, c)) nextKeys.add(coordKey(c));
+    nextKeys.add(coordKey(c));
   }
   return {
     active: true,
@@ -58,6 +62,10 @@ export function extendBrushStroke(
   };
 }
 
+/**
+ * 结束笔刷会话并返回覆盖格集合。
+ * 值为地图模块 `coordKey` 格式的格键，与策划文档「蓝图笔刷」输出在去重集合语义上一致（见 `oh-gen-doc/交互系统.yaml`）。
+ */
 export function endBrushStroke(state: BrushStrokeState): ReadonlySet<string> {
   if (!state.active) return new Set();
   return new Set(state.accumulatedKeys);

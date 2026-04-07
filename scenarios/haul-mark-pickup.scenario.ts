@@ -1,6 +1,6 @@
 import { coordKey, DEFAULT_WORLD_GRID } from "../src/game/map";
 import type { ScenarioDefinition } from "../src/headless/scenario-types";
-import type { DomainCommand } from "../src/player/s0-contract";
+import type { DomainCommand } from "../src/game/interaction/domain-command-types";
 
 const RESOURCE_A = { col: 10, row: 5 } as const;
 const RESOURCE_B = { col: 11, row: 5 } as const;
@@ -11,7 +11,7 @@ const HAUL_MARK_PICKUP_CELLS: DomainCommand = {
   targetCellKeys: [coordKey(RESOURCE_A), coordKey(RESOURCE_B)],
   targetEntityIds: [],
   sourceMode: {
-    source: { kind: "menu", menuId: "orders", itemId: "haul" },
+    source: { kind: "menu", menuId: "tools", itemId: "haul" },
     selectionModifier: "replace",
     inputShape: "rect-selection"
   }

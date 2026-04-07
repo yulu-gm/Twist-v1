@@ -1,3 +1,10 @@
+/**
+ * 需求满足结算器：按**整段时长**结算进食/休息增量，速率与 {@link evolveNeeds} 中 `eating`/`resting` 一致。
+ *
+ * **禁止双重结算**：主循环已在 `tickSimulation` 阶段 1 用 `advancePawnNeedsWithBehavior` → `evolveNeeds`
+ * 按秒推进时，不得再对**同一仿真时段**调用 `settleEating` / `settleResting`；本模块适用于未走 tick
+ * 演化的区间（场景合成、测试、中断部分恢复等）。
+ */
 import {
   EATING_SATIETY_RECOVERY_PER_SECOND,
   RESTING_ENERGY_RECOVERY_PER_SECOND

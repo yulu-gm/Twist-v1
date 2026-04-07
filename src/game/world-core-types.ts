@@ -24,10 +24,17 @@ export type MarkerSnapshot = Readonly<{
   workItemId: string;
 }>;
 
+/**
+ * 领域只读快照：`time` 已含 `currentPeriod` 等投影结果；附带 `timeConfig` 便于验收/调试复算昼夜边界。
+ * 刻意不包含 `grid`（`WorldGridConfig`）——地图尺度与阻挡等仍以 {@link WorldCore} 为准，避免与 `occupancy`/实体 footprint 重复或漂移。
+ */
 export type WorldSnapshot = Readonly<{
   time: WorldTimeSnapshot;
+  /** 与 {@link WorldCore.timeConfig} 对齐的日内规则；与 `time` 一并构成时间语义完整只读视图。 */
+  timeConfig: TimeOfDayConfig;
   entities: readonly WorldEntitySnapshot[];
-  occupancy: Readonly<Record<string, string>>;
+  /** 格键 → 该格上的实体 id 列表（与 oh-gen-doc「地图格.包含实体」对齐；空格不出现在 Record 中）。 */
+  occupancy: Readonly<Record<string, readonly string[]>>;
   markers: readonly MarkerSnapshot[];
   workItems: readonly WorkItemSnapshot[];
   restSpots: readonly RestSpotSnapshot[];

@@ -4,6 +4,7 @@
  * 对 ALL_SCENARIOS 统一跑通；本文件补充饥饿→进食链路的细粒度断言。
  */
 import { describe, expect, it } from "vitest";
+import { pawnNeedsFromScalars } from "../../src/game/need/need-utils";
 import { createHeadlessSim, hydrateScenario } from "../../src/headless";
 import { PAWN_EATS_WHEN_HUNGRY_SCENARIO } from "../../scenarios/pawn-eats-when-hungry.scenario";
 
@@ -17,7 +18,8 @@ describe("NEED-001 pawn-eats-when-hungry", () => {
 
     const initialPawn = sim.getPawns()[0]!;
     expect(initialPawn.currentGoal).toBeUndefined();
-    expect(initialPawn.needs.hunger).toBe(92);
+    /** 与 {@link normalizePawnNeedSnapshot} 一致：饥饿紧迫度由饱食标量推导，而非场景里手写 needs 覆盖。 */
+    expect(initialPawn.needs.hunger).toBe(pawnNeedsFromScalars(5, 100, 6).hunger);
 
     const reachedEatGoal = sim.runUntil(() => {
       const pawn = sim.getPawns()[0];

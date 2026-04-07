@@ -8,8 +8,9 @@ import {
   parseCoordKey as parseGridCoordKey,
   type GridCoord,
   type WorldGridConfig
-} from "../../game/map/world-grid";
+} from "../../game/map";
 import type { FloorSelectionState } from "../../game/interaction/floor-selection";
+import { MAP_OVERLAY_DEPTH } from "../map-overlay-depths";
 
 export type FloorSelectionRedrawOptions = Readonly<{
   /** 当前拖动的矩形范围内「会成为任务目标」的格（与领域过滤一致）；不传则不画预览环。 */
@@ -199,12 +200,12 @@ export function syncTaskMarkerView(
           strokeThickness: 3
         })
         .setOrigin(0.5, 0.5)
-        .setDepth(41);
+        .setDepth(MAP_OVERLAY_DEPTH.taskMarkerLabel);
       textMap.set(key, text);
     } else {
       text.setText(taskName);
       text.setPosition(cx, cy);
-      text.setDepth(41);
+      text.setDepth(MAP_OVERLAY_DEPTH.taskMarkerLabel);
     }
   }
 }

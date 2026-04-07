@@ -11,7 +11,7 @@ import { CHOP_TREE_COMMAND_SCENARIO } from "../../scenarios/chop-tree-command.sc
 import { createHeadlessSim } from "../../src/headless";
 import { hydrateScenario } from "../../src/headless/scenario-runner";
 import type { ScenarioDefinition } from "../../src/headless/scenario-types";
-import type { DomainCommand } from "../../src/player/s0-contract";
+import type { DomainCommand } from "../../src/game/interaction/domain-command-types";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -22,7 +22,7 @@ function makeLumberCommand(targetCellKeys: readonly string[]): DomainCommand {
     targetCellKeys: [...targetCellKeys],
     targetEntityIds: [],
     sourceMode: {
-      source: { kind: "menu", menuId: "orders", itemId: "lumber" },
+      source: { kind: "menu", menuId: "tools", itemId: "lumber" },
       selectionModifier: "replace",
       inputShape: "rect-selection"
     }
@@ -75,7 +75,7 @@ describe("chop-tree-command（lumber → WorldCore）", () => {
   });
 
   it("applyDomainCommandToWorldCore 的 lumber 分支含 chop-tree", () => {
-    const srcPath = join(__dirname, "..", "..", "src", "player", "apply-domain-command.ts");
+    const srcPath = join(__dirname, "..", "..", "src", "game", "interaction", "apply-domain-command.ts");
     const src = readFileSync(srcPath, "utf8");
     expect(src).toContain("lumber");
     expect(src).toContain("chop-tree");

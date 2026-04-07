@@ -48,7 +48,9 @@ describe("completePickUpWork（WorldCore 直接工单完成）", () => {
       anchorCell: { ...resourceCell },
       targetEntityId: resourceId,
       status: "open",
-      failureCount: 0
+      failureCount: 0,
+      priority: 8,
+      sourceReason: "test"
     });
 
     const pawnId = "pawn-carrier";
@@ -98,7 +100,9 @@ describe("completePickUpWork（WorldCore 直接工单完成）", () => {
       anchorCell: { ...resourceCell },
       targetEntityId: resourceId,
       status: "open",
-      failureCount: 0
+      failureCount: 0,
+      priority: 8,
+      sourceReason: "test"
     });
 
     const pawnId = "pawn-solo";
@@ -162,7 +166,9 @@ describe("completePickUpWork（WorldCore 直接工单完成）", () => {
       anchorCell: { ...resourceCell },
       targetEntityId: resourceId,
       status: "open",
-      failureCount: 0
+      failureCount: 0,
+      priority: 8,
+      sourceReason: "test"
     });
 
     const pawnId = "pawn-carrier";

@@ -3,6 +3,11 @@ export {
   applyNeedDelta,
   DEFAULT_PAWN_NEEDS,
   formatPawnDebugLabel,
+  normalizePawnNeedSnapshot,
+  pawnNeedStages,
+  pawnNeedsFromScalars,
+  PAWN_HUNGER_SATIETY_ANCHOR,
+  PAWN_REST_ENERGY_ANCHOR,
   withPawnNeeds
 } from "./need-utils";
 export {
@@ -20,7 +25,14 @@ export {
   CRITICAL_THRESHOLD,
   evaluateFatigueStage,
   evaluateHungerStage,
+  HUNGER_INTERRUPT_THRESHOLD,
   needActionSuggestion,
+  PAWN_NEED_URGENCY_RULES,
+  PAWN_NEEDS_HUNGER_CRITICAL,
+  PAWN_NEEDS_HUNGER_WARN,
+  PAWN_NEEDS_REST_CRITICAL,
+  PAWN_NEEDS_REST_WARN,
+  REST_INTERRUPT_THRESHOLD,
   WARNING_THRESHOLD,
   type NeedActionSuggestion
 } from "./threshold-rules";
@@ -31,6 +43,8 @@ export {
   EATING_SATIETY_RECOVERY_PER_SECOND,
   type EvolveNeedsOptions,
   evolveNeeds,
+  type NeedEvolutionTimePeriod,
+  NIGHT_ENERGY_NEGATIVE_RATE_MULTIPLIER,
   RESTING_ENERGY_RECOVERY_PER_SECOND,
   type NeedEvolutionRates,
   WANDERING_ENERGY_MULTIPLIER,

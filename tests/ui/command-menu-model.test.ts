@@ -3,6 +3,7 @@ import {
   COMMAND_MENU_CATEGORIES,
   COMMAND_MENU_HOTKEY_COMMAND_IDS,
   commandIdForHotkeyIndex,
+  commandMenuListRowsForCategory,
   getCommandMenuCommand
 } from "../../src/data/command-menu";
 import { VILLAGER_TOOL_KEY_CODES } from "../../src/data/villager-tools";
@@ -18,11 +19,18 @@ import {
 describe("command-menu model", () => {
   it("wires current live commands into explicit categories", () => {
     expect(COMMAND_MENU_CATEGORIES.map((category) => category.id)).toEqual([
-      "orders",
-      "structures",
-      "furniture"
+      "zones",
+      "building",
+      "furniture",
+      "tools"
     ]);
-    expect(COMMAND_MENU_CATEGORIES[0]!.commands.map((command) => command.id)).toEqual([
+    expect(COMMAND_MENU_CATEGORIES[0]!.layout).toBe("flat");
+    expect(COMMAND_MENU_CATEGORIES[0]!.commands.map((command) => command.id)).toEqual(["storage-zone"]);
+    expect(COMMAND_MENU_CATEGORIES[1]!.layout).toBe("grouped");
+    expect(COMMAND_MENU_CATEGORIES[1]!.subgroups.map((sub) => sub.id)).toEqual(["walls"]);
+    expect(COMMAND_MENU_CATEGORIES[1]!.subgroups[0]!.commands.map((command) => command.id)).toEqual(["build-wall"]);
+    expect(COMMAND_MENU_CATEGORIES[2]!.commands.map((command) => command.id)).toEqual(["place-bed"]);
+    expect(COMMAND_MENU_CATEGORIES[3]!.commands.map((command) => command.id)).toEqual([
       "mine",
       "demolish",
       "mow",
@@ -32,12 +40,12 @@ describe("command-menu model", () => {
       "patrol",
       "idle"
     ]);
-    expect(COMMAND_MENU_CATEGORIES[1]!.commands.map((command) => command.id)).toEqual([
-      "build-wall",
-      "storage-zone"
-    ]);
-    expect(COMMAND_MENU_CATEGORIES[2]!.commands.map((command) => command.id)).toEqual([
-      "place-bed"
+  });
+
+  it("exposes building category as 墙 → 木墙 rows for HUD", () => {
+    expect(commandMenuListRowsForCategory("building")).toEqual([
+      { kind: "subgroup-heading", label: "墙" },
+      { kind: "command", command: expect.objectContaining({ id: "build-wall", label: "木墙" }) }
     ]);
   });
 
@@ -69,9 +77,7 @@ describe("command-menu model", () => {
       "patrol",
       "idle"
     ]);
-    expect(visibleCommandsForCommandMenuState(switched).map((command) => command.id)).toEqual([
-      "place-bed"
-    ]);
+    expect(visibleCommandsForCommandMenuState(switched).map((command) => command.id)).toEqual(["place-bed"]);
     expect(switched.activeCategoryId).toBe("furniture");
     expect(switched.activeCommandId).toBe("mine");
   });
@@ -98,7 +104,7 @@ describe("command-menu model", () => {
   });
 
   it("looks up a command by id", () => {
-    expect(getCommandMenuCommand("haul")?.categoryId).toBe("orders");
+    expect(getCommandMenuCommand("haul")?.categoryId).toBe("tools");
   });
 
   it("keeps Q–P hotkeys aligned with command-menu slot count", () => {

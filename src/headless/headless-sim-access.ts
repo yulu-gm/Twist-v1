@@ -8,23 +8,35 @@ import type { PawnState } from "../game/pawn-state";
 import {
   createReservationSnapshot,
   type ReservationSnapshot
-} from "../game/map/world-grid";
+} from "../game/map";
 import type { SimGridSyncState } from "../game/world-sim-bridge";
 import {
   createInitialTimeOfDayState,
   DEFAULT_TIME_CONTROL_STATE,
-  sampleTimeOfDayPalette,
   type TimeControlState,
-  type TimeOfDayPalette,
   type TimeOfDayState
 } from "../game/time";
+import { sampleTimeOfDayPalette, type TimeOfDayPalette } from "../ui/time-of-day-palette";
 
+/**
+ * 无头 SimAccess：在 {@link GameOrchestratorSimAccess} 合约之上可选暴露 ref，用于零拷贝同步仿真侧状态。
+ *
+ * **单方写入约定**：若调用方通过 `getPawnsRef` / `getReservationsRef` 原地修改集合，须与注入本 access 的
+ * {@link GameOrchestrator}（或唯一认可的 headless 驱动）事先约定**同一时刻仅一方**承担写入；
+ * 其他模块仍应走 `setPawns` / `setReservations`，禁止多写入源并行改同一闭包内集合，以免违背
+ * `oh-code-design/实体系统.yaml` 中应用编排层统一协调实体视图的意图。
+ */
 export type HeadlessGameOrchestratorSimAccess = GameOrchestratorSimAccess & {
-  /** 与 {@link GameOrchestratorSimAccess.getPawns} 共用同一数组引用，可原地观察或同步。 */
+  /**
+   * @internal 仅供自动化测试等需与闭包内数组**同一引用**的观测/同步场景。
+   * 生产与场景运行路径应使用 {@link GameOrchestratorSimAccess.getPawns} / {@link GameOrchestratorSimAccess.setPawns}，避免旁路原地写入。
+   * 若必须原地写入：须遵守类型文档所述与编排层的单方写入约定。
+   */
   getPawnsRef(): PawnState[];
   /**
-   * 与 {@link GameOrchestratorSimAccess.getReservations} 共用同一 Map 引用；
-   * 仿真与 orchestrator 通过 set/get 维护预订表。
+   * @internal 仅供自动化测试等需与闭包内 Map **同一引用**的观测/同步场景。
+   * 生产与场景运行路径应使用 {@link GameOrchestratorSimAccess.getReservations} / {@link GameOrchestratorSimAccess.setReservations}，避免旁路原地写入。
+   * 若必须原地写入：须遵守类型文档所述与编排层的单方写入约定。
    */
   getReservationsRef(): Map<string, string>;
 };
@@ -99,7 +111,10 @@ export function createHeadlessSimAccess(
       timeOfDayPalette = next;
     },
     getTimeControlState(): TimeControlState {
-      return timeControlState;
+      return { ...timeControlState };
+    },
+    setTimeControlState(next: TimeControlState): void {
+      timeControlState = { ...next };
     },
     getSimGridSyncState(): SimGridSyncState | null {
       return simGridSyncState;
@@ -107,9 +122,11 @@ export function createHeadlessSimAccess(
     setSimGridSyncState(next: SimGridSyncState | null): void {
       simGridSyncState = next;
     },
+    /** @internal 见 {@link HeadlessGameOrchestratorSimAccess.getPawnsRef}。 */
     getPawnsRef(): PawnState[] {
       return pawns;
     },
+    /** @internal 见 {@link HeadlessGameOrchestratorSimAccess.getReservationsRef}。 */
     getReservationsRef(): Map<string, string> {
       return reservations;
     }

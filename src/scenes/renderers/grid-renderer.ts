@@ -11,8 +11,16 @@ import {
   type InteractionPoint,
   type ReservationSnapshot,
   type WorldGridConfig
-} from "../../game/map/world-grid";
-import type { TimeOfDayPalette } from "../../game/time";
+} from "../../game/map";
+import {
+  GRID_OVERLAY_INTERACTION,
+  GRID_OVERLAY_INTERACTION_LABEL,
+  GRID_OVERLAY_INTERACTION_LABEL_STYLE,
+  GRID_OVERLAY_INTERACTION_SHAPE,
+  GRID_OVERLAY_STONE,
+  interactionFillColor
+} from "../../ui/grid-overlay-theme";
+import type { TimeOfDayPalette } from "../../ui/time-of-day-palette";
 
 export function drawGridLines(
   g: Phaser.GameObjects.Graphics,
@@ -50,8 +58,15 @@ export function drawStoneCells(
   const side = Math.max(14, cellPx * 0.42);
   for (const cell of cells) {
     const pos = cellCenterWorld(grid, cell, ox, oy);
-    const stone = scene.add.rectangle(pos.x, pos.y, side, side * 0.88, 0x6b6560, 1);
-    stone.setStrokeStyle(1, 0x3d3830, 0.92);
+    const stone = scene.add.rectangle(
+      pos.x,
+      pos.y,
+      side,
+      side * 0.88,
+      GRID_OVERLAY_STONE.fillColor,
+      1
+    );
+    stone.setStrokeStyle(1, GRID_OVERLAY_STONE.strokeColor, GRID_OVERLAY_STONE.strokeAlpha);
   }
 }
 
@@ -71,9 +86,9 @@ export function drawStoneCellsToGraphics(
     const cell = parseCoordKey(key);
     if (!cell) continue;
     const pos = cellCenterWorld(grid, cell, ox, oy);
-    g.fillStyle(0x6b6560, 1);
+    g.fillStyle(GRID_OVERLAY_STONE.fillColor, 1);
     g.fillRect(pos.x - w / 2, pos.y - h / 2, w, h);
-    g.lineStyle(1, 0x3d3830, 0.92);
+    g.lineStyle(1, GRID_OVERLAY_STONE.strokeColor, GRID_OVERLAY_STONE.strokeAlpha);
     g.strokeRect(pos.x - w / 2, pos.y - h / 2, w, h);
   }
 }
@@ -102,27 +117,39 @@ export function drawInteractionPoints(
   for (const point of grid.interactionPoints) {
     const pos = cellCenterWorld(grid, point.cell, ox, oy);
     const reserved = reservations.has(point.id);
-    const color =
-      point.kind === "food" ? 0xc57b57 : point.kind === "bed" ? 0x5d7fa3 : 0x5ea37c;
+    const color = interactionFillColor(point.kind);
 
-    g.fillStyle(color, reserved ? 0.95 : 0.65);
-    g.lineStyle(2, reserved ? 0xf5f1e8 : 0x1f1a16, 0.85);
+    g.fillStyle(
+      color,
+      reserved
+        ? GRID_OVERLAY_INTERACTION.fillAlphaReserved
+        : GRID_OVERLAY_INTERACTION.fillAlphaIdle
+    );
+    g.lineStyle(
+      2,
+      reserved
+        ? GRID_OVERLAY_INTERACTION.strokeReserved
+        : GRID_OVERLAY_INTERACTION.strokeIdle,
+      GRID_OVERLAY_INTERACTION.strokeAlpha
+    );
 
     drawInteractionShape(g, point, pos);
 
+    const labelY = pos.y + GRID_OVERLAY_INTERACTION_LABEL_STYLE.offsetYPx;
+    const labelText = GRID_OVERLAY_INTERACTION_LABEL[point.kind];
     let label = labelMap.get(point.id);
     if (!label || !label.active) {
       if (label) labelMap.delete(point.id);
       label = scene.add
-        .text(pos.x, pos.y + 18, point.kind.toUpperCase(), {
-          fontFamily: "Segoe UI, sans-serif",
-          fontSize: "10px",
+        .text(pos.x, labelY, labelText, {
+          fontFamily: GRID_OVERLAY_INTERACTION_LABEL_STYLE.fontFamily,
+          fontSize: GRID_OVERLAY_INTERACTION_LABEL_STYLE.fontSize,
           color: secondaryColor
         })
         .setOrigin(0.5, 0);
       labelMap.set(point.id, label);
     }
-    label.setPosition(pos.x, pos.y + 18);
+    label.setPosition(pos.x, labelY);
     label.setAlpha(reserved ? 1 : 0.8);
     label.setColor(secondaryColor);
   }
@@ -133,18 +160,30 @@ function drawInteractionShape(
   point: InteractionPoint,
   pos: Readonly<{ x: number; y: number }>
 ): void {
+  const { bed, food, recreation } = GRID_OVERLAY_INTERACTION_SHAPE;
   if (point.kind === "bed") {
-    g.fillRect(pos.x - 14, pos.y - 10, 28, 20);
-    g.strokeRect(pos.x - 14, pos.y - 10, 28, 20);
+    g.fillRect(
+      pos.x - bed.halfW,
+      pos.y - bed.halfH,
+      bed.halfW * 2,
+      bed.halfH * 2
+    );
+    g.strokeRect(
+      pos.x - bed.halfW,
+      pos.y - bed.halfH,
+      bed.halfW * 2,
+      bed.halfH * 2
+    );
   } else if (point.kind === "food") {
-    g.fillCircle(pos.x, pos.y, 12);
-    g.strokeCircle(pos.x, pos.y, 12);
+    g.fillCircle(pos.x, pos.y, food.radius);
+    g.strokeCircle(pos.x, pos.y, food.radius);
   } else {
+    const { apex, wing } = recreation;
     g.beginPath();
-    g.moveTo(pos.x, pos.y - 12);
-    g.lineTo(pos.x + 12, pos.y);
-    g.lineTo(pos.x, pos.y + 12);
-    g.lineTo(pos.x - 12, pos.y);
+    g.moveTo(pos.x, pos.y - apex);
+    g.lineTo(pos.x + wing, pos.y);
+    g.lineTo(pos.x, pos.y + apex);
+    g.lineTo(pos.x - wing, pos.y);
     g.closePath();
     g.fillPath();
     g.strokePath();

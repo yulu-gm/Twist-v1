@@ -7,7 +7,13 @@ import {
 } from "../../src/game/flows/need-interrupt-flow";
 import { createNeedProfile } from "../../src/game/need/need-profile";
 import { isNeedSatisfied } from "../../src/game/need/satisfaction-settler";
-import { addWork, claimWork, createWorkRegistry, generateChopWork } from "../../src/game/work";
+import {
+  addWork,
+  claimWork,
+  createWorkRegistry,
+  generateChopWork,
+  replaceWorkRegistryOrders
+} from "../../src/game/work";
 
 const cell = { col: 2, row: 3 };
 
@@ -27,13 +33,15 @@ describe("need-interrupt-flow", () => {
     const work = wr.generateChopWork("tree-need-int", cell);
     wr.addWork(registry, work);
     const pawnId = "pawn-ada";
-    expect(wr.claimWork(registry, work.workId, pawnId)).toEqual({ kind: "claimed" });
+    const initialClaim = wr.claimWork(registry, work.workId, pawnId);
+    replaceWorkRegistryOrders(registry, initialClaim.registry);
+    expect(initialClaim.outcome).toEqual({ kind: "claimed" });
 
     const fsm = createFsm(pawnId);
     fsm.currentState = "working";
 
     const profile = needProfile(pawnId, 15, 80);
-    const scoringContext = scoring(pawnId, profile, work);
+    const scoringContext = scoring(pawnId, profile, registry);
 
     const scenario = runScenario({
       fsm,
@@ -65,7 +73,8 @@ describe("need-interrupt-flow", () => {
     const work = generateChopWork("tree-tick-only", { col: 1, row: 1 });
     addWork(registry, work);
     const pawnId = "pawn-ced";
-    claimWork(registry, work.workId, pawnId);
+    const ic = claimWork(registry, work.workId, pawnId);
+    replaceWorkRegistryOrders(registry, ic.registry);
     const fsm = createBehaviorFSM(pawnId);
     fsm.currentState = "working";
     const profile = createNeedProfile(pawnId, 15, 90);
@@ -75,7 +84,7 @@ describe("need-interrupt-flow", () => {
       workId: work.workId,
       pawnId,
       profile,
-      scoringContext: defaultNeedInterruptScoringContext(pawnId, profile, work)
+      scoringContext: defaultNeedInterruptScoringContext(pawnId, profile, registry)
     });
     expect(tick.kind).toBe("released-and-eating");
     expect(registry.orders.get(work.workId)?.status).toBe("open");
@@ -87,12 +96,13 @@ describe("need-interrupt-flow", () => {
     const work = generateChopWork("tree-flow-only", cell);
     addWork(registry, work);
     const pawnId = "pawn-bob";
-    claimWork(registry, work.workId, pawnId);
+    const ic = claimWork(registry, work.workId, pawnId);
+    replaceWorkRegistryOrders(registry, ic.registry);
 
     const fsm = createBehaviorFSM(pawnId);
     fsm.currentState = "working";
     const profile = createNeedProfile(pawnId, 15, 75);
-    const ctx = defaultNeedInterruptScoringContext(pawnId, profile, work);
+    const ctx = defaultNeedInterruptScoringContext(pawnId, profile, registry);
 
     const out = runNeedInterruptScenario({
       fsm,

@@ -19,20 +19,26 @@ export function presentationForCommandMenuCommand(
     return { modeLine: "未选择指令", usesBrushStroke: false };
   }
   const categoryLabel = getCommandMenuCategory(command.categoryId)?.label ?? command.categoryId;
-  if (command.id === "storage-zone") {
-    return {
-      modeLine: `${categoryLabel}·${command.label}：拖拽框选区域；Shift 并集 / Ctrl 切换；Esc 取消`,
-      usesBrushStroke: false
-    };
+  switch (command.id) {
+    case "storage-zone":
+      return {
+        modeLine: `${categoryLabel}·${command.label}：拖拽框选区域；Shift 并集 / Ctrl 切换；Esc 取消`,
+        usesBrushStroke: false
+      };
+    case "place-bed":
+      return {
+        modeLine: `${categoryLabel}·${command.label}：单击地格；放置位置以游戏规则为准；Shift 并集 / Ctrl 切换，Esc 取消`,
+        usesBrushStroke: false
+      };
+    default: {
+      const modeLine =
+        command.inputShape === "brush-stroke"
+          ? `${categoryLabel}·${command.label}：拖拽绘制路径（笔刷），Esc 取消当前手势`
+          : `${categoryLabel}·${command.label}：拖拽框选；Shift 并集 / Ctrl 切换；Esc 取消`;
+      return {
+        modeLine,
+        usesBrushStroke: command.inputShape === "brush-stroke"
+      };
+    }
   }
-  const modeLine =
-    command.inputShape === "brush-stroke"
-      ? `${categoryLabel}·${command.label}：拖拽绘制路径（笔刷），Esc 取消当前手势`
-      : command.inputShape === "single-cell"
-        ? `${categoryLabel}·${command.label}：单击地格放置；Shift 并集 / Ctrl 切换，Esc 取消`
-        : `${categoryLabel}·${command.label}：拖拽框选；Shift 并集 / Ctrl 切换；Esc 取消`;
-  return {
-    modeLine,
-    usesBrushStroke: command.inputShape === "brush-stroke"
-  };
 }

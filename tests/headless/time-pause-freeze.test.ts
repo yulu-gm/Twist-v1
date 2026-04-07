@@ -10,11 +10,6 @@ import {
   type HeadlessSim
 } from "../../src/headless";
 
-type MutableTimeControls = {
-  paused: boolean;
-  speed: 1 | 2 | 3;
-};
-
 function pawnProgressSnapshot(sim: HeadlessSim) {
   const pawn = sim.getPawns()[0]!;
   return {
@@ -74,8 +69,9 @@ describe("TIME-003 time-pause-freeze", () => {
     const beforePauseWork = visibleWorkSnapshot(sim);
     const beforePauseEventCount = sim.getSimEventCollector().getEvents().length;
 
-    const controls = sim.getSimAccess().getTimeControlState() as MutableTimeControls;
-    controls.paused = true;
+    const access = sim.getSimAccess();
+    const prev = access.getTimeControlState();
+    access.setTimeControlState({ ...prev, paused: true });
     sim.tick(16);
 
     const pausedHud = captureVisibleState(sim).hud;

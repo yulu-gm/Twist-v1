@@ -64,6 +64,32 @@ describe("runtime log session logger", () => {
     expect(firstBatch?.map((item: { seq: number }) => item.seq)).toEqual([1, 2]);
   });
 
+  it("continues batching after a writeBatch rejection", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    let calls = 0;
+    const writeBatch = vi.fn(async () => {
+      calls += 1;
+      if (calls === 1) {
+        throw new Error("sink-down");
+      }
+    });
+    const logger = createRuntimeLogSessionLogger({
+      flushIntervalMs: 500,
+      flushSize: 1,
+      asyncBatchSink: { writeBatch }
+    });
+
+    logger.log(event(1));
+    logger.log(event(2));
+    for (let i = 0; i < 20; i += 1) {
+      await Promise.resolve();
+    }
+
+    expect(writeBatch).toHaveBeenCalledTimes(2);
+    expect(errSpy).toHaveBeenCalled();
+    errSpy.mockRestore();
+  });
+
   it("becomes a noop for file output when disabled", async () => {
     const writeBatch = vi.fn<(events: readonly { seq: number }[]) => Promise<void>>(async () => undefined);
     const logger = createRuntimeLogSessionLogger({

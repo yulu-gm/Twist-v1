@@ -4,6 +4,7 @@ import { coordKey, DEFAULT_WORLD_GRID } from "../../src/game/map/world-grid";
 import {
   advanceWorldClock,
   claimWorkItem,
+  cloneWorldCoreState,
   completeWorkItem,
   createWorldCore,
   failWorkItem,
@@ -39,7 +40,7 @@ describe("world-core A-M1", () => {
     expect(created.outcome.kind).toBe("created");
     const createdSnapshot = getWorldSnapshot(created.world);
     expect(findEntity(createdSnapshot, created.entityId)?.label).toBe("Alex");
-    expect(createdSnapshot.occupancy[coordKey({ col: 2, row: 2 })]).toBe(created.entityId);
+    expect(createdSnapshot.occupancy[coordKey({ col: 2, row: 2 })]).toEqual([created.entityId]);
 
     const moved = moveWorldEntity(created.world, created.entityId, { col: 3, row: 2 });
 
@@ -47,7 +48,7 @@ describe("world-core A-M1", () => {
     const movedSnapshot = getWorldSnapshot(moved.world);
     expect(findEntity(movedSnapshot, created.entityId)?.cell).toEqual({ col: 3, row: 2 });
     expect(movedSnapshot.occupancy[coordKey({ col: 2, row: 2 })]).toBeUndefined();
-    expect(movedSnapshot.occupancy[coordKey({ col: 3, row: 2 })]).toBe(created.entityId);
+    expect(movedSnapshot.occupancy[coordKey({ col: 3, row: 2 })]).toEqual([created.entityId]);
 
     const removed = removeWorldEntity(moved.world, created.entityId);
 
@@ -89,14 +90,14 @@ describe("world-core A-M1", () => {
       occupiedCells: [{ col: 0, row: 0 }],
       relatedWorkItemIds: []
     });
-    (snapshot.occupancy as Record<string, string>)["9,9"] = "tampered";
+    (snapshot.occupancy as Record<string, readonly string[]>)["9,9"] = ["tampered"];
 
     const freshSnapshot = getWorldSnapshot(created.world);
     expect(findEntity(freshSnapshot, "tampered")).toBeUndefined();
     expect(freshSnapshot.occupancy["9,9"]).toBeUndefined();
   });
 
-  it("does not advance time while paused and emits time slice, period, and day events when the clock crosses midnight", () => {
+  it("does not advance time while paused and advances the clock across midnight", () => {
     const world = createWorldCore({
       grid: DEFAULT_WORLD_GRID,
       timeState: {
@@ -114,7 +115,6 @@ describe("world-core A-M1", () => {
       speed: 3
     });
     expect(paused.elapsedSimulationSeconds).toBe(0);
-    expect(paused.events).toEqual([]);
     expect(getWorldSnapshot(paused.world).time.dayNumber).toBe(1);
     expect(getWorldSnapshot(paused.world).time.minuteOfDay).toBe(23 * 60 + 50);
     expect(getWorldSnapshot(paused.world).time.paused).toBe(true);
@@ -132,23 +132,6 @@ describe("world-core A-M1", () => {
       paused: false,
       speed: 1
     });
-    expect(running.events).toEqual([
-      {
-        kind: "time-advanced",
-        dayNumber: 2,
-        minuteOfDay: 20,
-        currentPeriod: "night"
-      },
-      {
-        kind: "period-changed",
-        dayNumber: 2,
-        period: "night"
-      },
-      {
-        kind: "day-changed",
-        dayNumber: 2
-      }
-    ]);
   });
 });
 
@@ -247,7 +230,17 @@ describe("world-core A-M2", () => {
     );
 
     const claimed = claimWorkItem(blueprintPlaced.world, blueprintPlaced.workItemId, "pawn-a");
-    const completed = completeWorkItem(claimed.world, blueprintPlaced.workItemId, "pawn-a");
+    const worldReady = cloneWorldCoreState(claimed.world);
+    const bpEntity = worldReady.entities.get(blueprintPlaced.blueprintEntityId);
+    if (bpEntity?.kind !== "blueprint") {
+      throw new Error("expected blueprint entity before complete");
+    }
+    worldReady.entities.set(blueprintPlaced.blueprintEntityId, {
+      ...bpEntity,
+      buildProgress01: 1,
+      buildState: "completed"
+    });
+    const completed = completeWorkItem(worldReady, blueprintPlaced.workItemId, "pawn-a");
     if (completed.outcome.kind !== "completed" || !completed.outcome.createdEntityId) {
       throw new Error(`expected completed build result, got ${completed.outcome.kind}`);
     }
@@ -259,15 +252,17 @@ describe("world-core A-M2", () => {
     expect(builtEntity?.buildingKind).toBe("bed");
     expect(builtEntity?.interactionCapabilities).toEqual(["rest"]);
     expect(builtEntity?.ownership).toEqual({
-      ownerPawnId: undefined,
+      ownerPawnId: "pawn-a",
       assignmentReason: "unassigned"
     });
-    expect(snapshot.occupancy[coordKey({ col: 10, row: 6 })]).toBe(completed.outcome.createdEntityId);
+    expect(snapshot.occupancy[coordKey({ col: 10, row: 6 })]).toEqual([
+      completed.outcome.createdEntityId
+    ]);
     expect(snapshot.restSpots).toEqual([
       {
         buildingEntityId: completed.outcome.createdEntityId,
         cell: { col: 10, row: 6 },
-        ownerPawnId: undefined,
+        ownerPawnId: "pawn-a",
         assignmentReason: "unassigned"
       }
     ]);

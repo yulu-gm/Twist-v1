@@ -31,6 +31,9 @@ export type BuildCommandInput = Readonly<{
  * UI/交互层不判断可行性，仅打包意图；裁决由世界网关完成。
  */
 export function buildDomainCommand(input: BuildCommandInput): DomainCommand | null {
+  if (getCommandMenuCommand(input.commandId) === undefined) {
+    return null;
+  }
   const def = commandMenuDomainSemantics(input.commandId);
   const { selectionModifier, cellKeys, inputShape, nowMs } = input;
 

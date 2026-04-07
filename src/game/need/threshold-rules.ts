@@ -5,8 +5,20 @@ export type NeedStage = "normal" | "warning" | "critical";
 export const WARNING_THRESHOLD = 40;
 export const CRITICAL_THRESHOLD = 20;
 
-/** sim-loop：饥饿需求值超过此阈值时，放弃已认领的走向工单类工作并释放工单（与 needs.hunger 量纲一致）。 */
-export const HUNGER_INTERRUPT_THRESHOLD = 70;
+/**
+ * PawnNeeds 量纲为越高越紧迫：警戒 / 走向工单中断与 UI 信号共用此表（`oh-code-design/需求系统.yaml`「需求规则配置」）。
+ */
+export const PAWN_NEED_URGENCY_RULES = {
+  hunger: { warn: 55, interruptWalkWork: 70 },
+  rest: { warn: 50, interruptWalkWork: 70 },
+  recreation: { warn: 50, interruptWalkWork: 70 }
+} as const;
+
+/** sim-loop：饥饿需求值超过此阈值时，放弃已认领的走向工单（与 `PAWN_NEED_URGENCY_RULES.hunger.interruptWalkWork` 同源）。 */
+export const HUNGER_INTERRUPT_THRESHOLD = PAWN_NEED_URGENCY_RULES.hunger.interruptWalkWork;
+
+/** sim-loop：疲劳对称；与 `PAWN_NEED_URGENCY_RULES.rest.interruptWalkWork` 同源。 */
+export const REST_INTERRUPT_THRESHOLD = PAWN_NEED_URGENCY_RULES.rest.interruptWalkWork;
 
 /**
  * needs.rest 高于此值视为夜间应优先睡眠（与 needs.rest 量纲一致；与 NEED-002 / Phase 6 对齐）。
@@ -89,3 +101,19 @@ export function needActionSuggestion(profile: {
   }
   return { actionKind: "eat", urgency: hungerU, allowInterrupt };
 }
+
+// ---------------------------------------------------------------------------
+// PawnNeeds 紧急度投影（`need-signals.ts`）：与上文 satiety/energy 阶段阈值量纲不同；数值取自 {@link PAWN_NEED_URGENCY_RULES}。
+
+/** 饥饿警戒阈值（含）：映射为 warn。 */
+export const PAWN_NEEDS_HUNGER_WARN = PAWN_NEED_URGENCY_RULES.hunger.warn;
+/**
+ * 饥饿「紧急」刻度，与 {@link HUNGER_INTERRUPT_THRESHOLD} 相同。
+ * 与 sim-loop 一致判定为「紧迫」时请用 `need.hunger > HUNGER_INTERRUPT_THRESHOLD`（严格大于）。
+ */
+export const PAWN_NEEDS_HUNGER_CRITICAL = PAWN_NEED_URGENCY_RULES.hunger.interruptWalkWork;
+
+/** 疲劳警戒阈值（含）；娱乐与疲劳共用 warn 刻度。 */
+export const PAWN_NEEDS_REST_WARN = PAWN_NEED_URGENCY_RULES.rest.warn;
+/** 疲劳/娱乐紧急刻度，与 {@link REST_INTERRUPT_THRESHOLD} 相同。 */
+export const PAWN_NEEDS_REST_CRITICAL = PAWN_NEED_URGENCY_RULES.rest.interruptWalkWork;

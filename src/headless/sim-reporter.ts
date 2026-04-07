@@ -2,10 +2,17 @@
  * Headless 模拟只读快照与断言汇总（不修改 sim、不依赖 Phaser）。
  */
 
-import type { PawnState } from "../game/pawn-state";
-import type { WorldTimeSnapshot } from "../game/time/world-time";
-import type { HeadlessSim } from "./headless-sim";
-import type { SimEventSummary } from "./sim-event-log";
+import type { PawnActionState, PawnGoalState, PawnState } from "../game/pawn-state";
+import type { WorldTimeSnapshot } from "../game/time";
+import type { SimEventCollector, SimEventSummary } from "./sim-event-log";
+
+/** 仅 {@link generateReport} 所需 getter 交集，降低对 `headless-sim` 具体类型的编译期绑定。 */
+export type HeadlessSimReportSource = Readonly<{
+  getTickCount(): number;
+  getWorldTime(): WorldTimeSnapshot;
+  getPawns(): readonly PawnState[];
+  getSimEventCollector(): Pick<SimEventCollector, "summary">;
+}>;
 
 /** 小人当前状态摘要，供报告与人类阅读。 */
 export type PawnSummary = Readonly<{
@@ -17,8 +24,14 @@ export type PawnSummary = Readonly<{
   satiety: number;
   energy: number;
   needs: Readonly<{ hunger: number; rest: number; recreation: number }>;
-  currentGoalKind: string | undefined;
-  currentActionKind: string | undefined;
+  /** 与领域 `PawnGoalState` 对齐的可解释快照（含 reason / targetId）。 */
+  currentGoal: PawnGoalState | undefined;
+  /** 与领域 `PawnActionState` 对齐。 */
+  currentAction: PawnActionState | undefined;
+  reservedTargetId: string | undefined;
+  actionTimerSec: number;
+  workTimerSec: number;
+  activeWorkItemId: string | undefined;
   debugLabel: string;
 }>;
 
@@ -32,7 +45,7 @@ export type AssertionResult = Readonly<{
 /** 可传入 {@link generateReport} 的断言描述：`predicate` 在只读访问 `sim` 的前提下应为真。 */
 export type SimAssertion = Readonly<{
   label: string;
-  predicate: (sim: HeadlessSim) => boolean;
+  predicate: (sim: HeadlessSimReportSource) => boolean;
   /** 失败时优先展示；省略则使用默认说明。 */
   messageOnFailure?: string;
 }>;
@@ -61,8 +74,12 @@ function toPawnSummary(p: PawnState): PawnSummary {
       rest: p.needs.rest,
       recreation: p.needs.recreation
     },
-    currentGoalKind: p.currentGoal?.kind,
-    currentActionKind: p.currentAction?.kind,
+    currentGoal: p.currentGoal,
+    currentAction: p.currentAction,
+    reservedTargetId: p.reservedTargetId,
+    actionTimerSec: p.actionTimerSec,
+    workTimerSec: p.workTimerSec,
+    activeWorkItemId: p.activeWorkItemId,
     debugLabel: p.debugLabel
   };
 }
@@ -71,7 +88,7 @@ function defaultFailureMessage(label: string): string {
   return `断言未通过：${label}`;
 }
 
-function evaluateAssertion(sim: HeadlessSim, assertion: SimAssertion): AssertionResult {
+function evaluateAssertion(sim: HeadlessSimReportSource, assertion: SimAssertion): AssertionResult {
   const { label, predicate, messageOnFailure } = assertion;
   try {
     const ok = predicate(sim);
@@ -96,10 +113,10 @@ function evaluateAssertion(sim: HeadlessSim, assertion: SimAssertion): Assertion
 /**
  * 汇总当前 `sim` 的只读快照；可选地对 `assertions` 逐项求值。
  *
- * 仅调用 `HeadlessSim` 的 getter 与 `SimEventCollector` 的只读查询，不 `tick`、不清事件、不改状态。
+ * 仅调用 getter 与 `SimEventCollector` 的只读查询，不 `tick`、不清事件、不改状态。
  */
 export function generateReport(
-  sim: HeadlessSim,
+  sim: HeadlessSimReportSource,
   assertions?: ReadonlyArray<SimAssertion>
 ): SimReport {
   const tickCount = sim.getTickCount();

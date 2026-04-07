@@ -7,11 +7,19 @@ export type {
   WorkOrderStatus,
   WorkStep
 } from "./work-types";
-export type { ClaimOutcome, CompleteOutcome, FailOutcome } from "./work-operations";
+export {
+  WORK_ITEM_ANCHOR_DURATION_SEC,
+  WORK_WALK_KINDS,
+  workItemAnchorDurationSeconds
+} from "./work-item-duration";
+export type {
+  ClaimOutcome,
+  CompleteOutcome,
+  CompleteWorkItemContext,
+  FailOutcome
+} from "./work-operations";
 export {
   claimWorkItem,
-  completeBlueprintWork,
-  completeDeconstructWork,
   completeWorkItem,
   failWorkItem
 } from "./work-operations";
@@ -22,7 +30,10 @@ export {
   getByKind,
   getByStatus,
   getByTarget,
-  removeWork
+  getByTargetCell,
+  removeWork,
+  replaceWorkRegistryOrders,
+  sortWorkOrdersByPriorityDesc
 } from "./work-registry";
 export {
   generateChopWork,
@@ -30,7 +41,7 @@ export {
   generateHaulWork,
   generatePickUpWork
 } from "./work-generator";
-export type { ClaimResult } from "./work-scheduler";
+export type { ClaimResult, ClaimWorkResult, ReleaseWorkResult } from "./work-scheduler";
 export { claimWork, getAvailableWork, isWorkClaimed, releaseWork } from "./work-scheduler";
 export type { SettleResult } from "./work-settler";
 export { settleWorkFailure, settleWorkSuccess } from "./work-settler";

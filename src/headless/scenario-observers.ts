@@ -2,6 +2,10 @@ import { commandMenuDomainSemantics, type CommandMenuCommandId } from "../data/c
 import { formatTimeOfDayLabel } from "../game/time";
 import type { SelectionModifier } from "../game/interaction/floor-selection";
 import type { GridCoord } from "../game/map";
+import {
+  WORK_ITEM_ANCHOR_DURATION_SEC,
+  workItemAnchorDurationSeconds
+} from "../game/work";
 import type { WorkItemSnapshot } from "../game/work/work-types";
 import type { PlayerSelectionCommitOutcome } from "../player/commit-player-intent";
 import type { HeadlessSim } from "./headless-sim";
@@ -51,6 +55,16 @@ export type VisibleWorkItemSnapshot = Readonly<{
   claimedBy: string | undefined;
   failureCount: number;
   anchorCell: GridCoord;
+  /**
+   * 与 {@link PawnState.workTimerSec} 对齐：某小人 `activeWorkItemId === id` 时，其累计锚格读条秒数。
+   * 多小人同指一单时取最大累计值（防御性）。
+   */
+  anchorWorkTimerSec: number | undefined;
+  /**
+   * 0..1，由 `anchorWorkTimerSec` 与该工单类型默认 {@link WORK_ITEM_ANCHOR_DURATION_SEC} 推导。
+   * 无读条或未匹配到认领者时为 `undefined`。
+   */
+  anchorProgress01: number | undefined;
 }>;
 
 export type VisibleOwnershipSnapshot = Readonly<{
@@ -96,6 +110,10 @@ type VisibleWorkItemExpectation = Readonly<{
   status?: WorkItemSnapshot["status"];
   claimedBy?: string;
   failureCountAtLeast?: number;
+  anchorWorkTimerSec?: number;
+  anchorWorkTimerSecAtLeast?: number;
+  anchorProgress01AtLeast?: number;
+  anchorProgress01AtMost?: number;
 }>;
 
 type VisibleOwnershipExpectation = Readonly<{
@@ -112,6 +130,22 @@ type VisibleFailureExpectation = Readonly<{
 
 function defaultLabel(prefix: string, detail: string): string {
   return `${prefix}: ${detail}`;
+}
+
+/** 各工单当前锚格读条累计（秒）；键为 `activeWorkItemId`。 */
+function maxAnchorWorkTimerSecByWorkItemId(
+  pawns: readonly { activeWorkItemId?: string; workTimerSec: number }[]
+): ReadonlyMap<string, number> {
+  const map = new Map<string, number>();
+  for (const p of pawns) {
+    const wid = p.activeWorkItemId;
+    if (wid === undefined) continue;
+    const prev = map.get(wid);
+    if (prev === undefined || p.workTimerSec > prev) {
+      map.set(wid, p.workTimerSec);
+    }
+  }
+  return map;
 }
 
 export function resolveScenarioPlayerInputSemantic(
@@ -149,6 +183,7 @@ export function captureVisibleState(
   options: VisibleStateOptions = {}
 ): VisibleStateSnapshot {
   const world = sim.getWorldPort().getWorld();
+  const anchorTimers = maxAnchorWorkTimerSecByWorkItemId(sim.getPawns());
   const hud: VisibleHudSnapshot = {
     layer: "hud",
     dayNumber: world.time.dayNumber,
@@ -161,15 +196,25 @@ export function captureVisibleState(
 
   const workItems = [...world.workItems.values()]
     .sort((left, right) => left.id.localeCompare(right.id))
-    .map((item) => ({
-      layer: "world" as const,
-      id: item.id,
-      kind: item.kind,
-      status: item.status,
-      claimedBy: item.claimedBy,
-      failureCount: item.failureCount,
-      anchorCell: { ...item.anchorCell }
-    }));
+    .map((item) => {
+      const anchorWorkTimerSec = anchorTimers.get(item.id);
+      const durationSec = workItemAnchorDurationSeconds(WORK_ITEM_ANCHOR_DURATION_SEC, item.kind);
+      const anchorProgress01 =
+        anchorWorkTimerSec !== undefined && durationSec > 0
+          ? Math.max(0, Math.min(1, anchorWorkTimerSec / durationSec))
+          : undefined;
+      return {
+        layer: "world" as const,
+        id: item.id,
+        kind: item.kind,
+        status: item.status,
+        claimedBy: item.claimedBy,
+        failureCount: item.failureCount,
+        anchorCell: { ...item.anchorCell },
+        anchorWorkTimerSec,
+        anchorProgress01
+      };
+    });
 
   const ownerships = [...world.entities.values()]
     .filter((entity) => entity.ownership !== undefined)
@@ -287,6 +332,33 @@ export function assertVisibleWorkItemState(
     if (
       expected.failureCountAtLeast !== undefined &&
       item.failureCount < expected.failureCountAtLeast
+    ) {
+      return false;
+    }
+    if (
+      expected.anchorWorkTimerSec !== undefined &&
+      item.anchorWorkTimerSec !== expected.anchorWorkTimerSec
+    ) {
+      return false;
+    }
+    if (
+      expected.anchorWorkTimerSecAtLeast !== undefined &&
+      (item.anchorWorkTimerSec === undefined ||
+        item.anchorWorkTimerSec < expected.anchorWorkTimerSecAtLeast)
+    ) {
+      return false;
+    }
+    if (
+      expected.anchorProgress01AtLeast !== undefined &&
+      (item.anchorProgress01 === undefined ||
+        item.anchorProgress01 < expected.anchorProgress01AtLeast)
+    ) {
+      return false;
+    }
+    if (
+      expected.anchorProgress01AtMost !== undefined &&
+      (item.anchorProgress01 === undefined ||
+        item.anchorProgress01 > expected.anchorProgress01AtMost)
     ) {
       return false;
     }

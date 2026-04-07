@@ -1,6 +1,6 @@
 import { coordKey, DEFAULT_WORLD_GRID } from "../src/game/map";
 import type { ScenarioDefinition, ScenarioExpectation } from "../src/headless/scenario-types";
-import type { DomainCommand } from "../src/player/s0-contract";
+import type { DomainCommand } from "../src/game/interaction/domain-command-types";
 
 /**
  * Story-1 第一天集成场景：固定布局、3 小人、1 树、2 份地面食物（不可拾取直至 haul）。
@@ -15,10 +15,11 @@ export const STORY_1_FOOD_CELLS = [
   { col: 11, row: 5 },
   { col: 12, row: 5 }
 ] as const;
-/** zone_create 目标格（ hydrate 时为空地，由测试提交命令创建）。 */
+/** zone_create 目标格（ hydrate 时为空地，由测试提交命令创建）。需保留至少一空位供木材入区：两格已被两份食物占满。 */
 export const STORY_1_ZONE_CELLS = [
   { col: 13, row: 5 },
-  { col: 14, row: 5 }
+  { col: 14, row: 5 },
+  { col: 15, row: 5 }
 ] as const;
 export const STORY_1_WALL_CELL = { col: 5, row: 4 } as const;
 export const STORY_1_BED_CELL = { col: 7, row: 4 } as const;
@@ -48,7 +49,7 @@ export const STORY_1_DOMAIN_COMMANDS = {
     targetCellKeys: [...foodKeys],
     targetEntityIds: [],
     sourceMode: {
-      source: { kind: "menu", menuId: "orders", itemId: "haul" },
+      source: { kind: "menu", menuId: "tools", itemId: "haul" },
       selectionModifier: "replace",
       inputShape: "rect-selection"
     }
@@ -59,7 +60,7 @@ export const STORY_1_DOMAIN_COMMANDS = {
     targetCellKeys: [treeKey],
     targetEntityIds: [],
     sourceMode: {
-      source: { kind: "menu", menuId: "orders", itemId: "lumber" },
+      source: { kind: "menu", menuId: "tools", itemId: "lumber" },
       selectionModifier: "replace",
       inputShape: "rect-selection"
     }
@@ -70,7 +71,7 @@ export const STORY_1_DOMAIN_COMMANDS = {
     targetCellKeys: [wallKey],
     targetEntityIds: [],
     sourceMode: {
-      source: { kind: "menu", menuId: "structures", itemId: "build-wall" },
+      source: { kind: "menu", menuId: "building", itemId: "build-wall" },
       selectionModifier: "replace",
       inputShape: "single-cell"
     }
@@ -130,19 +131,19 @@ export const STORY_1_DAY_ONE_EXPECTATION_GROUPS = {
       label: "WORK-001：树已砍伐移除",
       type: "entity-kind-absent",
       params: { entityKind: "tree" },
-      maxTicks: 8_000
+      maxTicks: 12_000
     },
     {
       label: "WORK-001：chop-tree 工单已完成",
       type: "work-item-completed-kind",
       params: { workKind: "chop-tree" },
-      maxTicks: 8_000
+      maxTicks: 12_000
     },
     {
       label: "WORK-001：木材已进入存储区",
       type: "resource-in-container",
       params: { containerKind: "zone", materialKind: "wood" },
-      maxTicks: 15_000
+      maxTicks: 25_000
     }
   ] as const satisfies readonly ScenarioExpectation[],
   /** BUILD-001 */

@@ -2,7 +2,7 @@
  * Headless 模拟 tick 差分事件：对比 PawnState 与世界快照，生成可测试的结构化事件流。
  */
 
-import type { GridCoord } from "../game/map/world-grid";
+import type { GridCoord } from "../game/map";
 import type { PawnActionState, PawnGoalState, PawnId, PawnState } from "../game/pawn-state";
 import type { WorldSnapshot } from "../game/world-core-types";
 
@@ -15,10 +15,36 @@ export type SimEventKind =
   | "pawn-action-changed"
   | "pawn-need-changed"
   | "work-created"
+  | "work-derived"
   | "work-claimed"
+  | "work-released"
+  | "work-failed"
   | "work-completed"
   | "entity-spawned"
   | "entity-removed";
+
+/** 与 {@link SimEventKind} 单源对齐；场景期望与收集器共用同一守卫。 */
+const SIM_EVENT_KINDS = [
+  "day-start",
+  "night-start",
+  "pawn-moved",
+  "pawn-motion-changed",
+  "pawn-goal-changed",
+  "pawn-action-changed",
+  "pawn-need-changed",
+  "work-created",
+  "work-derived",
+  "work-claimed",
+  "work-released",
+  "work-failed",
+  "work-completed",
+  "entity-spawned",
+  "entity-removed"
+] as const satisfies readonly SimEventKind[];
+
+export function isSimEventKind(value: string): value is SimEventKind {
+  return (SIM_EVENT_KINDS as readonly string[]).includes(value);
+}
 
 export type SimEvent =
   | Readonly<{
@@ -75,8 +101,27 @@ export type SimEvent =
     }>
   | Readonly<{
       tick: number;
+      kind: "work-derived";
+      workItemId: string;
+      derivedFromWorkId: string;
+    }>
+  | Readonly<{
+      tick: number;
       kind: "work-claimed";
       workItemId: string;
+      claimedBy: string | undefined;
+    }>
+  | Readonly<{
+      tick: number;
+      kind: "work-released";
+      workItemId: string;
+      claimedBy: string | undefined;
+    }>
+  | Readonly<{
+      tick: number;
+      kind: "work-failed";
+      workItemId: string;
+      failureCount: number;
       claimedBy: string | undefined;
     }>
   | Readonly<{
@@ -155,6 +200,8 @@ function eventTouchesPawn(event: SimEvent, pawnId: PawnId): boolean {
     case "pawn-need-changed":
       return event.pawnId === pawnId;
     case "work-claimed":
+    case "work-released":
+    case "work-failed":
       return event.claimedBy === pawnId;
     default:
       return false;
@@ -275,6 +322,14 @@ export function createSimEventCollector(): SimEventCollector {
       const wa = afterWork.get(id);
       if (!wb && wa) {
         events.push({ tick, kind: "work-created", workItemId: id });
+        if (wa.derivedFromWorkId) {
+          events.push({
+            tick,
+            kind: "work-derived",
+            workItemId: id,
+            derivedFromWorkId: wa.derivedFromWorkId
+          });
+        }
         if (wa.status === "claimed" || wa.claimedBy) {
           events.push({
             tick,
@@ -299,6 +354,23 @@ export function createSimEventCollector(): SimEventCollector {
           claimedBy: wa.claimedBy
         });
       }
+      if (wasClaimed && !isClaimed) {
+        events.push({
+          tick,
+          kind: "work-released",
+          workItemId: id,
+          claimedBy: wb.claimedBy
+        });
+      }
+      if (wa.failureCount > wb.failureCount) {
+        events.push({
+          tick,
+          kind: "work-failed",
+          workItemId: id,
+          failureCount: wa.failureCount,
+          claimedBy: wb.claimedBy
+        });
+      }
       const wasCompleted = wb.status === "completed";
       const isCompleted = wa.status === "completed";
       if (!wasCompleted && isCompleted) {
@@ -310,7 +382,7 @@ export function createSimEventCollector(): SimEventCollector {
   return {
     recordPawnDiff,
     recordWorldDiff,
-    getEvents: () => events,
+    getEvents: () => Object.freeze([...events]),
     getEventsByKind: <K extends SimEventKind>(kind: K) =>
       events.filter((e): e is Extract<SimEvent, { kind: K }> => e.kind === kind),
     getEventsByPawn: (pawnId: PawnId) => events.filter((e) => eventTouchesPawn(e, pawnId)),

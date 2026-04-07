@@ -1,28 +1,28 @@
 /**
- * 游戏场景用的世界与网格初值：在 game 层创建 WorldCore 与网关，避免场景直接持有 WorldCore 构造细节。
+ * 游戏场景用的世界与网格初值：在 game 层创建 WorldCore，避免场景直接持有构造细节；
+ * 编排用 WorldPort（见 `player/orchestrator-world-bridge`）由场景或应用入口注入组装。
  */
 
-import { createWorldCore } from "./world-core";
+import { createWorldCore, type WorldCore } from "./world-core";
 import { DEFAULT_TIME_OF_DAY_CONFIG } from "./time";
 import type { TimeOfDayState } from "./time";
-import { WorldCoreWorldPort } from "../player/world-core-world-port";
 import type { SimConfig } from "./behavior";
 import {
   blockedKeysFromCells,
+  DEFAULT_SCENARIO_INTERACTION_POINTS,
   pickRandomBlockedCells,
-  seedBlockedCellsAsObstacles,
   seedInitialTreesAndResources,
   DEFAULT_WORLD_GRID,
   type WorldGridConfig
 } from "./map";
+import { seedBlockedCellsAsObstacles } from "./world-seed-obstacles";
 import { createSeededRng } from "./util/seeded-rng";
-import type { OrchestratorWorldBridge } from "./orchestrator-world-bridge";
 
 const DEFAULT_TERRAIN_DECORATION_SEED = 0xc0ffee42;
 
 export type WorldBootstrapResult = Readonly<{
   worldGrid: WorldGridConfig;
-  worldPort: OrchestratorWorldBridge;
+  worldCore: WorldCore;
 }>;
 
 export function bootstrapWorldForScene(opts: Readonly<{
@@ -33,14 +33,17 @@ export function bootstrapWorldForScene(opts: Readonly<{
 }>): WorldBootstrapResult {
   const { simConfig, timeOfDayState, terrainDecorationSeed = DEFAULT_TERRAIN_DECORATION_SEED } = opts;
   const excludeSpawn = blockedKeysFromCells(DEFAULT_WORLD_GRID.defaultSpawnPoints);
+  /** 与 terrainDecorationSeed 同源派生，避免石格与装饰各用一套随机源。 */
+  const stoneLayoutRng = createSeededRng((terrainDecorationSeed ^ 0x5b7a11ed) >>> 0);
   const stoneCellsRandom = pickRandomBlockedCells(
     DEFAULT_WORLD_GRID,
     simConfig.stoneCellCount,
     excludeSpawn,
-    () => Math.random()
+    stoneLayoutRng
   );
   const worldGrid: WorldGridConfig = {
     ...DEFAULT_WORLD_GRID,
+    interactionPoints: DEFAULT_SCENARIO_INTERACTION_POINTS,
     blockedCellKeys: new Set(blockedKeysFromCells(stoneCellsRandom))
   };
 
@@ -58,6 +61,5 @@ export function bootstrapWorldForScene(opts: Readonly<{
     decorationRng
   );
 
-  const worldPort: OrchestratorWorldBridge = new WorldCoreWorldPort(worldCore);
-  return { worldGrid, worldPort };
+  return { worldGrid, worldCore };
 }

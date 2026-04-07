@@ -21,7 +21,20 @@ export type BuildState = "planned" | "in-progress" | "completed";
 
 export type InteractionCapability = "rest";
 
-export type AssignmentReason = "unassigned";
+/**
+ * 树实体在地图反馈上的伐木视觉相位（只读投影）。
+ * - `normal`：未标记且无未完成 chop 工单。
+ * - `marked`：已标记伐木和/或存在开放 chop 工单（队列预占）。
+ * - `chopping`：存在已认领的 chop 工单（小人正在执行伐木）。
+ */
+export type TreeLoggingVisualPhase = "normal" | "marked" | "chopping";
+
+/** 床铺归属原因：`unassigned` 表示无主人；其余值区分来源，便于手动调整与排错追溯。 */
+export type AssignmentReason =
+  | "unassigned"
+  | "manual"
+  | "auto-after-construction"
+  | "auto-unowned-fill";
 
 export type EntityOwnership = Readonly<{
   ownerPawnId?: string;
@@ -48,6 +61,12 @@ export type WorldEntitySnapshot = Readonly<{
   pickupAllowed?: boolean;
   reservedByPawnId?: string;
   loggingMarked?: boolean;
+  /** 仅 `kind==="tree"`：存在未认领的 `chop-tree` 工单指向本树（工作队列预占）。 */
+  treeChopWorkOpen?: boolean;
+  /** 仅 `kind==="tree"`：存在已认领且未完成的 `chop-tree` 工单（伐木中）。 */
+  treeChopWorkClaimed?: boolean;
+  /** 仅 `kind==="tree"`：由 `getWorldSnapshot` / `projectTreeSnapshotsForRender` 等填充。 */
+  treeLoggingVisualPhase?: TreeLoggingVisualPhase;
   /** 地图石料障碍是否已登记开采工单（与 trees 的 loggingMarked 对称）。 */
   miningMarked?: boolean;
   zoneKind?: ZoneKind;
@@ -80,6 +99,23 @@ export type ResourceMaterialKind = "wood" | "food" | "stone" | "generic";
 
 /** 物资所在容器类别（地面、小人携带、区域、建筑内存储等）。 */
 export type ResourceContainerKind = "ground" | "pawn" | "zone" | "building";
+
+/** 与 {@link ResourceContainerKind} 一一对应；扩展 union 时需补全键以通过类型检查。 */
+const RESOURCE_CONTAINER_KIND_SET: Record<ResourceContainerKind, true> = {
+  ground: true,
+  pawn: true,
+  zone: true,
+  building: true
+};
+
+/** 全部 {@link ResourceContainerKind} 字面量（顺序依实现而定），供迭代与表驱动校验。 */
+export const RESOURCE_CONTAINER_KINDS = Object.keys(
+  RESOURCE_CONTAINER_KIND_SET
+) as ResourceContainerKind[];
+
+export function isResourceContainerKind(value: string): value is ResourceContainerKind {
+  return Object.prototype.hasOwnProperty.call(RESOURCE_CONTAINER_KIND_SET, value);
+}
 
 /** 区域用途分类。 */
 export type ZoneKind = "storage" | "forbidden" | "priority-build" | "custom";

@@ -37,16 +37,30 @@ export function createRuntimeDebugLogStore(
 ): RuntimeDebugLogStore {
   const limit = Math.max(1, options.limit);
   let events: RuntimeDebugLogEvent[] = [];
+  let panelEntries: RuntimeLogPanelEntry[] = [];
 
   return {
     append: (entry) => {
       events = [...events, entry].slice(-limit);
+      panelEntries = [
+        ...panelEntries,
+        runtimeLogEventToPanelEntry(entry)
+      ].slice(-limit);
     },
     clear: () => {
       events = [];
+      panelEntries = [];
     },
-    getEntries: () => events.map(runtimeLogEventToPanelEntry),
+    getEntries: () => panelEntries,
     getEvents: () => events,
-    getVisibleEntries: (keyword: string) => selectRuntimeDebugLogEntries(events, keyword)
+    getVisibleEntries: (keyword: string) => {
+      const normalized = normalizeKeyword(keyword);
+      if (normalized === "") {
+        return panelEntries;
+      }
+      return panelEntries.filter((entry) =>
+        entry.searchText.toLowerCase().includes(normalized)
+      );
+    }
   };
 }

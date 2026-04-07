@@ -57,14 +57,18 @@ describe("wander-planning", () => {
     expect(legal).toContainEqual(pawns[1]!.logicalCell);
   });
 
-  it("chooseWanderPath picks a farther reachable target and returns a multi-step path", () => {
+  it("chooseWanderPath picks a random legal neighbor and returns a single-step path", () => {
     const rng: WanderRng = () => 0.99;
     const pawn = createDefaultPawnStates([{ col: 5, row: 5 }], ["T"])[0]!;
-    const path = chooseWanderPath(DEFAULT_WORLD_GRID, pawn, rng);
+    const occupied = logicalCellsByPawnId([pawn]);
+    const path = chooseWanderPath(DEFAULT_WORLD_GRID, pawn, occupied, rng);
 
     expect(path).toBeDefined();
-    expect((path?.length ?? 0) > 1).toBe(true);
-    expect(path?.[0]).not.toEqual({ col: pawn.logicalCell.col, row: pawn.logicalCell.row });
+    expect(path).toHaveLength(1);
+    const step = path![0]!;
+    expect(Math.abs(step.col - pawn.logicalCell.col) + Math.abs(step.row - pawn.logicalCell.row)).toBe(
+      1
+    );
   });
 
   it("chooseWanderPath returns undefined when no other reachable walkable cell exists", () => {
@@ -84,6 +88,6 @@ describe("wander-planning", () => {
       ])
     };
 
-    expect(chooseWanderPath(grid, pawn, rng)).toBeUndefined();
+    expect(chooseWanderPath(grid, pawn, logicalCellsByPawnId([pawn]), rng)).toBeUndefined();
   });
 });

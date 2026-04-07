@@ -8,13 +8,15 @@ import {
   generateConstructWork,
   generateHaulWork,
   generatePickUpWork,
+  replaceWorkRegistryOrders,
   settleWorkFailure,
   settleWorkSuccess
 } from "../../src/game/work";
 
 function claim(registry: ReturnType<typeof createWorkRegistry>, workId: string, pawnId: string): void {
-  const r = claimWork(registry, workId, pawnId);
-  expect(r.kind).toBe("claimed");
+  const step = claimWork(registry, workId, pawnId);
+  expect(step.outcome.kind).toBe("claimed");
+  replaceWorkRegistryOrders(registry, step.registry);
 }
 
 describe("work-settler", () => {

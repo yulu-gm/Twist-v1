@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_WORLD_GRID } from "../../src/game/map/world-grid";
+import { DEFAULT_WORLD_GRID, type WorldGridConfig } from "../../src/game/map/world-grid";
 import { createWorldCore, removeWorldEntity, spawnWorldEntity } from "../../src/game/world-core";
 import {
   obstacleBlockedCellKeys,
@@ -7,6 +7,27 @@ import {
   simulationInteractionPoints,
   syncWorldGridForSimulation
 } from "../../src/game/world-sim-bridge";
+
+/** 含 bed/food 样板供 simulationInteractionPoints 取时长与 needDelta（非 (0,0) 幽灵兜底）。 */
+const GRID_WITH_INTERACTION_PROTOTYPES: WorldGridConfig = {
+  ...DEFAULT_WORLD_GRID,
+  interactionPoints: [
+    {
+      id: "template-bed-proto",
+      kind: "bed",
+      cell: { col: 1, row: 1 },
+      useDurationSec: 3.6,
+      needDelta: { rest: -65 }
+    },
+    {
+      id: "template-food-proto",
+      kind: "food",
+      cell: { col: 1, row: 2 },
+      useDurationSec: 2.4,
+      needDelta: { hunger: -55 }
+    }
+  ]
+};
 
 describe("world-sim-bridge", () => {
   it("simulationImpassableCellKeys 含 obstacle、wall、树与蓝图占格", () => {
@@ -81,7 +102,7 @@ describe("world-sim-bridge", () => {
         }
       ]
     };
-    const pts = simulationInteractionPoints(DEFAULT_WORLD_GRID, withSpots);
+    const pts = simulationInteractionPoints(GRID_WITH_INTERACTION_PROTOTYPES, withSpots);
     const ids = pts.map((p) => p.id);
     expect(ids.some((id) => id === "world-rest-b1")).toBe(true);
     const dynamic = pts.find((p) => p.id === "world-rest-b1");
@@ -101,7 +122,7 @@ describe("world-sim-bridge", () => {
     });
     w = s.world;
 
-    const r = syncWorldGridForSimulation(grid, w, DEFAULT_WORLD_GRID, null);
+    const r = syncWorldGridForSimulation(grid, w, GRID_WITH_INTERACTION_PROTOTYPES, null);
     expect(r.blockedChanged).toBe(true);
     expect(grid.blockedCellKeys?.has("0,0")).toBe(true);
     expect(r.next.interactionPointIds.length).toBeGreaterThan(0);

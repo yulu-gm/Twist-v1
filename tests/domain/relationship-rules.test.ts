@@ -188,13 +188,16 @@ describe("relationship-rules", () => {
   describe("validateResourceLocation", () => {
     it("flags ground resource with containerEntityId", () => {
       const reg = createEntityRegistry();
-      reg.create({
+      const res = reg.create({
         kind: "resource",
         materialKind: "wood",
         cell: { col: 0, row: 0 },
         containerKind: "ground",
-        containerEntityId: "entity-999" as import("../../src/game/entity").EntityId,
         pickupAllowed: true
+      });
+      reg.replace({
+        ...res,
+        containerEntityId: "entity-999" as import("../../src/game/entity").EntityId
       });
       const v = validateResourceLocation(reg);
       expect(v.ok).toBe(false);

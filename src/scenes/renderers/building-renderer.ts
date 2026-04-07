@@ -3,8 +3,18 @@
  */
 
 import Phaser from "phaser";
-import type { WorldEntitySnapshot } from "../../game/entity/entity-types";
-import { isInsideGrid, type WorldGridConfig } from "../../game/map/world-grid";
+import type { BuildingKind, WorldEntitySnapshot } from "../../game/entity/entity-types";
+import { isInsideGrid, type WorldGridConfig } from "../../game/map";
+
+/** 单格建筑/蓝图绘制；扩展 {@link BuildingKind} 时在此表注册，避免主循环堆叠分支。 */
+type BuildingCellDrawer = (
+  g: Phaser.GameObjects.Graphics,
+  left: number,
+  top: number,
+  w: number,
+  h: number,
+  blueprint: boolean
+) => void;
 
 function drawWallCell(
   g: Phaser.GameObjects.Graphics,
@@ -56,7 +66,19 @@ function drawBedCell(
   g.strokeRoundedRect(left + pad, top + pad, w - pad * 2, h - pad * 2, rx);
 }
 
-/** 同步绘制 `building`（wall/bed）与施工中 `blueprint`（同 kinds）。 */
+const BUILDING_CELL_DRAWERS: Record<BuildingKind, BuildingCellDrawer> = {
+  wall: drawWallCell,
+  bed: drawBedCell
+};
+
+function isRegisteredBuildingKind(value: string | undefined): value is BuildingKind {
+  return (
+    typeof value === "string" &&
+    Object.prototype.hasOwnProperty.call(BUILDING_CELL_DRAWERS, value)
+  );
+}
+
+/** 同步绘制 `building` 与施工中 `blueprint`（仅已注册 {@link BuildingKind}）。 */
 export function drawBuildingsAndBlueprintsToGraphics(
   g: Phaser.GameObjects.Graphics,
   grid: WorldGridConfig,
@@ -70,11 +92,11 @@ export function drawBuildingsAndBlueprintsToGraphics(
 
   const list: WorldEntitySnapshot[] = [];
   for (const e of entities) {
-    if (e.kind === "building" && (e.buildingKind === "wall" || e.buildingKind === "bed")) {
+    if (e.kind === "building" && isRegisteredBuildingKind(e.buildingKind)) {
       list.push(e);
       continue;
     }
-    if (e.kind === "blueprint" && (e.blueprintKind === "wall" || e.blueprintKind === "bed")) {
+    if (e.kind === "blueprint" && isRegisteredBuildingKind(e.blueprintKind)) {
       list.push(e);
     }
   }
@@ -87,9 +109,10 @@ export function drawBuildingsAndBlueprintsToGraphics(
 
   for (const e of list) {
     const blueprint = e.kind === "blueprint";
-    const kind = e.kind === "building" ? e.buildingKind : e.blueprintKind;
-    if (kind !== "wall" && kind !== "bed") continue;
+    const kindRaw = e.kind === "building" ? e.buildingKind : e.blueprintKind;
+    if (!isRegisteredBuildingKind(kindRaw)) continue;
 
+    const drawCell = BUILDING_CELL_DRAWERS[kindRaw];
     const cells = e.occupiedCells.length > 0 ? e.occupiedCells : [e.cell];
     for (const cell of cells) {
       if (!isInsideGrid(grid, cell)) continue;
@@ -97,11 +120,7 @@ export function drawBuildingsAndBlueprintsToGraphics(
       const top = oy + cell.row * cs + inset;
       const w = cs - inset * 2;
       const h = cs - inset * 2;
-      if (kind === "wall") {
-        drawWallCell(g, left, top, w, h, blueprint);
-      } else {
-        drawBedCell(g, left, top, w, h, blueprint);
-      }
+      drawCell(g, left, top, w, h, blueprint);
     }
   }
 }

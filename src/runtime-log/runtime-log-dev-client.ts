@@ -1,10 +1,14 @@
 import type { RuntimeLogAsyncBatchSink } from "./runtime-log-session-logger";
 import type { RuntimeLogEvent } from "./runtime-log";
 
+const MAX_ERROR_BODY_CHARS = 512;
+
 export type RuntimeLogDevHttpBatchSinkOptions = Readonly<{
   runId: string;
   endpoint: string;
   fetchImpl?: typeof fetch;
+  /** 开发服 `POST …/start` 成功返回体中的 `filePath` / `runId` 回调（用于调试面板展示 NDJSON 落盘路径）。 */
+  onStartAck?: (ack: Readonly<{ filePath?: string; runId?: string }>) => void;
 }>;
 
 type RuntimeLogResponse = Readonly<{
@@ -16,6 +20,21 @@ type RuntimeLogResponse = Readonly<{
 
 async function readJson(response: Response | { json: () => Promise<RuntimeLogResponse> }): Promise<RuntimeLogResponse> {
   return response.json();
+}
+
+async function readErrorBodySummary(response: Response): Promise<string> {
+  try {
+    const text = (await response.text()).trim();
+    if (text.length === 0) {
+      return "";
+    }
+    if (text.length <= MAX_ERROR_BODY_CHARS) {
+      return text;
+    }
+    return `${text.slice(0, MAX_ERROR_BODY_CHARS)}…`;
+  } catch {
+    return "(无法读取响应体)";
+  }
 }
 
 export function createRuntimeLogDevHttpBatchSink(
@@ -33,7 +52,9 @@ export function createRuntimeLogDevHttpBatchSink(
       body: JSON.stringify(body)
     });
     if (!response.ok) {
-      throw new Error(`runtime-log-dev-client: request failed for ${path}`);
+      const summary = await readErrorBodySummary(response as Response);
+      const suffix = summary.length > 0 ? `: ${summary}` : "";
+      throw new Error(`runtime-log-dev-client: request failed for ${path} (HTTP ${response.status})${suffix}`);
     }
     return readJson(response as Response);
   };
@@ -45,7 +66,9 @@ export function createRuntimeLogDevHttpBatchSink(
     startPromise = post("/start", {
       action: "start",
       runId: options.runId
-    }).then(() => undefined);
+    }).then((body) => {
+      options.onStartAck?.(body);
+    });
     return startPromise;
   };
 

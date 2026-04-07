@@ -2,71 +2,13 @@
  * 任务标记格筛选：与领域层「哪些格会实际接到工单」对齐，避免空地板铺满标记。
  */
 
-import type { BuildingKind, WorldEntitySnapshot } from "../game/entity/entity-types";
+import type { BuildingKind } from "../game/entity/entity-types";
 import { safePlaceBlueprint, type WorldCore } from "../game/world-core";
-import { coordKey, isInsideGrid, parseCoordKey } from "../game/map/world-grid";
-import { simulationImpassableCellKeys } from "../game/world-sim-bridge";
-
-function mergedBlockedCellKeys(world: WorldCore): ReadonlySet<string> {
-  const fromEntities = simulationImpassableCellKeys(world);
-  const fromGrid = world.grid.blockedCellKeys;
-  if (!fromGrid || fromGrid.size === 0) return fromEntities;
-  const out = new Set(fromEntities);
-  for (const k of fromGrid) {
-    out.add(k);
-  }
-  return out;
-}
-
-function findObstacleCoveringCell(world: WorldCore, cellKey: string): string | undefined {
-  const cell = parseCoordKey(cellKey);
-  if (!cell) return undefined;
-  const k = coordKey(cell);
-  for (const entity of world.entities.values()) {
-    if (entity.kind !== "obstacle") continue;
-    const coveredCells = entity.occupiedCells.length > 0 ? entity.occupiedCells : [entity.cell];
-    if (coveredCells.some((occupantCell) => coordKey(occupantCell) === k)) {
-      return entity.id;
-    }
-  }
-  return undefined;
-}
-
-function findUnmarkedTreeCoveringCell(world: WorldCore, cellKey: string): WorldEntitySnapshot | undefined {
-  for (const entity of world.entities.values()) {
-    if (entity.kind !== "tree") continue;
-    if (entity.loggingMarked) continue;
-    const coveredCells = entity.occupiedCells.length > 0 ? entity.occupiedCells : [entity.cell];
-    if (coveredCells.some((c) => coordKey(c) === cellKey)) {
-      return entity;
-    }
-  }
-  return undefined;
-}
-
-function findGroundResourceCoveringCell(world: WorldCore, cellKey: string): WorldEntitySnapshot | undefined {
-  for (const entity of world.entities.values()) {
-    if (entity.kind !== "resource") continue;
-    if (entity.containerKind !== "ground") continue;
-    const coveredCells = entity.occupiedCells.length > 0 ? entity.occupiedCells : [entity.cell];
-    if (coveredCells.some((c) => coordKey(c) === cellKey)) {
-      return entity;
-    }
-  }
-  return undefined;
-}
-
-function findUnmarkedStoneObstacleCoveringCell(world: WorldCore, cellKey: string): WorldEntitySnapshot | undefined {
-  for (const entity of world.entities.values()) {
-    if (entity.kind !== "obstacle") continue;
-    if (entity.label !== "stone") continue;
-    if (entity.miningMarked) continue;
-    if (entity.occupiedCells.some((c) => coordKey(c) === cellKey)) {
-      return entity;
-    }
-  }
-  return undefined;
-}
+import { isInsideGrid, parseCoordKey } from "../game/map";
+import {
+  mergedBlockedCellKeys,
+  resolveToolbarTaskTargetCellKeys
+} from "../game/interaction/toolbar-task-target-resolution";
 
 function buildBlueprintKind(
   toolId: string,
@@ -93,8 +35,6 @@ export function filterCellKeysForToolbarTaskMarkers(
     return new Set(cellKeys);
   }
 
-  const blocked = mergedBlockedCellKeys(world);
-
   const bk = buildBlueprintKind(toolId, inputShape);
   if (bk !== null) {
     for (const key of cellKeys) {
@@ -107,35 +47,22 @@ export function filterCellKeysForToolbarTaskMarkers(
   }
 
   if (toolId === "lumber") {
-    for (const key of cellKeys) {
-      if (blocked.has(key)) continue;
-      if (findUnmarkedTreeCoveringCell(world, key)) out.add(key);
-    }
-    return out;
+    return resolveToolbarTaskTargetCellKeys(world, world, "lumber", cellKeys);
   }
 
   if (toolId === "haul") {
-    for (const key of cellKeys) {
-      if (blocked.has(key)) continue;
-      if (findGroundResourceCoveringCell(world, key)) out.add(key);
-    }
-    return out;
+    return resolveToolbarTaskTargetCellKeys(world, world, "haul", cellKeys);
   }
 
   if (toolId === "demolish") {
-    for (const key of cellKeys) {
-      if (findObstacleCoveringCell(world, key)) out.add(key);
-    }
-    return out;
+    return resolveToolbarTaskTargetCellKeys(world, world, "demolish", cellKeys);
   }
 
   if (toolId === "mine") {
-    for (const key of cellKeys) {
-      if (findUnmarkedStoneObstacleCoveringCell(world, key)) out.add(key);
-    }
-    return out;
+    return resolveToolbarTaskTargetCellKeys(world, world, "mine", cellKeys);
   }
 
+  const blocked = mergedBlockedCellKeys(world);
   for (const key of cellKeys) {
     if (blocked.has(key)) continue;
     out.add(key);

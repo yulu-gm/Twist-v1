@@ -1,5 +1,6 @@
 import type { EntityRegistry } from "../entity/entity-registry";
-import type { EntityId } from "../entity/entity-types";
+import type { EntityId, WorldEntitySnapshot } from "../entity/entity-types";
+import { findAvailableStorageCell } from "../map/storage-zones";
 import {
   dropResource,
   pickUpResource,
@@ -12,15 +13,16 @@ import {
 } from "../entity/lifecycle-rules";
 import type { WorkRegistry } from "./work-registry";
 import { addWork } from "./work-registry";
-import { generatePickUpWork } from "./work-generator";
+import { generateHaulWork, generatePickUpWork } from "./work-generator";
 import type { WorkOrder, WorkOrderStatus } from "./work-types";
 
 function replaceOrder(registry: WorkRegistry, next: WorkOrder): void {
   registry.orders.set(next.workId, next);
 }
 
-function asEntityId(id: string): EntityId {
-  return id as EntityId;
+/** 工单中的目标 id 仅在注册表存在时视为 {@link EntityId}，避免与策划「目标实体标识」字段不一致时的无校验断言。 */
+function resolveWorkTargetEntityId(registry: EntityRegistry, raw: string): EntityId | undefined {
+  return registry.get(raw as EntityId) !== undefined ? (raw as EntityId) : undefined;
 }
 
 export type SettleResult =
@@ -47,10 +49,11 @@ export type SettleResult =
   | Readonly<{
       kind: "haul-drop-failed";
       outcome: Exclude<DropResourceOutcome, { kind: "ok" }>;
-    }>;
+    }>
+  | Readonly<{ kind: "registry-entity-missing"; id: string }>;
 
 /**
- * 行为层回报成功时结算：按 {@link WorkOrder.kind} 调用实体生命周期规则，更新工单为 `completed`，必要时派生后续工单（伐木 → 拾取）。
+ * 行为层回报成功时结算：按 {@link WorkOrder.kind} 调用实体生命周期规则，更新工单为 `completed`，必要时派生后续工单（伐木 → 拾取；若存在可用存储格则同时登记搬运工单）。
  */
 export function settleWorkSuccess(
   registry: WorkRegistry,
@@ -74,44 +77,98 @@ export function settleWorkSuccess(
       : { kind: "ok" };
   };
 
+  const failClaimed = (reason: string, result: SettleResult): SettleResult => {
+    settleWorkFailure(registry, workId, reason);
+    return result;
+  };
+
   switch (order.kind) {
     case "chop": {
-      const out = transformTreeToResource(entityRegistry, asEntityId(order.targetEntityId));
+      const treeId = resolveWorkTargetEntityId(entityRegistry, order.targetEntityId);
+      if (!treeId) {
+        return failClaimed("registry-entity-missing", {
+          kind: "registry-entity-missing",
+          id: order.targetEntityId
+        });
+      }
+      const out = transformTreeToResource(entityRegistry, treeId);
       if (out.kind !== "ok") {
-        return { kind: "tree-transform-failed", outcome: out };
+        return failClaimed(`tree-transform:${out.kind}`, { kind: "tree-transform-failed", outcome: out });
       }
       const pickupOrder = generatePickUpWork(out.resourceId, order.targetCell);
       addWork(registry, pickupOrder);
+      const storageLookup = {
+        entities: new Map<string, WorldEntitySnapshot>(
+          entityRegistry.getAll().map((e) => [e.id, e as unknown as WorldEntitySnapshot])
+        )
+      };
+      const slot = findAvailableStorageCell(storageLookup, out.resourceId);
+      if (slot) {
+        const haulOrder = generateHaulWork(out.resourceId, order.targetCell, slot.zoneId, slot.cell);
+        addWork(registry, haulOrder);
+      }
       return finishOk(pickupOrder.workId);
     }
     case "construct": {
-      const out = transformBlueprintToBuilding(entityRegistry, asEntityId(order.targetEntityId));
+      const blueprintId = resolveWorkTargetEntityId(entityRegistry, order.targetEntityId);
+      if (!blueprintId) {
+        return failClaimed("registry-entity-missing", {
+          kind: "registry-entity-missing",
+          id: order.targetEntityId
+        });
+      }
+      const out = transformBlueprintToBuilding(entityRegistry, blueprintId);
       if (out.kind !== "ok") {
-        return { kind: "construct-transform-failed", outcome: out };
+        return failClaimed(`construct-transform:${out.kind}`, {
+          kind: "construct-transform-failed",
+          outcome: out
+        });
       }
       return finishOk();
     }
     case "pick-up": {
       const pawnId = order.claimedByPawnId;
-      if (!pawnId) return { kind: "pick-up-missing-pawn" };
-      const out = pickUpResource(entityRegistry, asEntityId(pawnId), asEntityId(order.targetEntityId));
+      if (!pawnId) return failClaimed("pick-up-missing-pawn", { kind: "pick-up-missing-pawn" });
+      const pawnResolved = resolveWorkTargetEntityId(entityRegistry, pawnId);
+      if (!pawnResolved) {
+        return failClaimed("registry-entity-missing", { kind: "registry-entity-missing", id: pawnId });
+      }
+      const resourceId = resolveWorkTargetEntityId(entityRegistry, order.targetEntityId);
+      if (!resourceId) {
+        return failClaimed("registry-entity-missing", {
+          kind: "registry-entity-missing",
+          id: order.targetEntityId
+        });
+      }
+      const out = pickUpResource(entityRegistry, pawnResolved, resourceId);
       if (out.kind !== "ok") {
-        return { kind: "pick-up-failed", outcome: out };
+        return failClaimed(`pick-up:${out.kind}`, { kind: "pick-up-failed", outcome: out });
       }
       return finishOk();
     }
     case "haul": {
       const pawnId = order.claimedByPawnId;
-      if (!pawnId) return { kind: "haul-missing-pawn" };
+      if (!pawnId) return failClaimed("haul-missing-pawn", { kind: "haul-missing-pawn" });
       const dropCell = order.haulDropCell;
-      if (!dropCell) return { kind: "haul-missing-drop-cell" };
-      const pawn = entityRegistry.get(asEntityId(pawnId));
-      if (pawn?.kind !== "pawn" || pawn.carriedResourceId !== order.targetEntityId) {
-        return { kind: "haul-not-carrying-target" };
+      if (!dropCell) return failClaimed("haul-missing-drop-cell", { kind: "haul-missing-drop-cell" });
+      const haulTargetId = resolveWorkTargetEntityId(entityRegistry, order.targetEntityId);
+      if (!haulTargetId) {
+        return failClaimed("registry-entity-missing", {
+          kind: "registry-entity-missing",
+          id: order.targetEntityId
+        });
       }
-      const out = dropResource(entityRegistry, asEntityId(pawnId), dropCell);
+      const pawnResolved = resolveWorkTargetEntityId(entityRegistry, pawnId);
+      if (!pawnResolved) {
+        return failClaimed("registry-entity-missing", { kind: "registry-entity-missing", id: pawnId });
+      }
+      const pawn = entityRegistry.get(pawnResolved);
+      if (pawn?.kind !== "pawn" || pawn.carriedResourceId !== haulTargetId) {
+        return failClaimed("haul-not-carrying-target", { kind: "haul-not-carrying-target" });
+      }
+      const out = dropResource(entityRegistry, pawnResolved, dropCell);
       if (out.kind !== "ok") {
-        return { kind: "haul-drop-failed", outcome: out };
+        return failClaimed(`haul-drop:${out.kind}`, { kind: "haul-drop-failed", outcome: out });
       }
       return finishOk();
     }

@@ -1,39 +1,44 @@
 /**
- * 格子 hover 展示文案（mock 生物群系 + 通行状态 + 掉落物）。
- * 未来接入真实地图数据时，只需换掉此文件的实现。
+ * 格子 hover 展示文案：消费 `GridCellHoverReadModel` + 与 `ground-items-renderer` 同源的地面资源行。
  */
 
-import {
-  type GridCoord,
-  type WorldGridConfig,
-  coordKey,
-  isWalkableCell
-} from "../game/map/world-grid";
-import { groundItemAt } from "./ground-items";
+import type { WorldEntitySnapshot } from "../game/entity/entity-types";
+import { collectRenderableResourceItems } from "../scenes/renderers/ground-items-renderer";
 
-const MOCK_BIOME_BY_KEY: Readonly<Record<string, string>> = {
-  "4,3": "mock · 营地北门",
-  "6,3": "mock · 浅溪渡口",
-  "8,3": "mock · 老橡树桩"
-};
+/** 与寻路/工单一致的格面摘要，由 `world-sim-bridge.buildGridCellHoverReadModel` 构造。 */
+export type GridCellHoverReadModel = Readonly<{
+  cell: Readonly<{ col: number; row: number }>;
+  /** 地形/地块标签；当前工程未配置生物群系时为中性说明。 */
+  terrainLabel: string;
+  /** 与 simulationImpassableCellKeys + 网格配置阻挡合并后的不可走。 */
+  simulationImpassable: boolean;
+  /** `simulationImpassable` 为真时的阻挡来源简述。 */
+  impassableBrief: string | null;
+  /**
+   * 仅在可走格上展示占用（避免与树木/墙等阻挡实体重复一行）。
+   */
+  occupancyBrief: string | null;
+}>;
 
-const MOCK_BIOME_ROTATE = [
-  "mock · 草甸过渡带",
-  "mock · 疏林边缘",
-  "mock · 河滩晒石",
-  "mock · 塌墙遗迹"
-] as const;
+function formatStateLines(model: GridCellHoverReadModel): string {
+  if (model.simulationImpassable) {
+    const tail = model.impassableBrief ? `（${model.impassableBrief}）` : "";
+    return `不可通行${tail}`;
+  }
+  const base = "可通行";
+  return model.occupancyBrief ? `${base}\n${model.occupancyBrief}` : base;
+}
 
 export function formatGridCellHoverText(
-  cell: GridCoord,
-  grid: WorldGridConfig
+  model: GridCellHoverReadModel,
+  entities: Iterable<WorldEntitySnapshot>
 ): string {
-  const k = coordKey(cell);
-  const biome =
-    MOCK_BIOME_BY_KEY[k] ??
-    MOCK_BIOME_ROTATE[(cell.col + cell.row * 5) % MOCK_BIOME_ROTATE.length]!;
-  const state = isWalkableCell(grid, cell) ? "可通行" : "障碍（mock 石块）";
-  const item = groundItemAt(cell);
-  const itemLine = item ? `\n掉落：${item.displayName} ×${item.quantity}` : "";
-  return `坐标：(${cell.col}, ${cell.row})\n地形：${biome}\n状态：${state}${itemLine}`;
+  const { cell } = model;
+  const renderable = collectRenderableResourceItems(entities);
+  const atCell = renderable.filter((it) => it.cell.col === cell.col && it.cell.row === cell.row);
+  const itemLines =
+    atCell.length > 0
+      ? atCell.map((it) => `\n掉落：${it.centerText} ×${it.stackCount}`).join("")
+      : "";
+  return `坐标：(${cell.col}, ${cell.row})\n地形：${model.terrainLabel}\n状态：${formatStateLines(model)}${itemLines}`;
 }

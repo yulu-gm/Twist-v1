@@ -42,6 +42,7 @@ export {
 export {
   generateReport,
   type AssertionResult,
+  type HeadlessSimReportSource,
   type PawnSummary,
   type SimAssertion,
   type SimReport

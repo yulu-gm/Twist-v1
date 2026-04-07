@@ -5,8 +5,11 @@
 
 import { type SelectionModifier } from "../game/interaction/floor-selection";
 import type { WorldSnapshot } from "../game/world-core";
-import { coordKey } from "../game/map/world-grid";
+import { coordKey } from "../game/map";
 import { VILLAGER_TOOLS } from "./villager-tools";
+
+/** 未完成 `pick-up-resource` 工单的格上文案；与工具栏「物资拾取标记」(haul) 及 `haul-to-zone` 语义区分，对齐策划「拾取物资」。 */
+const PICK_UP_RESOURCE_CELL_LABEL = "拾取";
 
 export type TaskMarkerSelectionInput = Readonly<{
   toolId: string;
@@ -98,7 +101,7 @@ function worldDerivedTaskLabelForCell(cellKey: string, snap: WorldSnapshot): str
     if (w.kind !== "pick-up-resource") continue;
     if (w.status === "completed") continue;
     if (coordKey(w.anchorCell) === cellKey) {
-      return issuedTaskLabelForToolId("haul") ?? undefined;
+      return PICK_UP_RESOURCE_CELL_LABEL;
     }
   }
   return undefined;
@@ -138,7 +141,7 @@ export function mergeTaskMarkerOverlayWithWorldSnapshot(
   }
   for (const w of snap.workItems) {
     if (w.status === "completed") continue;
-    if (w.kind === "mine-stone" || w.kind === "chop-tree") {
+    if (w.kind === "mine-stone" || w.kind === "chop-tree" || w.kind === "pick-up-resource") {
       keys.add(coordKey(w.anchorCell));
     }
   }

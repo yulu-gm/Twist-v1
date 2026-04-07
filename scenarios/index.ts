@@ -1,6 +1,6 @@
 /**
  * 场景定义汇总入口：各场景模块 export 具体 {@link ScenarioDefinition} 后在此 import 并加入 {@link ALL_SCENARIOS}。
- * T-10 起填入真实场景；保持静态数组以便浏览器端打包与 {@link listAvailableScenarios} 枚举。
+ * T-10 起填入真实场景；保持静态数组以便浏览器端打包与 GameScene 场景面板枚举。
  */
 
 import type { ScenarioDefinition } from "../src/headless/scenario-types";

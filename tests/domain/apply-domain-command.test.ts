@@ -7,18 +7,18 @@ import {
   spawnWorldEntity
 } from "../../src/game/world-core";
 import { coordKey, DEFAULT_WORLD_GRID } from "../../src/game/map/world-grid";
-import { seedBlockedCellsAsObstacles } from "../../src/game/map/world-seed";
+import { seedBlockedCellsAsObstacles } from "../../src/game/world-seed-obstacles";
 import { applyDomainCommandToWorldCore } from "../../src/player/apply-domain-command";
-import type { DomainCommand } from "../../src/player/s0-contract";
+import type { DomainCommand, DomainVerb } from "../../src/game/interaction/domain-command-types";
 
-function demoCmd(verb: string, cellKeys: string[]): DomainCommand {
+function demoCmd(verb: DomainVerb, cellKeys: string[]): DomainCommand {
   return {
     commandId: "test-cmd",
     verb,
     targetCellKeys: cellKeys,
     targetEntityIds: [],
     sourceMode: {
-      source: { kind: "menu", menuId: "orders", itemId: "demolish" },
+      source: { kind: "menu", menuId: "tools", itemId: "demolish" },
       selectionModifier: "replace",
       inputShape: "rect-selection"
     },
@@ -84,7 +84,7 @@ describe("applyDomainCommandToWorldCore", () => {
       targetCellKeys: [stoneKey, "4,4"],
       targetEntityIds: [],
       sourceMode: {
-        source: { kind: "menu", menuId: "orders", itemId: "mine" },
+        source: { kind: "menu", menuId: "tools", itemId: "mine" },
         selectionModifier: "replace",
         inputShape: "rect-selection"
       },

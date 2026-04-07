@@ -25,7 +25,8 @@ function createVisibleStateTestSim(world: WorldCore): HeadlessSim {
   return {
     getWorldPort: () => ({
       getWorld: () => world
-    })
+    }),
+    getPawns: () => []
   } as unknown as HeadlessSim;
 }
 
@@ -199,7 +200,9 @@ describe("visible headless assertions", () => {
       anchorCell: { col: 2, row: 2 },
       status: "claimed",
       claimedBy: "pawn-0",
-      failureCount: 1
+      failureCount: 1,
+      priority: 9,
+      sourceReason: "test"
     });
     const sim = createVisibleStateTestSim(world);
     const selectionRecord = recordScenarioPlayerSelection(

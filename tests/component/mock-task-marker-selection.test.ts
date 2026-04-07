@@ -54,7 +54,7 @@ describe("mock task marker selection (scene-hud)", () => {
   it("clears existing markers on the dragged cells when the idle tool is selected", () => {
     const existing = new Map<string, string>([
       ["1,1", "建造"],
-      ["2,2", "搬运"]
+      ["2,2", "物资拾取标记"]
     ]);
 
     const idle = applyMockTaskMarkersForSelection(existing, {
@@ -68,7 +68,7 @@ describe("mock task marker selection (scene-hud)", () => {
 
   it("leaves markers unchanged for unknown tools or an empty drag result", () => {
     const existing = new Map<string, string>([
-      ["2,2", "搬运"]
+      ["2,2", "物资拾取标记"]
     ]);
 
     const unknown = applyMockTaskMarkersForSelection(existing, {

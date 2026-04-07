@@ -67,6 +67,17 @@ describe("WorkRegistry", () => {
     expect(new Set(forTarget.map((w) => w.kind))).toEqual(new Set(["pick-up", "haul"]));
     expect(getByTarget(registry, "missing")).toHaveLength(0);
   });
+
+  it("addWork dedupes same logical slot when workId differs (AP-0168)", () => {
+    const registry = createWorkRegistry();
+    const canonical = generateChopWork("tree-1", { col: 1, row: 1 });
+    const alias = { ...canonical, workId: "legacy:chop-slot" };
+    addWork(registry, alias);
+    addWork(registry, canonical);
+    expect(registry.orders.size).toBe(1);
+    expect(registry.orders.get(canonical.workId)?.workId).toBe(canonical.workId);
+    expect(registry.orders.has("legacy:chop-slot")).toBe(false);
+  });
 });
 
 describe("WorkOrder generators", () => {
@@ -96,7 +107,7 @@ describe("WorkOrder generators", () => {
   it("generateHaulWork encodes from cell and zone in workId and steps", () => {
     const drop = { col: 9, row: 8 };
     const w = generateHaulWork("res-3", cell, "stockpile-main", drop);
-    expect(w.workId).toBe("work:haul:res-3:5,7:stockpile-main");
+    expect(w.workId).toBe("work:haul:res-3:5,7:stockpile-main:9,8");
     expect(w.kind).toBe("haul");
     expect(w.targetCell).toEqual(cell);
     expect(w.haulDropCell).toEqual(drop);

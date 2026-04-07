@@ -92,4 +92,45 @@ describe("sim debug trace runtime log mapping", () => {
     expect(events[1]?.message).toContain("work-claimed");
     expect(events[1]?.searchText).toContain("work.lifecycle");
   });
+
+  it("emits Work.Snapshot runtime log when tick carries work item snapshots", () => {
+    const tick: SimDebugTick = {
+      tick: 3,
+      worldTime: {
+        dayNumber: 1,
+        minuteOfDay: 0,
+        dayProgress01: 0,
+        currentPeriod: "day",
+        paused: false,
+        speed: 1
+      },
+      pawnDecisions: [],
+      workLifecycleEvents: [],
+      workItems: [
+        {
+          id: "w-a",
+          kind: "chop-tree",
+          status: "open",
+          anchorCell: { col: 0, row: 0 },
+          failureCount: 0
+        }
+      ]
+    };
+
+    const events = mapSimDebugTickToRuntimeLogEvents({
+      tick,
+      runId: "run-snap",
+      seqStart: 1,
+      timestampIso: "2026-04-07T00:00:00.000Z"
+    });
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      category: "Work.Snapshot",
+      verbosity: "Verbose",
+      tick: 3
+    });
+    expect(events[0]?.message).toContain("work snapshot");
+    expect(events[0]?.searchText).toContain("work.snapshot");
+  });
 });

@@ -5,10 +5,10 @@ import {
   type WorldCore
 } from "../game/world-core";
 import { applyDomainCommandToWorldCore } from "./apply-domain-command";
-import type { DomainCommand, MockLineAPort, MockWorldSubmitResult } from "./s0-contract";
+import type { DomainCommand, LineAReadPort, WorldSubmitResult } from "./s0-contract";
 import type { MockWorldPortConfig, PlayerWorldPort } from "./world-port-types";
 import { filterCellKeysForToolbarTaskMarkers } from "./task-marker-target-cells";
-import type { OrchestratorWorldBridge } from "../game/orchestrator-world-bridge";
+import type { OrchestratorWorldBridge } from "./orchestrator-world-bridge";
 
 const DEFAULT_CONFIG: MockWorldPortConfig = {
   alwaysAccept: true,
@@ -24,7 +24,7 @@ export class WorldCoreWorldPort implements PlayerWorldPort, OrchestratorWorldBri
   private sessionBaseline: WorldCore;
   private config: MockWorldPortConfig;
   private readonly log: DomainCommand[] = [];
-  private readonly results: MockWorldSubmitResult[] = [];
+  private readonly results: WorldSubmitResult[] = [];
 
   public constructor(initialWorld: WorldCore, config: Partial<MockWorldPortConfig> = {}) {
     this.world = initialWorld;
@@ -52,6 +52,9 @@ export class WorldCoreWorldPort implements PlayerWorldPort, OrchestratorWorldBri
     this.sessionBaseline = cloneWorldCoreState(this.world);
   }
 
+  /**
+   * @inheritdoc PlayerWorldPort.applyMockConfig — 仅供 headless 场景与测试；非生产游戏入口。
+   */
   public applyMockConfig(partial: Partial<MockWorldPortConfig>): void {
     this.config = {
       alwaysAccept: partial.alwaysAccept ?? this.config.alwaysAccept,
@@ -62,7 +65,7 @@ export class WorldCoreWorldPort implements PlayerWorldPort, OrchestratorWorldBri
     };
   }
 
-  public get lineA(): MockLineAPort {
+  public get lineA(): LineAReadPort {
     const snap = getWorldSnapshot(this.world);
     return {
       snapshotLabel: `world-core·实体${snap.entities.length}·工单${snap.workItems.length}·标记${snap.markers.length}`
@@ -73,7 +76,7 @@ export class WorldCoreWorldPort implements PlayerWorldPort, OrchestratorWorldBri
     return this.log;
   }
 
-  public getSubmitResults(): readonly MockWorldSubmitResult[] {
+  public getSubmitResults(): readonly WorldSubmitResult[] {
     return this.results;
   }
 
@@ -89,7 +92,7 @@ export class WorldCoreWorldPort implements PlayerWorldPort, OrchestratorWorldBri
     return filterCellKeysForToolbarTaskMarkers(this.world, toolId, inputShape, cellKeys);
   }
 
-  public submit(raw: DomainCommand, nowMs: number): MockWorldSubmitResult {
+  public submit(raw: DomainCommand, nowMs: number): WorldSubmitResult {
     const cmd: DomainCommand = {
       ...raw,
       issuedAtMs: raw.issuedAtMs ?? nowMs
@@ -98,7 +101,7 @@ export class WorldCoreWorldPort implements PlayerWorldPort, OrchestratorWorldBri
 
     for (const key of cmd.targetCellKeys) {
       if (this.config.rejectIfTouchesCellKeys.has(key)) {
-        const rejected: MockWorldSubmitResult = {
+        const rejected: WorldSubmitResult = {
           accepted: false,
           messages: [`网关：与注入冲突格重叠（${key}）`],
           conflictCellKeys: [key]
@@ -109,7 +112,7 @@ export class WorldCoreWorldPort implements PlayerWorldPort, OrchestratorWorldBri
     }
 
     if (!this.config.alwaysAccept) {
-      const rejected: MockWorldSubmitResult = {
+      const rejected: WorldSubmitResult = {
         accepted: false,
         messages: ["网关：验收项关闭 alwaysAccept，未提交领域"]
       };
@@ -123,12 +126,12 @@ export class WorldCoreWorldPort implements PlayerWorldPort, OrchestratorWorldBri
     return applied.result;
   }
 
-  public replayAll(nowMsStart: number): readonly MockWorldSubmitResult[] {
+  public replayAll(nowMsStart: number): readonly WorldSubmitResult[] {
     const previous = [...this.log];
     this.log.length = 0;
     this.results.length = 0;
     this.world = cloneWorldCoreState(this.sessionBaseline);
-    const out: MockWorldSubmitResult[] = [];
+    const out: WorldSubmitResult[] = [];
     let t = nowMsStart;
     for (const cmd of previous) {
       out.push(this.submit(cmd, t));

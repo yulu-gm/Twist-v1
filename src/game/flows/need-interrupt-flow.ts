@@ -3,7 +3,12 @@
  */
 
 import { scoreActions } from "../behavior/action-scorer";
-import type { BehaviorContext } from "../behavior/behavior-context";
+import {
+  collectBehaviorCandidateWorks,
+  type BehaviorContext,
+  type BehaviorMapSnapshot
+} from "../behavior/behavior-context";
+import type { GridCoord } from "../map/world-grid";
 import {
   canBeInterrupted,
   transition,
@@ -14,9 +19,8 @@ import type { NeedSnapshot } from "../need/need-profile";
 import { EATING_SATIETY_RECOVERY_PER_SECOND } from "../need/need-evolution-engine";
 import { settleEating, isNeedSatisfied } from "../need/satisfaction-settler";
 import { needActionSuggestion, WARNING_THRESHOLD } from "../need/threshold-rules";
+import { replaceWorkRegistryOrders, type WorkRegistry } from "../work/work-registry";
 import { claimWork, releaseWork, type ClaimResult } from "../work/work-scheduler";
-import type { WorkRegistry } from "../work/work-registry";
-import type { WorkOrder } from "../work/work-types";
 
 /**
  * 与 {@link DEFAULT_BEHAVIOR_TRANSITIONS} 中 `working → eating` 的 `need-interrupt-hunger` 一致。
@@ -30,7 +34,7 @@ export type NeedInterruptTickInput = Readonly<{
   pawnId: string;
   profile: NeedSnapshot;
   /**
-   * 供 {@link scoreActions} 使用；`candidateWorks` 须包含当前执行工单（可比 registry 中快照更新 status 以便评分）。
+   * 供 {@link scoreActions} 使用；`candidateWorks` 应通过 {@link collectBehaviorCandidateWorks} 与 {@link aggregateBehaviorContext} 同源策略构造。
    */
   scoringContext: BehaviorContext;
 }>;
@@ -74,7 +78,8 @@ export function handleNeedInterruptTick(input: NeedInterruptTickInput): NeedInte
     return { kind: "not-interruptible" };
   }
 
-  releaseWork(workRegistry, workId, pawnId);
+  const released = releaseWork(workRegistry, workId, pawnId);
+  replaceWorkRegistryOrders(workRegistry, released.registry);
 
   const tr = transition(fsm, "eating", { interruptPriority: NEED_INTERRUPT_TO_EAT_PRIORITY });
   if (!tr.ok) {
@@ -137,22 +142,37 @@ export function runNeedInterruptScenario(
     throw new Error(`need-interrupt-flow: eating→idle failed: ${toIdle.reason}`);
   }
 
-  const claimAfterResume = claimWork(input.workRegistry, input.workId, input.pawnId);
-  return { kind: "ok", profileAfterEating, claimAfterResume };
+  const resumed = claimWork(input.workRegistry, input.workId, input.pawnId);
+  replaceWorkRegistryOrders(input.workRegistry, resumed.registry);
+  return { kind: "ok", profileAfterEating, claimAfterResume: resumed.outcome };
 }
 
-/** 构造评分上下文：`candidateWorks` 仅含当前工单，地图假设食物可达。 */
+/**
+ * 单测/编排用评分上下文：工单候选与 {@link aggregateBehaviorContext} 一致（开放 + 本小人已认领），时间/地图仍为固定夹具。
+ * 可注入 `foodTargetId`/`bedTargetId` 与 `pawnCell`，与 {@link scoreActions} 及 #0029 目标句柄约定一致。
+ */
 export function defaultNeedInterruptScoringContext(
   pawnId: string,
   profile: NeedSnapshot,
-  currentWork: WorkOrder
+  workRegistry: WorkRegistry,
+  options?: Readonly<{
+    map?: Partial<BehaviorMapSnapshot>;
+    pawnCell?: GridCoord;
+  }>
 ): BehaviorContext {
+  const map: BehaviorMapSnapshot = {
+    foodReachable: true,
+    bedReachable: true,
+    reachableCellCount: 1,
+    ...options?.map
+  };
   return {
     pawnId,
     behaviorState: "working",
     needState: { satiety: profile.satiety, energy: profile.energy },
-    candidateWorks: [{ ...currentWork, status: "open" }],
+    candidateWorks: collectBehaviorCandidateWorks(workRegistry, pawnId),
     time: { currentPeriod: "day", minuteOfDay: 12 * 60 },
-    map: { foodReachable: true, bedReachable: true, reachableCellCount: 1 }
+    map,
+    ...(options?.pawnCell !== undefined ? { pawnCell: options.pawnCell } : {})
   };
 }

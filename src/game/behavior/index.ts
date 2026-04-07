@@ -9,11 +9,15 @@ export {
   DEFAULT_BEHAVIOR_TRANSITIONS,
   canBeInterrupted,
   canTransition,
+  cloneBehaviorFSM,
   createBehaviorFSM,
   getCurrentState,
+  setBehaviorSubState,
   transition,
+  transitionImmutable,
   type BehaviorFSM,
   type BehaviorState,
+  type BehaviorSubState,
   type BehaviorTransition,
   type TransitionContext,
   type TransitionFailureReason,
@@ -21,12 +25,21 @@ export {
 } from "./behavior-state-machine";
 export {
   aggregateBehaviorContext,
+  buildBehaviorMapSnapshot,
+  collectBehaviorCandidateWorks,
   type BehaviorContext,
   type BehaviorMapSnapshot,
+  type LegacyNarrowMapBehaviorQuery,
   type MapBehaviorQuery,
+  type MapBehaviorQueryObject,
   type PawnNeedState
 } from "./behavior-context";
-export { scoreActions, type ActionCandidate } from "./action-scorer";
+export {
+  scoreActions,
+  DEFAULT_ACTION_SCORING_STRATEGY,
+  type ActionCandidate,
+  type ActionScoringStrategy
+} from "./action-scorer";
 export {
   chooseGoalDecision,
   canChooseNewGoal,
@@ -36,7 +49,8 @@ export {
   type ActionKind,
   type ChooseGoalPlannerInput,
   type GoalDecision,
-  type GoalKind
+  type GoalKind,
+  type RestSpotOwnershipForPlanning
 } from "./goal-driven-planning";
 export {
   legalWanderNeighbors,
@@ -45,3 +59,9 @@ export {
   type WanderRng
 } from "./wander-planning";
 export { DEFAULT_SIM_CONFIG, type SimConfig } from "./sim-config";
+export {
+  clonePawnDecisionState,
+  type PawnDecisionResult,
+  type PawnDecisionTrace,
+  type PawnDecisionTraceState
+} from "./pawn-decision-trace";

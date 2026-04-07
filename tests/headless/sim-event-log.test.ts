@@ -8,6 +8,7 @@ import {
   setPawnIntent,
   type PawnState
 } from "../../src/game/pawn-state";
+import { DEFAULT_TIME_OF_DAY_CONFIG } from "../../src/game/time/time-of-day";
 import type { WorldTimeSnapshot } from "../../src/game/time/world-time";
 import type { WorldSnapshot } from "../../src/game/world-core-types";
 import { createHeadlessSim, createSimEventCollector } from "../../src/headless/index";
@@ -23,6 +24,7 @@ const MINIMAL_TIME: WorldTimeSnapshot = {
 
 const MINIMAL_SNAPSHOT: WorldSnapshot = {
   time: MINIMAL_TIME,
+  timeConfig: DEFAULT_TIME_OF_DAY_CONFIG,
   entities: [],
   occupancy: {},
   markers: [],
@@ -69,7 +71,9 @@ describe("createSimEventCollector", () => {
           targetEntityId: "e1",
           status: "claimed",
           claimedBy: "pawn-0",
-          failureCount: 0
+          failureCount: 0,
+          priority: 5,
+          sourceReason: "test"
         }
       ]
     };
@@ -80,6 +84,67 @@ describe("createSimEventCollector", () => {
     expect(claimed).toHaveLength(1);
     expect(claimed[0]!.claimedBy).toBe("pawn-0");
     expect(collector.getEventsByPawn("pawn-0").some((e) => e.kind === "work-claimed")).toBe(true);
+  });
+
+  it("records work-derived when new work has derivedFromWorkId", () => {
+    const collector = createSimEventCollector();
+    const before: WorldSnapshot = { ...MINIMAL_SNAPSHOT, workItems: [] };
+    const after: WorldSnapshot = {
+      ...MINIMAL_SNAPSHOT,
+      workItems: [
+        {
+          id: "w2",
+          kind: "haul-to-zone",
+          anchorCell: { col: 0, row: 0 },
+          status: "open",
+          failureCount: 0,
+          priority: 1,
+          sourceReason: "test",
+          derivedFromWorkId: "w1"
+        }
+      ]
+    };
+    collector.recordWorldDiff(before, after, 1);
+    const derived = collector.getEventsByKind("work-derived");
+    expect(derived).toHaveLength(1);
+    expect(derived[0]!.workItemId).toBe("w2");
+    expect(derived[0]!.derivedFromWorkId).toBe("w1");
+  });
+
+  it("records work-released and work-failed on claim drop and failureCount bump", () => {
+    const collector = createSimEventCollector();
+    const baseItem = {
+      id: "w1",
+      kind: "chop-tree" as const,
+      anchorCell: { col: 1, row: 1 },
+      targetEntityId: "tree-1",
+      status: "claimed" as const,
+      claimedBy: "pawn-0",
+      failureCount: 0,
+      priority: 3,
+      sourceReason: "test"
+    };
+    const before: WorldSnapshot = { ...MINIMAL_SNAPSHOT, workItems: [baseItem] };
+    const after: WorldSnapshot = {
+      ...MINIMAL_SNAPSHOT,
+      workItems: [{ ...baseItem, status: "open" as const, claimedBy: undefined, failureCount: 1 }]
+    };
+    collector.recordWorldDiff(before, after, 9);
+    expect(collector.getEventsByKind("work-released")).toHaveLength(1);
+    expect(collector.getEventsByKind("work-failed")).toHaveLength(1);
+    expect(collector.getEventsByKind("work-failed")[0]!.failureCount).toBe(1);
+    expect(collector.getEventsByPawn("pawn-0").some((e) => e.kind === "work-released")).toBe(true);
+  });
+
+  it("getEvents returns a frozen snapshot array", () => {
+    const collector = createSimEventCollector();
+    collector.recordPawnDiff([], [], 0);
+    const snap = collector.getEvents();
+    expect(Object.isFrozen(snap)).toBe(true);
+    expect(() => {
+      // 运行期变异应失败：冻结数组在严格模式下 push 抛错
+      (snap as unknown as { push: (...a: unknown[]) => number }).push({} as never);
+    }).toThrow();
   });
 
   it("emits night-start and day-start when the visible period changes", () => {
@@ -152,7 +217,10 @@ describe("createSimEventCollector", () => {
       "pawn-action-changed",
       "pawn-need-changed",
       "work-created",
+      "work-derived",
       "work-claimed",
+      "work-released",
+      "work-failed",
       "work-completed",
       "entity-spawned",
       "entity-removed"

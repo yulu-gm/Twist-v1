@@ -14,6 +14,10 @@ export type RuntimeLogSession = Readonly<{
   store: ReturnType<typeof createRuntimeDebugLogStore>;
   logger: RuntimeLogSessionLogger;
   nextSeq: () => number;
+  /** 开发服将运行时日志落盘为 NDJSON 时的绝对/工程内路径；仅 dev HTTP sink 启用且首次上报触发 `start` 成功后可用。 */
+  devNdjsonFilePath: string | undefined;
+  /** 当 `devNdjsonFilePath` 首次由开发服 `start` 响应写入时调用（用于刷新调试面板等）。 */
+  setOnDevNdjsonPathReady: (callback: (() => void) | null) => void;
   createEvent: (input: Readonly<{
     category: RuntimeLogCategory;
     verbosity: RuntimeLogVerbosity;
@@ -44,11 +48,19 @@ let sequence = 0;
 function createSession(): RuntimeLogSession {
   const runId = FALLBACK_RUN_ID;
   const store = createRuntimeDebugLogStore({ limit: DEFAULT_LIMIT });
+  let devNdjsonFilePath: string | undefined;
+  let onDevNdjsonPathReady: (() => void) | null = null;
   const asyncBatchSink =
     __TWIST_RUNTIME_LOG_DEV_SERVER__ === true
       ? createRuntimeLogDevHttpBatchSink({
           runId,
-          endpoint: "/__runtime-log"
+          endpoint: "/__runtime-log",
+          onStartAck: (ack) => {
+            if (ack.filePath) {
+              devNdjsonFilePath = ack.filePath;
+              onDevNdjsonPathReady?.();
+            }
+          }
         })
       : undefined;
   const logger = createRuntimeLogSessionLogger({
@@ -90,6 +102,12 @@ function createSession(): RuntimeLogSession {
     store,
     logger,
     nextSeq,
+    get devNdjsonFilePath(): string | undefined {
+      return devNdjsonFilePath;
+    },
+    setOnDevNdjsonPathReady: (callback) => {
+      onDevNdjsonPathReady = callback;
+    },
     createEvent,
     log: (input) => {
       const event = createEvent(input);

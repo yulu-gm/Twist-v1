@@ -9,6 +9,16 @@ export {
   cancelBlueprint,
   createBlueprint,
   isBlueprintComplete,
+  resolveBlueprintCoveredCells,
   updateBlueprintProgress,
   type BlueprintPlacementCells
 } from "./blueprint-manager";
+export {
+  validateBuildPlacementForBlueprint,
+  type BuildPlacementRejectReason,
+  type BuildPlacementValidationResult
+} from "./build-placement-validator";
+export {
+  assignBedAfterConstruction,
+  type AssignBedOutcome
+} from "./bed-ownership-facade";

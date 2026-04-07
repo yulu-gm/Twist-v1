@@ -1,7 +1,22 @@
 import Phaser from "phaser";
 
-const MIN_ZOOM = 0.4;
-const MAX_ZOOM = 2.75;
+/** 与默认 48px 格、原 0.4 最小缩放等价的屏幕格边最小像素（可读性下限）。 */
+const BASELINE_CELL_PX = 48;
+const MIN_CELL_SCREEN_PX = 0.4 * BASELINE_CELL_PX;
+/** 与默认 48px 格、原 2.75 最大缩放等价的屏幕格边最大像素（避免单格过大挤压 HUD）。 */
+const MAX_CELL_SCREEN_PX = 2.75 * BASELINE_CELL_PX;
+
+function zoomLimitsForCellSize(cellSizePx: number): { minZoom: number; maxZoom: number } {
+  const cs = Math.max(1, cellSizePx);
+  let minZ = MIN_CELL_SCREEN_PX / cs;
+  let maxZ = MAX_CELL_SCREEN_PX / cs;
+  minZ = Phaser.Math.Clamp(minZ, 0.15, 2.5);
+  maxZ = Phaser.Math.Clamp(maxZ, 1.05, 5);
+  if (minZ >= maxZ) {
+    maxZ = Math.min(5, minZ * 1.1);
+  }
+  return { minZoom: minZ, maxZoom: maxZ };
+}
 
 function isMiddleButton(pointer: Phaser.Input.Pointer): boolean {
   if (pointer.middleButtonDown()) return true;
@@ -18,8 +33,17 @@ export class GameSceneCameraControls {
   private panStartScreenY = 0;
   private panStartScrollX = 0;
   private panStartScrollY = 0;
+  private readonly minZoom: number;
+  private readonly maxZoom: number;
 
-  public constructor(private readonly scene: Phaser.Scene) {}
+  public constructor(
+    private readonly scene: Phaser.Scene,
+    cellSizePx: number
+  ) {
+    const { minZoom, maxZoom } = zoomLimitsForCellSize(cellSizePx);
+    this.minZoom = minZoom;
+    this.maxZoom = maxZoom;
+  }
 
   public bind(): void {
     const input = this.scene.input;
@@ -60,7 +84,7 @@ export class GameSceneCameraControls {
 
   private onPointerMove(pointer: Phaser.Input.Pointer): void {
     if (this.panPointerId !== pointer.id || !pointer.isDown) return;
-    if (!pointer.middleButtonDown()) return;
+    if (!isMiddleButton(pointer)) return;
     const cam = this.scene.cameras.main;
     const z = cam.zoom;
     const dx = pointer.x - this.panStartScreenX;
@@ -89,7 +113,7 @@ export class GameSceneCameraControls {
     const cam = this.scene.cameras.main;
     const oldZoom = cam.zoom;
     const factor = deltaY > 0 ? 0.92 : 1.08;
-    const newZoom = Phaser.Math.Clamp(oldZoom * factor, MIN_ZOOM, MAX_ZOOM);
+    const newZoom = Phaser.Math.Clamp(oldZoom * factor, this.minZoom, this.maxZoom);
     if (newZoom === oldZoom) return;
 
     const worldPoint = cam.getWorldPoint(pointer.x, pointer.y);

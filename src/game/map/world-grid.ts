@@ -1,17 +1,20 @@
 /** world-grid：格子坐标、邻格、边界与默认出生点（与 Phaser 无关）。 */
 
-import type { NeedKind } from "../pawn-state";
-
 export type GridCoord = Readonly<{ col: number; row: number }>;
 
 export type InteractionPointKind = "food" | "bed" | "recreation";
+
+/** 交互点完成时的需求轴增量；键名与小人需求轴一致，本模块不显式依赖 pawn-state。 */
+export type InteractionNeedDelta = Partial<
+  Readonly<Record<"hunger" | "rest" | "recreation", number>>
+>;
 
 export type InteractionPoint = Readonly<{
   id: string;
   kind: InteractionPointKind;
   cell: GridCoord;
   useDurationSec: number;
-  needDelta: Partial<Record<NeedKind, number>>;
+  needDelta: InteractionNeedDelta;
 }>;
 
 export type ReservationSnapshot = ReadonlyMap<string, string>;
@@ -40,43 +43,8 @@ export const DEFAULT_WORLD_GRID: WorldGridConfig = {
     { col: 10, row: 3 },
     { col: 12, row: 3 }
   ],
-  interactionPoints: [
-    {
-      id: "food-1",
-      kind: "food",
-      cell: { col: 5, row: 7 },
-      useDurationSec: 2.4,
-      needDelta: { hunger: -55 }
-    },
-    {
-      id: "bed-1",
-      kind: "bed",
-      cell: { col: 9, row: 7 },
-      useDurationSec: 3.6,
-      needDelta: { rest: -65 }
-    },
-    {
-      id: "bed-2",
-      kind: "bed",
-      cell: { col: 10, row: 7 },
-      useDurationSec: 3.6,
-      needDelta: { rest: -65 }
-    },
-    {
-      id: "recreation-1",
-      kind: "recreation",
-      cell: { col: 14, row: 6 },
-      useDurationSec: 2.8,
-      needDelta: { recreation: -50 }
-    },
-    {
-      id: "recreation-2",
-      kind: "recreation",
-      cell: { col: 15, row: 6 },
-      useDurationSec: 2.8,
-      needDelta: { recreation: -50 }
-    }
-  ]
+  /** 几何默认不含样板交互点；由 bootstrap / 关卡数据注入。 */
+  interactionPoints: []
 };
 
 export function isInsideGrid(config: WorldGridConfig, cell: GridCoord): boolean {
@@ -114,21 +82,18 @@ export function cellAtWorldPixel(
   return cell;
 }
 
+/**
+ * 与 {@link cellAtWorldPixel} 相同语义；参数顺序为「世界点 → 网格原点」，原点默认 `(0,0)`。
+ * 网格外返回 `null`。
+ */
 export function worldPointToCell(
   config: WorldGridConfig,
   worldXPx: number,
   worldYPx: number,
   gridOriginXPx = 0,
   gridOriginYPx = 0
-): GridCoord | undefined {
-  const localX = worldXPx - gridOriginXPx;
-  const localY = worldYPx - gridOriginYPx;
-  const cell = {
-    col: Math.floor(localX / config.cellSizePx),
-    row: Math.floor(localY / config.cellSizePx)
-  };
-  if (!isInsideGrid(config, cell)) return undefined;
-  return cell;
+): GridCoord | null {
+  return cellAtWorldPixel(config, gridOriginXPx, gridOriginYPx, worldXPx, worldYPx);
 }
 
 const ORTHO_OFFSETS: readonly GridCoord[] = [
@@ -221,7 +186,6 @@ export function coordKey(cell: GridCoord): string {
   return `${cell.col},${cell.row}`;
 }
 
-/** 解析 {@link coordKey} 格式；失败时返回 `undefined`。 */
 /** 移除已不存在的交互点预订（动态床位 id 变化时避免陈留）。 */
 export function pruneReservationSnapshot(
   reservations: ReservationSnapshot,
@@ -234,6 +198,7 @@ export function pruneReservationSnapshot(
   return next;
 }
 
+/** 解析 {@link coordKey} 格式；失败时返回 `undefined`。 */
 export function parseCoordKey(key: string): GridCoord | undefined {
   const comma = key.indexOf(",");
   if (comma <= 0) return undefined;
@@ -245,8 +210,14 @@ export function parseCoordKey(key: string): GridCoord | undefined {
 
 /**
  * 两格之间的 Bresenham 线段（含端点），用于笔刷拖拽覆盖格集合。
+ * 传入 `grid` 时仅保留 {@link isInsideGrid} 为真的格（选区/笔刷路径应传入以避免超界格进入下游）。
+ * 省略 `grid` 时返回原始枚举，供纯几何或单测使用。
  */
-export function gridLineCells(from: GridCoord, to: GridCoord): GridCoord[] {
+export function gridLineCells(
+  from: GridCoord,
+  to: GridCoord,
+  grid?: WorldGridConfig
+): GridCoord[] {
   let x0 = from.col;
   let y0 = from.row;
   const x1 = to.col;
@@ -272,19 +243,8 @@ export function gridLineCells(from: GridCoord, to: GridCoord): GridCoord[] {
     }
   }
 
-  return out;
-}
-
-export function isCellOccupiedByOthers(
-  logicalCellsByPawnId: ReadonlyMap<string, GridCoord>,
-  cell: GridCoord,
-  selfPawnId: string
-): boolean {
-  for (const [id, c] of logicalCellsByPawnId) {
-    if (id === selfPawnId) continue;
-    if (c.col === cell.col && c.row === cell.row) return true;
-  }
-  return false;
+  if (!grid) return out;
+  return out.filter((cell) => isInsideGrid(grid, cell));
 }
 
 export function createReservationSnapshot(): ReservationSnapshot {

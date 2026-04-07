@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createEntityRegistry } from "../../src/game/entity/entity-registry";
 import * as relationshipRules from "../../src/game/entity/relationship-rules";
+import { coordKey, DEFAULT_WORLD_GRID } from "../../src/game/map/world-grid";
 import {
   runBuildBedScenario,
   runBuildFlowScenario,
@@ -104,5 +105,73 @@ describe("build-flow", () => {
     if (b?.kind !== "building") return;
     expect(b.buildingKind).toBe("bed");
     expect(res.assignedPawnId).toBe(pawn.id);
+  });
+
+  it("越界：placement-rejected / out-of-bounds，不创建蓝图", () => {
+    const entities = createEntityRegistry();
+    const work = createWorkRegistry();
+    const pawn = entities.create({
+      kind: "pawn",
+      cell: { col: 0, row: 0 },
+      behavior: undefined,
+      currentGoal: undefined,
+      satiety: 50,
+      energy: 50
+    });
+    const res = runBuildBedScenario(entities, work, { col: 25, row: 0 }, pawn.id);
+    expect(res.kind).toBe("placement-rejected");
+    if (res.kind !== "placement-rejected") return;
+    expect(res.reason).toBe("out-of-bounds");
+    expect(entities.getByKind("blueprint")).toHaveLength(0);
+  });
+
+  it("占格冲突：placement-rejected / cell-occupied", () => {
+    const entities = createEntityRegistry();
+    const anchor = { col: 3, row: 3 };
+    entities.create({
+      kind: "building",
+      buildingKind: "wall",
+      cell: anchor,
+      coveredCells: [anchor],
+      interactionCapabilities: []
+    });
+    const pawn = entities.create({
+      kind: "pawn",
+      cell: { col: 0, row: 0 },
+      behavior: undefined,
+      currentGoal: undefined,
+      satiety: 50,
+      energy: 50
+    });
+    const work = createWorkRegistry();
+    const res = runBuildWallScenario(entities, work, anchor, pawn.id);
+    expect(res.kind).toBe("placement-rejected");
+    if (res.kind !== "placement-rejected") return;
+    expect(res.reason).toBe("cell-occupied");
+    expect(res.blockingEntityId).toBeDefined();
+    expect(entities.getByKind("blueprint")).toHaveLength(0);
+  });
+
+  it("不可行走格（地图阻挡）：placement-rejected / blocked-terrain", () => {
+    const entities = createEntityRegistry();
+    const anchor = { col: 2, row: 2 };
+    const gridConfig = {
+      ...DEFAULT_WORLD_GRID,
+      blockedCellKeys: new Set([coordKey(anchor)])
+    };
+    const pawn = entities.create({
+      kind: "pawn",
+      cell: { col: 0, row: 0 },
+      behavior: undefined,
+      currentGoal: undefined,
+      satiety: 50,
+      energy: 50
+    });
+    const work = createWorkRegistry();
+    const res = runBuildBedScenario(entities, work, anchor, pawn.id, { gridConfig });
+    expect(res.kind).toBe("placement-rejected");
+    if (res.kind !== "placement-rejected") return;
+    expect(res.reason).toBe("blocked-terrain");
+    expect(entities.getByKind("blueprint")).toHaveLength(0);
   });
 });

@@ -109,6 +109,28 @@ describe("satisfaction settler", () => {
     expect(settleResting(p, -3)).toEqual(p);
     expect(evolveNeeds(p, -1, "working")).toEqual(p);
   });
+
+  it("AP-0139：evolveNeeds(eating) 与 settleEating 同速率；串联同一段时长会双倍饱食（集成层禁止）", () => {
+    const p = createNeedProfile("ap139-eat", 40, 50);
+    const dt = 5;
+    const viaEvolve = evolveNeeds(p, dt, "eating");
+    const viaSettle = settleEating(p, dt);
+    expect(viaEvolve.satiety).toBeCloseTo(viaSettle.satiety, 10);
+    const doubleCounted = settleEating(viaEvolve, dt);
+    const single = viaSettle.satiety - p.satiety;
+    expect(doubleCounted.satiety - p.satiety).toBeCloseTo(single * 2, 10);
+  });
+
+  it("AP-0139：evolveNeeds(resting) 与 settleResting 同速率；串联同一段时长会双倍精力（集成层禁止）", () => {
+    const p = createNeedProfile("ap139-rest", 50, 30);
+    const dt = 6;
+    const viaEvolve = evolveNeeds(p, dt, "resting");
+    const viaSettle = settleResting(p, dt);
+    expect(viaEvolve.energy).toBeCloseTo(viaSettle.energy, 10);
+    const doubleCounted = settleResting(viaEvolve, dt);
+    const single = viaSettle.energy - p.energy;
+    expect(doubleCounted.energy - p.energy).toBeCloseTo(single * 2, 10);
+  });
 });
 
 describe("satiety drain baseline sanity", () => {

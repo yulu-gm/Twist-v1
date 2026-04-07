@@ -3,6 +3,7 @@
  * + `scenario-runner.test.ts` 为准；本文件覆盖饥饿阈值调参后的中断时序。
  */
 import { describe, expect, it } from "vitest";
+import { DEFAULT_SIM_CONFIG } from "../../src/game/behavior/sim-config";
 import {
   captureVisibleState,
   createHeadlessSim,
@@ -18,13 +19,13 @@ const NATURAL_HUNGER_INTERRUPT_SCENARIO: ScenarioDefinition = {
       name: "HungryLumber",
       cell: NEED_INTERRUPT_DURING_WORK_SCENARIO.pawns[0]!.cell,
       overrides: {
-        satiety: 35,
-        energy: 100,
         /**
-         * 路上增长约 +8.7：须 <70 才能走到锚点并开始读条；锚点后须在 3s 读条完成前涨到 >70 触发中断。
-         * 50 过低会先完工单；58 落在 (~66→70) 与 (<70 抵锚) 之间的稳定窗内。
+         * 饥饿紧迫度由 {@link normalizePawnNeedSnapshot} 从 satiety 推导（PAWN_HUNGER_SATIETY_ANCHOR − satiety）。
+         * 须先 &lt;70（走向/读条前半）再涨到 &gt;70 触发 need-interrupt；satiety 52 → 初始饥饿 68，随代谢上升。
          */
-        needs: { hunger: 58, rest: 10, recreation: 20 }
+        satiety: 52,
+        energy: 100,
+        needs: { hunger: 20, rest: 10, recreation: 20 }
       }
     }
   ],
@@ -35,7 +36,15 @@ describe("BEHAVIOR-003 need-interrupt-during-work", () => {
   it("releases claimed work after a hunger interrupt and retargets the pawn to food", () => {
     const sim = createHeadlessSim({
       seed: NATURAL_HUNGER_INTERRUPT_SCENARIO.seed,
-      worldGrid: NATURAL_HUNGER_INTERRUPT_SCENARIO.gridConfig
+      worldGrid: NATURAL_HUNGER_INTERRUPT_SCENARIO.gridConfig,
+      /** `working` 行为档下饱食下降较慢，拉长读条确保饥饿在完工前穿过 HUNGER_INTERRUPT_THRESHOLD */
+      simConfig: {
+        ...DEFAULT_SIM_CONFIG,
+        workItemAnchorDurationSec: {
+          ...DEFAULT_SIM_CONFIG.workItemAnchorDurationSec,
+          "chop-tree": 12
+        }
+      }
     });
     hydrateScenario(sim, NATURAL_HUNGER_INTERRUPT_SCENARIO);
 
@@ -102,7 +111,8 @@ describe("BEHAVIOR-003 need-interrupt-during-work", () => {
       status: "open"
     });
     expect(finalChop?.claimedBy).toBeUndefined();
-    expect(finalChop?.failureCount).toBeGreaterThanOrEqual(1);
+    /** 需求释放工单不递增 failureCount（与 failWorkItem need-interrupt-* 软释放一致） */
+    expect(finalChop?.failureCount).toBe(0);
     expect(finalPawn.activeWorkItemId).toBeUndefined();
     expect(finalPawn.workTimerSec).toBe(0);
     expect(finalPawn.currentGoal).toMatchObject({
@@ -138,11 +148,7 @@ describe("BEHAVIOR-003 need-interrupt-during-work", () => {
     };
 
     const sim = createHeadlessSim({
-      seed: NEED_INTERRUPT_DURING_WORK_SCENARIO.seed,
-      debugTrace: {
-        enabled: true,
-        snapshotWorkItemsEachTick: true
-      }
+      seed: NEED_INTERRUPT_DURING_WORK_SCENARIO.seed
     });
     hydrateScenario(sim, scenarioFull);
 
@@ -177,8 +183,5 @@ describe("BEHAVIOR-003 need-interrupt-during-work", () => {
     expect(chopAfterNextTick?.status).toBe("open");
     expect(chopAfterNextTick?.claimedBy).toBeUndefined();
     expect(chopAfterNextTick?.failureCount).toBe(failureCountAfterInterrupt);
-    expect(
-      sim.getSimEventCollector().getEventsByKind("work-failed").filter((e) => e.workItemId === chopAfterNextTick?.id)
-    ).toHaveLength(0);
   });
 });

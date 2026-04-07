@@ -7,13 +7,16 @@ import {
   type GoalDecision,
   type GoalKind
 } from "../../src/game/behavior/goal-driven-planning";
-import { createDefaultPawnStates, logicalCellsByPawnId, setPawnPath, withPawnNeeds } from "../../src/game/pawn-state";
+import { createDefaultPawnStates, logicalCellsByPawnId, setPawnPath } from "../../src/game/pawn-state";
+import { withPawnNeeds } from "../../src/game/need/need-utils";
 import {
   coordKey,
+  DEFAULT_INTERACTION_TEMPLATE_GRID,
+  DEFAULT_SCENARIO_INTERACTION_POINTS,
   DEFAULT_WORLD_GRID,
   createReservationSnapshot,
   reserveInteractionPoint
-} from "../../src/game/map/world-grid";
+} from "../../src/game/map";
 
 function expectGoalKind(decision: GoalDecision, kind: GoalKind): void {
   expect(decision.goal).toBe(kind);
@@ -29,7 +32,7 @@ describe("goal-driven-planning", () => {
 
     expectGoalKind(
       chooseGoalDecision({
-        grid: DEFAULT_WORLD_GRID,
+        grid: DEFAULT_INTERACTION_TEMPLATE_GRID,
         pawn,
         reservations: createReservationSnapshot()
       }),
@@ -45,7 +48,7 @@ describe("goal-driven-planning", () => {
 
     expectGoalKind(
       chooseGoalDecision({
-        grid: DEFAULT_WORLD_GRID,
+        grid: DEFAULT_INTERACTION_TEMPLATE_GRID,
         pawn,
         reservations: createReservationSnapshot()
       }),
@@ -61,7 +64,7 @@ describe("goal-driven-planning", () => {
 
     expectGoalKind(
       chooseGoalDecision({
-        grid: DEFAULT_WORLD_GRID,
+        grid: DEFAULT_INTERACTION_TEMPLATE_GRID,
         pawn,
         reservations: createReservationSnapshot()
       }),
@@ -70,7 +73,7 @@ describe("goal-driven-planning", () => {
   });
 
   it("falls back when the best target is reserved by another pawn", () => {
-    const foodPoint = DEFAULT_WORLD_GRID.interactionPoints.find((p) => p.kind === "food");
+    const foodPoint = DEFAULT_SCENARIO_INTERACTION_POINTS.find((p) => p.kind === "food");
     const pawn = withPawnNeeds(
       createDefaultPawnStates([DEFAULT_WORLD_GRID.defaultSpawnPoints[0]!], ["T"])[0]!,
       { hunger: 96, rest: 10, recreation: 10 }
@@ -82,7 +85,7 @@ describe("goal-driven-planning", () => {
     )!;
 
     const decision = chooseGoalDecision({
-      grid: DEFAULT_WORLD_GRID,
+      grid: DEFAULT_INTERACTION_TEMPLATE_GRID,
       pawn,
       reservations: reserved
     });
@@ -96,7 +99,7 @@ describe("goal-driven-planning", () => {
       { hunger: 80, rest: 55, recreation: 10 }
     );
     const decision = chooseGoalDecision({
-      grid: DEFAULT_WORLD_GRID,
+      grid: DEFAULT_INTERACTION_TEMPLATE_GRID,
       pawn,
       reservations: createReservationSnapshot(),
       timePeriod: "day"
@@ -110,7 +113,7 @@ describe("goal-driven-planning", () => {
       { hunger: 80, rest: 55, recreation: 10 }
     );
     const decision = chooseGoalDecision({
-      grid: DEFAULT_WORLD_GRID,
+      grid: DEFAULT_INTERACTION_TEMPLATE_GRID,
       pawn,
       reservations: createReservationSnapshot(),
       timePeriod: "night"
@@ -176,7 +179,7 @@ describe("goal-driven-planning", () => {
     expect(nextStepFromPath(blockedGrid, pawn, logical, { col: 8, row: 5 })).toBeUndefined();
   });
 
-  it("nextStepFromPath ignores other pawns occupying the next step", () => {
+  it("nextStepFromPath invalidates cached path when the next step is occupied by another pawn", () => {
     const pawn = setPawnPath(
       createDefaultPawnStates([{ col: 5, row: 5 }], ["T"])[0]!,
       { col: 8, row: 5 },
@@ -192,14 +195,11 @@ describe("goal-driven-planning", () => {
     };
     const logical = logicalCellsByPawnId([pawn, otherPawn]);
 
-    expect(nextStepFromPath(DEFAULT_WORLD_GRID, pawn, logical, { col: 8, row: 5 })).toEqual({
-      col: 6,
-      row: 5
-    });
+    expect(nextStepFromPath(DEFAULT_WORLD_GRID, pawn, logical, { col: 8, row: 5 })).toBeUndefined();
   });
 
   it("falls back to wander when no interaction target is available", () => {
-    const reservations = DEFAULT_WORLD_GRID.interactionPoints.reduce(
+    const reservations = DEFAULT_SCENARIO_INTERACTION_POINTS.reduce(
       (snapshot, point, index) =>
         reserveInteractionPoint(snapshot, point.id, `other-${index}`) ?? snapshot,
       createReservationSnapshot()
@@ -210,7 +210,7 @@ describe("goal-driven-planning", () => {
     );
 
     const decision = chooseGoalDecision({
-      grid: DEFAULT_WORLD_GRID,
+      grid: DEFAULT_INTERACTION_TEMPLATE_GRID,
       pawn,
       reservations
     });
@@ -225,7 +225,7 @@ describe("goal-driven-planning", () => {
     );
 
     const candidates = collectGoalDecisionCandidates({
-      grid: DEFAULT_WORLD_GRID,
+      grid: DEFAULT_INTERACTION_TEMPLATE_GRID,
       pawn,
       reservations: createReservationSnapshot(),
       timePeriod: "day"
@@ -234,8 +234,8 @@ describe("goal-driven-planning", () => {
     expect(candidates).toHaveLength(4);
     expect(candidates.map((candidate) => candidate.goal)).toEqual([
       "eat",
-      "sleep",
       "wander",
+      "sleep",
       "recreate"
     ]);
     expect(candidates[0]?.score).toBeGreaterThan(candidates[1]?.score ?? 0);
@@ -245,7 +245,7 @@ describe("goal-driven-planning", () => {
   });
 
   it("reports unavailable candidate reasons when all interaction points are reserved", () => {
-    const reservations = DEFAULT_WORLD_GRID.interactionPoints.reduce(
+    const reservations = DEFAULT_SCENARIO_INTERACTION_POINTS.reduce(
       (snapshot, point, index) =>
         reserveInteractionPoint(snapshot, point.id, `other-${index}`) ?? snapshot,
       createReservationSnapshot()
@@ -256,7 +256,7 @@ describe("goal-driven-planning", () => {
     );
 
     const candidates = collectGoalDecisionCandidates({
-      grid: DEFAULT_WORLD_GRID,
+      grid: DEFAULT_INTERACTION_TEMPLATE_GRID,
       pawn,
       reservations
     });
@@ -264,7 +264,9 @@ describe("goal-driven-planning", () => {
     expect(candidates.find((candidate) => candidate.goal === "sleep")?.reason).toBe("sleep-unavailable");
     expect(candidates.find((candidate) => candidate.goal === "sleep")?.targetAvailable).toBe(false);
     expect(candidates.find((candidate) => candidate.goal === "sleep")?.blockedReason).toBe("no-target");
-    expect(chooseGoalDecision({ grid: DEFAULT_WORLD_GRID, pawn, reservations }).goal).toBe("wander");
+    expect(chooseGoalDecision({ grid: DEFAULT_INTERACTION_TEMPLATE_GRID, pawn, reservations }).goal).toBe(
+      "wander"
+    );
   });
 
   it("skips unreachable interaction targets when choosing a goal", () => {
@@ -275,7 +277,7 @@ describe("goal-driven-planning", () => {
       coordKey({ col: 14, row: 7 })
     ]);
     const grid = {
-      ...DEFAULT_WORLD_GRID,
+      ...DEFAULT_INTERACTION_TEMPLATE_GRID,
       blockedCellKeys: blockedAroundRecreation1
     };
     const pawn = withPawnNeeds(
@@ -297,5 +299,46 @@ describe("goal-driven-planning", () => {
     expect(candidates.find((candidate) => candidate.goal === "recreate")?.targetAvailable).toBe(false);
     expect(candidates.find((candidate) => candidate.goal === "recreate")?.blockedReason).toBe("no-target");
     expect(decision.goal).toBe("wander");
+  });
+
+  it("world-rest 床在传入 restSpots 时仅将归属本小人的床纳入睡眠候选（AP-0040）", () => {
+    const grid = {
+      ...DEFAULT_WORLD_GRID,
+      interactionPoints: [
+        {
+          id: "world-rest-bedA",
+          kind: "bed" as const,
+          cell: { col: 9, row: 7 },
+          useDurationSec: 3.6,
+          needDelta: { rest: -65 }
+        },
+        {
+          id: "world-rest-bedB",
+          kind: "bed" as const,
+          cell: { col: 10, row: 7 },
+          useDurationSec: 3.6,
+          needDelta: { rest: -65 }
+        }
+      ]
+    };
+    const restSpots = [
+      { buildingEntityId: "bedA", ownerPawnId: "pawn-0" },
+      { buildingEntityId: "bedB", ownerPawnId: "other-pawn" }
+    ] as const;
+    const pawn = withPawnNeeds(
+      createDefaultPawnStates([DEFAULT_WORLD_GRID.defaultSpawnPoints[0]!], ["T"])[0]!,
+      { hunger: 10, rest: 95, recreation: 10 }
+    );
+    expect(pawn.id).toBe("pawn-0");
+
+    const decision = chooseGoalDecision({
+      grid,
+      pawn,
+      reservations: createReservationSnapshot(),
+      restSpots: [...restSpots]
+    });
+
+    expect(decision.goal).toBe("sleep");
+    expect(decision.targetId).toBe("world-rest-bedA");
   });
 });

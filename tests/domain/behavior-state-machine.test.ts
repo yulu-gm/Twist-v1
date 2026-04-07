@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   canBeInterrupted,
   canTransition,
+  cloneBehaviorFSM,
   createBehaviorFSM,
   getCurrentState,
-  transition
+  setBehaviorSubState,
+  transition,
+  transitionImmutable
 } from "../../src/game/behavior/behavior-state-machine";
 
 describe("behavior-state-machine", () => {
@@ -96,5 +99,65 @@ describe("behavior-state-machine", () => {
     const r = transition(fsm, "idle", { completeNatural: true });
     expect(r).toMatchObject({ ok: true, previousState: "working" });
     expect(getCurrentState(fsm)).toBe("idle");
+  });
+
+  it("transition 成功后清空 subState；协调层可 setBehaviorSubState", () => {
+    const fsm = createBehaviorFSM("p-12");
+    fsm.currentState = "working";
+    setBehaviorSubState(fsm, "chopping");
+    expect(fsm.subState).toBe("chopping");
+    transition(fsm, "moving", { interruptPriority: 48 });
+    expect(fsm.subState).toBeUndefined();
+    setBehaviorSubState(fsm, "pickup");
+    expect(fsm.subState).toBe("pickup");
+  });
+
+  it("转移失败时不应清空已有 subState", () => {
+    const fsm = createBehaviorFSM("p-13");
+    fsm.currentState = "working";
+    setBehaviorSubState(fsm, "building");
+    fsm.lockedUntilInterruptPriority = 80;
+    transition(fsm, "eating", { interruptPriority: 40 });
+    expect(getCurrentState(fsm)).toBe("working");
+    expect(fsm.subState).toBe("building");
+  });
+
+  it("cloneBehaviorFSM 复制 pawnId、主状态、subState 与锁字段", () => {
+    const fsm = createBehaviorFSM("p-14");
+    fsm.currentState = "eating";
+    setBehaviorSubState(fsm, "eatingMeal");
+    fsm.lockedUntilInterruptPriority = 50;
+    const c = cloneBehaviorFSM(fsm);
+    expect(c).toEqual(fsm);
+    expect(c).not.toBe(fsm);
+    transition(c, "idle", { completeNatural: true });
+    expect(getCurrentState(fsm)).toBe("eating");
+    expect(fsm.subState).toBe("eatingMeal");
+    expect(getCurrentState(c)).toBe("idle");
+    expect(c.subState).toBeUndefined();
+  });
+
+  it("transitionImmutable：成功时不改原 FSM，next 与原地 transition 结果一致", () => {
+    const fsm = createBehaviorFSM("p-15");
+    const { next, result } = transitionImmutable(fsm, "moving", {});
+    expect(result).toEqual({ ok: true, previousState: "idle" });
+    expect(getCurrentState(fsm)).toBe("idle");
+    expect(getCurrentState(next)).toBe("moving");
+
+    const baseline = createBehaviorFSM("p-15");
+    transition(baseline, "moving", {});
+    expect(next).toEqual(baseline);
+  });
+
+  it("transitionImmutable：失败时不改原 FSM，next 保持克隆快照", () => {
+    const fsm = createBehaviorFSM("p-16");
+    fsm.currentState = "working";
+    setBehaviorSubState(fsm, "chopping");
+    fsm.lockedUntilInterruptPriority = 80;
+    const before = cloneBehaviorFSM(fsm);
+    const { next, result } = transitionImmutable(fsm, "eating", { interruptPriority: 40 });
+    expect(result).toEqual({ ok: false, reason: "below-lock-priority" });
+    expect(fsm).toEqual(before);
+    expect(next).toEqual(before);
   });
 });

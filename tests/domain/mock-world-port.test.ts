@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { DomainCommand } from "../../src/player/s0-contract";
+import type { DomainCommand } from "../../src/game/interaction/domain-command-types";
 import { MockWorldPort } from "../../src/player/mock-world-port";
 
 describe("MockWorldPort", () => {
@@ -11,7 +11,7 @@ describe("MockWorldPort", () => {
       targetCellKeys: ["0,1"],
       targetEntityIds: [],
       sourceMode: {
-        source: { kind: "menu", menuId: "orders", itemId: "lumber" },
+        source: { kind: "menu", menuId: "tools", itemId: "lumber" },
         selectionModifier: "replace",
         inputShape: "single-cell"
       }
@@ -26,11 +26,11 @@ describe("MockWorldPort", () => {
     const port = new MockWorldPort({ rejectIfTouchesCellKeys: new Set(["5,5"]) });
     const cmd: DomainCommand = {
       commandId: "y",
-      verb: "test",
+      verb: "assign_tool_task:mine",
       targetCellKeys: ["5,5", "6,6"],
       targetEntityIds: [],
       sourceMode: {
-        source: { kind: "menu", menuId: "structures", itemId: "build-wall" },
+        source: { kind: "menu", menuId: "building", itemId: "build-wall" },
         selectionModifier: "replace",
         inputShape: "brush-stroke"
       }
@@ -47,11 +47,11 @@ describe("MockWorldPort", () => {
     port.submit(
       {
         commandId: "z",
-        verb: "x",
+        verb: "assign_tool_task:mine",
         targetCellKeys: ["0,0"],
         targetEntityIds: [],
         sourceMode: {
-          source: { kind: "menu", menuId: "orders", itemId: "mine" },
+          source: { kind: "menu", menuId: "tools", itemId: "mine" },
           selectionModifier: "replace",
           inputShape: "single-cell"
         }
@@ -65,11 +65,11 @@ describe("MockWorldPort", () => {
     const r = port.submit(
       {
         commandId: "z2",
-        verb: "x",
+        verb: "assign_tool_task:mow",
         targetCellKeys: ["0,0"],
         targetEntityIds: [],
         sourceMode: {
-          source: { kind: "menu", menuId: "orders", itemId: "mine" },
+          source: { kind: "menu", menuId: "tools", itemId: "mine" },
           selectionModifier: "replace",
           inputShape: "single-cell"
         }
@@ -82,11 +82,11 @@ describe("MockWorldPort", () => {
     const r2 = port.submit(
       {
         commandId: "z3",
-        verb: "x",
+        verb: "assign_tool_task:patrol",
         targetCellKeys: ["1,1"],
         targetEntityIds: [],
         sourceMode: {
-          source: { kind: "menu", menuId: "orders", itemId: "mine" },
+          source: { kind: "menu", menuId: "tools", itemId: "mine" },
           selectionModifier: "replace",
           inputShape: "single-cell"
         }
@@ -101,11 +101,11 @@ describe("MockWorldPort", () => {
     port.submit(
       {
         commandId: "a",
-        verb: "v1",
+        verb: "assign_tool_task:mine",
         targetCellKeys: ["0,0"],
         targetEntityIds: [],
         sourceMode: {
-          source: { kind: "menu", menuId: "orders", itemId: "mine" },
+          source: { kind: "menu", menuId: "tools", itemId: "mine" },
           selectionModifier: "replace",
           inputShape: "rect-selection"
         }
@@ -115,11 +115,11 @@ describe("MockWorldPort", () => {
     port.submit(
       {
         commandId: "b",
-        verb: "v2",
+        verb: "assign_tool_task:mow",
         targetCellKeys: ["1,1"],
         targetEntityIds: [],
         sourceMode: {
-          source: { kind: "menu", menuId: "orders", itemId: "mine" },
+          source: { kind: "menu", menuId: "tools", itemId: "mine" },
           selectionModifier: "replace",
           inputShape: "rect-selection"
         }
@@ -130,6 +130,7 @@ describe("MockWorldPort", () => {
     expect(results).toHaveLength(2);
     expect(results.every((x) => x.accepted)).toBe(true);
     expect(port.getCommandLog()).toHaveLength(2);
-    expect(port.getCommandLog()[0]!.verb).toBe("v1");
+    expect(port.getCommandLog()[0]!.verb).toBe("assign_tool_task:mine");
+    expect(port.getCommandLog()[1]!.verb).toBe("assign_tool_task:mow");
   });
 });

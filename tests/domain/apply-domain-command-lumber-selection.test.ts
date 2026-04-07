@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createWorldCore, spawnWorldEntity } from "../../src/game/world-core";
 import { DEFAULT_WORLD_GRID } from "../../src/game/map/world-grid";
 import { applyDomainCommandToWorldCore } from "../../src/player/apply-domain-command";
-import type { DomainCommand } from "../../src/player/s0-contract";
+import type { DomainCommand } from "../../src/game/interaction/domain-command-types";
 
 function lumberCommand(cellKeys: string[]): DomainCommand {
   return {
@@ -11,7 +11,7 @@ function lumberCommand(cellKeys: string[]): DomainCommand {
     targetCellKeys: cellKeys,
     targetEntityIds: [],
     sourceMode: {
-      source: { kind: "toolbar", toolId: "lumber" },
+      source: { kind: "menu", menuId: "tools", itemId: "lumber" },
       selectionModifier: "replace",
       inputShape: "rect-selection"
     },

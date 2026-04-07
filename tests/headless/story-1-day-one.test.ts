@@ -7,6 +7,8 @@
  * 注册场景 + `scenario-runner.test.ts` + `map-initial-state.test.ts` 为准。
  */
 import { describe, expect, it } from "vitest";
+import { findAvailableStorageCell } from "../../src/game/map/storage-zones";
+import { withPawnNeeds } from "../../src/game/need/need-utils";
 import { describePawnDebugLabel } from "../../src/game/pawn-state";
 import { claimWorkItem } from "../../src/game/world-core";
 import { createHeadlessSim } from "../../src/headless";
@@ -26,7 +28,7 @@ import {
 
 function runExpectGroup(sim: ReturnType<typeof createHeadlessSim>, exps: readonly ScenarioExpectation[]): void {
   const results = runAllExpectations(sim, [...exps]);
-  expect(results.every((r) => r.passed)).toBe(true);
+  expect(results.filter((r) => !r.passed)).toEqual([]);
 }
 
 function claimNextOpenConstruct(sim: ReturnType<typeof createHeadlessSim>, pawnId: string): void {
@@ -44,7 +46,8 @@ function forceNight(sim: ReturnType<typeof createHeadlessSim>): void {
   w.timeConfig = { ...w.timeConfig, startMinuteOfDay: minuteOfDay };
   w.time = toWorldTimeSnapshot(
     { dayNumber: w.time.dayNumber, minuteOfDay },
-    { paused: w.time.paused, speed: w.time.speed }
+    { paused: w.time.paused, speed: w.time.speed },
+    w.timeConfig
   );
   sim.getWorldPort().setWorld(w);
 }
@@ -94,6 +97,21 @@ describe("story-1-day-one integration (T-27)", () => {
     // d. WORK-001：lumber 全链（含木材入 zone）
     const lumber = sim.getWorldPort().submit(STORY_1_DOMAIN_COMMANDS.lumberTree, 3);
     expect(lumber.accepted).toBe(true);
+    const chopDonePre = sim.runUntil(
+      () =>
+        [...sim.getWorldPort().getWorld().workItems.values()].some(
+          (w) => w.kind === "chop-tree" && w.status === "completed"
+        ),
+      { maxTicks: 15_000, deltaMs: 16 }
+    );
+    expect(chopDonePre.reachedPredicate).toBe(true);
+    const worldPre = sim.getWorldPort().getWorld();
+    const woodGround = [...worldPre.entities.values()].find(
+      (e) => e.kind === "resource" && e.materialKind === "wood" && e.containerKind === "ground"
+    );
+    expect(woodGround).toBeDefined();
+    expect(findAvailableStorageCell(worldPre, woodGround!.id), "采伐后应存在可投放木材的存储格").toBeDefined();
+
     runExpectGroup(sim, STORY_1_DAY_ONE_EXPECTATION_GROUPS.afterLumberChain);
 
     // e. BUILD-001：墙蓝图 → 落成
@@ -147,16 +165,26 @@ describe("story-1-day-one integration (T-27)", () => {
     sim.runUntil(() => true, { maxTicks: 400, deltaMs: 16 });
 
     forceNight(sim);
+    /** NEED-002：仅已分配床铺者会对床位形成 sleep；疲劳须加在该小人上才有可验收目标。 */
+    const bedOwnerId =
+      sim.getWorldPort().getWorld().restSpots.find((s) => s.ownerPawnId)?.ownerPawnId ?? "pawn-0";
     const ref = sim.getSimAccess().getPawnsRef();
-    const p0 = ref[0]!;
-    const tired = {
-      ...p0,
-      energy: 10,
-      needs: { hunger: 8, rest: 90, recreation: p0.needs.recreation }
-    };
-    ref[0] = { ...tired, debugLabel: describePawnDebugLabel(tired) };
+    const ownerIdx = ref.findIndex((p) => p.id === bedOwnerId);
+    expect(ownerIdx).toBeGreaterThanOrEqual(0);
+    const owner = ref[ownerIdx]!;
+    const tired = withPawnNeeds(owner, {
+      hunger: 8,
+      rest: 90,
+      recreation: owner.needs.recreation
+    });
+    ref[ownerIdx] = { ...tired, debugLabel: describePawnDebugLabel(tired) };
 
-    runExpectGroup(sim, STORY_1_DAY_ONE_EXPECTATION_GROUPS.nightSleep);
+    runExpectGroup(sim, [
+      {
+        ...STORY_1_DAY_ONE_EXPECTATION_GROUPS.nightSleep[0]!,
+        params: { ...STORY_1_DAY_ONE_EXPECTATION_GROUPS.nightSleep[0]!.params, pawnId: bedOwnerId }
+      }
+    ]);
   });
 
   // h. BEHAVIOR-003：伐木 claimed 后人为压低饱食度 → eat + chop-tree 重回 open

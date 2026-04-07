@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createEntityRegistry } from "../../src/game/entity/entity-registry";
 import { transformTreeToResource } from "../../src/game/entity/lifecycle-rules";
-import { createZone, getZoneAtCell } from "../../src/game/map/zone-manager";
+import { createOccupancyMap, createZone, getZoneAtCell } from "../../src/game/map";
 import { runChopFlowScenario } from "../../src/game/flows/chop-flow";
 import { createWorkRegistry } from "../../src/game/work/work-registry";
 
@@ -30,6 +30,7 @@ describe("chop-flow", () => {
         { col: 10, row: 5 },
         { col: 11, row: 5 }
       ],
+      createOccupancyMap(),
       "storage",
       "wood-stock",
       ["wood"]

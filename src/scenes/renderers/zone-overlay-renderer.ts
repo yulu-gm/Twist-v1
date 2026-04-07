@@ -1,11 +1,16 @@
 /**
- * zone-overlay-renderer：从 WorldCore 筛选 `kind==="zone"`，按 coveredCells 绘制半透明蓝底与浅色描边，并为连续 storage 组挂标签。
+ * zone-overlay-renderer：从 WorldCore 筛选 `kind==="zone"` 且 `zoneKind==="storage"`，按 coveredCells 绘制半透明蓝底与浅色描边，并为连续 storage 组挂标签。
  */
 
 import Phaser from "phaser";
 import type { WorldEntitySnapshot } from "../../game/entity/entity-types";
-import { listStorageGroupLabels } from "../../game/map/storage-zones";
-import { coordKey, isInsideGrid, type GridCoord, type WorldGridConfig } from "../../game/map/world-grid";
+import {
+  coordKey,
+  isInsideGrid,
+  listStorageGroupLabels,
+  type GridCoord,
+  type WorldGridConfig
+} from "../../game/map";
 
 export type StorageZoneLabelGroup = Readonly<{
   key: string;
@@ -84,12 +89,21 @@ export function collectStorageZoneLabelGroups(
     collectConnectedGroups(storageCells).map((cells) => [groupKey(cells), cells] as const)
   );
 
-  return labels.map((label) => ({
-    key: label.groupKey,
-    anchor: cloneCell(label.anchorCell),
-    cells: cellsByGroupKey.get(label.groupKey) ?? [cloneCell(label.anchorCell)],
-    text: label.text
-  }));
+  return labels.map((label) => {
+    const mapped = cellsByGroupKey.get(label.groupKey);
+    if (import.meta.env.DEV && mapped == null) {
+      console.warn(
+        "[zone-overlay-renderer] storage groupKey lookup miss; label vs local map out of sync (see storage-zones groupKey)",
+        { groupKey: label.groupKey }
+      );
+    }
+    return {
+      key: label.groupKey,
+      anchor: cloneCell(label.anchorCell),
+      cells: mapped ?? [cloneCell(label.anchorCell)],
+      text: label.text
+    };
+  });
 }
 
 export function drawZoneOverlaysToGraphics(
@@ -115,6 +129,7 @@ export function drawZoneOverlaysToGraphics(
   zones.sort((a, b) => a.id.localeCompare(b.id));
 
   for (const e of zones) {
+    if (e.zoneKind !== "storage") continue;
     const cells = e.coveredCells;
     if (!cells || cells.length === 0) continue;
 

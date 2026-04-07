@@ -3,6 +3,7 @@
  * 主证据：`night-forces-sleep.scenario.ts` + `scenario-runner.test.ts`；本文件覆盖昼间疲劳睡径。
  */
 import { describe, expect, it } from "vitest";
+import { pawnNeedsFromScalars } from "../../src/game/need/need-utils";
 import {
   captureVisibleState,
   createHeadlessSim,
@@ -21,7 +22,7 @@ describe("NEED-002 pawn-sleeps-when-tired", () => {
     const initialPawn = sim.getPawns()[0]!;
     const initialHud = captureVisibleState(sim).hud;
     expect(initialPawn.currentGoal).toBeUndefined();
-    expect(initialPawn.needs.rest).toBe(92);
+    expect(initialPawn.needs.rest).toBe(pawnNeedsFromScalars(100, 5, 6).rest);
     expect(initialHud.period).toBe("day");
 
     const reachedSleepGoal = sim.runUntil(() => {
@@ -36,7 +37,9 @@ describe("NEED-002 pawn-sleeps-when-tired", () => {
 
     const startedSleeping = sim.runUntil(() => {
       const pawn = sim.getPawns()[0];
-      return pawn?.currentAction?.kind === "use-target" && pawn.currentAction.targetId?.startsWith("bed-");
+      return Boolean(
+        pawn?.currentAction?.kind === "use-target" && pawn.currentAction.targetId?.startsWith("bed-")
+      );
     }, { maxTicks: 3_000 });
     expect(startedSleeping.reachedPredicate).toBe(true);
 

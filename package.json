@@ -14,7 +14,7 @@
     "preview": "npx vite preview",
     "test": "vitest run",
     "test:headless": "vitest run tests/headless/",
-    "test:docs": "node tools/aidoc/validate-index.mjs && vitest run tests/route-demand-docs.test.ts tests/aidoc-docs.test.ts",
+    "test:docs": "node tools/aidoc/validate-index.mjs",
     "test:watch": "vitest"
   },
   "dependencies": {

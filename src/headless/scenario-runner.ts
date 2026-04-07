@@ -2,15 +2,14 @@
  * Headless 场景装载与按期望运行：无 Phaser。
  */
 
-import type { ResourceContainerKind, ResourceMaterialKind, ZoneKind } from "../game/entity/entity-types";
+import type { ResourceContainerKind } from "../game/entity/entity-types";
 import { createGameplayTreeDraft } from "../game/entity/gameplay-tree-spawn";
 import { claimWorkItem, placeBlueprint, spawnWorldEntity } from "../game/world-core";
-import { coordKey, isInsideGrid, type GridCoord } from "../game/map/world-grid";
+import { isInsideGrid } from "../game/map";
 import type { SpawnOutcome } from "../game/world-internal";
-import { validateZoneCells } from "../game/map/zone-manager";
+import { applyScenarioResourcesToWorld, applyScenarioZonesToWorld } from "../player/scenario-zone-resource-spawn";
 import type { PawnState } from "../game/pawn-state";
-import type { SimEventKind } from "./sim-event-log";
-import { toWorldTimeSnapshot } from "../game/time/world-time";
+import { isSimEventKind } from "./sim-event-log";
 import { createHeadlessSim, type HeadlessSim } from "./headless-sim";
 import type { AssertionResult, SimReport } from "./sim-reporter";
 import { generateReport } from "./sim-reporter";
@@ -24,39 +23,6 @@ import {
 
 const DEFAULT_EXPECTATION_MAX_TICKS = 500;
 
-const RESOURCE_MATERIAL_KINDS = new Set<ResourceMaterialKind>(["wood", "food", "stone", "generic"]);
-
-const ZONE_KINDS = new Set<ZoneKind>(["storage", "forbidden", "priority-build", "custom"]);
-
-function parseScenarioResourceMaterialKind(raw: string): ResourceMaterialKind {
-  if (RESOURCE_MATERIAL_KINDS.has(raw as ResourceMaterialKind)) {
-    return raw as ResourceMaterialKind;
-  }
-  throw new Error(`scenario-runner: unknown resource materialKind "${raw}"`);
-}
-
-function parseScenarioZoneKind(raw: string | undefined): ZoneKind {
-  if (raw === undefined) {
-    return "custom";
-  }
-  if (ZONE_KINDS.has(raw as ZoneKind)) {
-    return raw as ZoneKind;
-  }
-  throw new Error(`scenario-runner: unknown zoneKind "${raw}"`);
-}
-
-function uniqueGridCoords(cells: readonly GridCoord[]): GridCoord[] {
-  const seen = new Set<string>();
-  const out: GridCoord[] = [];
-  for (const c of cells) {
-    const k = coordKey(c);
-    if (seen.has(k)) continue;
-    seen.add(k);
-    out.push({ col: c.col, row: c.row });
-  }
-  return out;
-}
-
 function isResourceContainerKind(value: string): value is ResourceContainerKind {
   return value === "ground" || value === "pawn" || value === "zone" || value === "building";
 }
@@ -66,50 +32,10 @@ function throwUnlessSpawnCreated(kind: string, outcome: SpawnOutcome, detail: st
   const reason =
     outcome.kind === "conflict"
       ? `与 ${outcome.blockingEntityId} 占格冲突`
-      : `越界 (${outcome.cell.col},${outcome.cell.row})`;
+      : outcome.kind === "invalid-draft"
+        ? outcome.reason
+        : `越界 (${outcome.cell.col},${outcome.cell.row})`;
   throw new Error(`scenario-runner: failed to spawn ${kind} (${detail}): ${reason}`);
-}
-
-function isSimEventKind(value: string): value is SimEventKind {
-  return (
-    value === "day-start" ||
-    value === "night-start" ||
-    value === "pawn-moved" ||
-    value === "pawn-motion-changed" ||
-    value === "pawn-goal-changed" ||
-    value === "pawn-action-changed" ||
-    value === "pawn-need-changed" ||
-    value === "work-created" ||
-    value === "work-claimed" ||
-    value === "work-completed" ||
-    value === "entity-spawned" ||
-    value === "entity-removed"
-  );
-}
-
-function applyScenarioTime(sim: HeadlessSim, timeConfig: ScenarioDefinition["timeConfig"]): void {
-  if (timeConfig === undefined) return;
-  const controls = sim.getSimAccess().getTimeControlState() as {
-    paused: boolean;
-    speed: 1 | 2 | 3;
-  };
-  if (timeConfig.paused !== undefined) {
-    controls.paused = timeConfig.paused;
-  }
-  if (timeConfig.speed !== undefined) {
-    controls.speed = timeConfig.speed;
-  }
-  const world = sim.getWorldPort().getWorld();
-  if (timeConfig.startMinuteOfDay !== undefined) {
-    world.timeConfig = { ...world.timeConfig, startMinuteOfDay: timeConfig.startMinuteOfDay };
-  }
-  world.time = toWorldTimeSnapshot(
-    {
-      dayNumber: world.time.dayNumber,
-      minuteOfDay: timeConfig.startMinuteOfDay ?? world.time.minuteOfDay
-    },
-    { paused: controls.paused, speed: controls.speed }
-  );
 }
 
 function selectPawnsForExpectation(
@@ -254,7 +180,7 @@ export function runAllExpectations(
  */
 export function hydrateScenario(sim: HeadlessSim, def: ScenarioDefinition): ScenarioHydrationResult {
   const grid = sim.getWorldPort().getWorld().grid;
-  applyScenarioTime(sim, def.timeConfig);
+  sim.applyScenarioTimeConfig(def.timeConfig);
   if (def.worldPortConfig) {
     sim.getWorldPort().applyMockConfig({
       alwaysAccept: def.worldPortConfig.alwaysAccept,
@@ -281,7 +207,9 @@ export function hydrateScenario(sim: HeadlessSim, def: ScenarioDefinition): Scen
       const reason =
         spawned.outcome.kind === "conflict"
           ? `与 ${spawned.outcome.blockingEntityId} 占格冲突`
-          : `越界 (${spawned.outcome.cell.col},${spawned.outcome.cell.row})`;
+          : spawned.outcome.kind === "invalid-draft"
+            ? spawned.outcome.reason
+            : `越界 (${spawned.outcome.cell.col},${spawned.outcome.cell.row})`;
       throw new Error(`scenario-runner: failed to spawn obstacle: ${reason}`);
     }
     world = spawned.world;
@@ -289,44 +217,7 @@ export function hydrateScenario(sim: HeadlessSim, def: ScenarioDefinition): Scen
   sim.getWorldPort().setWorld(world);
 
   world = sim.getWorldPort().getWorld();
-  for (let zi = 0; zi < (def.zones ?? []).length; zi++) {
-    const z = def.zones![zi]!;
-    const cellsRaw = z.cells;
-    if (cellsRaw.length === 0) {
-      throw new Error("scenario-runner: zone cells must be non-empty");
-    }
-    const cells = uniqueGridCoords(cellsRaw);
-    if (cells.length === 0) {
-      throw new Error("scenario-runner: zone cells must be non-empty");
-    }
-    for (const c of cells) {
-      if (!isInsideGrid(grid, c)) {
-        throw new Error(`scenario-runner: zone cell out of grid (${c.col},${c.row})`);
-      }
-    }
-    const validation = validateZoneCells(cells, world.occupancy);
-    if (!validation.ok) {
-      const cellInfo =
-        validation.reason === "cell_occupied" && validation.cell
-          ? ` (${validation.cell.col},${validation.cell.row}) occupant=${validation.occupantId ?? "?"}`
-          : validation.cell
-            ? ` (${validation.cell.col},${validation.cell.row})`
-            : "";
-      throw new Error(`scenario-runner: zone #${zi} validation failed: ${validation.reason}${cellInfo}`);
-    }
-    const zoneKind = parseScenarioZoneKind(z.zoneKind);
-    const spawned = spawnWorldEntity(world, {
-      kind: "zone",
-      cell: cells[0]!,
-      coveredCells: cells,
-      occupiedCells: [],
-      zoneKind,
-      acceptedMaterialKinds: [],
-      label: `scenario-zone-${zoneKind}-${zi}`
-    });
-    throwUnlessSpawnCreated("zone", spawned.outcome, `#${zi}`);
-    world = spawned.world;
-  }
+  world = applyScenarioZonesToWorld(world, def.zones, grid, "scenario-runner");
   sim.getWorldPort().setWorld(world);
 
   world = sim.getWorldPort().getWorld();
@@ -342,24 +233,7 @@ export function hydrateScenario(sim: HeadlessSim, def: ScenarioDefinition): Scen
   sim.getWorldPort().setWorld(world);
 
   world = sim.getWorldPort().getWorld();
-  for (let ri = 0; ri < (def.resources ?? []).length; ri++) {
-    const r = def.resources![ri]!;
-    if (!isInsideGrid(grid, r.cell)) {
-      throw new Error(`scenario-runner: resource cell out of grid (${r.cell.col},${r.cell.row})`);
-    }
-    const materialKind = parseScenarioResourceMaterialKind(r.materialKind);
-    const spawned = spawnWorldEntity(world, {
-      kind: "resource",
-      cell: r.cell,
-      occupiedCells: [r.cell],
-      materialKind,
-      containerKind: "ground",
-      pickupAllowed: r.pickupAllowed ?? true,
-      label: `scenario-resource-${materialKind}-${ri}`
-    });
-    throwUnlessSpawnCreated("resource", spawned.outcome, `#${ri}`);
-    world = spawned.world;
-  }
+  world = applyScenarioResourcesToWorld(world, def.resources, grid, "scenario-runner");
   sim.getWorldPort().setWorld(world);
 
   for (const bp of def.blueprints ?? []) {
@@ -405,15 +279,29 @@ export function hydrateScenario(sim: HeadlessSim, def: ScenarioDefinition): Scen
   const claimerName = def.claimConstructBlueprintAsPawnName;
   if (claimerName) {
     const pawn = sim.getPawns().find((x) => x.name === claimerName);
+    if (!pawn) {
+      throw new Error(
+        `scenario-runner: claimConstructBlueprintAsPawnName="${claimerName}" but no pawn with that name exists`
+      );
+    }
     const work = [...sim.getWorldPort().getWorld().workItems.values()].find(
       (w) => w.kind === "construct-blueprint" && w.status === "open"
     );
-    if (pawn && work) {
-      const { world, outcome } = claimWorkItem(sim.getWorldPort().getWorld(), work.id, pawn.id);
-      if (outcome.kind === "claimed") {
-        sim.getWorldPort().setWorld(world);
-      }
+    if (!work) {
+      throw new Error(
+        "scenario-runner: claimConstructBlueprintAsPawnName set but no open construct-blueprint work item exists"
+      );
     }
+    const { world, outcome } = claimWorkItem(sim.getWorldPort().getWorld(), work.id, pawn.id);
+    if (outcome.kind === "already-claimed") {
+      throw new Error(
+        `scenario-runner: failed to claim construct-blueprint work (already claimed by ${outcome.claimedBy})`
+      );
+    }
+    if (outcome.kind === "missing-work-item") {
+      throw new Error("scenario-runner: failed to claim construct-blueprint work (work item missing)");
+    }
+    sim.getWorldPort().setWorld(world);
   }
 
   return {

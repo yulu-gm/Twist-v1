@@ -8,7 +8,7 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_SIM_CONFIG } from "../../src/game/behavior";
 import { coordKey, DEFAULT_WORLD_GRID } from "../../src/game/map";
-import { seedBlockedCellsAsObstacles } from "../../src/game/map/world-seed";
+import { seedBlockedCellsAsObstacles } from "../../src/game/world-seed-obstacles";
 import { claimWorkItem } from "../../src/game/world-core";
 import { createHeadlessSim, hydrateScenario } from "../../src/headless";
 import { runScenarioHeadless } from "../../src/headless/scenario-runner";

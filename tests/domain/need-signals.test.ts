@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { needSignalsFromNeeds } from "../../src/player/need-signals";
+import { needSignalsFromNeeds } from "../../src/game/need";
 
 describe("needSignalsFromNeeds", () => {
   it("marks allowInterrupt when hunger is critical", () => {

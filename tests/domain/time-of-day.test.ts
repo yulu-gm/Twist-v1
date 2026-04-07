@@ -9,10 +9,12 @@ import {
   MAX_FRAME_DT_SEC,
   advanceTimeOfDay,
   createInitialTimeOfDayState,
+  diffDayNightPhaseTransition,
   effectiveSimulationDeltaSeconds,
   formatTimeOfDayLabel,
-  sampleTimeOfDayPalette
+  getDayNightPhase
 } from "../../src/game/time";
+import { sampleTimeOfDayPalette } from "../../src/ui/time-of-day-palette";
 
 describe("time-of-day", () => {
   it("starts at day 1 06:00 and formats zero-padded time labels", () => {
@@ -23,6 +25,24 @@ describe("time-of-day", () => {
       minuteOfDay: 360
     });
     expect(formatTimeOfDayLabel(state)).toBe("Day 1 06:00");
+    expect(getDayNightPhase(state, DEFAULT_TIME_OF_DAY_CONFIG)).toBe("day");
+  });
+
+  it("uses configurable day/night thresholds for phase and detects transitions", () => {
+    const cfg = {
+      ...DEFAULT_TIME_OF_DAY_CONFIG,
+      daytimeStartMinuteOfDay: 7 * 60,
+      nighttimeStartMinuteOfDay: 19 * 60
+    };
+    expect(getDayNightPhase({ dayNumber: 1, minuteOfDay: 6 * 60 + 59 }, cfg)).toBe("night");
+    expect(getDayNightPhase({ dayNumber: 1, minuteOfDay: 7 * 60 }, cfg)).toBe("day");
+    expect(
+      diffDayNightPhaseTransition(
+        { dayNumber: 1, minuteOfDay: 6 * 60 + 59 },
+        { dayNumber: 1, minuteOfDay: 7 * 60 },
+        cfg
+      )
+    ).toBe("entered_day");
   });
 
   it("advances time based on the configured real seconds per day", () => {

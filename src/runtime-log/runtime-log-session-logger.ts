@@ -60,8 +60,18 @@ export function createRuntimeLogSessionLogger(
     if (!asyncBatchSink || events.length === 0) {
       return Promise.resolve();
     }
-    writeChain = writeChain.then(() => asyncBatchSink.writeBatch(events));
+    writeChain = writeChain
+      .then(() => asyncBatchSink.writeBatch(events))
+      .catch((err: unknown) => {
+        console.error("[runtime-log-session-logger] asyncBatchSink.writeBatch failed", err);
+        return undefined;
+      });
     return writeChain;
+  };
+
+  const flushBufferedToSink = async (): Promise<void> => {
+    await writeBatch(drainBatch());
+    await asyncBatchSink?.flush?.();
   };
 
   const scheduleFlush = (): void => {
@@ -93,14 +103,10 @@ export function createRuntimeLogSessionLogger(
         log(event);
       }
     },
-    flush: async () => {
-      await writeBatch(drainBatch());
-      await asyncBatchSink?.flush?.();
-    },
+    flush: flushBufferedToSink,
     dispose: async () => {
       clearFlushTimer();
-      await writeBatch(drainBatch());
-      await asyncBatchSink?.flush?.();
+      await flushBufferedToSink();
     }
   };
 }

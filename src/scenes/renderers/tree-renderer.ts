@@ -3,8 +3,15 @@
  */
 
 import Phaser from "phaser";
-import type { WorldEntitySnapshot } from "../../game/entity/entity-types";
-import { cellCenterWorld, type WorldGridConfig } from "../../game/map/world-grid";
+import type { TreeLoggingVisualPhase, WorldEntitySnapshot } from "../../game/entity/entity-types";
+import { cellCenterWorld, type WorldGridConfig } from "../../game/map";
+import { TREE_RENDER_THEME, TREE_SHAPE_RATIOS } from "./tree-visual-theme";
+
+function resolveTreeLoggingPhase(entity: WorldEntitySnapshot): TreeLoggingVisualPhase {
+  if (entity.treeLoggingVisualPhase !== undefined) return entity.treeLoggingVisualPhase;
+  if (entity.loggingMarked === true) return "marked";
+  return "normal";
+}
 
 export function drawTreesToGraphics(
   g: Phaser.GameObjects.Graphics,
@@ -15,27 +22,28 @@ export function drawTreesToGraphics(
 ): void {
   g.clear();
   const cellPx = grid.cellSizePx;
+  const { crownWidth, crownHeight, trunkWidth, trunkHeight, crownTipY, crownBaseY, trunkTopY } =
+    TREE_SHAPE_RATIOS;
+
   for (const e of entities) {
     if (e.kind !== "tree") continue;
     const pos = cellCenterWorld(grid, e.cell, ox, oy);
-    const marked = e.loggingMarked === true;
-    const w = cellPx * 0.38;
-    const h = cellPx * 0.42;
-    const fill = marked ? 0xc45c26 : 0x2d8a3e;
-    const stroke = marked ? 0xfff3c4 : 0x1a4d24;
-    const lineW = marked ? 3 : 1.5;
-    g.fillStyle(fill, marked ? 1 : 0.92);
-    g.lineStyle(lineW, stroke, marked ? 1 : 0.9);
+    const phase = resolveTreeLoggingPhase(e);
+    const style = TREE_RENDER_THEME[phase];
+    const w = cellPx * crownWidth;
+    const h = cellPx * crownHeight;
+    g.fillStyle(style.foliageFill, style.foliageFillAlpha);
+    g.lineStyle(style.foliageLineWidth, style.foliageStroke, style.foliageStrokeAlpha);
     g.beginPath();
-    g.moveTo(pos.x, pos.y - h * 0.85);
-    g.lineTo(pos.x + w, pos.y + h * 0.15);
-    g.lineTo(pos.x - w, pos.y + h * 0.15);
+    g.moveTo(pos.x, pos.y - h * crownTipY);
+    g.lineTo(pos.x + w, pos.y + h * crownBaseY);
+    g.lineTo(pos.x - w, pos.y + h * crownBaseY);
     g.closePath();
     g.fillPath();
     g.strokePath();
-    const tw = cellPx * 0.08;
-    const th = cellPx * 0.22;
-    g.fillStyle(marked ? 0x5c3d2e : 0x4a3528, 1);
-    g.fillRect(pos.x - tw / 2, pos.y + h * 0.12, tw, th);
+    const tw = cellPx * trunkWidth;
+    const th = cellPx * trunkHeight;
+    g.fillStyle(style.trunkFill, style.trunkFillAlpha);
+    g.fillRect(pos.x - tw / 2, pos.y + h * trunkTopY, tw, th);
   }
 }

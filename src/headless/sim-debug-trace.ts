@@ -1,10 +1,11 @@
-import type { GoalDecisionCandidate } from "../game/behavior/goal-driven-planning";
-import type { GridCoord } from "../game/map/world-grid";
-import type { PawnActionState, PawnGoalState, PawnState } from "../game/pawn-state";
+import type { GridCoord } from "../game/map";
 import type { WorldSnapshot } from "../game/world-core-types";
 import type { WorkItemSnapshot } from "../game/work/work-types";
-import type { WorldTimeSnapshot } from "../game/time/world-time";
+import type { WorldTimeSnapshot } from "../game/time";
 import { createRuntimeLogEvent, type RuntimeLogEvent } from "../runtime-log/runtime-log";
+import type { PawnDecisionTrace } from "../game/behavior/pawn-decision-trace";
+
+export type { PawnDecisionResult, PawnDecisionTrace, PawnDecisionTraceState } from "../game/behavior/pawn-decision-trace";
 
 export type HeadlessDebugTraceOptions = Readonly<{
   enabled?: boolean;
@@ -43,34 +44,6 @@ export type WorkLifecycleTraceEvent = Readonly<{
   reason?: string;
 }>;
 
-export type PawnDecisionTraceState = Readonly<{
-  logicalCell: GridCoord;
-  needs: PawnState["needs"];
-  currentGoal: PawnGoalState | undefined;
-  currentAction: PawnActionState | undefined;
-  activeWorkItemId?: string;
-  debugLabel: string;
-}>;
-
-export type PawnDecisionResult = Readonly<{
-  kind: "move" | "use-target" | "idle" | "blocked";
-  targetId?: string;
-  step?: GridCoord;
-  blockedReason?: "reservation-failed" | "step-blocked" | "step-conflict" | "target-missing";
-}>;
-
-export type PawnDecisionTrace = Readonly<{
-  pawnId: string;
-  pawnName: string;
-  decisionSource: "claimed-work-anchor" | "goal-planner" | "continue-current" | "need-interrupt";
-  before: PawnDecisionTraceState;
-  after: PawnDecisionTraceState;
-  candidates: readonly GoalDecisionCandidate[];
-  selectedCandidate?: GoalDecisionCandidate;
-  result: PawnDecisionResult;
-  interruptReason?: string;
-}>;
-
 export type SimDebugTick = Readonly<{
   tick: number;
   worldTime: WorldTimeSnapshot;
@@ -95,21 +68,6 @@ export function createEmptySimDebugTrace(enabled: boolean = false): SimDebugTrac
   return {
     enabled,
     ticks: []
-  };
-}
-
-export function clonePawnDecisionState(pawn: PawnState): PawnDecisionTraceState {
-  return {
-    logicalCell: { col: pawn.logicalCell.col, row: pawn.logicalCell.row },
-    needs: {
-      hunger: pawn.needs.hunger,
-      rest: pawn.needs.rest,
-      recreation: pawn.needs.recreation
-    },
-    currentGoal: pawn.currentGoal ? { ...pawn.currentGoal } : undefined,
-    currentAction: pawn.currentAction ? { ...pawn.currentAction } : undefined,
-    activeWorkItemId: pawn.activeWorkItemId,
-    debugLabel: pawn.debugLabel
   };
 }
 
@@ -226,17 +184,6 @@ export function diffWorkLifecycleEvents(
   return events;
 }
 
-export function currentClaimedWorkEvents(world: WorldSnapshot): readonly WorkLifecycleTraceEvent[] {
-  return world.workItems
-    .filter((work) => work.status === "claimed" || Boolean(work.claimedBy))
-    .map((work) => ({
-      kind: "work-claimed" as const,
-      workItemId: work.id,
-      claimedBy: work.claimedBy,
-      pawnId: work.claimedBy
-    }));
-}
-
 function formatPawnDecisionMessage(tick: number, decision: PawnDecisionTrace): string {
   return `[tick ${tick}] ${decision.pawnName} ${decision.decisionSource} -> ${decision.selectedCandidate?.goal ?? decision.result.kind}`;
 }
@@ -313,6 +260,27 @@ export function mapSimDebugTickToRuntimeLogEvents(
       })
     );
     nextSeq += 1;
+  }
+
+  const workItems = input.tick.workItems;
+  if (workItems && workItems.length > 0) {
+    const message = `[tick ${input.tick.tick}] work snapshot (${workItems.length} items)`;
+    events.push(
+      createRuntimeLogEvent({
+        runId: input.runId,
+        seq: nextSeq,
+        timestampIso: input.timestampIso,
+        tick: input.tick.tick,
+        category: "Work.Snapshot",
+        verbosity: "Verbose",
+        message,
+        detail: {
+          worldTime: input.tick.worldTime,
+          workItems
+        },
+        searchTextParts: ["work.snapshot", workItems.length, ...workItems.flatMap((w) => [w.id, w.kind, w.status, w.claimedBy])]
+      })
+    );
   }
 
   return events;

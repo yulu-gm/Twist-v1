@@ -4,7 +4,7 @@ import type { GridCoord, WorldGridConfig } from "../game/map";
 import type { PawnState } from "../game/pawn-state";
 import type { TimeSpeed } from "../game/time";
 import type { CommandMenuCommandId } from "../data/command-menu";
-import type { DomainCommand } from "../player/s0-contract";
+import type { DomainCommand } from "../game/interaction/domain-command-types";
 
 export type ScenarioTreeSpawn = Readonly<{ cell: GridCoord }>;
 

@@ -2,17 +2,24 @@ import type { PawnId, PawnState } from "../pawn-state";
 import { isMoving } from "../pawn-state";
 import {
   NIGHT_SLEEP_GOAL_SCORE_MULTIPLIER,
+  PAWN_NEED_URGENCY_RULES,
   REST_SLEEP_PRIORITY_THRESHOLD
 } from "../need/threshold-rules";
-import type { GridCoord, ReservationSnapshot, WorldGridConfig } from "../map/world-grid";
+import type {
+  GridCoord,
+  InteractionPointKind,
+  ReservationSnapshot,
+  WorldGridConfig
+} from "../map/world-grid";
 import {
   findInteractionPointById,
   interactionPointsByKind,
   isInteractionPointReservedByOther,
   isWalkableCell
 } from "../map/world-grid";
+import { isCellOccupiedByOthers } from "../map/occupancy-manager";
+import { findPathAStar } from "../map/a-star-pathfinding";
 import { legalWanderNeighbors, pickWanderTarget, type WanderRng } from "./wander-planning";
-import { findPathAStar } from "./a-star-pathfinding";
 
 export type GoalKind = "eat" | "sleep" | "recreate" | "wander";
 export type ActionKind = "reserve-target" | "move-to-target" | "use-target" | "idle";
@@ -30,15 +37,60 @@ export type GoalDecisionCandidate = GoalDecision &
     blockedReason?: "no-target";
   }>;
 
+/**
+ * 睡眠候选过滤用：与 `WorldCore.restSpots` 字段子集同形。
+ * 不直接 import `entity-types`（其与 `pawn-state` 形成经本文件的循环依赖）。
+ */
+export type RestSpotOwnershipForPlanning = Readonly<{
+  buildingEntityId: string;
+  ownerPawnId?: string;
+}>;
+
 export type ChooseGoalPlannerInput = Readonly<{
   grid: WorldGridConfig;
   pawn: PawnState;
   reservations: ReservationSnapshot;
   /** 当前时段；省略时按白天处理（不施加夜间睡眠得分乘数）。 */
   timePeriod?: "day" | "night";
+  /**
+   * 与 `world-sim-bridge` 衍生的 `world-rest-{buildingId}` 床点配合：
+   * 已归属他人的床不进入本小人的睡眠候选；未传则不做归属过滤（纯模板交互点关卡兼容）。
+   */
+  restSpots?: readonly RestSpotOwnershipForPlanning[];
 }>;
 
 const WANDER_BASE_SCORE = 5;
+
+const WORLD_REST_ID_PREFIX = "world-rest-";
+
+function buildingEntityIdFromWorldRestBedPoint(point: {
+  id: string;
+  kind: InteractionPointKind;
+}): string | undefined {
+  if (point.kind !== "bed") return undefined;
+  if (!point.id.startsWith(WORLD_REST_ID_PREFIX)) return undefined;
+  return point.id.slice(WORLD_REST_ID_PREFIX.length);
+}
+
+/**
+ * 模板床等非 world-rest 点：全员可候选。
+ * `world-rest-{buildingId}`：传入 `restSpots` 时按归属过滤（缺条目不匹配则排除，避免与 WorldCore 脱节）；
+ * 省略 `restSpots` 时不做归属过滤（纯模板交互点关卡兼容）。
+ */
+function bedInteractionAllowedForPawn(
+  point: { id: string; kind: InteractionPointKind },
+  pawnId: string,
+  restSpots: readonly RestSpotOwnershipForPlanning[] | undefined
+): boolean {
+  if (point.kind !== "bed") return true;
+  const buildingId = buildingEntityIdFromWorldRestBedPoint(point);
+  if (buildingId === undefined) return true;
+  if (restSpots === undefined) return true;
+  const spot = restSpots.find((s) => s.buildingEntityId === buildingId);
+  if (!spot) return false;
+  if (spot.ownerPawnId === undefined) return true;
+  return spot.ownerPawnId === pawnId;
+}
 
 function manhattanDistance(a: GridCoord, b: GridCoord): number {
   return Math.abs(a.col - b.col) + Math.abs(a.row - b.row);
@@ -57,14 +109,20 @@ function interactionKindForGoal(goal: GoalKind): "food" | "bed" | "recreation" |
   }
 }
 
+/**
+ * 与 oh-gen-doc「空闲无紧迫需求」一致：仅当某轴紧迫度达到警戒阈值以上时，该轴才参与目标打分，
+ * 避免满饱食小人因邻格食物永远压过闲逛。
+ */
 function needScoreForGoal(pawn: PawnState, goal: GoalKind): number {
   switch (goal) {
     case "eat":
-      return pawn.needs.hunger;
+      return pawn.needs.hunger >= PAWN_NEED_URGENCY_RULES.hunger.warn ? pawn.needs.hunger : 0;
     case "sleep":
-      return pawn.needs.rest;
+      return pawn.needs.rest >= PAWN_NEED_URGENCY_RULES.rest.warn ? pawn.needs.rest : 0;
     case "recreate":
-      return pawn.needs.recreation;
+      return pawn.needs.recreation >= PAWN_NEED_URGENCY_RULES.recreation.warn
+        ? pawn.needs.recreation
+        : 0;
     case "wander":
       return WANDER_BASE_SCORE;
   }
@@ -88,6 +146,10 @@ function buildGoalDecisionCandidate(
   const candidates = interactionPointsByKind(input.grid, interactionKind)
     .filter(
       (point) => !isInteractionPointReservedByOther(input.reservations, point.id, input.pawn.id)
+    )
+    .filter((point) =>
+      interactionKind !== "bed" ||
+      bedInteractionAllowedForPawn(point, input.pawn.id, input.restSpots)
     )
     .filter((point) => {
       if (
@@ -178,7 +240,7 @@ export function planPathTowardCell(
 export function nextStepFromPath(
   grid: WorldGridConfig,
   pawn: PawnState,
-  _logicalCellsByPawnId: ReadonlyMap<PawnId, GridCoord>,
+  logicalCellsByPawnId: ReadonlyMap<PawnId, GridCoord>,
   targetCell: GridCoord
 ): GridCoord | undefined {
   const pathTarget = pawn.pathTarget;
@@ -190,6 +252,7 @@ export function nextStepFromPath(
   const isAdjacent = manhattanDistance(pawn.logicalCell, step) === 1;
   if (!isAdjacent) return undefined;
   if (!isWalkableCell(grid, step)) return undefined;
+  if (isCellOccupiedByOthers(logicalCellsByPawnId, step, pawn.id)) return undefined;
   return step;
 }
 
@@ -207,43 +270,17 @@ export function chooseStepTowardCell(
   return step;
 }
 
-function allReachableWanderPaths(
-  grid: WorldGridConfig,
-  pawn: PawnState
-): GridCoord[][] {
-  const paths: GridCoord[][] = [];
-  for (let row = 0; row < grid.rows; row += 1) {
-    for (let col = 0; col < grid.columns; col += 1) {
-      if (col === pawn.logicalCell.col && row === pawn.logicalCell.row) continue;
-      const target = { col, row };
-      if (!isWalkableCell(grid, target)) continue;
-      const path = planPathTowardCell(grid, pawn, target);
-      if (!path || path.length === 0) continue;
-      paths.push(path);
-    }
-  }
-  return paths.sort((left, right) => {
-    const lengthDiff = right.length - left.length;
-    if (lengthDiff !== 0) return lengthDiff;
-    const leftLast = left[left.length - 1]!;
-    const rightLast = right[right.length - 1]!;
-    const rowDiff = leftLast.row - rightLast.row;
-    if (rowDiff !== 0) return rowDiff;
-    return leftLast.col - rightLast.col;
-  });
-}
-
+/** 与策划一致的闲逛：在合法邻格中随机选一格，路径为单步（不再对全图反复 A*）。 */
 export function chooseWanderPath(
   grid: WorldGridConfig,
   pawn: PawnState,
+  logicalCellsByPawnId: ReadonlyMap<PawnId, GridCoord>,
   rng: WanderRng
 ): GridCoord[] | undefined {
-  const paths = allReachableWanderPaths(grid, pawn);
-  if (paths.length === 0) return undefined;
-  const preferred = paths.filter((path) => path.length > 1);
-  const pool = preferred.length > 0 ? preferred : paths;
-  const idx = Math.floor(rng() * pool.length);
-  return pool[idx];
+  const legal = legalWanderNeighbors(grid, pawn, logicalCellsByPawnId);
+  const decision = pickWanderTarget(rng, legal);
+  if (decision.kind !== "move") return undefined;
+  return [decision.target];
 }
 
 export function chooseWanderStep(
@@ -255,7 +292,7 @@ export function chooseWanderStep(
   if (pawn.pathCells && pawn.pathCells.length > 0) {
     return nextStepFromPath(grid, pawn, logicalCellsByPawnId, pawn.pathTarget ?? pawn.pathCells[pawn.pathCells.length - 1]!);
   }
-  const wanderPath = chooseWanderPath(grid, pawn, rng);
+  const wanderPath = chooseWanderPath(grid, pawn, logicalCellsByPawnId, rng);
   if (wanderPath && wanderPath.length > 0) {
     const [step] = wanderPath;
     if (step) {
