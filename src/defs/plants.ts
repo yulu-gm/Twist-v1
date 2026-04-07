@@ -1,0 +1,53 @@
+import { PlantDef } from '../world/def-database';
+
+export const PLANT_DEFS: PlantDef[] = [
+  {
+    defId: 'tree_oak',
+    label: 'Oak Tree',
+    description: 'A sturdy oak tree.',
+    growthDays: 30,
+    harvestYield: { defId: 'wood', count: 25 },
+    tags: ['plant', 'tree', 'cuttable'],
+    color: 0x228B22,
+    growthStages: 4,
+  },
+  {
+    defId: 'tree_pine',
+    label: 'Pine Tree',
+    description: 'A tall pine tree.',
+    growthDays: 25,
+    harvestYield: { defId: 'wood', count: 20 },
+    tags: ['plant', 'tree', 'cuttable'],
+    color: 0x006400,
+    growthStages: 4,
+  },
+  {
+    defId: 'bush_berry',
+    label: 'Berry Bush',
+    description: 'A bush bearing edible berries.',
+    growthDays: 8,
+    harvestYield: { defId: 'berries', count: 8 },
+    tags: ['plant', 'harvestable'],
+    color: 0x32CD32,
+    growthStages: 3,
+  },
+  {
+    defId: 'crop_rice',
+    label: 'Rice Plant',
+    description: 'A domesticated rice plant.',
+    growthDays: 6,
+    harvestYield: { defId: 'rice', count: 6 },
+    tags: ['plant', 'crop', 'harvestable'],
+    color: 0x9ACD32,
+    growthStages: 3,
+  },
+  {
+    defId: 'grass_tall',
+    label: 'Tall Grass',
+    description: 'Wild grass.',
+    growthDays: 5,
+    tags: ['plant', 'grass'],
+    color: 0x7CFC00,
+    growthStages: 2,
+  },
+];

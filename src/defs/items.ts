@@ -1,0 +1,63 @@
+import { ItemDef } from '../world/def-database';
+
+export const ITEM_DEFS: ItemDef[] = [
+  {
+    defId: 'wood',
+    label: 'Wood',
+    description: 'Raw wood logs.',
+    maxStack: 75,
+    tags: ['haulable', 'resource', 'material'],
+    color: 0x8B4513,
+  },
+  {
+    defId: 'stone_chunk',
+    label: 'Stone Chunk',
+    description: 'A rough chunk of stone.',
+    maxStack: 50,
+    tags: ['haulable', 'resource'],
+    color: 0x808080,
+  },
+  {
+    defId: 'stone_block',
+    label: 'Stone Block',
+    description: 'Cut stone blocks for building.',
+    maxStack: 50,
+    tags: ['haulable', 'resource', 'material'],
+    color: 0x999999,
+  },
+  {
+    defId: 'steel',
+    label: 'Steel',
+    description: 'Refined steel.',
+    maxStack: 75,
+    tags: ['haulable', 'resource', 'material'],
+    color: 0xB0C4DE,
+  },
+  {
+    defId: 'meal_simple',
+    label: 'Simple Meal',
+    description: 'A simple but nutritious meal.',
+    maxStack: 10,
+    tags: ['haulable', 'food'],
+    color: 0xDAA520,
+    nutritionValue: 30,
+  },
+  {
+    defId: 'berries',
+    label: 'Berries',
+    description: 'Wild berries, edible raw.',
+    maxStack: 30,
+    tags: ['haulable', 'food', 'raw_food'],
+    color: 0x8B0000,
+    nutritionValue: 10,
+  },
+  {
+    defId: 'rice',
+    label: 'Rice',
+    description: 'Harvested rice.',
+    maxStack: 50,
+    tags: ['haulable', 'food', 'raw_food'],
+    color: 0xFFFACD,
+    nutritionValue: 5,
+  },
+];
