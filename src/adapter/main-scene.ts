@@ -1,3 +1,13 @@
+/**
+ * @file main-scene.ts
+ * @description Phaser 主场景，负责游戏循环的 tick 推进、系统执行和渲染同步
+ * @dependencies phaser — 渲染引擎；world/world — 游戏世界；core/types — SimSpeed；
+ *               core/clock — 时钟推进；render/* — 渲染同步和摄像机；
+ *               input/* — 输入处理；ui/* — UI 管理；debug/* — 调试工具；
+ *               presentation — 展示层状态
+ * @part-of adapter — 适配器层
+ */
+
 import Phaser from 'phaser';
 import { World } from '../world/world';
 import type { GameMap } from '../world/game-map';
@@ -12,17 +22,40 @@ import { DebugOverlay } from './debug/debug-overlay';
 import { installDebugConsole } from './debug/console';
 import { createPresentationState, PresentationState } from '../presentation/presentation-state';
 
+/** 基础 tick 间隔（毫秒），1x 速度下每 100ms 执行一次 tick */
 const TICK_MS = 100; // base tick interval at 1x
 
+/**
+ * 主场景类 — Phaser 的核心场景
+ *
+ * 职责：
+ * 1. 初始化所有子系统（渲染、输入、UI、调试）
+ * 2. 在 update 循环中按速度倍率累积时间并执行 tick
+ * 3. 每帧同步渲染状态
+ */
 export class MainScene extends Phaser.Scene {
+  // ── 核心引用 ──
+  /** 游戏世界状态 */
   private world: World;
+  /** 当前激活的地图 */
   private activeMap!: GameMap;
+
+  // ── 子系统 ──
+  /** 渲染同步器：将世界对象同步为 Phaser 精灵 */
   private renderSync!: RenderSync;
+  /** 摄像机控制器：处理缩放、平移、键盘/鼠标移动 */
   private cameraController!: CameraController;
+  /** 输入处理器：处理鼠标点击和键盘快捷键 */
   private inputHandler!: InputHandler;
+  /** UI 管理器：管理顶栏、工具栏、选择面板、调试面板 */
   private uiManager!: UIManager;
+  /** 调试覆盖层：渲染区域/房间/温度等可视化 */
   private debugOverlay!: DebugOverlay;
+  /** 展示层状态：存储选中、悬停、预览等 UI 状态 */
   private presentation!: PresentationState;
+
+  // ── tick 累积器 ──
+  /** 累积的帧间隔时间（毫秒），达到 TICK_MS 时消耗并执行 tick */
   private accumulator = 0;
 
   constructor(world: World) {
@@ -30,8 +63,14 @@ export class MainScene extends Phaser.Scene {
     this.world = world;
   }
 
+  /**
+   * 场景创建回调 — 初始化所有子系统
+   *
+   * 操作：获取首个地图 → 创建展示状态 → 初始化渲染/摄像机/输入/UI/调试 →
+   *       安装调试控制台 → 执行首次完整渲染
+   */
   create(): void {
-    // Get the first map
+    // 获取第一张地图
     const mapEntry = this.world.maps.entries().next();
     if (!mapEntry.done) {
       this.activeMap = mapEntry.value[1];
@@ -46,17 +85,30 @@ export class MainScene extends Phaser.Scene {
     this.uiManager = new UIManager(this, this.world, this.activeMap, this.presentation);
     this.debugOverlay = new DebugOverlay(this, this.world, this.activeMap, this.presentation);
 
-    // Install debug console (window.opus)
+    // 安装调试控制台（window.opus）
     installDebugConsole(this.world, this.activeMap);
 
-    // Initial render
+    // 首次完整渲染
     this.renderSync.fullSync();
 
     log.info('general', 'Game scene created');
   }
 
+  /**
+   * 每帧更新回调 — 执行 tick 循环和渲染同步
+   *
+   * @param _time - 当前时间戳（未使用）
+   * @param delta - 距上一帧的毫秒数
+   *
+   * 操作：
+   * 1. 始终更新输入/UI/调试（即使暂停）
+   * 2. 暂停时直接返回
+   * 3. 按速度倍率累积 delta，每达到 TICK_MS 执行一次 tick
+   * 4. 每帧最多执行 maxTicksPerFrame 次 tick 防止死亡螺旋
+   * 5. 同步渲染状态
+   */
   update(_time: number, delta: number): void {
-    // Always update input and UI (even when paused)
+    // 始终更新输入和 UI（即使暂停时也需响应操作）
     this.inputHandler.update();
     this.uiManager.update();
     this.debugOverlay.update();
@@ -65,23 +117,24 @@ export class MainScene extends Phaser.Scene {
       return;
     }
 
+    // 根据速度计算倍率：Normal=1x, Fast=2x, UltraFast=3x
     const multiplier = this.world.speed === SimSpeed.Normal ? 1
       : this.world.speed === SimSpeed.Fast ? 2 : 3;
 
     this.accumulator += delta * multiplier;
 
     let ticksThisFrame = 0;
-    const maxTicksPerFrame = 10; // prevent spiral of death
+    const maxTicksPerFrame = 10; // 防止死亡螺旋：每帧最多执行 10 次 tick
 
     while (this.accumulator >= TICK_MS && ticksThisFrame < maxTicksPerFrame) {
       this.world.tick++;
       log.setTick(this.world.tick);
       advanceClock(this.world.clock);
 
-      // Run all systems
+      // 执行所有已注册的系统
       this.world.tickRunner.executeTick(this.world);
 
-      // Dispatch events
+      // 分发事件缓冲区中的事件
       if (this.world.eventBuffer.length > 0) {
         this.world.eventBus.dispatch(this.world.eventBuffer);
         this.world.eventBuffer = [];
@@ -91,7 +144,7 @@ export class MainScene extends Phaser.Scene {
       ticksThisFrame++;
     }
 
-    // Render sync
+    // 同步渲染状态（将世界对象变化反映到精灵）
     this.renderSync.sync();
   }
 }

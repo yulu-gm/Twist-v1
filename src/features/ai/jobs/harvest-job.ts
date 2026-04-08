@@ -1,10 +1,28 @@
+/**
+ * @file harvest-job.ts
+ * @description 收割工作的工厂函数。创建一个包含"前往目标 → 执行收割"两步的 Job。
+ * @dependencies core/types — 基础类型与枚举；ai.types — Job 接口
+ * @part-of AI 子系统 / 工作工厂（features/ai/jobs）
+ */
+
 import {
   ObjectId, CellCoord, ToilType, ToilState, JobState,
 } from '../../../core/types';
 import { Job } from '../ai.types';
 
+/** 收割工作计数器，用于生成唯一 Job ID */
 let harvestJobCounter = 0;
 
+/**
+ * 创建一个收割工作（Job）。
+ *
+ * @param pawnId    - 执行收割的 Pawn 的 ID
+ * @param targetId  - 收割指派（Designation）对象的 ID
+ * @param targetCell - 收割目标所在的格子坐标
+ * @returns 包含两个 Toil 的收割 Job：
+ *   1. GoTo — 移动到目标位置
+ *   2. Work — 执行收割操作（默认总工作量 60）
+ */
 export function createHarvestJob(
   pawnId: ObjectId,
   targetId: ObjectId,
@@ -18,12 +36,14 @@ export function createHarvestJob(
     targetId,
     targetCell,
     toils: [
+      // 步骤1：移动到收割目标
       {
         type: ToilType.GoTo,
         targetCell,
         state: ToilState.NotStarted,
         localData: {},
       },
+      // 步骤2：执行收割工作
       {
         type: ToilType.Work,
         targetId,

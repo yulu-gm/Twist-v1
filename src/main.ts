@@ -1,3 +1,13 @@
+/**
+ * @file main.ts
+ * @description 游戏启动入口，负责初始化定义数据库、创建世界、生成地形/植被/棋子、
+ *              注册命令和系统，最终启动 Phaser 渲染引擎
+ * @dependencies world/world — 世界创建；world/game-map — 地图创建；defs/index — 定义构建；
+ *               core/* — 类型、日志、检查器、tick 阶段；adapter/bootstrap — Phaser 启动；
+ *               features/* — 各功能模块的工厂、系统和命令处理器
+ * @part-of 根模块 — 应用程序启动点
+ */
+
 import { createWorld } from './world/world';
 import { createGameMap, GameMap } from './world/game-map';
 import { buildDefDatabase } from './defs/index';
@@ -7,7 +17,7 @@ import { inspector } from './core/inspector';
 import { bootstrapPhaser } from './adapter/bootstrap';
 import { SystemRegistration } from './core/tick-runner';
 
-// Import feature modules
+// 导入功能模块
 import { createPawn } from './features/pawn/pawn.factory';
 import { createItem } from './features/item/item.factory';
 import { createPlant } from './features/plant/plant.factory';
@@ -29,6 +39,14 @@ import { roomRebuildSystem } from './features/room/room.system';
 import { buildingTickSystem } from './features/building/building.systems';
 import type { World } from './world/world';
 
+/**
+ * 生成地形 — 用随机噪声为地图分配地形类型
+ *
+ * @param map - 目标地图
+ * @param world - 世界对象（提供 RNG）
+ *
+ * 地形概率分布：5% 水、7% 岩石、13% 泥土、5% 沙地、70% 草地
+ */
 function generateTerrain(map: GameMap, world: World): void {
   const rng = world.rng;
 
@@ -49,6 +67,14 @@ function generateTerrain(map: GameMap, world: World): void {
   });
 }
 
+/**
+ * 生成初始植被 — 在草地上随机放置树木和浆果灌木
+ *
+ * @param map - 目标地图
+ * @param world - 世界对象（提供 RNG 和定义数据库）
+ *
+ * 草地格子上：8% 概率生成树木（橡树/松树各半）、3% 概率生成浆果灌木
+ */
 function spawnInitialVegetation(map: GameMap, world: World): void {
   const rng = world.rng;
 
@@ -78,6 +104,12 @@ function spawnInitialVegetation(map: GameMap, world: World): void {
   });
 }
 
+/**
+ * 生成初始棋子和资源 — 在地图中央创建 3 个棋子、5 堆木材和 3 堆食物
+ *
+ * @param map - 目标地图
+ * @param world - 世界对象（提供 RNG）
+ */
 function spawnInitialPawns(map: GameMap, world: World): void {
   const rng = world.rng;
   const centerX = Math.floor(map.width / 2);
@@ -106,7 +138,7 @@ function spawnInitialPawns(map: GameMap, world: World): void {
     map.objects.add(pawn);
   }
 
-  // Spawn starting resources
+  // 生成初始资源：5 堆木材
   for (let i = 0; i < 5; i++) {
     const item = createItem({
       defId: 'wood',
@@ -118,7 +150,7 @@ function spawnInitialPawns(map: GameMap, world: World): void {
     map.objects.add(item);
   }
 
-  // Spawn food
+  // 生成初始食物：3 堆简单餐食
   for (let i = 0; i < 3; i++) {
     const item = createItem({
       defId: 'meal_simple',
@@ -131,10 +163,25 @@ function spawnInitialPawns(map: GameMap, world: World): void {
   }
 }
 
+/**
+ * 构建所有系统的注册列表 — 按 tick 阶段组织
+ *
+ * @returns 系统注册列表，包含所有游戏系统
+ *
+ * 阶段顺序：
+ * 0. 命令处理 — 处理命令队列
+ * 1. 工作生成 — 从指派创建可用工作
+ * 2. AI 决策 — 棋子选择任务
+ * 3. 预约管理 — 释放已销毁对象的预约
+ * 4. 执行 — 移动、工序执行、建造进度
+ * 5. 世界更新 — 需求衰减、植物生长、火焰、尸体腐烂、房间重建、建筑 tick
+ * 6. 清理 — 移除已销毁对象、清理过期预约
+ * 7. 事件分发 — 占位（实际在 main-scene 中分发）
+ */
 function buildSystems(): SystemRegistration[] {
   const systems: SystemRegistration[] = [];
 
-  // Phase 0: Command processing
+  // 阶段 0：命令处理
   systems.push({
     id: 'command_processor',
     phase: TickPhase.COMMAND_PROCESSING,
@@ -144,21 +191,21 @@ function buildSystems(): SystemRegistration[] {
     },
   });
 
-  // Phase 1: Work generation
+  // 阶段 1：工作生成
   systems.push(workGenerationSystem);
 
-  // Phase 2: AI decision
+  // 阶段 2：AI 决策
   systems.push(jobSelectionSystem);
 
-  // Phase 3: Reservation management
+  // 阶段 3：预约管理
   systems.push({
     id: 'reservation_mgr',
     phase: TickPhase.RESERVATION,
     frequency: 1,
     execute: (w: any) => {
       for (const [, gmap] of w.maps) {
-        // Release reservations for destroyed objects
-        for (const res of gmap.reservations.getAll()) {
+      // 释放已销毁对象的预约
+      for (const res of gmap.reservations.getAll()) {
           const obj = gmap.objects.get(res.targetId);
           if (obj && obj.destroyed) {
             gmap.reservations.release(res.id);
@@ -168,12 +215,12 @@ function buildSystems(): SystemRegistration[] {
     },
   });
 
-  // Phase 4: Execution
+  // 阶段 4：执行
   systems.push(movementSystem);
   systems.push(toilExecutorSystem);
   systems.push(constructionProgressSystem);
 
-  // Phase 5: World update
+  // 阶段 5：世界更新
   systems.push(needDecayRegistration);
   systems.push(growPlantsSystem);
   systems.push(fireSystem);
@@ -181,7 +228,7 @@ function buildSystems(): SystemRegistration[] {
   systems.push(roomRebuildSystem);
   systems.push(buildingTickSystem);
 
-  // Phase 6: Cleanup
+  // 阶段 6：清理
   systems.push({
     id: 'cleanup',
     phase: TickPhase.CLEANUP,
@@ -200,7 +247,7 @@ function buildSystems(): SystemRegistration[] {
     },
   });
 
-  // Phase 7: Event dispatch (events dispatched in main-scene)
+  // 阶段 7：事件分发（实际在 main-scene 中处理）
   systems.push({
     id: 'event_dispatch',
     phase: TickPhase.EVENT_DISPATCH,
@@ -211,8 +258,20 @@ function buildSystems(): SystemRegistration[] {
   return systems;
 }
 
+/**
+ * 注册所有命令处理器 — 包括速度控制、调试命令和各功能模块命令
+ *
+ * @param world - 游戏世界对象
+ *
+ * 注册的命令类型：
+ * - set_speed: 设置游戏速度
+ * - debug_spawn: 调试生成物品
+ * - debug_destroy: 调试销毁对象
+ * - debug_advance_ticks: 调试快进 tick
+ * - 建造、指派、棋子、区域、存档等功能模块命令
+ */
 function registerCommands(world: World): void {
-  // Speed command
+  // 速度切换命令
   world.commandBus.register({
     type: 'set_speed',
     validate: (_w, cmd) => {
@@ -226,7 +285,7 @@ function registerCommands(world: World): void {
     },
   });
 
-  // Debug spawn
+  // 调试生成物品命令
   world.commandBus.register({
     type: 'debug_spawn',
     validate: () => ({ valid: true }),
@@ -240,7 +299,7 @@ function registerCommands(world: World): void {
     },
   });
 
-  // Debug destroy
+  // 调试销毁对象命令
   world.commandBus.register({
     type: 'debug_destroy',
     validate: () => ({ valid: true }),
@@ -254,7 +313,7 @@ function registerCommands(world: World): void {
     },
   });
 
-  // Debug advance ticks
+  // 调试快进 tick 命令
   world.commandBus.register({
     type: 'debug_advance_ticks',
     validate: (_w, cmd) => {
@@ -272,7 +331,7 @@ function registerCommands(world: World): void {
     },
   });
 
-  // Feature commands
+  // 注册功能模块命令
   world.commandBus.registerAll(constructionCommandHandlers);
   world.commandBus.registerAll(designationCommandHandlers);
   world.commandBus.registerAll(pawnCommandHandlers);
@@ -280,46 +339,60 @@ function registerCommands(world: World): void {
   world.commandBus.registerAll(saveCommandHandlers);
 }
 
+/**
+ * 游戏启动函数 — 按顺序执行完整的初始化流程
+ *
+ * 启动步骤：
+ * 1. 构建定义数据库
+ * 2. 创建世界
+ * 3. 添加派系（玩家殖民地 + 野生动物）
+ * 4. 创建 80x80 地图
+ * 5. 生成地形 → 初始化寻路网格 → 生成植被 → 生成棋子和资源
+ * 6. 注册命令处理器
+ * 7. 注册 tick 系统
+ * 8. 设置检查器
+ * 9. 启动 Phaser 渲染引擎
+ */
 async function boot(): Promise<void> {
   log.info('general', 'Booting Opus World...');
 
-  // 1. Build def database
+  // 1. 构建定义数据库
   const defs = buildDefDatabase();
   log.info('general', `Loaded defs: ${defs.buildings.size} buildings, ${defs.items.size} items, ${defs.plants.size} plants, ${defs.terrains.size} terrains`);
 
-  // 2. Create world
+  // 2. 创建世界
   const world = createWorld({ defs, seed: 12345 });
 
-  // 3. Add factions
+  // 3. 添加派系
   world.factions.set('player', { id: 'player', name: 'Colony', isPlayer: true, hostile: false });
   world.factions.set('wild', { id: 'wild', name: 'Wildlife', isPlayer: false, hostile: false });
 
-  // 4. Create map
+  // 4. 创建地图
   const map = createGameMap({ id: 'main', width: 80, height: 80 });
   world.maps.set(map.id, map);
 
-  // 5. Generate terrain and populate
+  // 5. 生成地形并填充内容
   generateTerrain(map, world);
 
-  // 5b. Initialize pathGrid from terrain (mark rock/water impassable)
+  // 5b. 根据地形初始化寻路网格（标记岩石/水域为不可通行）
   map.pathGrid.rebuildFrom(map, defs);
 
   spawnInitialVegetation(map, world);
   spawnInitialPawns(map, world);
 
-  // 6. Register commands
+  // 6. 注册命令处理器
   registerCommands(world);
 
-  // 7. Register systems
+  // 7. 注册 tick 系统
   const systems = buildSystems();
   world.tickRunner.registerAll(systems);
 
-  // 8. Setup inspector
+  // 8. 设置检查器
   inspector.setWorld(world);
 
   log.info('general', `World created: ${map.objects.size} objects on ${map.width}x${map.height} map`);
 
-  // 9. Launch Phaser
+  // 9. 启动 Phaser 渲染引擎
   bootstrapPhaser(world);
 }
 

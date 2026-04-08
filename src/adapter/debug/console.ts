@@ -1,3 +1,13 @@
+/**
+ * @file console.ts
+ * @description 调试控制台，在 window.opus 上暴露全局调试 API，
+ *              供开发者在浏览器控制台中检查和操纵游戏状态
+ * @dependencies world/world — 世界状态；world/game-map — 地图数据；
+ *               core/inspector — 对象/格子/AI 检查器；core/logger — 日志系统；
+ *               core/types — ObjectKind
+ * @part-of adapter/debug — 调试工具模块
+ */
+
 import type { World } from '../../world/world';
 import type { GameMap } from '../../world/game-map';
 import { inspector } from '../../core/inspector';
@@ -5,57 +15,78 @@ import { log } from '../../core/logger';
 import { ObjectKind } from '../../core/types';
 
 /**
- * Debug console — provides a global API for inspecting and manipulating the game
- * from the browser's developer console.
+ * 安装调试控制台到 window.opus
+ *
+ * @param world - 游戏世界对象
+ * @param map - 当前地图对象
+ *
+ * 提供的 API：
+ * - inspect(id): 检查指定对象
+ * - cell(x,y): 检查指定格子
+ * - pawns(): 列出所有棋子
+ * - job(id): 查看棋子当前任务
+ * - aiLog(id, count): 获取棋子 AI 日志
+ * - reservations(): 列出所有预约
+ * - zones(): 列出所有区域
+ * - rooms(): 列出所有房间
+ * - tick(): 获取当前 tick
+ * - status(): 获取世界状态概览
+ * - cmd(type, payload): 推送命令到队列
+ * - spawn(defId, x, y, count): 生成物品
+ * - destroy(objectId): 销毁对象
+ * - advance(count): 快进指定 tick 数
+ * - logs(count): 获取最近日志
+ * - world(): 获取世界对象（完整访问）
+ * - map(): 获取地图对象
  */
 export function installDebugConsole(world: World, map: GameMap): void {
   const debugApi = {
-    /** Inspect an object by ID */
+    /** 按 ID 检查一个地图对象 */
     inspect(id: string) {
       return inspector.inspectObject(id);
     },
 
-    /** Inspect a cell */
+    /** 检查指定坐标的格子信息 */
     cell(x: number, y: number) {
       return inspector.inspectCell(map.id, { x, y });
     },
 
-    /** List all pawns */
+    /** 列出地图上所有棋子 */
     pawns() {
       return map.objects.allOfKind(ObjectKind.Pawn);
     },
 
-    /** Inspect a pawn's current job */
+    /** 检查指定棋子的当前任务 */
     job(pawnId: string) {
       return inspector.inspectPawnJob(pawnId);
     },
 
-    /** Get AI log for a pawn */
+    /** 获取指定棋子的 AI 决策日志 */
     aiLog(pawnId: string, count = 20) {
       return inspector.inspectAILog(pawnId, count);
     },
 
-    /** List all reservations */
+    /** 列出所有活动预约 */
     reservations() {
       return map.reservations.getAll();
     },
 
-    /** List all zones */
+    /** 列出所有区域 */
     zones() {
       return map.zones.getAll();
     },
 
-    /** List all rooms */
+    /** 列出所有房间 */
     rooms() {
       return map.rooms.rooms;
     },
 
-    /** Get world tick */
+    /** 获取当前 tick 数 */
     tick() {
       return world.tick;
     },
 
-    /** Get world state summary */
+    /** 获取世界状态概览（对象数量统计） */
     status() {
       return {
         tick: world.tick,
@@ -73,44 +104,44 @@ export function installDebugConsole(world: World, map: GameMap): void {
       };
     },
 
-    /** Push a command to the queue */
+    /** 推送一个命令到命令队列 */
     cmd(type: string, payload: Record<string, unknown> = {}) {
       world.commandQueue.push({ type, payload });
       return `Queued: ${type}`;
     },
 
-    /** Spawn an item */
+    /** 在指定位置生成物品 */
     spawn(defId: string, x: number, y: number, count = 1) {
       return this.cmd('debug_spawn', { defId, cell: { x, y }, count });
     },
 
-    /** Destroy an object */
+    /** 销毁指定对象 */
     destroy(objectId: string) {
       return this.cmd('debug_destroy', { objectId });
     },
 
-    /** Advance ticks */
+    /** 快进指定数量的 tick */
     advance(count: number) {
       return this.cmd('debug_advance_ticks', { count });
     },
 
-    /** Get recent log entries */
+    /** 获取最近的日志条目 */
     logs(count = 30) {
       return log.getEntries({ count });
     },
 
-    /** Get the world object (full access) */
+    /** 获取世界对象（完整访问，调试用） */
     world() {
       return world;
     },
 
-    /** Get the map object */
+    /** 获取地图对象 */
     map() {
       return map;
     },
   };
 
-  // Expose on window
+  // 挂载到 window.opus 供浏览器控制台使用
   (window as any).opus = debugApi;
 
   console.log(

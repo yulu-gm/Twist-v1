@@ -1,6 +1,16 @@
+/**
+ * @file buildings.ts
+ * @description 建筑定义数据——定义游戏中所有建筑类型的属性。
+ *              包括结构建筑（木墙、石墙、木门）、家具（木床、桌子）和区域标记（仓储区）。
+ *              每种建筑定义了尺寸、耐久、建造成本、通行阻挡等属性。
+ * @dependencies world/def-database（BuildingDef 接口）
+ * @part-of defs 模块——游戏静态数据定义
+ */
+
 import { BuildingDef } from '../world/def-database';
 
 export const BUILDING_DEFS: BuildingDef[] = [
+  /** 木墙——基础结构，阻挡移动和光线，需要5个木材建造 */
   {
     defId: 'wall_wood',
     label: 'Wood Wall',
@@ -15,6 +25,7 @@ export const BUILDING_DEFS: BuildingDef[] = [
     passable: false,
     color: 0x8B6914,
   },
+  /** 石墙——高耐久结构，阻挡移动和光线，需要5个石砖建造 */
   {
     defId: 'wall_stone',
     label: 'Stone Wall',
@@ -29,6 +40,7 @@ export const BUILDING_DEFS: BuildingDef[] = [
     passable: false,
     color: 0x777777,
   },
+  /** 木门——可通行的结构，殖民者可以开关，阻挡光线但不阻挡移动 */
   {
     defId: 'door_wood',
     label: 'Wood Door',
@@ -43,6 +55,7 @@ export const BUILDING_DEFS: BuildingDef[] = [
     passable: true,
     color: 0x6B4226,
   },
+  /** 木床——家具，供殖民者睡觉，占1x2格，有交互偏移格 */
   {
     defId: 'bed_wood',
     label: 'Wood Bed',
@@ -58,6 +71,7 @@ export const BUILDING_DEFS: BuildingDef[] = [
     interactionCellOffset: { x: 0, y: 2 },
     color: 0xCD853F,
   },
+  /** 桌子——家具，用于进食，占2x1格 */
   {
     defId: 'table',
     label: 'Table',
@@ -72,6 +86,7 @@ export const BUILDING_DEFS: BuildingDef[] = [
     passable: false,
     color: 0xA0522D,
   },
+  /** 仓储区标记——区域标记类建筑，不需要建造，用于标识物品存储区域 */
   {
     defId: 'stockpile_zone_marker',
     label: 'Stockpile',

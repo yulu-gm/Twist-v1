@@ -1,17 +1,44 @@
+/**
+ * @file input-handler.ts
+ * @description 输入处理器，处理鼠标点击、键盘快捷键，以及放置/指派预览更新
+ * @dependencies phaser — 输入系统；world/world — 命令队列；world/game-map — 地图数据；
+ *               core/types — CellCoord、ObjectKind、DesignationType、SimSpeed；
+ *               presentation — ToolType、OverlayType、PresentationState
+ * @part-of adapter/input — 输入处理模块
+ */
+
 import Phaser from 'phaser';
 import { World } from '../../world/world';
 import type { GameMap } from '../../world/game-map';
 import { CellCoord, ObjectKind, DesignationType, SimSpeed } from '../../core/types';
 import { PresentationState, ToolType, OverlayType } from '../../presentation/presentation-state';
 
+/** 地图格子像素大小 */
 const TILE_SIZE = 32;
 
+/**
+ * 输入处理器类
+ *
+ * 职责：
+ * 1. 监听鼠标点击 — 根据当前工具模式执行选择/建造/指派
+ * 2. 监听键盘快捷键 — 切换工具、速度控制、覆盖层切换、存档/读档
+ * 3. 每帧更新悬停格子、放置预览和指派预览
+ */
 export class InputHandler {
+  // ── 引用 ──
+  /** Phaser 场景引用 */
   private scene: Phaser.Scene;
+  /** 游戏世界（用于推送命令） */
   private world: World;
+  /** 当前地图 */
   private map: GameMap;
+  /** 展示层状态（工具模式、预览等） */
   private presentation: PresentationState;
+
+  // ── 工具状态 ──
+  /** 当前选中的建筑定义 ID */
   private selectedBuildingDefId: string | null = null;
+  /** 当前指派类型（采矿/收获/砍伐） */
   private designationType: DesignationType = DesignationType.Mine;
 
   constructor(
@@ -28,8 +55,9 @@ export class InputHandler {
     this.setupInputs();
   }
 
+  /** 注册所有输入事件监听器（鼠标点击 + 键盘快捷键） */
   private setupInputs(): void {
-    // Left click
+    // 左键点击处理
     this.scene.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       if (!pointer.leftButtonDown()) return;
 
@@ -49,11 +77,11 @@ export class InputHandler {
       }
     });
 
-    // Keyboard shortcuts
+    // 键盘快捷键
     if (this.scene.input.keyboard) {
       const kb = this.scene.input.keyboard;
 
-      // Speed controls
+      // ── 速度控制 ──
       kb.on('keydown-SPACE', () => {
         this.world.commandQueue.push({
           type: 'set_speed',
@@ -70,7 +98,7 @@ export class InputHandler {
         this.world.commandQueue.push({ type: 'set_speed', payload: { speed: SimSpeed.UltraFast } });
       });
 
-      // Tool shortcuts
+      // ── 工具快捷键 ──
       kb.on('keydown-ESC', () => {
         this.presentation.activeTool = ToolType.Select;
         this.presentation.placementPreview = null;
@@ -98,12 +126,12 @@ export class InputHandler {
         this.presentation.selectedObjectIds.clear();
       });
 
-      // Debug: F1 toggle debug panel
+      // 调试面板切换：F1
       kb.on('keydown-F1', () => {
         this.presentation.showDebugPanel = !this.presentation.showDebugPanel;
       });
 
-      // Overlay toggles: F2-F6
+      // 覆盖层切换：F2 区域、F3 房间、F4 温度、F5 寻路
       kb.on('keydown-F2', () => {
         this.presentation.activeOverlay =
           this.presentation.activeOverlay === OverlayType.Zones ? OverlayType.None : OverlayType.Zones;
@@ -122,7 +150,7 @@ export class InputHandler {
           this.presentation.activeOverlay === OverlayType.Pathfinding ? OverlayType.None : OverlayType.Pathfinding;
       });
 
-      // Save/Load: F6 save, F7 load
+      // 存档/读档：F6 保存、F7 加载
       kb.on('keydown-F6', () => {
         this.world.commandQueue.push({ type: 'save_game', payload: {} });
       });
@@ -132,6 +160,12 @@ export class InputHandler {
     }
   }
 
+  /**
+   * 将屏幕指针坐标转换为地图格子坐标
+   *
+   * @param pointer - Phaser 指针对象
+   * @returns 格子坐标，超出地图范围时返回 null
+   */
   private pointerToCell(pointer: Phaser.Input.Pointer): CellCoord | null {
     const cam = this.scene.cameras.main;
     const worldPoint = cam.getWorldPoint(pointer.x, pointer.y);
@@ -142,6 +176,11 @@ export class InputHandler {
     return { x, y };
   }
 
+  /**
+   * 处理选择操作 — 清除旧选择，选中目标格子上的所有对象
+   *
+   * @param cell - 点击的格子坐标
+   */
   private handleSelect(cell: CellCoord): void {
     this.presentation.selectedObjectIds.clear();
     const objectIds = this.map.spatial.getAt(cell);
@@ -150,6 +189,11 @@ export class InputHandler {
     }
   }
 
+  /**
+   * 处理建造操作 — 在目标格子放置建筑蓝图
+   *
+   * @param cell - 点击的格子坐标
+   */
   private handleBuild(cell: CellCoord): void {
     if (!this.selectedBuildingDefId) return;
     this.world.commandQueue.push({
@@ -158,6 +202,11 @@ export class InputHandler {
     });
   }
 
+  /**
+   * 处理指派操作 — 根据指派类型对格子上的对象发出相应命令
+   *
+   * @param cell - 点击的格子坐标
+   */
   private handleDesignate(cell: CellCoord): void {
     switch (this.designationType) {
       case DesignationType.Mine:
@@ -195,12 +244,20 @@ export class InputHandler {
     }
   }
 
+  /**
+   * 每帧更新 — 刷新悬停格子、放置预览和指派预览
+   *
+   * 操作：
+   * 1. 将鼠标位置转换为格子坐标并记录到展示状态
+   * 2. 如果当前为建造模式，更新放置预览（含通行性验证）
+   * 3. 如果当前为指派模式，更新指派预览（含有效性验证）
+   */
   update(): void {
-    // Update hovered cell
+    // 更新悬停格子
     const pointer = this.scene.input.activePointer;
     this.presentation.hoveredCell = this.pointerToCell(pointer);
 
-    // Update placement preview
+    // 更新放置预览
     if (this.presentation.activeTool === ToolType.Build && this.selectedBuildingDefId && this.presentation.hoveredCell) {
       const cell = this.presentation.hoveredCell;
       const isPassable = this.map.spatial.isPassable(cell);
@@ -214,7 +271,7 @@ export class InputHandler {
       this.presentation.placementPreview = null;
     }
 
-    // Update designation preview
+    // 更新指派预览
     if (this.presentation.activeTool === ToolType.Designate && this.presentation.hoveredCell) {
       const cell = this.presentation.hoveredCell;
       let valid = false;
@@ -260,11 +317,21 @@ export class InputHandler {
     }
   }
 
+  /**
+   * 设置当前选中的建筑定义并切换到建造工具
+   *
+   * @param defId - 建筑定义 ID
+   */
   setSelectedBuilding(defId: string): void {
     this.selectedBuildingDefId = defId;
     this.presentation.activeTool = ToolType.Build;
   }
 
+  /**
+   * 设置当前指派类型并切换到指派工具
+   *
+   * @param type - 指派类型（采矿/收获/砍伐）
+   */
   setDesignationType(type: DesignationType): void {
     this.designationType = type;
     this.presentation.activeTool = ToolType.Designate;

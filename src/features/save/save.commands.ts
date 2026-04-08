@@ -1,3 +1,13 @@
+/**
+ * @file save.commands.ts
+ * @description 存档/读档命令处理器，以及序列化/反序列化工具函数
+ * @dependencies core/command-bus — 命令处理接口；core/event-bus — 事件类型；
+ *               core/serialization — 版本迁移；core/types — ID 计数器、标签等；
+ *               world/world — World 与 Faction；world/game-map — GameMap、Zone；
+ *               core/grid — Grid 工具；save.types — 存档数据类型
+ * @part-of features/save — 存档/读档功能模块
+ */
+
 import { CommandHandler, Command } from '../../core/command-bus';
 import { GameEvent } from '../../core/event-bus';
 import { CURRENT_SAVE_VERSION, applyMigrations } from '../../core/serialization';
@@ -7,13 +17,16 @@ import { createGameMap, Zone } from '../../world/game-map';
 import { Grid } from '../../core/grid';
 import { SaveData, MapSaveData } from './save.types';
 
+/** localStorage 中存档数据的键名 */
 const SAVE_KEY = 'opus_world_save';
 
-// ── Serialization helpers ──
+// ── 序列化辅助函数 ──
 
 /**
- * Convert a MapObjectBase (with Set<Tag> tags, etc.) to a plain object
- * with Sets as arrays for JSON serialization. Handles nested objects.
+ * 将地图对象序列化为纯 JSON 对象
+ *
+ * @param obj - 包含 Set 等非序列化类型的地图对象
+ * @returns 纯 JSON 对象，所有 Set 转换为数组，嵌套对象递归处理
  */
 function serializeObject(obj: any): any {
   const serialized: any = {};
@@ -32,9 +45,10 @@ function serializeObject(obj: any): any {
 }
 
 /**
- * Convert a serialized object (with tags as string[]) back to a
- * MapObjectBase with tags as Set<Tag>.
- * Also handles nested Set fields like building.storage.allowedDefIds.
+ * 将序列化后的对象还原为带 Set 类型的地图对象
+ *
+ * @param data - 纯 JSON 对象（tags 为字符串数组）
+ * @returns 还原后的对象，tags 恢复为 Set<Tag>，storage.allowedDefIds 恢复为 Set
  */
 function deserializeObject(data: any): any {
   const obj: any = {};
@@ -59,7 +73,10 @@ function deserializeObject(data: any): any {
 }
 
 /**
- * Serialize a Zone (with Set<CellCoordKey> cells) to a plain object.
+ * 将区域（Zone）序列化为纯 JSON 对象
+ *
+ * @param zone - 包含 Set<CellCoordKey> cells 的区域对象
+ * @returns 纯 JSON 对象，cells 转换为数组
  */
 function serializeZone(zone: Zone): any {
   return {
@@ -71,7 +88,10 @@ function serializeZone(zone: Zone): any {
 }
 
 /**
- * Deserialize a Zone back from a plain object.
+ * 将纯 JSON 对象反序列化为区域（Zone）
+ *
+ * @param data - 序列化后的区域数据
+ * @returns 还原后的 Zone 对象，cells 恢复为 Set
  */
 function deserializeZone(data: any): Zone {
   return {
@@ -82,15 +102,28 @@ function deserializeZone(data: any): Zone {
   };
 }
 
-// ── save_game handler ──
+// ── save_game 命令处理器 ──
 
+/**
+ * 保存游戏命令处理器
+ *
+ * 将整个世界状态序列化为 JSON 并存入 localStorage。
+ * 包括：tick、时钟、RNG、速度、地图（地形+对象+区域+预约）、派系、故事状态。
+ */
 export const saveGameHandler: CommandHandler = {
   type: 'save_game',
 
+  /** 验证：保存操作无需前置条件，始终有效 */
   validate(_world: any, _cmd: Command) {
     return { valid: true };
   },
 
+  /**
+   * 执行保存：遍历所有地图和派系，构建 SaveData 并写入 localStorage
+   *
+   * @param world - 当前世界状态
+   * @returns 包含 'game_saved' 事件的结果
+   */
   execute(world: World, _cmd: Command) {
     const mapSaves: MapSaveData[] = [];
 
@@ -157,11 +190,19 @@ export const saveGameHandler: CommandHandler = {
   },
 };
 
-// ── load_game handler ──
+// ── load_game 命令处理器 ──
 
+/**
+ * 加载游戏命令处理器
+ *
+ * 从 localStorage 读取存档 JSON，应用版本迁移，
+ * 然后完整还原世界状态：tick、时钟、RNG、速度、派系、地图、对象、
+ * 区域、预约和寻路网格。加载后清除棋子的运行时 AI/移动/背包状态。
+ */
 export const loadGameHandler: CommandHandler = {
   type: 'load_game',
 
+  /** 验证：检查 localStorage 中是否存在存档数据 */
   validate(_world: any, _cmd: Command) {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) {
@@ -170,14 +211,20 @@ export const loadGameHandler: CommandHandler = {
     return { valid: true };
   },
 
+  /**
+   * 执行加载：从 localStorage 解析存档数据并还原完整世界状态
+   *
+   * @param world - 需要被还原的世界对象
+   * @returns 包含 'game_loaded' 事件的结果
+   */
   execute(world: World, _cmd: Command) {
     const raw = localStorage.getItem(SAVE_KEY)!;
     let savedData: SaveData = JSON.parse(raw);
 
-    // Apply any version migrations
+    // 应用版本迁移，确保旧存档兼容新版本
     savedData = applyMigrations(savedData) as SaveData;
 
-    // Restore top-level world state
+    // 还原顶层世界状态
     world.tick = savedData.tick;
     world.clock.totalTicks = savedData.clockState.totalTicks;
     world.clock.hour = savedData.clockState.hour;
@@ -188,12 +235,12 @@ export const loadGameHandler: CommandHandler = {
     world.speed = savedData.speed;
     resetIdCounter(savedData.nextObjectId);
 
-    // Restore story state
+    // 还原故事生成器状态
     world.storyState.threatLevel = savedData.storyState.threatLevel;
     world.storyState.daysSinceLastRaid = savedData.storyState.daysSinceLastRaid;
     world.storyState.totalWealth = savedData.storyState.totalWealth;
 
-    // Restore factions
+    // 还原派系
     world.factions.clear();
     for (const f of savedData.factions) {
       const faction: Faction = {
@@ -205,7 +252,7 @@ export const loadGameHandler: CommandHandler = {
       world.factions.set(f.id, faction);
     }
 
-    // Restore maps
+    // 还原地图
     world.maps.clear();
     for (const mapData of savedData.maps) {
       const map = createGameMap({
@@ -214,31 +261,27 @@ export const loadGameHandler: CommandHandler = {
         height: mapData.height,
       });
 
-      // Rebuild terrain from flat array
+      // 从平铺数组重建地形网格
       const terrainGrid = Grid.fromFlatArray(mapData.width, mapData.height, mapData.terrain);
       terrainGrid.forEach((x, y, value) => {
         map.terrain.set(x, y, value);
       });
 
-      // Recreate objects (restore Set<Tag> from string[])
+      // 重建对象（将 string[] 还原为 Set<Tag>）
       for (const objData of mapData.objects) {
         const obj = deserializeObject(objData);
         map.objects.add(obj);
       }
 
-      // Recreate zones
+      // 重建区域
       for (const zoneData of mapData.zones) {
         const zone = deserializeZone(zoneData);
         map.zones.add(zone);
       }
 
-      // Recreate reservations
+      // 重建预约（通过 tryReserve 重新创建，预约 ID 可能不同，但核心状态保留）
       for (const resData of mapData.reservations) {
-        // Directly add reservation via tryReserve is not ideal since it
-        // has its own ID generation. We re-create by inserting manually.
-        // The ReservationTable doesn't expose a raw add, so we use tryReserve
-        // and accept that reservation IDs may differ. The important state
-        // (claimant, target, job, expiry) is preserved.
+        // 通过 tryReserve 重建，ID 可能不同但核心数据（持有者、目标、任务、过期时间）保留
         map.reservations.tryReserve({
           claimantId: resData.claimantId,
           targetId: resData.targetId,
@@ -250,10 +293,10 @@ export const loadGameHandler: CommandHandler = {
 
       world.maps.set(mapData.id as MapId, map);
 
-      // Rebuild pathGrid from terrain + buildings
+      // 根据地形和建筑重建寻路网格
       map.pathGrid.rebuildFrom(map, world.defs);
 
-      // Clear active pawn jobs — they may not deserialize correctly
+      // 清除棋子运行时状态 — 反序列化后 AI 任务/移动路径可能无效
       const pawns = map.objects.allOfKind(ObjectKind.Pawn);
       for (const pawn of pawns) {
         const p = pawn as any;
@@ -274,7 +317,7 @@ export const loadGameHandler: CommandHandler = {
       }
     }
 
-    // Clear command queue and event buffer
+    // 清空命令队列和事件缓冲区
     world.commandQueue.length = 0;
     world.eventBuffer.length = 0;
 
@@ -290,6 +333,7 @@ export const loadGameHandler: CommandHandler = {
   },
 };
 
+/** 导出所有存档相关的命令处理器 */
 export const saveCommandHandlers: CommandHandler[] = [
   saveGameHandler,
   loadGameHandler,

@@ -1,3 +1,10 @@
+/**
+ * @file pawn.factory.ts
+ * @description 棋子工厂函数，负责创建新的棋子实例并初始化默认属性
+ * @dependencies core/types — 对象ID生成、日程活动枚举等; core/seeded-random — 种子随机数; pawn.types — 棋子接口
+ * @part-of features/pawn 棋子功能模块
+ */
+
 import {
   ObjectKind,
   nextObjectId,
@@ -14,7 +21,11 @@ import type {
 import type { SeededRandom } from '../../core/seeded-random';
 import type { Pawn } from './pawn.types';
 
-/** Default 24-hour schedule: sleep 0-5, anything 6-21, joy 22-23. */
+/**
+ * 生成默认的24小时日程安排
+ * 0-5点睡觉，6-21点自由活动，22-23点娱乐
+ * @returns 24个小时的日程条目数组
+ */
 function defaultSchedule(): ScheduleEntry[] {
   const entries: ScheduleEntry[] = [];
   for (let h = 0; h < 24; h++) {
@@ -31,7 +42,11 @@ function defaultSchedule(): ScheduleEntry[] {
   return entries;
 }
 
-/** Baseline skills every pawn starts with. */
+/**
+ * 生成每个棋子的基础技能表
+ * 包含采矿、建造、种植、搬运四项初始技能，等级和经验均为0
+ * @returns 技能ID到技能等级的映射
+ */
 function defaultSkills(): Record<SkillId, SkillLevel> {
   const base: Record<SkillId, SkillLevel> = {};
   const defaultIds: SkillId[] = ['mining', 'construction', 'growing', 'hauling'];
@@ -41,6 +56,15 @@ function defaultSkills(): Record<SkillId, SkillLevel> {
   return base;
 }
 
+/**
+ * 创建一个新的棋子实例
+ * @param params.name - 棋子名称
+ * @param params.cell - 初始格子坐标
+ * @param params.mapId - 所属地图ID
+ * @param params.factionId - 所属阵营ID
+ * @param params.rng - 种子随机数生成器（预留用于随机化属性）
+ * @returns 完整初始化的棋子对象
+ */
 export function createPawn(params: {
   name: string;
   cell: CellCoord;

@@ -1,8 +1,24 @@
+/**
+ * @file item.factory.ts
+ * @description 物品工厂函数，根据定义数据创建新的物品实例
+ * @dependencies core/types — 对象ID生成、DefId等; world/def-database — 物品定义数据库; item.types — 物品接口
+ * @part-of features/item 物品功能模块
+ */
+
 import { ObjectKind, nextObjectId } from '../../core/types';
 import type { CellCoord, DefId, MapId } from '../../core/types';
 import type { DefDatabase } from '../../world/def-database';
 import type { Item } from './item.types';
 
+/**
+ * 创建一个新的物品实例
+ * @param params.defId - 物品定义ID（用于查找定义数据库中的属性）
+ * @param params.cell - 放置位置的格子坐标
+ * @param params.mapId - 所属地图ID
+ * @param params.stackCount - 初始堆叠数量（默认为1）
+ * @param params.defs - 定义数据库（用于获取 maxStack 和 tags 等信息）
+ * @returns 完整初始化的物品对象
+ */
 export function createItem(params: {
   defId: DefId;
   cell: CellCoord;

@@ -1,3 +1,12 @@
+/**
+ * @file zone.commands.ts
+ * @description 区域命令处理器——处理区域的创建/扩展（zone_set_cells）和删除（zone_delete）
+ * @dependencies MapId, ZoneId, CellCoordKey, cellKey, CellCoord — 核心类型；
+ *              CommandHandler, Command, ValidationResult, ExecutionResult — 命令总线接口；
+ *              World — 世界状态；Zone — 区域类型
+ * @part-of features/zone — 区域管理功能
+ */
+
 import {
   MapId,
   ZoneId,
@@ -14,13 +23,24 @@ import {
 import { World } from '../../world/world';
 import { Zone } from '../../world/game-map';
 
+/** 区域ID自增计数器 */
 let _nextZoneId = 1;
+/**
+ * 生成下一个唯一区域ID
+ * @returns 格式为 "zone_N" 的区域ID
+ */
 function nextZoneId(): ZoneId {
   return `zone_${_nextZoneId++}`;
 }
 
-// ── zone_set_cells ──
+// ── zone_set_cells（设置区域格子） ──
 
+/**
+ * 设置区域格子命令处理器
+ * 验证：检查地图存在性、cells 数组非空、所有格子在地图边界内
+ * 执行：若指定了已存在的 zoneId 则扩展该区域；否则创建新区域
+ *       发出 zone_updated 或 zone_created 事件
+ */
 export const zoneSetCellsHandler: CommandHandler = {
   type: 'zone_set_cells',
 
@@ -36,7 +56,7 @@ export const zoneSetCellsHandler: CommandHandler = {
       return { valid: false, reason: 'No cells provided for zone' };
     }
 
-    // Bounds check
+    // 边界检查
     for (const cell of cells) {
       if (cell.x < 0 || cell.x >= map.width || cell.y < 0 || cell.y >= map.height) {
         return { valid: false, reason: `Cell (${cell.x},${cell.y}) out of bounds` };
@@ -60,7 +80,7 @@ export const zoneSetCellsHandler: CommandHandler = {
     const cellKeys: Set<CellCoordKey> = new Set(cells.map(c => cellKey(c)));
 
     if (zoneId) {
-      // Extend existing zone
+      // 扩展已存在的区域——将新格子添加到现有区域
       const existing = map.zones.get(zoneId);
       if (existing) {
         for (const key of cellKeys) {
@@ -76,7 +96,7 @@ export const zoneSetCellsHandler: CommandHandler = {
       }
     }
 
-    // Create new zone
+    // 创建新区域
     const id = zoneId ?? nextZoneId();
     const zone: Zone = {
       id,
@@ -96,8 +116,13 @@ export const zoneSetCellsHandler: CommandHandler = {
   },
 };
 
-// ── zone_delete ──
+// ── zone_delete（删除区域） ──
 
+/**
+ * 删除区域命令处理器
+ * 验证：检查地图存在性、区域存在性
+ * 执行：从地图中移除指定区域，发出 zone_deleted 事件
+ */
 export const zoneDeleteHandler: CommandHandler = {
   type: 'zone_delete',
 
@@ -134,7 +159,7 @@ export const zoneDeleteHandler: CommandHandler = {
   },
 };
 
-/** All zone command handlers for batch registration. */
+/** 所有区域命令处理器数组，用于批量注册到命令总线 */
 export const zoneCommandHandlers: CommandHandler[] = [
   zoneSetCellsHandler,
   zoneDeleteHandler,

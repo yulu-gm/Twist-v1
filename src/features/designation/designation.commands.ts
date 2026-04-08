@@ -1,3 +1,12 @@
+/**
+ * @file designation.commands.ts
+ * @description 指派命令处理器集合——处理采集、挖矿、砍伐指派的创建与取消
+ * @dependencies ObjectKind, DesignationType, WorkPriority, nextObjectId, MapId, ObjectId, CellCoord — 核心类型；
+ *              CommandHandler, Command, ValidationResult, ExecutionResult — 命令总线接口；
+ *              World — 世界状态；GameMap — 游戏地图；Designation — 指派类型
+ * @part-of features/designation — 指派/工作指令功能
+ */
+
 import {
   ObjectKind,
   DesignationType,
@@ -17,21 +26,42 @@ import { World } from '../../world/world';
 import { GameMap } from '../../world/game-map';
 import { Designation } from './designation.types';
 
-// ── Helpers ──
+// ── 辅助函数 ──
 
+/**
+ * 解析命令中的地图引用
+ * @param world - 世界状态
+ * @param cmd - 命令对象
+ * @returns 对应的 GameMap 实例；若未指定 mapId 则返回第一个地图
+ */
 function resolveMap(world: World, cmd: Command): GameMap | undefined {
   const mapId = cmd.payload.mapId as string | undefined;
   if (mapId) return world.maps.get(mapId);
-  // Default to first map
+  // 默认取第一个地图
   return world.maps.values().next().value as GameMap | undefined;
 }
 
+/**
+ * 解析命令中的地图ID
+ * @param world - 世界状态
+ * @param cmd - 命令对象
+ * @returns 地图ID字符串；若未指定则返回第一个地图的ID
+ */
 function resolveMapId(world: World, cmd: Command): string {
   const mapId = cmd.payload.mapId as string | undefined;
   if (mapId) return mapId;
   return world.maps.keys().next().value as string;
 }
 
+/**
+ * 创建一个新的指派对象
+ * @param mapId - 所在地图ID
+ * @param designationType - 指派类型（采集/挖矿/砍伐）
+ * @param priority - 工作优先级
+ * @param targetObjectId - 目标对象ID（可选）
+ * @param targetCell - 目标格子坐标（可选）
+ * @returns 新创建的 Designation 对象
+ */
 function createDesignation(
   mapId: MapId,
   designationType: DesignationType,
@@ -54,8 +84,13 @@ function createDesignation(
   };
 }
 
-// ── designate_harvest ──
+// ── designate_harvest（采集指派） ──
 
+/**
+ * 采集指派命令处理器
+ * 验证：检查地图存在性、目标对象存在性、目标必须为植物类型
+ * 执行：创建采集类型指派并添加到地图对象池，发出 designation_created 事件
+ */
 export const designateHarvestHandler: CommandHandler = {
   type: 'designate_harvest',
 
@@ -64,7 +99,7 @@ export const designateHarvestHandler: CommandHandler = {
     const map = resolveMap(w, cmd);
     if (!map) return { valid: false, reason: 'Map not found' };
 
-    // Accept both targetObjectId and targetId
+    // 同时接受 targetObjectId 和 targetId 两种字段名
     const targetObjectId = (cmd.payload.targetObjectId ?? cmd.payload.targetId) as ObjectId;
     if (!targetObjectId) return { valid: false, reason: 'No target specified' };
 
@@ -105,8 +140,13 @@ export const designateHarvestHandler: CommandHandler = {
   },
 };
 
-// ── designate_mine ──
+// ── designate_mine（挖矿指派） ──
 
+/**
+ * 挖矿指派命令处理器
+ * 验证：检查地图存在性、目标格子边界、目标地形是否可挖掘
+ * 执行：创建挖矿类型指派并添加到地图对象池，发出 designation_created 事件
+ */
 export const designateMineHandler: CommandHandler = {
   type: 'designate_mine',
 
@@ -115,7 +155,7 @@ export const designateMineHandler: CommandHandler = {
     const map = resolveMap(w, cmd);
     if (!map) return { valid: false, reason: 'Map not found' };
 
-    // Accept both targetCell and cell
+    // 同时接受 targetCell 和 cell 两种字段名
     const targetCell = (cmd.payload.targetCell ?? cmd.payload.cell) as CellCoord;
     if (!targetCell) return { valid: false, reason: 'No target cell specified' };
 
@@ -126,7 +166,7 @@ export const designateMineHandler: CommandHandler = {
       return { valid: false, reason: `Cell (${targetCell.x},${targetCell.y}) out of bounds` };
     }
 
-    // Check terrain is mineable
+    // 检查地形是否可挖掘
     const terrainDefId = map.terrain.get(targetCell.x, targetCell.y);
     const terrainDef = w.defs.terrains.get(terrainDefId);
     if (!terrainDef?.mineable) {
@@ -164,8 +204,13 @@ export const designateMineHandler: CommandHandler = {
   },
 };
 
-// ── designate_cut ──
+// ── designate_cut（砍伐指派） ──
 
+/**
+ * 砍伐指派命令处理器
+ * 验证：检查地图存在性、目标对象存在性、目标必须为植物类型
+ * 执行：创建砍伐类型指派并添加到地图对象池，发出 designation_created 事件
+ */
 export const designateCutHandler: CommandHandler = {
   type: 'designate_cut',
 
@@ -214,8 +259,13 @@ export const designateCutHandler: CommandHandler = {
   },
 };
 
-// ── cancel_designation ──
+// ── cancel_designation（取消指派） ──
 
+/**
+ * 取消指派命令处理器
+ * 验证：检查地图存在性、指派对象存在性、对象类型必须为 Designation
+ * 执行：标记指派为已销毁并从对象池移除，发出 designation_cancelled 事件
+ */
 export const cancelDesignationHandler: CommandHandler = {
   type: 'cancel_designation',
 
@@ -255,7 +305,7 @@ export const cancelDesignationHandler: CommandHandler = {
   },
 };
 
-/** All designation command handlers for batch registration. */
+/** 所有指派命令处理器数组，用于批量注册到命令总线 */
 export const designationCommandHandlers: CommandHandler[] = [
   designateHarvestHandler,
   designateMineHandler,

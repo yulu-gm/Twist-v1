@@ -1,7 +1,26 @@
+/**
+ * @file bootstrap.ts
+ * @description Phaser 游戏引擎的启动入口，创建并返回 Phaser.Game 实例
+ * @dependencies phaser — 渲染引擎；world/world — 游戏世界状态；main-scene — 主场景
+ * @part-of adapter — 适配器层，连接游戏逻辑与 Phaser 渲染
+ */
+
 import Phaser from 'phaser';
 import { World } from '../world/world';
 import { MainScene } from './main-scene';
 
+/**
+ * 创建并启动 Phaser 游戏实例
+ *
+ * @param world - 已初始化的游戏世界对象
+ * @returns 创建好的 Phaser.Game 实例
+ *
+ * 配置项：
+ * - 自动选择渲染器（WebGL 或 Canvas）
+ * - 窗口大小自适应缩放
+ * - 像素风格渲染（pixelArt + roundPixels）
+ * - 使用 MainScene 作为唯一场景
+ */
 export function bootstrapPhaser(world: World): Phaser.Game {
   const config: Phaser.Types.Core.GameConfig = {
     type: Phaser.AUTO,

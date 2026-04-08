@@ -1,3 +1,15 @@
+/**
+ * @file construction.commands.ts
+ * @description 建造系统命令处理器，处理放置蓝图和取消建造两个指令
+ * @dependencies core/types, core/command-bus, core/event-bus, world/world, core/logger, blueprint.types
+ * @part-of 建造系统（construction）
+ *
+ * 组成部分：
+ *   - placeBlueprintHandler：放置蓝图命令 —— 在地图上创建建筑蓝图
+ *   - cancelConstructionHandler：取消建造命令 —— 移除蓝图或施工工地并退还材料
+ *   - constructionCommandHandlers：导出的命令处理器数组
+ */
+
 import {
   ObjectKind, DefId, CellCoord, Rotation, nextObjectId, MapId, MaterialReq,
 } from '../../core/types';
@@ -7,11 +19,22 @@ import { World } from '../../world/world';
 import { log } from '../../core/logger';
 import { Blueprint } from './blueprint.types';
 
-// ── place_blueprint ──
+// ── 放置蓝图命令 ──
 
+/**
+ * 放置蓝图命令处理器
+ * validate：验证目标地图、建筑定义是否存在，目标格子是否在地图范围内
+ * execute：创建蓝图对象并添加到地图，发出 blueprint_placed 事件
+ */
 export const placeBlueprintHandler: CommandHandler = {
   type: 'place_blueprint',
 
+  /**
+   * 验证放置蓝图命令的合法性
+   * @param world - 游戏世界
+   * @param cmd - 命令对象，payload 包含 defId（建筑定义ID）、cell（目标格子）、mapId（可选地图ID）
+   * @returns 验证结果，{ valid: true } 或 { valid: false, reason: string }
+   */
   validate(world: World, cmd: Command) {
     const { defId, cell } = cmd.payload as {
       defId: DefId;
@@ -30,6 +53,7 @@ export const placeBlueprintHandler: CommandHandler = {
       return { valid: false, reason: `Building def ${defId} not found` };
     }
 
+    // 检查目标格子是否在地图范围内（遍历建筑占地面积的每个格子）
     // Check that the target cells are passable (not blocked by existing impassable objects)
     const c = cell as CellCoord;
     const size = buildingDef.size;
@@ -45,6 +69,13 @@ export const placeBlueprintHandler: CommandHandler = {
     return { valid: true };
   },
 
+  /**
+   * 执行放置蓝图命令
+   * 根据建筑定义生成材料需求清单，创建蓝图对象并添加到地图
+   * @param world - 游戏世界
+   * @param cmd - 命令对象，payload 包含 defId、cell、mapId、rotation
+   * @returns 包含 blueprint_placed 事件的事件数组
+   */
   execute(world: World, cmd: Command) {
     const { defId, cell, rotation } = cmd.payload as {
       defId: DefId;
@@ -105,11 +136,22 @@ export const placeBlueprintHandler: CommandHandler = {
   },
 };
 
-// ── cancel_construction ──
+// ── 取消建造命令 ──
 
+/**
+ * 取消建造命令处理器
+ * validate：验证目标对象存在且为蓝图或施工工地
+ * execute：移除蓝图/工地，退还已运送的材料，中断相关棋子的工作
+ */
 export const cancelConstructionHandler: CommandHandler = {
   type: 'cancel_construction',
 
+  /**
+   * 验证取消建造命令的合法性
+   * @param world - 游戏世界
+   * @param cmd - 命令对象，payload 包含 targetId（目标对象ID）、mapId（可选地图ID）
+   * @returns 验证结果
+   */
   validate(world: World, cmd: Command) {
     const { targetId } = cmd.payload as {
       targetId: string;
@@ -134,6 +176,13 @@ export const cancelConstructionHandler: CommandHandler = {
     return { valid: true };
   },
 
+  /**
+   * 执行取消建造命令
+   * 移除蓝图或施工工地，退还材料为掉落物品，中断相关棋子，释放预约
+   * @param world - 游戏世界
+   * @param cmd - 命令对象
+   * @returns 包含 construction_cancelled 等事件的事件数组
+   */
   execute(world: World, cmd: Command) {
     const { targetId } = cmd.payload as {
       targetId: string;
@@ -145,6 +194,7 @@ export const cancelConstructionHandler: CommandHandler = {
     const obj = map.objects.get(targetId)!;
     const events: GameEvent[] = [];
 
+    // 若目标为蓝图且已有材料运送，将已运送材料作为物品掉落到地上
     // If it's a blueprint with delivered materials, drop them as items
     if (obj.kind === ObjectKind.Blueprint) {
       const bp = obj as Blueprint;
@@ -172,6 +222,7 @@ export const cancelConstructionHandler: CommandHandler = {
       }
     }
 
+    // 若目标为施工工地，按已完成进度比例退还材料
     // If it's a construction site, refund materials proportionally
     if (obj.kind === ObjectKind.ConstructionSite) {
       const site = obj as any;
@@ -198,12 +249,14 @@ export const cancelConstructionHandler: CommandHandler = {
       }
     }
 
+    // 释放目标对象上的预约
     // Release any reservations on this target object
     const res = map.reservations.getReservation(targetId);
     if (res) {
       map.reservations.release(res.id);
     }
 
+    // 中断所有正在对该对象执行工作的棋子，重置其AI状态和移动路径
     // Interrupt any pawns whose current job targets this object
     const pawns = map.objects.allOfKind(ObjectKind.Pawn);
     for (const pawn of pawns) {
@@ -230,6 +283,7 @@ export const cancelConstructionHandler: CommandHandler = {
       }
     }
 
+    // 从地图中移除目标对象（蓝图或施工工地）
     // Remove the object
     map.objects.remove(targetId);
 
@@ -245,6 +299,7 @@ export const cancelConstructionHandler: CommandHandler = {
   },
 };
 
+/** 建造系统导出的所有命令处理器 */
 export const constructionCommandHandlers: CommandHandler[] = [
   placeBlueprintHandler,
   cancelConstructionHandler,
