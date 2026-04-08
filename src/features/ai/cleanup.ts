@@ -17,6 +17,8 @@ interface CleanablePawn {
     currentJob: {
       id: string;
       reservations: string[];
+      toils: Array<{ localData: Record<string, unknown> }>;
+      currentToilIndex: number;
     } | null;
     currentToilIndex: number;
     toilState: Record<string, unknown>;
@@ -61,12 +63,42 @@ export function cleanupProtocol(
 
   // 2. If carrying something, drop it at current cell
   if (pawn.inventory.carrying) {
-    // The item was removed from the pool on pickup; we need to re-create it.
-    // Since we only have the ObjectId, we create a generic dropped item.
     const carriedId = pawn.inventory.carrying;
     pawn.inventory.carrying = null;
 
-    log.debug('ai', `Pawn ${pawn.id} dropped carried item ${carriedId} during cleanup`, undefined, pawn.id);
+    // Try to recover item info from the current job's toil localData
+    let defId = 'unknown';
+    let count = 1;
+    if (job) {
+      for (const toil of job.toils) {
+        if (toil.localData.pickedDefId) {
+          defId = toil.localData.pickedDefId as string;
+          count = (toil.localData.pickedCount as number) ?? 1;
+          break;
+        }
+        if (toil.localData.defId) {
+          defId = toil.localData.defId as string;
+          count = (toil.localData.count as number) ?? 1;
+          break;
+        }
+      }
+    }
+
+    // Re-create item on the ground
+    const droppedItem = {
+      id: nextObjectId(),
+      kind: ObjectKind.Item,
+      defId,
+      mapId: map.id,
+      cell: { x: pawn.cell.x, y: pawn.cell.y },
+      tags: new Set(['haulable', 'resource']),
+      destroyed: false,
+      stackCount: count,
+      maxStack: 100,
+    };
+    map.objects.add(droppedItem as any);
+
+    log.debug('ai', `Pawn ${pawn.id} dropped ${defId} x${count} during cleanup`, undefined, pawn.id);
   }
 
   // 3. Reset pawn.ai

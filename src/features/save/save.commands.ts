@@ -1,7 +1,7 @@
 import { CommandHandler, Command } from '../../core/command-bus';
 import { GameEvent } from '../../core/event-bus';
 import { CURRENT_SAVE_VERSION, applyMigrations } from '../../core/serialization';
-import { currentIdCounter, resetIdCounter, MapId, Tag } from '../../core/types';
+import { currentIdCounter, resetIdCounter, MapId, Tag, ObjectKind } from '../../core/types';
 import { World, Faction } from '../../world/world';
 import { createGameMap, Zone } from '../../world/game-map';
 import { Grid } from '../../core/grid';
@@ -249,6 +249,29 @@ export const loadGameHandler: CommandHandler = {
       }
 
       world.maps.set(mapData.id as MapId, map);
+
+      // Rebuild pathGrid from terrain + buildings
+      map.pathGrid.rebuildFrom(map, world.defs);
+
+      // Clear active pawn jobs — they may not deserialize correctly
+      const pawns = map.objects.allOfKind(ObjectKind.Pawn);
+      for (const pawn of pawns) {
+        const p = pawn as any;
+        if (p.ai) {
+          p.ai.currentJob = null;
+          p.ai.currentToilIndex = 0;
+          p.ai.toilState = {};
+          p.ai.idleTicks = 0;
+        }
+        if (p.movement) {
+          p.movement.path = [];
+          p.movement.pathIndex = 0;
+          p.movement.moveProgress = 0;
+        }
+        if (p.inventory) {
+          p.inventory.carrying = null;
+        }
+      }
     }
 
     // Clear command queue and event buffer

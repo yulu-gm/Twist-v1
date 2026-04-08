@@ -16,6 +16,10 @@ export class UIManager {
   private world: World;
   private map: GameMap;
   private presentation: PresentationState;
+  private uiCamera!: Phaser.Cameras.Scene2D.Camera;
+
+  // All UI game objects — main camera ignores these, UI camera renders them
+  private uiObjects: Phaser.GameObjects.GameObject[] = [];
 
   // Top bar
   private topBarBg!: Phaser.GameObjects.Rectangle;
@@ -36,8 +40,11 @@ export class UIManager {
   private debugBg!: Phaser.GameObjects.Rectangle;
   private debugText!: Phaser.GameObjects.Text;
 
-  // Placement preview
+  // Placement preview (lives in world space, rendered by main camera)
   private previewRect: Phaser.GameObjects.Rectangle | null = null;
+
+  // Designation preview (lives in world space, rendered by main camera)
+  private designationRect: Phaser.GameObjects.Rectangle | null = null;
 
   constructor(
     scene: Phaser.Scene,
@@ -50,35 +57,71 @@ export class UIManager {
     this.map = map;
     this.presentation = presentation;
 
+    // Create a dedicated UI camera — fixed zoom=1, no scroll
+    this.uiCamera = scene.cameras.add(0, 0, scene.scale.width, scene.scale.height);
+    this.uiCamera.setScroll(0, 0);
+    this.uiCamera.setZoom(1);
+    this.uiCamera.setBackgroundColor('rgba(0,0,0,0)');
+    this.uiCamera.transparent = true;
+
     this.createTopBar();
     this.createToolbar();
     this.createSelectionPanel();
     this.createDebugPanel();
+
+    // Main camera: ignore all UI objects (so zoom doesn't affect them)
+    scene.cameras.main.ignore(this.uiObjects);
+
+    // Re-apply filters when the display list changes (new world objects added)
+    scene.events.on('update', () => this.syncWorldObjectFilters());
+
+    // Handle window resize for the UI camera viewport
+    scene.scale.on('resize', (gameSize: Phaser.Structs.Size) => {
+      this.uiCamera.setViewport(0, 0, gameSize.width, gameSize.height);
+    });
+  }
+
+  /** Make world objects (non-UI) invisible to the UI camera */
+  private syncWorldObjectFilters(): void {
+    const uiSet = new Set(this.uiObjects);
+    for (const obj of this.scene.children.list) {
+      if (!uiSet.has(obj)) {
+        this.uiCamera.ignore(obj);
+      }
+    }
+  }
+
+  /** Track a game object as UI */
+  private trackUI<T extends Phaser.GameObjects.GameObject>(obj: T): T {
+    this.uiObjects.push(obj);
+    return obj;
   }
 
   private createTopBar(): void {
     const w = this.scene.scale.width;
-    this.topBarBg = this.scene.add.rectangle(w / 2, 15, w, 30, PANEL_BG, PANEL_ALPHA)
-      .setScrollFactor(0).setDepth(UI_DEPTH);
-
-    this.clockText = this.scene.add.text(10, 5, '', { fontSize: FONT_SIZE, color: TEXT_COLOR })
-      .setScrollFactor(0).setDepth(UI_DEPTH + 1);
-
-    this.speedText = this.scene.add.text(300, 5, '', { fontSize: FONT_SIZE, color: TEXT_COLOR })
-      .setScrollFactor(0).setDepth(UI_DEPTH + 1);
-
-    this.tickText = this.scene.add.text(450, 5, '', { fontSize: FONT_SIZE, color: TEXT_COLOR })
-      .setScrollFactor(0).setDepth(UI_DEPTH + 1);
-
-    this.pawnCountText = this.scene.add.text(600, 5, '', { fontSize: FONT_SIZE, color: TEXT_COLOR })
-      .setScrollFactor(0).setDepth(UI_DEPTH + 1);
+    this.topBarBg = this.trackUI(
+      this.scene.add.rectangle(w / 2, 15, w, 30, PANEL_BG, PANEL_ALPHA).setDepth(UI_DEPTH)
+    );
+    this.clockText = this.trackUI(
+      this.scene.add.text(10, 5, '', { fontSize: FONT_SIZE, color: TEXT_COLOR }).setDepth(UI_DEPTH + 1)
+    );
+    this.speedText = this.trackUI(
+      this.scene.add.text(300, 5, '', { fontSize: FONT_SIZE, color: TEXT_COLOR }).setDepth(UI_DEPTH + 1)
+    );
+    this.tickText = this.trackUI(
+      this.scene.add.text(450, 5, '', { fontSize: FONT_SIZE, color: TEXT_COLOR }).setDepth(UI_DEPTH + 1)
+    );
+    this.pawnCountText = this.trackUI(
+      this.scene.add.text(600, 5, '', { fontSize: FONT_SIZE, color: TEXT_COLOR }).setDepth(UI_DEPTH + 1)
+    );
   }
 
   private createToolbar(): void {
     const w = this.scene.scale.width;
     const h = this.scene.scale.height;
-    this.toolbarBg = this.scene.add.rectangle(w / 2, h - 20, w, 40, PANEL_BG, PANEL_ALPHA)
-      .setScrollFactor(0).setDepth(UI_DEPTH);
+    this.toolbarBg = this.trackUI(
+      this.scene.add.rectangle(w / 2, h - 20, w, 40, PANEL_BG, PANEL_ALPHA).setDepth(UI_DEPTH)
+    );
 
     const tools = [
       '[ESC] Select',
@@ -92,40 +135,68 @@ export class UIManager {
     ];
 
     tools.forEach((label, i) => {
-      const text = this.scene.add.text(10 + i * 130, h - 30, label, {
-        fontSize: '12px',
-        color: TEXT_COLOR,
-      }).setScrollFactor(0).setDepth(UI_DEPTH + 1);
+      const text = this.trackUI(
+        this.scene.add.text(10 + i * 130, h - 30, label, {
+          fontSize: '12px',
+          color: TEXT_COLOR,
+        }).setDepth(UI_DEPTH + 1)
+      );
       this.toolTexts.push(text);
     });
   }
 
   private createSelectionPanel(): void {
     const h = this.scene.scale.height;
-    this.selectionBg = this.scene.add.rectangle(140, h - 140, 260, 180, PANEL_BG, PANEL_ALPHA)
-      .setScrollFactor(0).setDepth(UI_DEPTH).setVisible(false);
-
-    this.selectionText = this.scene.add.text(20, h - 225, '', {
-      fontSize: FONT_SIZE,
-      color: TEXT_COLOR,
-      wordWrap: { width: 240 },
-    }).setScrollFactor(0).setDepth(UI_DEPTH + 1).setVisible(false);
+    this.selectionBg = this.trackUI(
+      this.scene.add.rectangle(140, h - 140, 260, 180, PANEL_BG, PANEL_ALPHA)
+        .setDepth(UI_DEPTH).setVisible(false)
+    );
+    this.selectionText = this.trackUI(
+      this.scene.add.text(20, h - 225, '', {
+        fontSize: FONT_SIZE,
+        color: TEXT_COLOR,
+        wordWrap: { width: 240 },
+      }).setDepth(UI_DEPTH + 1).setVisible(false)
+    );
   }
 
   private createDebugPanel(): void {
     const w = this.scene.scale.width;
-    this.debugBg = this.scene.add.rectangle(w - 160, 130, 300, 230, PANEL_BG, PANEL_ALPHA)
-      .setScrollFactor(0).setDepth(UI_DEPTH).setVisible(false);
-
-    this.debugText = this.scene.add.text(w - 300, 25, '', {
-      fontSize: '12px',
-      color: TEXT_COLOR,
-      lineSpacing: 4,
-    }).setScrollFactor(0).setDepth(UI_DEPTH + 1).setVisible(false);
+    this.debugBg = this.trackUI(
+      this.scene.add.rectangle(w - 160, 130, 300, 230, PANEL_BG, PANEL_ALPHA)
+        .setDepth(UI_DEPTH).setVisible(false)
+    );
+    this.debugText = this.trackUI(
+      this.scene.add.text(w - 300, 25, '', {
+        fontSize: '12px',
+        color: TEXT_COLOR,
+        lineSpacing: 4,
+      }).setDepth(UI_DEPTH + 1).setVisible(false)
+    );
   }
 
   update(): void {
-    // Top bar
+    const w = this.scene.scale.width;
+    const h = this.scene.scale.height;
+
+    // ── Reposition top bar ──
+    this.topBarBg.setPosition(w / 2, 15).setSize(w, 30);
+
+    // ── Reposition bottom toolbar ──
+    this.toolbarBg.setPosition(w / 2, h - 20).setSize(w, 40);
+    this.toolTexts.forEach((text, i) => {
+      text.setPosition(10 + i * 130, h - 30);
+    });
+
+    // ── Reposition selection panel ──
+    this.selectionBg.setPosition(140, h - 140);
+    this.selectionText.setPosition(20, h - 225);
+
+    // ── Reposition debug panel ──
+    this.debugBg.setPosition(w - 160, 130);
+    this.debugText.setPosition(w - 300, 25);
+
+    // ── Update top bar content ──
     const speedLabels = ['Paused', '1x', '2x', '3x'];
     this.clockText.setText(getClockDisplay(this.world.clock));
     this.speedText.setText(`Speed: ${speedLabels[this.world.speed]}`);
@@ -190,11 +261,11 @@ export class UIManager {
       this.debugText.setVisible(false);
     }
 
-    // Placement preview
+    // Placement preview (world space — rendered by main camera)
     if (this.presentation.placementPreview) {
       const pp = this.presentation.placementPreview;
       if (!this.previewRect) {
-        this.previewRect = this.scene.add.rectangle(0, 0, 30, 30, 0x66aaff, 0.5)
+        this.previewRect = this.scene.add.rectangle(0, 0, 32, 32, 0x66aaff, 0.5)
           .setDepth(50).setStrokeStyle(2, pp.valid ? 0x00ff00 : 0xff0000);
       }
       this.previewRect.setPosition(pp.cell.x * 32 + 16, pp.cell.y * 32 + 16);
@@ -202,6 +273,23 @@ export class UIManager {
       this.previewRect.setVisible(true);
     } else if (this.previewRect) {
       this.previewRect.setVisible(false);
+    }
+
+    // Designation preview (world space — rendered by main camera)
+    if (this.presentation.designationPreview) {
+      const dp = this.presentation.designationPreview;
+      if (!this.designationRect) {
+        this.designationRect = this.scene.add.rectangle(0, 0, 32, 32, 0x000000, 0.3)
+          .setDepth(50);
+      }
+      const fillColor = dp.valid ? 0xffaa00 : 0xff0000;
+      const strokeColor = dp.valid ? 0xffcc44 : 0xff4444;
+      this.designationRect.setFillStyle(fillColor, 0.35);
+      this.designationRect.setStrokeStyle(2, strokeColor);
+      this.designationRect.setPosition(dp.cell.x * 32 + 16, dp.cell.y * 32 + 16);
+      this.designationRect.setVisible(true);
+    } else if (this.designationRect) {
+      this.designationRect.setVisible(false);
     }
   }
 }

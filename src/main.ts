@@ -62,6 +62,7 @@ function spawnInitialVegetation(map: GameMap, world: World): void {
         cell: { x, y },
         mapId: map.id,
         growthProgress: rng.nextFloat(0.3, 1.0),
+        defs: world.defs,
       });
       map.objects.add(plant);
     } else if (rng.chance(0.03)) {
@@ -70,6 +71,7 @@ function spawnInitialVegetation(map: GameMap, world: World): void {
         cell: { x, y },
         mapId: map.id,
         growthProgress: rng.nextFloat(0.5, 1.0),
+        defs: world.defs,
       });
       map.objects.add(plant);
     }
@@ -298,6 +300,10 @@ async function boot(): Promise<void> {
 
   // 5. Generate terrain and populate
   generateTerrain(map, world);
+
+  // 5b. Initialize pathGrid from terrain (mark rock/water impassable)
+  map.pathGrid.rebuildFrom(map, defs);
+
   spawnInitialVegetation(map, world);
   spawnInitialPawns(map, world);
 

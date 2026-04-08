@@ -80,18 +80,22 @@ export class InputHandler {
       kb.on('keydown-B', () => {
         this.presentation.activeTool = ToolType.Build;
         this.selectedBuildingDefId = 'wall_wood';
+        this.presentation.selectedObjectIds.clear();
       });
       kb.on('keydown-M', () => {
         this.presentation.activeTool = ToolType.Designate;
         this.designationType = DesignationType.Mine;
+        this.presentation.selectedObjectIds.clear();
       });
       kb.on('keydown-H', () => {
         this.presentation.activeTool = ToolType.Designate;
         this.designationType = DesignationType.Harvest;
+        this.presentation.selectedObjectIds.clear();
       });
       kb.on('keydown-X', () => {
         this.presentation.activeTool = ToolType.Designate;
         this.designationType = DesignationType.Cut;
+        this.presentation.selectedObjectIds.clear();
       });
 
       // Debug: F1 toggle debug panel
@@ -130,10 +134,9 @@ export class InputHandler {
 
   private pointerToCell(pointer: Phaser.Input.Pointer): CellCoord | null {
     const cam = this.scene.cameras.main;
-    const worldX = (pointer.x + cam.scrollX * cam.zoom) / cam.zoom;
-    const worldY = (pointer.y + cam.scrollY * cam.zoom) / cam.zoom;
-    const x = Math.floor(worldX / TILE_SIZE);
-    const y = Math.floor(worldY / TILE_SIZE);
+    const worldPoint = cam.getWorldPoint(pointer.x, pointer.y);
+    const x = Math.floor(worldPoint.x / TILE_SIZE);
+    const y = Math.floor(worldPoint.y / TILE_SIZE);
 
     if (x < 0 || x >= this.map.width || y < 0 || y >= this.map.height) return null;
     return { x, y };
@@ -209,6 +212,51 @@ export class InputHandler {
       };
     } else {
       this.presentation.placementPreview = null;
+    }
+
+    // Update designation preview
+    if (this.presentation.activeTool === ToolType.Designate && this.presentation.hoveredCell) {
+      const cell = this.presentation.hoveredCell;
+      let valid = false;
+
+      switch (this.designationType) {
+        case DesignationType.Mine: {
+          const terrainDefId = this.map.terrain.get(cell.x, cell.y);
+          const terrainDef = this.world.defs.terrains.get(terrainDefId);
+          valid = !!terrainDef?.mineable;
+          break;
+        }
+        case DesignationType.Cut: {
+          const objIds = this.map.spatial.getAt(cell);
+          for (const id of objIds) {
+            const obj = this.map.objects.get(id);
+            if (obj && obj.kind === ObjectKind.Plant && obj.tags.has('tree')) {
+              valid = true;
+              break;
+            }
+          }
+          break;
+        }
+        case DesignationType.Harvest: {
+          const objIds = this.map.spatial.getAt(cell);
+          for (const id of objIds) {
+            const obj = this.map.objects.get(id);
+            if (obj && obj.kind === ObjectKind.Plant) {
+              valid = true;
+              break;
+            }
+          }
+          break;
+        }
+      }
+
+      this.presentation.designationPreview = {
+        cell,
+        designationType: this.designationType,
+        valid,
+      };
+    } else {
+      this.presentation.designationPreview = null;
     }
   }
 

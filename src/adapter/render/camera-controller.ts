@@ -51,9 +51,9 @@ export class CameraController {
     }
 
     // Mouse wheel zoom
-    scene.input.on('wheel', (_pointer: any, _over: any, _dx: number, _dy: number, dz: number) => {
+    scene.input.on('wheel', (_pointer: any, _over: any, _dx: number, dy: number) => {
       const newZoom = Phaser.Math.Clamp(
-        this.camera.zoom + (dz > 0 ? -ZOOM_STEP : ZOOM_STEP),
+        this.camera.zoom + (dy > 0 ? -ZOOM_STEP : ZOOM_STEP),
         ZOOM_MIN,
         ZOOM_MAX,
       );

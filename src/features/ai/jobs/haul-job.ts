@@ -10,11 +10,29 @@ export function createHaulJob(
   itemId: ObjectId,
   itemCell: CellCoord,
   destCell: CellCoord,
+  blueprintId?: ObjectId,
 ): Job {
   haulJobCounter++;
+
+  // Final toil: Deliver to blueprint (with targetId) or Drop on ground
+  const finalToil = blueprintId
+    ? {
+        type: ToilType.Deliver,
+        targetId: blueprintId,
+        targetCell: destCell,
+        state: ToilState.NotStarted,
+        localData: { defId: 'unknown', count: 1 }, // populated at runtime by PickUp
+      }
+    : {
+        type: ToilType.Drop,
+        targetCell: destCell,
+        state: ToilState.NotStarted,
+        localData: { defId: 'unknown', count: 1 }, // populated at runtime by PickUp
+      };
+
   return {
     id: `job_haul_${haulJobCounter}`,
-    defId: 'job_haul',
+    defId: blueprintId ? 'job_deliver_materials' : 'job_haul',
     pawnId,
     targetId: itemId,
     targetCell: itemCell,
@@ -38,12 +56,7 @@ export function createHaulJob(
         state: ToilState.NotStarted,
         localData: {},
       },
-      {
-        type: ToilType.Drop,
-        targetCell: destCell,
-        state: ToilState.NotStarted,
-        localData: { defId: 'unknown', count: 1 }, // will be populated at runtime
-      },
+      finalToil,
     ],
     currentToilIndex: 0,
     reservations: [],

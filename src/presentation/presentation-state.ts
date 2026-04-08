@@ -1,4 +1,4 @@
-import { ObjectId, CellCoord, DefId, Rotation } from '../core/types';
+import { ObjectId, CellCoord, DefId, Rotation, DesignationType } from '../core/types';
 
 export enum OverlayType {
   None = 'none',
@@ -16,10 +16,17 @@ export interface PlacementPreview {
   valid: boolean;
 }
 
+export interface DesignationPreview {
+  cell: CellCoord;
+  designationType: DesignationType;
+  valid: boolean;
+}
+
 export interface PresentationState {
   selectedObjectIds: Set<ObjectId>;
   hoveredCell: CellCoord | null;
   placementPreview: PlacementPreview | null;
+  designationPreview: DesignationPreview | null;
   activeOverlay: OverlayType;
   cameraPosition: { x: number; y: number };
   cameraZoom: number;
@@ -39,6 +46,7 @@ export function createPresentationState(): PresentationState {
     selectedObjectIds: new Set(),
     hoveredCell: null,
     placementPreview: null,
+    designationPreview: null,
     activeOverlay: OverlayType.None,
     cameraPosition: { x: 0, y: 0 },
     cameraZoom: 1,

@@ -157,7 +157,7 @@ function gatherCandidates(
 
     switch (desig.designationType) {
       case DesignationType.Mine:
-        job = createMineJob(pawn.id, targetCell, desig.id);
+        job = createMineJob(pawn.id, targetCell, desig.id, map);
         baseScore = 60;
         break;
       case DesignationType.Harvest:
@@ -177,7 +177,6 @@ function gatherCandidates(
   const blueprints = map.objects.allOfKind(ObjectKind.Blueprint) as unknown as Blueprint[];
   for (const bp of blueprints) {
     if (bp.destroyed) continue;
-    if (map.reservations.isReserved(bp.id)) continue;
 
     // Find which materials still need delivery
     for (let i = 0; i < bp.materialsRequired.length; i++) {
@@ -204,10 +203,10 @@ function gatherCandidates(
       }
 
       if (bestItem) {
-        const job = createHaulJob(pawn.id, bestItem.id, bestItem.cell, bp.cell);
+        const job = createHaulJob(pawn.id, bestItem.id, bestItem.cell, bp.cell, bp.id);
         const score = 45 - bestItemDist * 0.5;
         candidates.push({ job, score });
-        break; // only one haul job per blueprint
+        break; // only one haul job per blueprint per pawn
       }
     }
   }

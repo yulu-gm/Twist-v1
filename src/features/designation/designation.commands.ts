@@ -126,6 +126,13 @@ export const designateMineHandler: CommandHandler = {
       return { valid: false, reason: `Cell (${targetCell.x},${targetCell.y}) out of bounds` };
     }
 
+    // Check terrain is mineable
+    const terrainDefId = map.terrain.get(targetCell.x, targetCell.y);
+    const terrainDef = w.defs.terrains.get(terrainDefId);
+    if (!terrainDef?.mineable) {
+      return { valid: false, reason: `Terrain ${terrainDefId} at (${targetCell.x},${targetCell.y}) is not mineable` };
+    }
+
     return { valid: true };
   },
 

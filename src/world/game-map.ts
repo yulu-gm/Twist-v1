@@ -1,8 +1,9 @@
-import { MapId, CellCoord, CellCoordKey, TerrainDefId, ObjectId, ZoneId } from '../core/types';
+import { MapId, CellCoord, CellCoordKey, TerrainDefId, ObjectId, ZoneId, ObjectKind } from '../core/types';
 import { Grid } from '../core/grid';
 import { ObjectPool } from '../core/object-pool';
 import { SpatialIndex } from '../core/spatial-index';
 import type { MapObjectBase } from '../core/types';
+import type { DefDatabase } from './def-database';
 
 // ── Zone ──
 export interface Zone {
@@ -174,15 +175,31 @@ export class PathGrid {
   get width(): number { return this.passable.width; }
   get height(): number { return this.passable.height; }
 
-  rebuildFrom(map: GameMap): void {
+  rebuildFrom(map: GameMap, defs?: DefDatabase): void {
     const terrain = map.terrain;
     terrain.forEach((x, y, defId) => {
-      // Check terrain passability from def later; default passable
-      this.passable.set(x, y, true);
+      if (defs) {
+        const tDef = defs.terrains.get(defId);
+        this.passable.set(x, y, tDef ? tDef.passable : true);
+      } else {
+        // Fallback: known impassable terrain types
+        const impassable = defId === 'rock' || defId === 'water';
+        this.passable.set(x, y, !impassable);
+      }
     });
-    // Mark cells occupied by impassable objects
-    map.objects.allOfKind('building' as any).forEach((obj: MapObjectBase) => {
-      if (obj.tags.has('impassable')) {
+    // Mark cells occupied by movement-blocking buildings
+    map.objects.allOfKind(ObjectKind.Building).forEach((obj: MapObjectBase) => {
+      if (defs) {
+        const bDef = defs.buildings.get(obj.defId);
+        if (bDef && bDef.blocksMovement) {
+          const fp = obj.footprint ?? { width: 1, height: 1 };
+          for (let dy = 0; dy < fp.height; dy++) {
+            for (let dx = 0; dx < fp.width; dx++) {
+              this.setPassable(obj.cell.x + dx, obj.cell.y + dy, false);
+            }
+          }
+        }
+      } else if (obj.tags.has('impassable')) {
         const fp = obj.footprint ?? { width: 1, height: 1 };
         for (let dy = 0; dy < fp.height; dy++) {
           for (let dx = 0; dx < fp.width; dx++) {
