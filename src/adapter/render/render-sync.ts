@@ -82,7 +82,7 @@ export class RenderSync {
 
   /**
    * 每帧同步 — 按需重绘地形，创建/更新/移除精灵
-   * @param tickProgress - tick 进度 [0,1)，用于帧间插值平滑移动
+   * @param tickProgress - 距下一次逻辑 tick 的时间比例 [0,1)；Pawn 上与 moveProgress、speed 同刻度推算边上位置
    */
   sync(tickProgress = 0): void {
     this.terrainRenderer.syncIfDirty(this.layers);

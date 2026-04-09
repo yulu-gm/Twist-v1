@@ -5,8 +5,9 @@
  */
 
 import Phaser from 'phaser';
-import { ObjectKind, ObjectId, MapObjectBase, CellCoord } from '../../../core/types';
+import { ObjectKind, ObjectId, MapObjectBase, CellCoord, cellEquals } from '../../../core/types';
 import type { Pawn } from '../../../features/pawn/pawn.types';
+import { MOVE_PROGRESS_PER_CELL } from '../../../features/movement/movement.types';
 import { TILE_SIZE, LayerName } from '../render-utils';
 import type { ObjectRenderer } from './types';
 
@@ -47,7 +48,10 @@ export class PawnRenderer implements ObjectRenderer {
     this.layers = layers;
   }
 
-  /** 由 RenderSync 每帧调用，设置当前 tick 插值因子 */
+  /**
+   * 由 RenderSync 每帧调用：当前距下一次逻辑 tick 的时间比例 [0,1)。
+   * 与 moveProgress、speed、MOVE_PROGRESS_PER_CELL 组合，得到边上连续位置。
+   */
   setTickProgress(t: number): void {
     this.currentTickProgress = t;
   }
@@ -118,12 +122,16 @@ export class PawnRenderer implements ObjectRenderer {
     const pawn = obj as Pawn;
     const mv = pawn.movement;
 
-    if (mv?.prevCell && mv.path && mv.path.length > 0) {
-      const t = this.currentTickProgress;
-      return {
-        x: (mv.prevCell.x + (obj.cell.x - mv.prevCell.x) * t) * TILE_SIZE + TILE_SIZE / 2,
-        y: (mv.prevCell.y + (obj.cell.y - mv.prevCell.y) * t) * TILE_SIZE + TILE_SIZE / 2,
-      };
+    if (mv?.path && mv.path.length > 0 && mv.pathIndex < mv.path.length) {
+      const target = mv.path[mv.pathIndex];
+      if (!cellEquals(obj.cell, target)) {
+        const tickFrac = this.currentTickProgress * mv.speed;
+        const edgeT = Math.min(1, (mv.moveProgress + tickFrac) / MOVE_PROGRESS_PER_CELL);
+        return {
+          x: (obj.cell.x + (target.x - obj.cell.x) * edgeT) * TILE_SIZE + TILE_SIZE / 2,
+          y: (obj.cell.y + (target.y - obj.cell.y) * edgeT) * TILE_SIZE + TILE_SIZE / 2,
+        };
+      }
     }
 
     return {

@@ -75,12 +75,10 @@ export interface Pawn extends MapObjectBase {
     path: CellCoord[];
     /** 当前路径中正在前往的节点索引 */
     pathIndex: number;
-    /** 当前格子间的移动进度（0~1） */
+    /** 当前格子间的移动进度（与 movement 模块 MOVE_PROGRESS_PER_CELL 同刻度） */
     moveProgress: number;
-    /** 移动速度（每 tick 移动的进度量） */
+    /** 移动速度（每 tick 增加的进度，刻度同上） */
     speed: number;
-    /** 上一次移动前所在的格子（用于渲染插值），null 表示尚未移动过 */
-    prevCell: CellCoord | null;
   };
 
   // ── 需求系统 ──

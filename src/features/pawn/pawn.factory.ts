@@ -91,8 +91,7 @@ export function createPawn(params: {
       path: [],
       pathIndex: 0,
       moveProgress: 0,
-      speed: 1,
-      prevCell: null,
+      speed: 25,
     },
 
     needs: {

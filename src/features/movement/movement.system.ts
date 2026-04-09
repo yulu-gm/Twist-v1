@@ -14,6 +14,7 @@ import { log } from '../../core/logger';
 import { World } from '../../world/world';
 import { GameMap } from '../../world/game-map';
 import type { Pawn } from '../pawn/pawn.types';
+import { MOVE_PROGRESS_PER_CELL } from './movement.types';
 
 /** 移动系统注册：在 EXECUTION 阶段每 tick 执行 */
 export const movementSystem: SystemRegistration = {
@@ -67,7 +68,7 @@ function processMap(map: GameMap): void {
     // 累加移动进度
     mv.moveProgress += mv.speed;
 
-    if (mv.moveProgress >= 1) {
+    if (mv.moveProgress >= MOVE_PROGRESS_PER_CELL) {
       // 检查目标格子是否仍可通行
       if (!map.spatial.isPassable(targetCell) && !cellEquals(targetCell, pawn.cell)) {
         // 路径被阻挡 — 清除路径，让 AI 重新规划
@@ -84,9 +85,6 @@ function processMap(map: GameMap): void {
       pawn.cell = { x: targetCell.x, y: targetCell.y };
       /** 更新空间索引中的位置 */
       map.spatial.onObjectMoved(pawn.id, prevCell, pawn.cell);
-
-      // 保存 prevCell 供渲染插值使用
-      mv.prevCell = prevCell;
 
       mv.moveProgress = 0;
       mv.pathIndex++;

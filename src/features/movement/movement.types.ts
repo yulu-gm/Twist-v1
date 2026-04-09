@@ -7,8 +7,14 @@
 
 import { CellCoord } from '../../core/types';
 
-/** 默认移动速度 — 每 tick 移动的格子比例 */
-export const MOVE_SPEED_DEFAULT = 0.1;
+/**
+ * 走完一格所需的进度累计值（整数刻度）。
+ * moveProgress、speed 均以此为单位，避免慢速（远低于每 tick 走满一格）时依赖极小浮点数。
+ */
+export const MOVE_PROGRESS_PER_CELL = 100;
+
+/** 默认移动速度 — 每 tick 增加的进度（同 MOVE_PROGRESS_PER_CELL 刻度，10 即约 10 tick 走一格） */
+export const MOVE_SPEED_DEFAULT = 10;
 
 /** 移动状态子对象（嵌套在 Pawn 内部） */
 export interface MovementState {
@@ -16,12 +22,10 @@ export interface MovementState {
   path: CellCoord[];
   /** 当前路径中正在前往的节点索引 */
   pathIndex: number;
-  /** 当前格子间的移动进度（0~1，达到1时移动到下一格） */
+  /** 当前格子间的移动进度（0 ~ MOVE_PROGRESS_PER_CELL-1，达到 MOVE_PROGRESS_PER_CELL 时进下一格并清零） */
   moveProgress: number;
-  /** 移动速度（每 tick 增加的进度量） */
+  /** 移动速度（每 tick 增加的进度量，与 MOVE_PROGRESS_PER_CELL 同刻度） */
   speed: number;
-  /** 上一次移动前所在的格子（用于渲染插值），null 表示尚未移动过 */
-  prevCell: CellCoord | null;
 }
 
 /**
@@ -34,6 +38,5 @@ export function createDefaultMovement(): MovementState {
     pathIndex: 0,
     moveProgress: 0,
     speed: MOVE_SPEED_DEFAULT,
-    prevCell: null,
   };
 }
