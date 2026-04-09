@@ -55,6 +55,8 @@ interface CleanablePawn {
     moveProgress: number;
     /** 移动速度 */
     speed: number;
+    /** 上一次移动前所在的格子 */
+    prevCell: { x: number; y: number } | null;
   };
 
   // ── 背包 ──

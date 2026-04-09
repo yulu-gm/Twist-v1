@@ -57,6 +57,7 @@ interface SelectablePawn {
     pathIndex: number;
     moveProgress: number;
     speed: number;
+    prevCell: { x: number; y: number } | null;
   };
 
   // ── 背包 ──
@@ -225,7 +226,7 @@ function gatherCandidates(
         break;
       case DesignationType.Harvest:
       case DesignationType.Cut:
-        job = createHarvestJob(pawn.id, desig.id, targetCell);
+        job = createHarvestJob(pawn.id, desig.id, targetCell, map);
         baseScore = 50;
         break;
     }
@@ -282,7 +283,7 @@ function gatherCandidates(
     if (map.reservations.isReserved(site.id)) continue;
 
     const dist = estimateDistance(pawn.cell, site.cell);
-    const job = createConstructJob(pawn.id, site.id, site.cell);
+    const job = createConstructJob(pawn.id, site.id, site.cell, map);
 
     // 根据工地剩余工作量更新 Work Toil 的 totalWork
     const workToil = job.toils.find(t => t.type === ToilType.Work);

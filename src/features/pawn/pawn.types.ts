@@ -79,6 +79,8 @@ export interface Pawn extends MapObjectBase {
     moveProgress: number;
     /** 移动速度（每 tick 移动的进度量） */
     speed: number;
+    /** 上一次移动前所在的格子（用于渲染插值），null 表示尚未移动过 */
+    prevCell: CellCoord | null;
   };
 
   // ── 需求系统 ──

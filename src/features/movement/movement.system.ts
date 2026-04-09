@@ -32,6 +32,8 @@ interface MovablePawn {
     moveProgress: number;
     /** 移动速度 */
     speed: number;
+    /** 上一次移动前所在的格子 */
+    prevCell: { x: number; y: number } | null;
   };
 }
 
@@ -104,6 +106,9 @@ function processMap(map: GameMap): void {
       pawn.cell = { x: targetCell.x, y: targetCell.y };
       /** 更新空间索引中的位置 */
       map.spatial.onObjectMoved(pawn.id, prevCell, pawn.cell);
+
+      // 保存 prevCell 供渲染插值使用
+      mv.prevCell = prevCell;
 
       mv.moveProgress = 0;
       mv.pathIndex++;

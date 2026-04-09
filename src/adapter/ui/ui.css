@@ -1,0 +1,258 @@
+/**
+ * @file ui.css
+ * @description DOM UI 层样式 — 所有 HUD 面板的布局与外观
+ */
+
+/* ── CSS 变量 ── */
+:root {
+  --panel-bg: rgba(30, 32, 40, 0.92);
+  --panel-border: #3a3f4a;
+  --text-color: #e0e0e0;
+  --text-muted: #8a8f9a;
+  --accent: #4a90d9;
+  --accent-hover: #5aa0e9;
+  --danger: #d94a4a;
+  --success: #44cc44;
+  --font-family: 'Consolas', 'Courier New', monospace;
+  --font-size: 13px;
+  --font-size-sm: 11px;
+  --font-size-lg: 16px;
+  --bar-height-top: 36px;
+  --bar-height-bottom: 44px;
+}
+
+/* ── UI 容器层 — 覆盖整个屏幕，穿透点击到 Canvas ── */
+#ui-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+  font-family: var(--font-family);
+  color: var(--text-color);
+  font-size: var(--font-size);
+}
+
+/* 所有面板内部恢复鼠标事件 */
+#ui-layer > div {
+  pointer-events: auto;
+}
+
+/* ── 顶栏（三区布局） ── */
+#ui-top-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--bar-height-top);
+  background: var(--panel-bg);
+  border-bottom: 1px solid var(--panel-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+}
+
+.top-left, .top-center, .top-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.top-left { min-width: 120px; }
+.top-right { min-width: 120px; justify-content: flex-end; }
+
+.clock {
+  font-size: var(--font-size-lg);
+  font-weight: bold;
+}
+
+.text-muted {
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+}
+
+/* 速度按钮组 */
+.speed-group {
+  display: flex;
+  gap: 2px;
+}
+
+.speed-btn {
+  padding: 2px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  user-select: none;
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  transition: background 0.1s;
+}
+
+.speed-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-color);
+}
+
+.speed-btn.active {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+/* ── 底部工具栏（分组 + 高亮） ── */
+#ui-toolbar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: var(--bar-height-bottom);
+  background: var(--panel-bg);
+  border-top: 1px solid var(--panel-border);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 12px;
+  font-size: var(--font-size-sm);
+}
+
+.tool-group {
+  display: flex;
+  gap: 2px;
+}
+
+.toolbar-sep {
+  width: 1px;
+  height: 20px;
+  background: var(--panel-border);
+  margin: 0 4px;
+}
+
+.tool-btn {
+  padding: 4px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  color: var(--text-muted);
+  transition: background 0.1s, color 0.1s;
+}
+
+.tool-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-color);
+}
+
+.tool-btn.active {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+/* ── 选择面板（右侧卡片式） ── */
+#ui-selection-panel {
+  display: none;
+  position: absolute;
+  right: 10px;
+  top: 46px;
+  bottom: 54px;
+  width: 280px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  overflow-y: auto;
+}
+
+#ui-selection-panel.visible {
+  display: flex;
+  flex-direction: column;
+}
+
+.sel-header {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--panel-border);
+  font-size: var(--font-size);
+  font-weight: bold;
+}
+
+.sel-props {
+  padding: 6px 10px;
+  font-size: var(--font-size-sm);
+  line-height: 1.6;
+}
+
+.sel-prop-row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.sel-prop-label {
+  color: var(--text-muted);
+}
+
+.sel-bars {
+  padding: 6px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.need-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-sm);
+}
+
+.need-label {
+  width: 36px;
+  color: var(--text-muted);
+}
+
+.need-bar {
+  flex: 1;
+  height: 6px;
+  background: #333;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.need-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.15s;
+}
+
+.need-bar-fill.food { background: #cc8844; }
+.need-bar-fill.rest { background: #4488cc; }
+.need-bar-fill.joy { background: #44cc88; }
+.need-bar-fill.mood { background: #cc44cc; }
+
+.need-value {
+  width: 28px;
+  text-align: right;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* ── 调试面板（右上，选择面板下方） ── */
+#ui-debug-panel {
+  display: none;
+  position: absolute;
+  top: 46px;
+  right: 300px;
+  width: 280px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  padding: 8px 10px;
+}
+
+#ui-debug-panel.visible {
+  display: block;
+}
+
+#ui-debug-text {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  font-family: var(--font-family);
+  color: var(--text-color);
+  white-space: pre-wrap;
+  line-height: 1.4;
+}

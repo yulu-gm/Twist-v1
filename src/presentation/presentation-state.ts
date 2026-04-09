@@ -80,8 +80,16 @@ export interface PresentationState {
   cameraZoom: number;
   /** 当前激活的工具类型 */
   activeTool: ToolType;
+  /** 当前激活的指派子类型（用于 UI 高亮） */
+  activeDesignationType: DesignationType | null;
+  /** 当前选中的建筑定义 ID（用于 UI 高亮） */
+  activeBuildDefId: DefId | null;
   /** 是否显示调试面板 */
   showDebugPanel: boolean;
+  /** 是否显示网格线 */
+  showGrid: boolean;
+  /** 拖拽选框（null 表示未在拖拽） */
+  dragRect: { startCell: CellCoord; endCell: CellCoord } | null;
 }
 
 /**
@@ -96,6 +104,8 @@ export enum ToolType {
   Designate = 'designate',
   /** 区域模式 — 点击划定区域 */
   Zone = 'zone',
+  /** 取消模式 — 点击取消指派/蓝图/工地 */
+  Cancel = 'cancel',
 }
 
 /**
@@ -113,6 +123,10 @@ export function createPresentationState(): PresentationState {
     cameraPosition: { x: 0, y: 0 },
     cameraZoom: 1,
     activeTool: ToolType.Select,
+    activeDesignationType: null,
+    activeBuildDefId: null,
     showDebugPanel: false,
+    showGrid: false,
+    dragRect: null,
   };
 }

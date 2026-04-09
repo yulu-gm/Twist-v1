@@ -2,7 +2,8 @@
  * @file mine-job.ts
  * @description 采矿工作的工厂函数。创建一个包含"前往矿点 → 执行采矿"两步的 Job。
  *              由于矿石格子本身不可通行，Pawn 需要站在相邻的可通行格子上进行采矿。
- * @dependencies core/types — 基础类型与枚举；ai.types — Job 接口；world/game-map — 地图数据
+ * @dependencies core/types — 基础类型与枚举；ai.types — Job 接口；
+ *               adjacent-util — 邻格查找；world/game-map — 地图数据
  * @part-of AI 子系统 / 工作工厂（features/ai/jobs）
  */
 
@@ -11,32 +12,7 @@ import {
 } from '../../../core/types';
 import { Job } from '../ai.types';
 import { GameMap } from '../../../world/game-map';
-
-/** 四方向偏移量：上、下、左、右 */
-const ADJACENT_DIRS: CellCoord[] = [
-  { x: 0, y: -1 },
-  { x: 0, y: 1 },
-  { x: -1, y: 0 },
-  { x: 1, y: 0 },
-];
-
-/**
- * 寻找目标格子四周的一个可通行格子（用于采矿时 Pawn 的站位）。
- *
- * @param target - 目标格子坐标（不可通行的矿石格子）
- * @param map    - 游戏地图，用于查询通行性
- * @returns 相邻的可通行格子坐标，若四周均不可通行则返回 null
- */
-export function findAdjacentPassable(target: CellCoord, map: GameMap): CellCoord | null {
-  for (const dir of ADJACENT_DIRS) {
-    const nx = target.x + dir.x;
-    const ny = target.y + dir.y;
-    if (map.pathGrid.isPassable(nx, ny) && map.spatial.isPassable({ x: nx, y: ny })) {
-      return { x: nx, y: ny };
-    }
-  }
-  return null;
-}
+import { findAdjacentPassable } from './adjacent-util';
 
 /** 采矿工作计数器，用于生成唯一 Job ID */
 let mineJobCounter = 0;

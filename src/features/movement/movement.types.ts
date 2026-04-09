@@ -20,6 +20,8 @@ export interface MovementState {
   moveProgress: number;
   /** 移动速度（每 tick 增加的进度量） */
   speed: number;
+  /** 上一次移动前所在的格子（用于渲染插值），null 表示尚未移动过 */
+  prevCell: CellCoord | null;
 }
 
 /**
@@ -32,5 +34,6 @@ export function createDefaultMovement(): MovementState {
     pathIndex: 0,
     moveProgress: 0,
     speed: MOVE_SPEED_DEFAULT,
+    prevCell: null,
   };
 }

@@ -13,6 +13,9 @@ import { createGameMap, GameMap } from './world/game-map';
 import { buildDefDatabase } from './defs/index';
 import { SimSpeed, TickPhase, ObjectKind } from './core/types';
 import { log } from './core/logger';
+
+// CSS 导入 — Vite 自动处理
+import './adapter/ui/ui.css';
 import { inspector } from './core/inspector';
 import { bootstrapPhaser } from './adapter/bootstrap';
 import { SystemRegistration } from './core/tick-runner';

@@ -17,7 +17,8 @@ import { log } from '../core/logger';
 import { RenderSync } from './render/render-sync';
 import { CameraController } from './render/camera-controller';
 import { InputHandler } from './input/input-handler';
-import { UIManager } from './ui/ui-manager';
+import { DomUIManager } from './ui/dom-ui-manager';
+import { WorldPreview } from './render/world-preview';
 import { DebugOverlay } from './debug/debug-overlay';
 import { installDebugConsole } from './debug/console';
 import { createPresentationState, PresentationState } from '../presentation/presentation-state';
@@ -47,8 +48,10 @@ export class MainScene extends Phaser.Scene {
   private cameraController!: CameraController;
   /** 输入处理器：处理鼠标点击和键盘快捷键 */
   private inputHandler!: InputHandler;
-  /** UI 管理器：管理顶栏、工具栏、选择面板、调试面板 */
-  private uiManager!: UIManager;
+  /** DOM UI 管理器：管理顶栏、工具栏、选择面板、调试面板 */
+  private domUI!: DomUIManager;
+  /** 世界空间预览：建筑放置和指派预览矩形 */
+  private worldPreview!: WorldPreview;
   /** 调试覆盖层：渲染区域/房间/温度等可视化 */
   private debugOverlay!: DebugOverlay;
   /** 展示层状态：存储选中、悬停、预览等 UI 状态 */
@@ -57,6 +60,9 @@ export class MainScene extends Phaser.Scene {
   // ── tick 累积器 ──
   /** 累积的帧间隔时间（毫秒），达到 TICK_MS 时消耗并执行 tick */
   private accumulator = 0;
+
+  /** 上一帧的 showGrid 值，用于检测变化 */
+  private prevShowGrid = false;
 
   constructor(world: World) {
     super({ key: 'MainScene' });
@@ -82,7 +88,8 @@ export class MainScene extends Phaser.Scene {
     this.renderSync = new RenderSync(this, this.world, this.activeMap);
     this.cameraController = new CameraController(this, this.activeMap);
     this.inputHandler = new InputHandler(this, this.world, this.activeMap, this.presentation);
-    this.uiManager = new UIManager(this, this.world, this.activeMap, this.presentation);
+    this.domUI = new DomUIManager(this.world, this.activeMap, this.presentation);
+    this.worldPreview = new WorldPreview(this);
     this.debugOverlay = new DebugOverlay(this, this.world, this.activeMap, this.presentation);
 
     // 安装调试控制台（window.opus）
@@ -90,6 +97,11 @@ export class MainScene extends Phaser.Scene {
 
     // 首次完整渲染
     this.renderSync.fullSync();
+
+    // 监听地形变化事件（采矿完成后需要重绘地形）
+    this.world.eventBus.on('designation_completed', () => {
+      this.renderSync.markTerrainDirty();
+    });
 
     log.info('general', 'Game scene created');
   }
@@ -110,8 +122,15 @@ export class MainScene extends Phaser.Scene {
   update(_time: number, delta: number): void {
     // 始终更新输入和 UI（即使暂停时也需响应操作）
     this.inputHandler.update();
-    this.uiManager.update();
+    this.domUI.update();
+    this.worldPreview.update(this.presentation);
     this.debugOverlay.update();
+
+    // 网格线开关同步
+    if (this.presentation.showGrid !== this.prevShowGrid) {
+      this.renderSync.setShowGrid(this.presentation.showGrid);
+      this.prevShowGrid = this.presentation.showGrid;
+    }
 
     if (this.world.speed === SimSpeed.Paused) {
       return;
@@ -145,6 +164,7 @@ export class MainScene extends Phaser.Scene {
     }
 
     // 同步渲染状态（将世界对象变化反映到精灵）
-    this.renderSync.sync();
+    const tickProgress = Math.min(this.accumulator / TICK_MS, 1);
+    this.renderSync.sync(tickProgress);
   }
 }
