@@ -109,6 +109,23 @@ export enum ToolType {
 }
 
 /**
+ * 切换工具并重置不相关的子状态
+ * 这是工具切换的唯一入口 — 键盘快捷键和工具栏按钮都应调用此函数
+ */
+export function switchTool(presentation: PresentationState, tool: ToolType): void {
+  presentation.activeTool = tool;
+  if (tool !== ToolType.Designate) {
+    presentation.activeDesignationType = null;
+  }
+  if (tool !== ToolType.Build) {
+    presentation.activeBuildDefId = null;
+  }
+  if (tool !== ToolType.Select) {
+    presentation.selectedObjectIds.clear();
+  }
+}
+
+/**
  * 创建展示层状态的默认初始值
  *
  * @returns 新的 PresentationState 对象，所有字段为默认值

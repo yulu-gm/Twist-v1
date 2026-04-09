@@ -6,7 +6,7 @@
 
 import { World } from '../../world/world';
 import { DesignationType } from '../../core/types';
-import { PresentationState, ToolType } from '../../presentation/presentation-state';
+import { PresentationState, ToolType, switchTool } from '../../presentation/presentation-state';
 
 /** 工具栏 UI 组件 */
 export class ToolbarUI {
@@ -32,39 +32,26 @@ export class ToolbarUI {
       btn.addEventListener('click', (e) => {
         switch (dataTool) {
           case 'select':
-            this.presentation.activeTool = ToolType.Select;
-            this.presentation.activeDesignationType = null;
-            this.presentation.activeBuildDefId = null;
+            switchTool(this.presentation, ToolType.Select);
             break;
           case 'build':
-            this.presentation.activeTool = ToolType.Build;
+            switchTool(this.presentation, ToolType.Build);
             this.presentation.activeBuildDefId = 'wall_wood';
-            this.presentation.activeDesignationType = null;
-            this.presentation.selectedObjectIds.clear();
             break;
           case 'mine':
-            this.presentation.activeTool = ToolType.Designate;
+            switchTool(this.presentation, ToolType.Designate);
             this.presentation.activeDesignationType = DesignationType.Mine;
-            this.presentation.activeBuildDefId = null;
-            this.presentation.selectedObjectIds.clear();
             break;
           case 'harvest':
-            this.presentation.activeTool = ToolType.Designate;
+            switchTool(this.presentation, ToolType.Designate);
             this.presentation.activeDesignationType = DesignationType.Harvest;
-            this.presentation.activeBuildDefId = null;
-            this.presentation.selectedObjectIds.clear();
             break;
           case 'cut':
-            this.presentation.activeTool = ToolType.Designate;
+            switchTool(this.presentation, ToolType.Designate);
             this.presentation.activeDesignationType = DesignationType.Cut;
-            this.presentation.activeBuildDefId = null;
-            this.presentation.selectedObjectIds.clear();
             break;
           case 'cancel':
-            this.presentation.activeTool = ToolType.Cancel;
-            this.presentation.activeDesignationType = null;
-            this.presentation.activeBuildDefId = null;
-            this.presentation.selectedObjectIds.clear();
+            switchTool(this.presentation, ToolType.Cancel);
             break;
         }
         (e.target as HTMLElement).blur();

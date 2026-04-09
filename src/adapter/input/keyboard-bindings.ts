@@ -7,18 +7,7 @@
 import Phaser from 'phaser';
 import { World } from '../../world/world';
 import { SimSpeed, DesignationType } from '../../core/types';
-import { PresentationState, ToolType, OverlayType } from '../../presentation/presentation-state';
-
-/** 切换工具并重置子类型 */
-function switchTool(presentation: PresentationState, tool: ToolType): void {
-  presentation.activeTool = tool;
-  if (tool !== ToolType.Designate) {
-    presentation.activeDesignationType = null;
-  }
-  if (tool !== ToolType.Build) {
-    presentation.activeBuildDefId = null;
-  }
-}
+import { PresentationState, ToolType, OverlayType, switchTool } from '../../presentation/presentation-state';
 
 /**
  * 注册所有键盘快捷键
@@ -65,26 +54,21 @@ export function setupKeyboardBindings(
   kb.on('keydown-B', () => {
     switchTool(presentation, ToolType.Build);
     presentation.activeBuildDefId = 'wall_wood';
-    presentation.selectedObjectIds.clear();
   });
   kb.on('keydown-M', () => {
     switchTool(presentation, ToolType.Designate);
     presentation.activeDesignationType = DesignationType.Mine;
-    presentation.selectedObjectIds.clear();
   });
   kb.on('keydown-H', () => {
     switchTool(presentation, ToolType.Designate);
     presentation.activeDesignationType = DesignationType.Harvest;
-    presentation.selectedObjectIds.clear();
   });
   kb.on('keydown-X', () => {
     switchTool(presentation, ToolType.Designate);
     presentation.activeDesignationType = DesignationType.Cut;
-    presentation.selectedObjectIds.clear();
   });
   kb.on('keydown-C', () => {
     switchTool(presentation, ToolType.Cancel);
-    presentation.selectedObjectIds.clear();
   });
 
   // ── 调试面板切换: F1 ──
