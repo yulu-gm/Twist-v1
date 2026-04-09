@@ -134,3 +134,10 @@ export interface Pawn extends MapObjectBase {
     entries: ScheduleEntry[];
   };
 }
+
+// ── KindMap 类型注册 ──
+declare module '../../core/types' {
+  interface KindMap {
+    [ObjectKind.Pawn]: Pawn;
+  }
+}

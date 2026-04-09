@@ -27,3 +27,10 @@ export interface ConstructionSite extends MapObjectBase {
   /** 已完成的工作量 */
   workDone: number;
 }
+
+// ── KindMap 类型注册 ──
+declare module '../../core/types' {
+  interface KindMap {
+    [ObjectKind.ConstructionSite]: ConstructionSite;
+  }
+}

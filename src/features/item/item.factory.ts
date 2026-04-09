@@ -6,7 +6,7 @@
  */
 
 import { ObjectKind, nextObjectId } from '../../core/types';
-import type { CellCoord, DefId, MapId } from '../../core/types';
+import type { CellCoord, DefId, MapId, Tag } from '../../core/types';
 import type { DefDatabase } from '../../world/def-database';
 import type { Item } from './item.types';
 
@@ -44,5 +44,36 @@ export function createItem(params: {
     destroyed: false,
     stackCount: stackCount ?? 1,
     maxStack,
+  };
+}
+
+/**
+ * 创建简单物品（不依赖 DefDatabase，用于 toil 执行等场景）
+ * @param params.defId - 物品定义ID
+ * @param params.cell - 放置位置
+ * @param params.mapId - 所属地图ID
+ * @param params.stackCount - 堆叠数量
+ * @param params.tags - 标签集合（默认 haulable + resource）
+ * @param params.maxStack - 最大堆叠数（默认 100）
+ * @returns 完整初始化的物品对象
+ */
+export function createItemRaw(params: {
+  defId: DefId;
+  cell: CellCoord;
+  mapId: MapId;
+  stackCount: number;
+  tags?: Set<Tag>;
+  maxStack?: number;
+}): Item {
+  return {
+    id: nextObjectId(),
+    kind: ObjectKind.Item,
+    defId: params.defId,
+    mapId: params.mapId,
+    cell: { x: params.cell.x, y: params.cell.y },
+    tags: params.tags ?? new Set(['haulable', 'resource']),
+    destroyed: false,
+    stackCount: params.stackCount,
+    maxStack: params.maxStack ?? 100,
   };
 }

@@ -22,3 +22,10 @@ export interface Fire extends MapObjectBase {
   /** 距离下一次尝试蔓延的剩余冷却 tick 数 */
   spreadCooldown: number;
 }
+
+// ── KindMap 类型注册 ──
+declare module '../../core/types' {
+  interface KindMap {
+    [ObjectKind.Fire]: Fire;
+  }
+}

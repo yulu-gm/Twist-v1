@@ -11,7 +11,7 @@
  */
 
 import {
-  ObjectKind, TickPhase, ToilType, ToilState, JobState, cellEquals, ObjectId, nextObjectId,
+  ObjectKind, TickPhase, ToilType, ToilState, JobState, cellEquals, ObjectId,
 } from '../../core/types';
 import { SystemRegistration } from '../../core/tick-runner';
 import { log } from '../../core/logger';
@@ -20,7 +20,12 @@ import { GameMap } from '../../world/game-map';
 import { findPath } from '../pathfinding/path.service';
 import { cleanupProtocol } from './cleanup';
 import { Job, Toil } from './ai.types';
-import { ConstructionSite } from '../construction/construction-site.types';
+import type { ConstructionSite } from '../construction/construction-site.types';
+import type { Blueprint } from '../construction/blueprint.types';
+import type { Designation } from '../designation/designation.types';
+import type { Building } from '../building/building.types';
+import type { Item } from '../item/item.types';
+import { createItemRaw } from '../item/item.factory';
 
 /**
  * Toil 执行器使用的 Pawn 鸭子类型接口。
@@ -100,7 +105,7 @@ export const toilExecutorSystem: SystemRegistration = {
  * @param map   - 当前处理的地图
  */
 function processMap(world: World, map: GameMap): void {
-  const pawns = map.objects.allOfKind(ObjectKind.Pawn) as unknown as ExecutablePawn[];
+  const pawns = map.objects.allOfKind(ObjectKind.Pawn) as ExecutablePawn[];
 
   for (const pawn of pawns) {
     const job = pawn.ai.currentJob;
@@ -111,7 +116,7 @@ function processMap(world: World, map: GameMap): void {
     // 紧急需求：饱食度低于 10 时中断当前非进食工作
     if (pawn.needs.food < 10 && job.defId !== 'job_eat') {
       log.info('ai', `Pawn ${pawn.id} interrupted (food critical: ${Math.floor(pawn.needs.food)})`, undefined, pawn.id);
-      cleanupProtocol(pawn as any, map, world);
+      cleanupProtocol(pawn, map, world);
       continue;
     }
 
@@ -120,7 +125,7 @@ function processMap(world: World, map: GameMap): void {
       const target = map.objects.get(job.targetId);
       if (target && target.destroyed) {
         log.info('ai', `Pawn ${pawn.id} interrupted (target ${job.targetId} destroyed)`, undefined, pawn.id);
-        cleanupProtocol(pawn as any, map, world);
+        cleanupProtocol(pawn, map, world);
         continue;
       }
     }
@@ -150,7 +155,7 @@ function processMap(world: World, map: GameMap): void {
 
     if (toil.state === ToilState.Failed) {
       log.warn('ai', `Toil failed for pawn ${pawn.id}, triggering cleanup`, undefined, pawn.id);
-      cleanupProtocol(pawn as any, map, world);
+      cleanupProtocol(pawn, map, world);
       continue;
     }
 
@@ -277,7 +282,7 @@ function executePickUp(
     return;
   }
 
-  const item = map.objects.get(targetId) as any;
+  const item = map.objects.getAs(targetId, ObjectKind.Item);
   if (!item || item.destroyed) {
     log.warn('ai', `Pawn ${pawn.id} PickUp target ${targetId} not found`, undefined, pawn.id);
     toil.state = ToilState.Failed;
@@ -343,19 +348,11 @@ function executeDrop(
   const defId = (toil.localData.defId as string) ?? 'unknown';
   const count = (toil.localData.count as number) ?? 1;
 
-  const item = {
-    id: nextObjectId(),
-    kind: ObjectKind.Item,
-    defId,
-    mapId: map.id,
-    cell: { x: pawn.cell.x, y: pawn.cell.y },
-    tags: new Set(['haulable', 'resource']),
-    destroyed: false,
-    stackCount: count,
-    maxStack: 100,
-  };
+  const item = createItemRaw({
+    defId, cell: pawn.cell, mapId: map.id, stackCount: count,
+  });
 
-  map.objects.add(item as any);
+  map.objects.add(item);
   pawn.inventory.carrying = null;
 
   log.debug('ai', `Pawn ${pawn.id} dropped ${defId} x${count} at (${pawn.cell.x},${pawn.cell.y})`, undefined, pawn.id);
@@ -387,11 +384,10 @@ function executeWork(
 
   // 如果正在建造建筑工地，更新工地的施工进度
   if (toil.targetId) {
-    const target = map.objects.get(toil.targetId) as any;
-    if (target && target.kind === ObjectKind.ConstructionSite) {
-      const site = target as ConstructionSite;
-      site.workDone += 1;
-      site.buildProgress = site.workDone / site.totalWorkAmount;
+    const target = map.objects.getAs(toil.targetId, ObjectKind.ConstructionSite);
+    if (target) {
+      target.workDone += 1;
+      target.buildProgress = target.workDone / target.totalWorkAmount;
     }
   }
 
@@ -404,7 +400,7 @@ function executeWork(
       if (target) {
         // 指派相关工作完成：销毁指派对象
         if (target.kind === ObjectKind.Designation) {
-          const desig = target as any;
+          const desig = target as Designation;
 
           // 采矿指派：将地形改为泥土地板，并产出石材
           if (desig.designationType === 'mine' && desig.targetCell) {
@@ -418,18 +414,11 @@ function executeWork(
 
               // 产出采矿掉落物
               if (terrainDef.mineYield) {
-                const yieldItem = {
-                  id: nextObjectId(),
-                  kind: ObjectKind.Item,
+                map.objects.add(createItemRaw({
                   defId: terrainDef.mineYield.defId,
-                  mapId: map.id,
-                  cell: { x: tc.x, y: tc.y },
-                  tags: new Set(['haulable', 'resource']),
-                  destroyed: false,
+                  cell: tc, mapId: map.id,
                   stackCount: terrainDef.mineYield.count,
-                  maxStack: 100,
-                };
-                map.objects.add(yieldItem as any);
+                }));
               }
             }
           }
@@ -440,18 +429,11 @@ function executeWork(
             if (plant && plant.kind === ObjectKind.Plant) {
               const plantDef = world.defs.plants.get(plant.defId);
               if (plantDef?.harvestYield) {
-                const yieldItem = {
-                  id: nextObjectId(),
-                  kind: ObjectKind.Item,
+                map.objects.add(createItemRaw({
                   defId: plantDef.harvestYield.defId,
-                  mapId: map.id,
-                  cell: { x: plant.cell.x, y: plant.cell.y },
-                  tags: new Set(['haulable', 'resource']),
-                  destroyed: false,
+                  cell: plant.cell, mapId: map.id,
                   stackCount: plantDef.harvestYield.count,
-                  maxStack: 100,
-                };
-                map.objects.add(yieldItem as any);
+                }));
               }
               plant.destroyed = true;
             }
@@ -547,8 +529,8 @@ function executeDeliver(
 
   // 若交付给蓝图，更新蓝图的已交付材料
   if (toil.targetId) {
-    const blueprint = map.objects.get(toil.targetId) as any;
-    if (blueprint && blueprint.kind === ObjectKind.Blueprint && blueprint.materialsDelivered) {
+    const blueprint = map.objects.getAs(toil.targetId, ObjectKind.Blueprint);
+    if (blueprint && blueprint.materialsDelivered) {
       for (const mat of blueprint.materialsDelivered) {
         if (mat.defId === defId) {
           mat.count += count;
@@ -558,18 +540,9 @@ function executeDeliver(
     }
   } else {
     // 没有蓝图目标，直接放置到地面
-    const item = {
-      id: nextObjectId(),
-      kind: ObjectKind.Item,
-      defId,
-      mapId: map.id,
-      cell: { x: pawn.cell.x, y: pawn.cell.y },
-      tags: new Set(['haulable', 'resource']),
-      destroyed: false,
-      stackCount: count,
-      maxStack: 100,
-    };
-    map.objects.add(item as any);
+    map.objects.add(createItemRaw({
+      defId, cell: pawn.cell, mapId: map.id, stackCount: count,
+    }));
   }
 
   pawn.inventory.carrying = null;
@@ -597,7 +570,7 @@ function executeInteract(
     return;
   }
 
-  const building = map.objects.get(toil.targetId) as any;
+  const building = map.objects.getAs(toil.targetId, ObjectKind.Building);
   if (!building || building.destroyed) {
     toil.state = ToilState.Failed;
     return;

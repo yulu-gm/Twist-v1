@@ -53,7 +53,7 @@ export class PawnRenderer implements ObjectRenderer {
   }
 
   createSprite(obj: MapObjectBase, cx: number, cy: number, _color: number): Phaser.GameObjects.Container {
-    const pawn = obj as unknown as Pawn;
+    const pawn = obj as Pawn;
     const color = 0x4fc3f7;
 
     const container = this.scene.add.container(cx, cy);
@@ -115,10 +115,10 @@ export class PawnRenderer implements ObjectRenderer {
   // ── 渲染位置计算 ──
 
   private getPawnRenderPosition(obj: MapObjectBase): { x: number; y: number } {
-    const pawn = obj as any;
+    const pawn = obj as Pawn;
     const mv = pawn.movement;
 
-    if (mv?.prevCell && mv.path?.length > 0) {
+    if (mv?.prevCell && mv.path && mv.path.length > 0) {
       const t = this.currentTickProgress;
       return {
         x: (mv.prevCell.x + (obj.cell.x - mv.prevCell.x) * t) * TILE_SIZE + TILE_SIZE / 2,
@@ -161,7 +161,7 @@ export class PawnRenderer implements ObjectRenderer {
   }
 
   private getToilProgress(obj: MapObjectBase): { current: number; total: number } | null {
-    const pawn = obj as any;
+    const pawn = obj as Pawn;
     const job = pawn.ai?.currentJob;
     if (!job) return null;
 
@@ -170,11 +170,11 @@ export class PawnRenderer implements ObjectRenderer {
 
     switch (toil.type) {
       case 'work':
-        return { current: toil.localData.workDone ?? 0, total: toil.localData.totalWork ?? 100 };
+        return { current: (toil.localData.workDone as number) ?? 0, total: (toil.localData.totalWork as number) ?? 100 };
       case 'wait':
-        return { current: toil.localData.waited ?? 0, total: toil.localData.waitTicks ?? 60 };
+        return { current: (toil.localData.waited as number) ?? 0, total: (toil.localData.waitTicks as number) ?? 60 };
       case 'interact':
-        return { current: toil.localData.interacted ?? 0, total: toil.localData.interactTicks ?? 30 };
+        return { current: (toil.localData.interacted as number) ?? 0, total: (toil.localData.interactTicks as number) ?? 30 };
       default:
         return null;
     }
@@ -183,10 +183,10 @@ export class PawnRenderer implements ObjectRenderer {
   // ── 朝向推导 ──
 
   private inferFacing(obj: MapObjectBase): Direction {
-    const pawn = obj as any;
+    const pawn = obj as Pawn;
     const mv = pawn.movement;
 
-    if (mv?.path?.length > 0 && mv.pathIndex < mv.path.length) {
+    if (mv?.path && mv.path.length > 0 && mv.pathIndex < mv.path.length) {
       const next = mv.path[mv.pathIndex];
       return this.directionFrom(obj.cell, next);
     }

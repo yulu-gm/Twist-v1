@@ -24,3 +24,10 @@ export interface Plant extends MapObjectBase {
   /** 枯萎进度，范围 0（健康）到 1（死亡） */
   dyingProgress: number;
 }
+
+// ── KindMap 类型注册 ──
+declare module '../../core/types' {
+  interface KindMap {
+    [ObjectKind.Plant]: Plant;
+  }
+}

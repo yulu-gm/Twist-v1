@@ -15,7 +15,7 @@ import type { Designation } from './designation.types';
  * @returns 该地图中所有指派对象的数组
  */
 export function getAllDesignations(map: GameMap): Designation[] {
-  return map.objects.allOfKind(ObjectKind.Designation) as unknown as Designation[];
+  return map.objects.allOfKind(ObjectKind.Designation);
 }
 
 /**

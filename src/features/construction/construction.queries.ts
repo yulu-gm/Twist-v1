@@ -16,7 +16,7 @@ import type { ConstructionSite } from './construction-site.types';
  * @returns 该地图上所有 Blueprint 对象的数组
  */
 export function getAllBlueprints(map: GameMap): Blueprint[] {
-  return map.objects.allOfKind(ObjectKind.Blueprint) as unknown as Blueprint[];
+  return map.objects.allOfKind(ObjectKind.Blueprint);
 }
 
 /**
@@ -25,5 +25,5 @@ export function getAllBlueprints(map: GameMap): Blueprint[] {
  * @returns 该地图上所有 ConstructionSite 对象的数组
  */
 export function getAllConstructionSites(map: GameMap): ConstructionSite[] {
-  return map.objects.allOfKind(ObjectKind.ConstructionSite) as unknown as ConstructionSite[];
+  return map.objects.allOfKind(ObjectKind.ConstructionSite);
 }

@@ -18,6 +18,9 @@ import { GameEvent } from '../../core/event-bus';
 import { World } from '../../world/world';
 import { log } from '../../core/logger';
 import { Blueprint } from './blueprint.types';
+import type { ConstructionSite } from './construction-site.types';
+import type { Pawn } from '../pawn/pawn.types';
+import { createItemRaw } from '../item/item.factory';
 
 // ── 放置蓝图命令 ──
 
@@ -200,18 +203,10 @@ export const cancelConstructionHandler: CommandHandler = {
       const bp = obj as Blueprint;
       for (const mat of bp.materialsDelivered) {
         if (mat.count > 0) {
-          const item = {
-            id: nextObjectId(),
-            kind: ObjectKind.Item,
-            defId: mat.defId,
-            mapId: mapId as string,
-            cell: { x: bp.cell.x, y: bp.cell.y },
-            tags: new Set(['haulable', 'resource']),
-            destroyed: false,
-            stackCount: mat.count,
-            maxStack: 100,
-          };
-          map.objects.add(item as any);
+          const item = createItemRaw({
+            defId: mat.defId, cell: bp.cell, mapId: mapId as string, stackCount: mat.count,
+          });
+          map.objects.add(item);
 
           events.push({
             type: 'item_dropped',
@@ -225,25 +220,16 @@ export const cancelConstructionHandler: CommandHandler = {
     // 若目标为施工工地，按已完成进度比例退还材料
     // If it's a construction site, refund materials proportionally
     if (obj.kind === ObjectKind.ConstructionSite) {
-      const site = obj as any;
+      const site = obj as ConstructionSite;
       const buildingDef = world.defs.buildings.get(site.targetDefId);
       if (buildingDef) {
         const refundRatio = Math.max(0, 1 - (site.buildProgress ?? 0));
         for (const cost of buildingDef.costList) {
           const refundCount = Math.floor(cost.count * refundRatio);
           if (refundCount > 0) {
-            const item = {
-              id: nextObjectId(),
-              kind: ObjectKind.Item,
-              defId: cost.defId,
-              mapId: mapId as string,
-              cell: { x: site.cell.x, y: site.cell.y },
-              tags: new Set(['haulable', 'resource']),
-              destroyed: false,
-              stackCount: refundCount,
-              maxStack: 100,
-            };
-            map.objects.add(item as any);
+            map.objects.add(createItemRaw({
+              defId: cost.defId, cell: site.cell, mapId: mapId as string, stackCount: refundCount,
+            }));
           }
         }
       }
@@ -260,25 +246,24 @@ export const cancelConstructionHandler: CommandHandler = {
     // Interrupt any pawns whose current job targets this object
     const pawns = map.objects.allOfKind(ObjectKind.Pawn);
     for (const pawn of pawns) {
-      const p = pawn as any;
-      if (p.ai?.currentJob?.targetId === targetId) {
+      if (pawn.ai?.currentJob?.targetId === targetId) {
         // Interrupt pawn: release their reservations and reset AI
-        if (p.ai.currentJob.reservations) {
-          for (const resId of p.ai.currentJob.reservations) {
+        if (pawn.ai.currentJob.reservations) {
+          for (const resId of pawn.ai.currentJob.reservations) {
             map.reservations.release(resId);
           }
         }
-        map.reservations.releaseAllByPawn(p.id);
-        p.ai.currentJob = null;
-        p.ai.currentToilIndex = 0;
-        p.ai.toilState = {};
-        p.movement.path = [];
-        p.movement.pathIndex = 0;
+        map.reservations.releaseAllByPawn(pawn.id);
+        pawn.ai.currentJob = null;
+        pawn.ai.currentToilIndex = 0;
+        pawn.ai.toilState = {};
+        pawn.movement.path = [];
+        pawn.movement.pathIndex = 0;
 
         world.eventBuffer.push({
           type: 'job_interrupted',
           tick: world.tick,
-          data: { pawnId: p.id, reason: 'construction_cancelled' },
+          data: { pawnId: pawn.id, reason: 'construction_cancelled' },
         });
       }
     }

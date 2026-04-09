@@ -22,11 +22,9 @@ function scanDesignationsForWork(world: World): void {
     for (const des of designations) {
       if (des.destroyed) continue;
 
-      const designation = des as any;
-
       // 如果指派目标是某个具体对象，验证该对象是否仍然存在
-      if (designation.targetObjectId) {
-        const target = map.objects.get(designation.targetObjectId);
+      if (des.targetObjectId) {
+        const target = map.objects.get(des.targetObjectId);
         if (!target || target.destroyed) {
           // 目标已消失——移除指派
           des.destroyed = true;
@@ -35,8 +33,8 @@ function scanDesignationsForWork(world: World): void {
       }
 
       // 如果指派是挖矿类型且指定了目标格子，验证地形是否仍然可挖
-      if (designation.designationType === 'mine' && designation.targetCell) {
-        const terrain = map.terrain.get(designation.targetCell.x, designation.targetCell.y);
+      if (des.designationType === 'mine' && des.targetCell) {
+        const terrain = map.terrain.get(des.targetCell.x, des.targetCell.y);
         const tDef = world.defs.terrains.get(terrain);
         if (!tDef || !tDef.mineable) {
           // 已被挖空——移除指派

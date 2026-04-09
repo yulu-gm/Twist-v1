@@ -8,7 +8,7 @@
  */
 
 import {
-  ObjectId, ObjectKind, Tag, MapObjectBase, byId
+  ObjectId, ObjectKind, Tag, MapObjectBase, KindMap, byId
 } from './types';
 
 /** 游戏对象池 - 集中管理所有地图对象，提供多维索引查询 */
@@ -110,6 +110,18 @@ export class ObjectPool {
   }
 
   /**
+   * 按 ID 获取指定种类的对象（类型安全版本，通过 kind 自动窄化返回类型）
+   * @param id - 对象 ID
+   * @param kind - 期望的对象种类，用于运行时校验和类型推导
+   * @returns 匹配的对象实例，不存在或种类不匹配时返回 undefined
+   */
+  getAs<K extends ObjectKind>(id: ObjectId, kind: K): KindMap[K] | undefined {
+    const obj = this.byId.get(id);
+    if (obj && obj.kind === kind) return obj as KindMap[K];
+    return undefined;
+  }
+
+  /**
    * 更新对象的标签集合，同步维护标签索引
    * @param id - 对象 ID
    * @param newTags - 新的标签集合，旧标签将被移除，新标签将被添加
@@ -141,19 +153,19 @@ export class ObjectPool {
   }
 
   /**
-   * 获取指定种类的所有对象
+   * 获取指定种类的所有对象（泛型版本，通过 KindMap 自动推导返回类型）
    * @param kind - 对象种类（如 Pawn、Building 等）
    * @returns 该种类的所有对象数组，按 ID 排序
    */
-  allOfKind(kind: ObjectKind): MapObjectBase[] {
+  allOfKind<K extends ObjectKind>(kind: K): KindMap[K][] {
     const ids = this.byKind.get(kind);
     if (!ids) return [];
-    const result: MapObjectBase[] = [];
+    const result: KindMap[K][] = [];
     for (const id of ids) {
       const obj = this.byId.get(id);
-      if (obj) result.push(obj);
+      if (obj) result.push(obj as KindMap[K]);
     }
-    return result.sort(byId);
+    return result.sort(byId as (a: KindMap[K], b: KindMap[K]) => number);
   }
 
   /**

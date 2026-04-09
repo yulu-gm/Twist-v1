@@ -54,3 +54,10 @@ export interface Building extends MapObjectBase {
     interactionCell: CellCoord;
   };
 }
+
+// ── KindMap 类型注册 ──
+declare module '../../core/types' {
+  interface KindMap {
+    [ObjectKind.Building]: Building;
+  }
+}

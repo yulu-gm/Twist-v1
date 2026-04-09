@@ -30,3 +30,10 @@ export interface Designation extends MapObjectBase {
   /** 工作优先级，用于排序任务执行顺序 */
   priority: WorkPriority;
 }
+
+// ── KindMap 类型注册 ──
+declare module '../../core/types' {
+  interface KindMap {
+    [ObjectKind.Designation]: Designation;
+  }
+}

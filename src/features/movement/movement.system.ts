@@ -55,7 +55,7 @@ export const movementSystem: SystemRegistration = {
  * @param map - 游戏地图
  */
 function processMap(map: GameMap): void {
-  const pawns = map.objects.allOfKind(ObjectKind.Pawn) as unknown as MovablePawn[];
+  const pawns = map.objects.allOfKind(ObjectKind.Pawn) as MovablePawn[];
 
   for (const pawn of pawns) {
     const mv = pawn.movement;

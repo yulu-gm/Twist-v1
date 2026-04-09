@@ -15,7 +15,7 @@ import type { Pawn } from './pawn.types';
  * @returns 该地图上所有棋子的数组
  */
 export function getAllPawns(map: GameMap): Pawn[] {
-  return map.objects.allOfKind(ObjectKind.Pawn) as unknown as Pawn[];
+  return map.objects.allOfKind(ObjectKind.Pawn);
 }
 
 /**
@@ -26,7 +26,7 @@ export function getAllPawns(map: GameMap): Pawn[] {
  */
 export function getPawnById(map: GameMap, id: string): Pawn | undefined {
   const obj = map.objects.get(id);
-  if (obj && obj.kind === ObjectKind.Pawn) return obj as unknown as Pawn;
+  if (obj && obj.kind === ObjectKind.Pawn) return obj as Pawn;
   return undefined;
 }
 

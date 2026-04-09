@@ -12,6 +12,7 @@ import type { GameMap } from '../../world/game-map';
 import { ObjectKind, SimSpeed, DesignationType } from '../../core/types';
 import { getClockDisplay } from '../../core/clock';
 import { PresentationState, ToolType } from '../../presentation/presentation-state';
+import type { Pawn } from '../../features/pawn/pawn.types';
 
 /**
  * DOM UI 管理器 — 通过原生 DOM 元素渲染所有固定位置 HUD
@@ -259,7 +260,7 @@ export class DomUIManager {
       if (!obj) continue;
       key += `:${id}`;
       if (obj.kind === ObjectKind.Pawn) {
-        const p = obj as any;
+        const p = obj as Pawn;
         const jobDef = p.ai?.currentJob?.defId ?? 'idle';
         key += `,${jobDef},${Math.floor(p.needs?.food ?? 0)},${Math.floor(p.needs?.rest ?? 0)},${Math.floor(p.needs?.joy ?? 0)}`;
       }

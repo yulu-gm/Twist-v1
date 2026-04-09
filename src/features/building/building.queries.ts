@@ -15,7 +15,7 @@ import type { Building } from './building.types';
  * @returns 该地图上所有 Building 对象的数组
  */
 export function getAllBuildings(map: GameMap): Building[] {
-  return map.objects.allOfKind(ObjectKind.Building) as unknown as Building[];
+  return map.objects.allOfKind(ObjectKind.Building);
 }
 
 /**
@@ -26,6 +26,6 @@ export function getAllBuildings(map: GameMap): Building[] {
  */
 export function getBuildingById(map: GameMap, id: string): Building | undefined {
   const obj = map.objects.get(id);
-  if (obj && obj.kind === ObjectKind.Building) return obj as unknown as Building;
+  if (obj && obj.kind === ObjectKind.Building) return obj as Building;
   return undefined;
 }

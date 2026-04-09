@@ -9,6 +9,7 @@ import { ObjectKind, MapObjectBase } from '../../../core/types';
 import { SeededRandom } from '../../../core/seeded-random';
 import { TILE_SIZE, scaleColor } from '../render-utils';
 import type { ObjectRenderer } from './types';
+import type { Plant } from '../../../features/plant/plant.types';
 
 /**
  * 植物渲染器 — 处理所有 Plant 类型的精灵创建和更新
@@ -38,7 +39,7 @@ export class PlantRenderer implements ObjectRenderer {
 
     // 树：底部对齐 Y 偏移
     if (obj.tags.has('tree')) {
-      const growth = (obj as any).growthProgress ?? 1;
+      const growth = (obj as Plant).growthProgress ?? 1;
       const scale = 0.5 + growth * 0.5;
       const margin = 4;
       const baseH = (TILE_SIZE - margin * 2) * scale;
@@ -66,7 +67,7 @@ export class PlantRenderer implements ObjectRenderer {
     const colorVariation = 1 + (colorRng.next() - 0.5) * 0.15;
     const color = scaleColor(baseColor, colorVariation);
 
-    const growth = (obj as any).growthProgress ?? 1;
+    const growth = (obj as Plant).growthProgress ?? 1;
     const scale = 0.5 + growth * 0.5;
 
     const margin = 4;
@@ -97,7 +98,7 @@ export class PlantRenderer implements ObjectRenderer {
   ): Phaser.GameObjects.Graphics {
     const idNum = parseInt(obj.id.replace(/\D/g, '') || '0', 10);
     const rng = new SeededRandom(idNum + 7727);
-    const growth = (obj as any).growthProgress ?? 1;
+    const growth = (obj as Plant).growthProgress ?? 1;
     const scale = 0.4 + growth * 0.6;
 
     const g = this.scene.add.graphics();

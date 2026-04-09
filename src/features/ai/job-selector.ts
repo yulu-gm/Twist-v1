@@ -123,7 +123,7 @@ export const jobSelectionSystem: SystemRegistration = {
  * @param map   - 当前处理的地图
  */
 function processMap(world: World, map: GameMap): void {
-  const pawns = map.objects.allOfKind(ObjectKind.Pawn) as unknown as SelectablePawn[];
+  const pawns = map.objects.allOfKind(ObjectKind.Pawn) as SelectablePawn[];
 
   for (const pawn of pawns) {
     // 仅为空闲的 Pawn 分配工作
@@ -207,7 +207,7 @@ function gatherCandidates(
   }
 
   // ── 2. 检查指派任务（采矿、收割、砍伐） ──
-  const designations = map.objects.allOfKind(ObjectKind.Designation) as unknown as DesignationObj[];
+  const designations = map.objects.allOfKind(ObjectKind.Designation) as DesignationObj[];
   for (const desig of designations) {
     if (desig.destroyed) continue;
     if (map.reservations.isReserved(desig.id)) continue;
@@ -238,7 +238,7 @@ function gatherCandidates(
   }
 
   // ── 3. 检查需要材料搬运的蓝图 ──
-  const blueprints = map.objects.allOfKind(ObjectKind.Blueprint) as unknown as Blueprint[];
+  const blueprints = map.objects.allOfKind(ObjectKind.Blueprint);
   for (const bp of blueprints) {
     if (bp.destroyed) continue;
 
@@ -276,7 +276,7 @@ function gatherCandidates(
   }
 
   // ── 4. 检查需要施工的建筑工地 ──
-  const sites = map.objects.allOfKind(ObjectKind.ConstructionSite) as unknown as ConstructionSite[];
+  const sites = map.objects.allOfKind(ObjectKind.ConstructionSite);
   for (const site of sites) {
     if (site.destroyed) continue;
     if (site.buildProgress >= 1.0) continue;

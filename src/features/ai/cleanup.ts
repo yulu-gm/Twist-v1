@@ -8,11 +8,12 @@
  */
 
 import {
-  ObjectId, ObjectKind, nextObjectId,
+  ObjectId, ObjectKind,
 } from '../../core/types';
 import { log } from '../../core/logger';
 import { GameMap } from '../../world/game-map';
 import { World } from '../../world/world';
+import { createItemRaw } from '../item/item.factory';
 
 /**
  * 清理协议使用的 Pawn 鸭子类型接口。
@@ -122,18 +123,10 @@ export function cleanupProtocol(
     }
 
     // 在地面重新创建物品对象
-    const droppedItem = {
-      id: nextObjectId(),
-      kind: ObjectKind.Item,
-      defId,
-      mapId: map.id,
-      cell: { x: pawn.cell.x, y: pawn.cell.y },
-      tags: new Set(['haulable', 'resource']),
-      destroyed: false,
-      stackCount: count,
-      maxStack: 100,
-    };
-    map.objects.add(droppedItem as any);
+    const droppedItem = createItemRaw({
+      defId, cell: pawn.cell, mapId: map.id, stackCount: count,
+    });
+    map.objects.add(droppedItem);
 
     log.debug('ai', `Pawn ${pawn.id} dropped ${defId} x${count} during cleanup`, undefined, pawn.id);
   }

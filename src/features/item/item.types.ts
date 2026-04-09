@@ -22,3 +22,10 @@ export interface Item extends MapObjectBase {
   /** 物品品质等级（可选） */
   quality?: QualityLevel;
 }
+
+// ── KindMap 类型注册 ──
+declare module '../../core/types' {
+  interface KindMap {
+    [ObjectKind.Item]: Item;
+  }
+}

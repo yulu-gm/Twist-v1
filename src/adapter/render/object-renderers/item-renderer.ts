@@ -8,6 +8,7 @@ import Phaser from 'phaser';
 import { ObjectKind, MapObjectBase } from '../../../core/types';
 import { TILE_SIZE, scaleColor } from '../render-utils';
 import type { ObjectRenderer } from './types';
+import type { Item } from '../../../features/item/item.types';
 
 /**
  * 物品渲染器 — 处理 Item 和 Corpse 的精灵创建和更新
@@ -36,7 +37,7 @@ export class ItemRenderer implements ObjectRenderer {
     container.add(rect);
 
     // 堆叠数标签
-    const stackCount = (obj as any).stackCount ?? 1;
+    const stackCount = (obj as Item).stackCount ?? 1;
     if (stackCount > 1) {
       const countText = this.scene.add.text(5, 3, `${stackCount}`, {
         fontSize: '8px',
@@ -62,7 +63,7 @@ export class ItemRenderer implements ObjectRenderer {
 
       // 更新堆叠数标签
       if (obj.kind === ObjectKind.Item) {
-        const stackCount = (obj as any).stackCount ?? 1;
+        const stackCount = (obj as Item).stackCount ?? 1;
         const countText = sprite.list[2] as Phaser.GameObjects.Text | undefined;
         if (stackCount > 1) {
           if (countText) {

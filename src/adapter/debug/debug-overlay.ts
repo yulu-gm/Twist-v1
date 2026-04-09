@@ -11,6 +11,7 @@ import type { World } from '../../world/world';
 import type { GameMap } from '../../world/game-map';
 import { ObjectKind, cellKey } from '../../core/types';
 import { OverlayType, PresentationState } from '../../presentation/presentation-state';
+import type { Pawn } from '../../features/pawn/pawn.types';
 
 /** 地图格子像素大小 */
 const TILE_SIZE = 32;
@@ -173,7 +174,7 @@ export class DebugOverlay {
     const pawns = this.map.objects.allOfKind(ObjectKind.Pawn);
     this.graphics.lineStyle(2, 0x00FF00, 0.8);
     for (const pawn of pawns) {
-      const p = pawn as any;
+      const p = pawn as Pawn;
       if (!p.movement?.path || p.movement.path.length === 0) continue;
       const path = p.movement.path;
       const idx = p.movement.pathIndex ?? 0;

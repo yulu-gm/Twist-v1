@@ -12,6 +12,7 @@ import { World } from '../../world/world';
 import type { GameMap } from '../../world/game-map';
 import { CellCoord, ObjectKind, DesignationType, SimSpeed } from '../../core/types';
 import { PresentationState, ToolType, OverlayType } from '../../presentation/presentation-state';
+import type { Designation } from '../../features/designation/designation.types';
 
 /** 地图格子像素大小 */
 const TILE_SIZE = 32;
@@ -465,9 +466,12 @@ export class InputHandler {
   private hasDuplicateDesignation(cell: CellCoord, type: DesignationType): boolean {
     const objIds = this.map.spatial.getAt(cell);
     for (const id of objIds) {
-      const obj = this.map.objects.get(id) as any;
-      if (obj && obj.kind === ObjectKind.Designation && obj.designationType === type) {
-        return true;
+      const obj = this.map.objects.get(id);
+      if (obj && obj.kind === ObjectKind.Designation) {
+        const desig = obj as Designation;
+        if (desig.designationType === type) {
+          return true;
+        }
       }
     }
     return false;

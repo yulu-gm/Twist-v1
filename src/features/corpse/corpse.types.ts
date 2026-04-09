@@ -21,3 +21,10 @@ export interface Corpse extends MapObjectBase {
   /** 腐烂进度：0 表示刚生成，1 表示完全腐烂（将被移除） */
   decayProgress: number;  // 0~1, 1=fully decayed
 }
+
+// ── KindMap 类型注册 ──
+declare module '../../core/types' {
+  interface KindMap {
+    [ObjectKind.Corpse]: Corpse;
+  }
+}

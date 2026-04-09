@@ -48,7 +48,7 @@ export const constructionProgressSystem: SystemRegistration = {
  */
 /** When all materials are delivered to a Blueprint, convert it to a ConstructionSite */
 function processBlueprints(world: World, map: GameMap): void {
-  const blueprints = map.objects.allOfKind(ObjectKind.Blueprint) as unknown as Blueprint[];
+  const blueprints = map.objects.allOfKind(ObjectKind.Blueprint);
 
   for (const bp of blueprints) {
     if (bp.destroyed) continue;
@@ -119,7 +119,7 @@ function processBlueprints(world: World, map: GameMap): void {
  */
 /** When a ConstructionSite reaches full progress, convert it to the target Building */
 function processConstructionSites(world: World, map: GameMap): void {
-  const sites = map.objects.allOfKind(ObjectKind.ConstructionSite) as unknown as ConstructionSite[];
+  const sites = map.objects.allOfKind(ObjectKind.ConstructionSite);
 
   for (const site of sites) {
     if (site.destroyed) continue;

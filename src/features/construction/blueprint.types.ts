@@ -25,3 +25,10 @@ export interface Blueprint extends MapObjectBase {
   /** 已运送到蓝图位置的材料清单（defId + 已到数量） */
   materialsDelivered: MaterialReq[];
 }
+
+// ── KindMap 类型注册 ──
+declare module '../../core/types' {
+  interface KindMap {
+    [ObjectKind.Blueprint]: Blueprint;
+  }
+}

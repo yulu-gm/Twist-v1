@@ -15,7 +15,7 @@ import type { Item } from './item.types';
  * @returns 该地图上所有物品的数组
  */
 export function getAllItems(map: GameMap): Item[] {
-  return map.objects.allOfKind(ObjectKind.Item) as unknown as Item[];
+  return map.objects.allOfKind(ObjectKind.Item);
 }
 
 /**
@@ -25,9 +25,7 @@ export function getAllItems(map: GameMap): Item[] {
  * @returns 找到的物品对象，未找到则返回 undefined
  */
 export function getItemById(map: GameMap, id: string): Item | undefined {
-  const obj = map.objects.get(id);
-  if (obj && obj.kind === ObjectKind.Item) return obj as unknown as Item;
-  return undefined;
+  return map.objects.getAs(id, ObjectKind.Item);
 }
 
 /**
@@ -38,6 +36,5 @@ export function getItemById(map: GameMap, id: string): Item | undefined {
  * @returns 该坐标上带有 'haulable' 标签的物品数组
  */
 export function getItemsAt(map: GameMap, x: number, y: number): Item[] {
-  const ids = map.objects.allWithTag('haulable');
-  return (ids as unknown as Item[]).filter(i => i.cell.x === x && i.cell.y === y);
+  return getAllItems(map).filter(i => i.cell.x === x && i.cell.y === y);
 }

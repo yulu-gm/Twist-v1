@@ -7,7 +7,7 @@
  * @part-of 核心引擎层 (core)
  */
 
-import { ObjectId, CellCoord, ObjectKind } from './types';
+import { ObjectId, CellCoord, ObjectKind, KindMap } from './types';
 import { log } from './logger';
 
 /**
@@ -74,7 +74,7 @@ export class Inspector {
   inspectPawnJob(pawnId: ObjectId): any | null {
     const obj = this.inspectObject(pawnId);
     if (!obj || obj.kind !== ObjectKind.Pawn) return null;
-    return (obj as any).ai?.currentJob ?? null;
+    return (obj as KindMap[ObjectKind.Pawn]).ai?.currentJob ?? null;
   }
 
   /**

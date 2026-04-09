@@ -209,6 +209,23 @@ export interface MapObjectBase {
   destroyed: boolean;      // 是否已被销毁
 }
 
+/**
+ * 类型映射：ObjectKind → 具体对象接口
+ *
+ * 各 feature 模块通过 declaration merging 注册自己的映射，
+ * 使 ObjectPool.allOfKind(kind) 等方法自动返回正确的具体类型，
+ * 而 core 层无需 import 任何 feature 类型。
+ *
+ * @example
+ * // 在 feature 的 types 文件末尾：
+ * declare module '../../core/types' {
+ *   interface KindMap { [ObjectKind.Pawn]: Pawn; }
+ * }
+ */
+export interface KindMap {
+  [key: string]: MapObjectBase;
+}
+
 // ── 日程安排 ──
 /** 小人每日活动安排类型 */
 export enum ScheduleActivity {

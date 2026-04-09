@@ -299,20 +299,19 @@ export const loadGameHandler: CommandHandler = {
       // 清除棋子运行时状态 — 反序列化后 AI 任务/移动路径可能无效
       const pawns = map.objects.allOfKind(ObjectKind.Pawn);
       for (const pawn of pawns) {
-        const p = pawn as any;
-        if (p.ai) {
-          p.ai.currentJob = null;
-          p.ai.currentToilIndex = 0;
-          p.ai.toilState = {};
-          p.ai.idleTicks = 0;
+        if (pawn.ai) {
+          pawn.ai.currentJob = null;
+          pawn.ai.currentToilIndex = 0;
+          pawn.ai.toilState = {};
+          pawn.ai.idleTicks = 0;
         }
-        if (p.movement) {
-          p.movement.path = [];
-          p.movement.pathIndex = 0;
-          p.movement.moveProgress = 0;
+        if (pawn.movement) {
+          pawn.movement.path = [];
+          pawn.movement.pathIndex = 0;
+          pawn.movement.moveProgress = 0;
         }
-        if (p.inventory) {
-          p.inventory.carrying = null;
+        if (pawn.inventory) {
+          pawn.inventory.carrying = null;
         }
       }
     }
