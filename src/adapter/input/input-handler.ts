@@ -1,18 +1,19 @@
 /**
  * @file input-handler.ts
- * @description 输入处理器，处理鼠标点击/拖拽、键盘快捷键，以及放置/指派预览更新
+ * @description 输入处理器 — 鼠标点击/拖拽状态机、工具操作执行、放置/指派预览更新
  * @dependencies phaser — 输入系统；world/world — 命令队列；world/game-map — 地图数据；
- *               core/types — CellCoord、ObjectKind、DesignationType、SimSpeed；
- *               presentation — ToolType、OverlayType、PresentationState
+ *               core/types — CellCoord、ObjectKind、DesignationType；
+ *               presentation — ToolType、PresentationState
  * @part-of adapter/input — 输入处理模块
  */
 
 import Phaser from 'phaser';
 import { World } from '../../world/world';
 import type { GameMap } from '../../world/game-map';
-import { CellCoord, ObjectKind, DesignationType, SimSpeed } from '../../core/types';
-import { PresentationState, ToolType, OverlayType } from '../../presentation/presentation-state';
+import { CellCoord, ObjectKind, DesignationType } from '../../core/types';
+import { PresentationState, ToolType } from '../../presentation/presentation-state';
 import type { Designation } from '../../features/designation/designation.types';
+import { setupKeyboardBindings } from './keyboard-bindings';
 
 /** 地图格子像素大小 */
 const TILE_SIZE = 32;
@@ -28,8 +29,9 @@ const MAX_DRAG_SIZE = 50;
  *
  * 职责：
  * 1. 监听鼠标点击/拖拽 — 根据当前工具模式执行单击或批量操作
- * 2. 监听键盘快捷键 — 切换工具、速度控制、覆盖层切换、存档/读档
- * 3. 每帧更新悬停格子、放置预览和指派预览
+ * 2. 每帧更新悬停格子、放置预览和指派预览
+ *
+ * 键盘快捷键绑定见 keyboard-bindings.ts
  */
 export class InputHandler {
   // ── 引用 ──
@@ -56,13 +58,12 @@ export class InputHandler {
     this.map = map;
     this.presentation = presentation;
 
-    this.setupInputs();
+    this.setupMouseInputs();
+    setupKeyboardBindings(scene, world, presentation);
   }
 
-  /** 注册所有输入事件监听器 */
-  private setupInputs(): void {
-    // ── 鼠标拖拽状态机 ──
-
+  /** 注册鼠标输入事件 */
+  private setupMouseInputs(): void {
     // pointerdown：记录起点
     this.scene.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       if (!pointer.leftButtonDown()) return;
@@ -124,113 +125,6 @@ export class InputHandler {
       }
       this.dragState = null;
     });
-
-    // ── 键盘快捷键 ──
-    if (this.scene.input.keyboard) {
-      const kb = this.scene.input.keyboard;
-
-      // ── 速度控制 ──
-      kb.on('keydown-SPACE', () => {
-        this.world.commandQueue.push({
-          type: 'set_speed',
-          payload: { speed: this.world.speed === SimSpeed.Paused ? SimSpeed.Normal : SimSpeed.Paused },
-        });
-      });
-      kb.on('keydown-ONE', () => {
-        this.world.commandQueue.push({ type: 'set_speed', payload: { speed: SimSpeed.Normal } });
-      });
-      kb.on('keydown-TWO', () => {
-        this.world.commandQueue.push({ type: 'set_speed', payload: { speed: SimSpeed.Fast } });
-      });
-      kb.on('keydown-THREE', () => {
-        this.world.commandQueue.push({ type: 'set_speed', payload: { speed: SimSpeed.UltraFast } });
-      });
-
-      // ── 工具快捷键 ──
-      kb.on('keydown-ESC', () => {
-        this.switchTool(ToolType.Select);
-        this.presentation.placementPreview = null;
-        this.presentation.selectedObjectIds.clear();
-      });
-      kb.on('keydown-Q', () => {
-        this.switchTool(ToolType.Select);
-      });
-      kb.on('keydown-B', () => {
-        this.switchTool(ToolType.Build);
-        this.presentation.activeBuildDefId = 'wall_wood';
-        this.presentation.selectedObjectIds.clear();
-      });
-      kb.on('keydown-M', () => {
-        this.switchTool(ToolType.Designate);
-        this.presentation.activeDesignationType = DesignationType.Mine;
-        this.presentation.selectedObjectIds.clear();
-      });
-      kb.on('keydown-H', () => {
-        this.switchTool(ToolType.Designate);
-        this.presentation.activeDesignationType = DesignationType.Harvest;
-        this.presentation.selectedObjectIds.clear();
-      });
-      kb.on('keydown-X', () => {
-        this.switchTool(ToolType.Designate);
-        this.presentation.activeDesignationType = DesignationType.Cut;
-        this.presentation.selectedObjectIds.clear();
-      });
-      kb.on('keydown-C', () => {
-        this.switchTool(ToolType.Cancel);
-        this.presentation.selectedObjectIds.clear();
-      });
-
-      // 调试面板切换：F1
-      kb.on('keydown-F1', () => {
-        this.presentation.showDebugPanel = !this.presentation.showDebugPanel;
-      });
-
-      // 覆盖层切换：F2 区域、F3 房间、F4 温度、F5 寻路
-      kb.on('keydown-F2', () => {
-        this.presentation.activeOverlay =
-          this.presentation.activeOverlay === OverlayType.Zones ? OverlayType.None : OverlayType.Zones;
-      });
-      kb.on('keydown-F3', () => {
-        this.presentation.activeOverlay =
-          this.presentation.activeOverlay === OverlayType.Rooms ? OverlayType.None : OverlayType.Rooms;
-      });
-      kb.on('keydown-F4', () => {
-        this.presentation.activeOverlay =
-          this.presentation.activeOverlay === OverlayType.Temperature ? OverlayType.None : OverlayType.Temperature;
-      });
-      kb.on('keydown-F5', (event: KeyboardEvent) => {
-        event.preventDefault();
-        this.presentation.activeOverlay =
-          this.presentation.activeOverlay === OverlayType.Pathfinding ? OverlayType.None : OverlayType.Pathfinding;
-      });
-
-      // 存档/读档：F6 保存、F7 加载
-      kb.on('keydown-F6', () => {
-        this.world.commandQueue.push({ type: 'save_game', payload: {} });
-      });
-      kb.on('keydown-F7', () => {
-        this.world.commandQueue.push({ type: 'load_game', payload: {} });
-      });
-
-      // 网格线切换：F8
-      kb.on('keydown-F8', (event: KeyboardEvent) => {
-        event.preventDefault();
-        this.presentation.showGrid = !this.presentation.showGrid;
-      });
-    }
-  }
-
-  // ── 工具切换 ──
-
-  /** 切换工具并重置子类型 */
-  private switchTool(tool: ToolType): void {
-    this.presentation.activeTool = tool;
-    if (tool !== ToolType.Designate) {
-      this.presentation.activeDesignationType = null;
-    }
-    if (tool !== ToolType.Build) {
-      this.presentation.activeBuildDefId = null;
-    }
   }
 
   // ── 坐标转换 ──
@@ -544,17 +438,5 @@ export class InputHandler {
     } else {
       this.presentation.designationPreview = null;
     }
-  }
-
-  // ── 公开 API ──
-
-  setSelectedBuilding(defId: string): void {
-    this.switchTool(ToolType.Build);
-    this.presentation.activeBuildDefId = defId;
-  }
-
-  setDesignationType(type: DesignationType): void {
-    this.switchTool(ToolType.Designate);
-    this.presentation.activeDesignationType = type;
   }
 }
