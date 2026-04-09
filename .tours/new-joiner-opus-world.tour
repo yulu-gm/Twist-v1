@@ -1,0 +1,85 @@
+{
+  "$schema": "https://aka.ms/codetour-schema",
+  "title": "Opus World 新人导览",
+  "description": "给新加入开发者的一条上手路径：从运行入口、架构原则和启动流程，到 World、Tick、输入命令链、AI 调度与浏览器调试入口。",
+  "ref": "blank-start",
+  "steps": [
+    {
+      "directory": "src",
+      "title": "先建立目录感",
+      "description": "你现在站在项目的主战场。这里同时放着 simulation、adapter、defs 和 presentation，意味着上手时最好先建立分层感，再沿主链路往下读；直接扎进某个 feature 往往会只见树木不见森林。"
+    },
+    {
+      "file": "package.json",
+      "line": 6,
+      "title": "确认运行面",
+      "description": "这里定义了最小工具链：`vite` 开发、`tsc && vite build` 构建，依赖也很克制。对新人来说，这说明难点主要在游戏模拟而不是工程脚手架；一个容易忽略的点是仓库当前没有测试脚本，前期验证更依赖手工回归和调试工具。"
+    },
+    {
+      "file": "plan/opus architecture.md",
+      "line": 15,
+      "title": "先读架构契约",
+      "description": "这份文档写的是代码的设计约束，而不只是背景介绍。它明确了 Simulation/Presentation 分离、Command 统一入口和确定性优先，新人先读这里会更容易判断后面的实现为什么长成这样；很多看似绕的结构，其实是在服务这些约束。"
+    },
+    {
+      "file": "src/main.ts",
+      "line": 359,
+      "title": "从启动入口看全局装配",
+      "description": "`boot()` 是整套运行链路的装配点：加载 defs、创建 world、建图、注册命令和系统，最后再把 Phaser 启起来。这里最适合建立模块地图，因为它几乎串到了所有核心子系统；但要注意，它负责接线，不是具体玩法规则的归宿。"
+    },
+    {
+      "file": "src/world/world.ts",
+      "line": 45,
+      "title": "抓住最高层状态容器",
+      "description": "`World` 是整个 simulation 的根对象，里面既有长期状态，也有 `commandQueue`、`eventBuffer`、`tickRunner` 这种运行时基础设施。新人理解了这里，就知道“状态放哪、命令从哪进、事件往哪出”；一个常见误区是把它看成纯存档数据，实际上它还承载了执行管线。"
+    },
+    {
+      "file": "src/world/game-map.ts",
+      "line": 30,
+      "title": "地图不是一张地形表",
+      "description": "`GameMap` 把地形、对象池、空间索引、区域、房间、预约和寻路缓存绑在一起，所以它更像一个地图级子世界。后面很多 feature 都会围着它转，新人读到某个系统时经常会回到这里确认依赖；关键 gotcha 是对象查询通常不直接扫全量，而是借助 `objects`、`spatial` 和 `reservations` 这些配套结构。"
+    },
+    {
+      "file": "src/core/tick-runner.ts",
+      "line": 68,
+      "title": "理解固定 Tick 流水线",
+      "description": "这里定义了每个 tick 的执行顺序：命令处理、工作生成、AI 决策、预约、执行、世界更新、清理和事件派发。新人只要记住这条流水线，跨模块追踪行为就会简单很多；别漏掉一个细节：`world.tick` 的递增不在这里做，而是在外层场景更新中完成。"
+    },
+    {
+      "file": "src/adapter/main-scene.ts",
+      "line": 122,
+      "title": "Phaser 只是桥，不是游戏本体",
+      "description": "`MainScene.update()` 把帧时间换成逻辑 tick，再调用 `tickRunner` 和渲染同步器，因此它是 presentation 与 simulation 对接的关键桥梁。新人从这里能看清“每帧”和“每 tick”的边界；一个容易错过的点是暂停时 UI、输入和调试层仍然会更新。"
+    },
+    {
+      "file": "src/presentation/presentation-state.ts",
+      "line": 66,
+      "title": "把展示态和模拟态分开看",
+      "description": "`PresentationState` 只存选中、悬停、预览、覆盖层和当前工具这些屏幕状态，不应该承载真实世界规则。新人如果要改 UI 或交互，先分清自己是在改 presentation 还是 simulation，会少走很多弯路；特别是 `switchTool()` 会顺手清理子状态，这一点很影响交互行为。"
+    },
+    {
+      "file": "src/adapter/input/input-handler.ts",
+      "line": 144,
+      "title": "用户操作先变成意图",
+      "description": "`handleClick()` 根据当前工具把点击分发成选择、建造、指派或取消，而真正写入世界的是压进 `world.commandQueue` 的命令。对新人来说，这一步能解释为什么输入层很少直接改对象；拖拽和单击看起来像直接操作地图，实际上只是生成不同粒度的意图。"
+    },
+    {
+      "file": "src/core/command-bus.ts",
+      "line": 82,
+      "title": "Command 是统一写入口",
+      "description": "`processQueue()` 会为每条命令找 handler、先校验再执行，并把事件推到缓冲区里。这里是架构原则真正落地的地方，所以新人加新交互时通常都要经过这层；别忽略 rejected 分支，没有 handler 或验证失败也会留下事件痕迹。"
+    },
+    {
+      "file": "src/features/ai/job-selector.ts",
+      "line": 126,
+      "title": "小人行为由系统调度，不靠对象方法",
+      "description": "`gatherCandidates()` 把进食、指派、搬运材料和施工都整理成候选工作，再按分数选择最优项。新人想理解“为什么小人去做这件事”时，几乎总会回到这里；一个关键 gotcha 是空闲并不等于停着不动，长时间没分到正式工作会退化成 wander job。"
+    },
+    {
+      "file": "src/adapter/debug/console.ts",
+      "line": 42,
+      "title": "用浏览器控制台快速验理解",
+      "description": "`window.opus` 暴露了检查对象、看 reservation、推进 tick、注入命令和查看状态的快捷入口。新人读完前面的链路后，最好的下一步不是盲改代码，而是先在浏览器里跑 `opus.status()`、`opus.pawns()` 或 `opus.advance(50)` 验证自己的心智模型；这会比单靠肉眼看画面更快定位理解偏差。"
+    }
+  ]
+}
