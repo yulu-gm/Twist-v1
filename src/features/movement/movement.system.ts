@@ -13,29 +13,7 @@ import { SystemRegistration } from '../../core/tick-runner';
 import { log } from '../../core/logger';
 import { World } from '../../world/world';
 import { GameMap } from '../../world/game-map';
-
-/** 可移动棋子的鸭子类型接口（只包含移动系统需要的字段） */
-interface MovablePawn {
-  /** 棋子ID */
-  id: string;
-  /** 对象类型 */
-  kind: ObjectKind;
-  /** 当前所在格子坐标 */
-  cell: { x: number; y: number };
-  /** 移动状态数据 */
-  movement: {
-    /** 移动路径 */
-    path: { x: number; y: number }[];
-    /** 当前路径索引 */
-    pathIndex: number;
-    /** 格子间移动进度 */
-    moveProgress: number;
-    /** 移动速度 */
-    speed: number;
-    /** 上一次移动前所在的格子 */
-    prevCell: { x: number; y: number } | null;
-  };
-}
+import type { Pawn } from '../pawn/pawn.types';
 
 /** 移动系统注册：在 EXECUTION 阶段每 tick 执行 */
 export const movementSystem: SystemRegistration = {
@@ -55,7 +33,7 @@ export const movementSystem: SystemRegistration = {
  * @param map - 游戏地图
  */
 function processMap(map: GameMap): void {
-  const pawns = map.objects.allOfKind(ObjectKind.Pawn) as MovablePawn[];
+  const pawns = map.objects.allOfKind(ObjectKind.Pawn);
 
   for (const pawn of pawns) {
     const mv = pawn.movement;

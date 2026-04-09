@@ -14,60 +14,7 @@ import { log } from '../../core/logger';
 import { GameMap } from '../../world/game-map';
 import { World } from '../../world/world';
 import { createItemRaw } from '../item/item.factory';
-
-/**
- * 清理协议使用的 Pawn 鸭子类型接口。
- * 使用结构化接口而非具体 Pawn 类型，以解耦模块依赖。
- */
-interface CleanablePawn {
-  /** Pawn 唯一标识符 */
-  id: ObjectId;
-  /** 当前所在格子坐标 */
-  cell: { x: number; y: number };
-
-  // ── AI 状态 ──
-  ai: {
-    /** 当前正在执行的工作（可为 null） */
-    currentJob: {
-      /** 工作 ID */
-      id: string;
-      /** 此工作持有的资源预留 ID 列表 */
-      reservations: string[];
-      /** 劳作步骤列表 */
-      toils: Array<{ localData: Record<string, unknown> }>;
-      /** 当前 Toil 索引 */
-      currentToilIndex: number;
-    } | null;
-    /** 当前 Toil 步骤索引 */
-    currentToilIndex: number;
-    /** Toil 执行的临时状态数据 */
-    toilState: Record<string, unknown>;
-    /** 空闲 Tick 计数 */
-    idleTicks: number;
-  };
-
-  // ── 移动状态 ──
-  movement: {
-    /** 当前路径点序列 */
-    path: { x: number; y: number }[];
-    /** 路径中当前步进索引 */
-    pathIndex: number;
-    /** 移动进度 */
-    moveProgress: number;
-    /** 移动速度 */
-    speed: number;
-    /** 上一次移动前所在的格子 */
-    prevCell: { x: number; y: number } | null;
-  };
-
-  // ── 背包 ──
-  inventory: {
-    /** 当前携带的物品 ID */
-    carrying: ObjectId | null;
-    /** 最大负重容量 */
-    carryCapacity: number;
-  };
-}
+import type { Pawn } from '../pawn/pawn.types';
 
 /**
  * 清理协议 —— 在工作中断或失败后重置 Pawn 的状态。
@@ -84,7 +31,7 @@ interface CleanablePawn {
  * @param world - 游戏世界实例
  */
 export function cleanupProtocol(
-  pawn: CleanablePawn,
+  pawn: Pawn,
   map: GameMap,
   world: World,
 ): void {

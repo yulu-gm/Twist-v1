@@ -88,7 +88,7 @@ export function createPawn(params: {
     drafted: false,
 
     movement: {
-      path: null,
+      path: [],
       pathIndex: 0,
       moveProgress: 0,
       speed: 1,

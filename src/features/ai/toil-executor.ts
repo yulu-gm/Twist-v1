@@ -20,67 +20,13 @@ import { GameMap } from '../../world/game-map';
 import { findPath } from '../pathfinding/path.service';
 import { cleanupProtocol } from './cleanup';
 import { Job, Toil } from './ai.types';
+import type { Pawn } from '../pawn/pawn.types';
 import type { ConstructionSite } from '../construction/construction-site.types';
 import type { Blueprint } from '../construction/blueprint.types';
 import type { Designation } from '../designation/designation.types';
 import type { Building } from '../building/building.types';
 import type { Item } from '../item/item.types';
 import { createItemRaw } from '../item/item.factory';
-
-/**
- * Toil 执行器使用的 Pawn 鸭子类型接口。
- * 使用结构化接口而非具体 Pawn 类型，以解耦模块依赖。
- */
-interface ExecutablePawn {
-  /** Pawn 唯一标识符 */
-  id: ObjectId;
-  /** 对象种类（Pawn） */
-  kind: ObjectKind;
-  /** 当前所在格子坐标 */
-  cell: { x: number; y: number };
-
-  // ── AI 状态 ──
-  ai: {
-    /** 当前正在执行的工作（为 null 表示空闲） */
-    currentJob: Job | null;
-    /** 当前 Toil 步骤索引 */
-    currentToilIndex: number;
-    /** Toil 执行的临时状态数据 */
-    toilState: Record<string, unknown>;
-    /** 空闲 Tick 计数 */
-    idleTicks: number;
-  };
-
-  // ── 移动状态 ──
-  movement: {
-    /** 当前路径点序列 */
-    path: { x: number; y: number }[];
-    /** 路径中当前步进索引 */
-    pathIndex: number;
-    /** 移动进度（0~1 之间，表示格子间的插值） */
-    moveProgress: number;
-    /** 移动速度 */
-    speed: number;
-    /** 上一次移动前所在的格子 */
-    prevCell: { x: number; y: number } | null;
-  };
-
-  // ── 背包 ──
-  inventory: {
-    /** 当前携带的物品 ID（null 表示未携带） */
-    carrying: ObjectId | null;
-    /** 最大负重容量 */
-    carryCapacity: number;
-  };
-
-  // ── 需求 ──
-  needs: {
-    /** 饱食度（0~100） */
-    food: number;
-    /** 疲劳度（0~100） */
-    rest: number;
-  };
-}
 
 /**
  * Toil 执行器系统注册。
@@ -105,7 +51,7 @@ export const toilExecutorSystem: SystemRegistration = {
  * @param map   - 当前处理的地图
  */
 function processMap(world: World, map: GameMap): void {
-  const pawns = map.objects.allOfKind(ObjectKind.Pawn) as ExecutablePawn[];
+  const pawns = map.objects.allOfKind(ObjectKind.Pawn);
 
   for (const pawn of pawns) {
     const job = pawn.ai.currentJob;
@@ -174,7 +120,7 @@ function processMap(world: World, map: GameMap): void {
  * @param world - 游戏世界实例
  */
 function executeToil(
-  pawn: ExecutablePawn,
+  pawn: Pawn,
   toil: Toil,
   job: Job,
   map: GameMap,
@@ -219,7 +165,7 @@ function executeToil(
  * @param world - 游戏世界实例
  */
 function executeGoTo(
-  pawn: ExecutablePawn,
+  pawn: Pawn,
   toil: Toil,
   map: GameMap,
   world: World,
@@ -271,7 +217,7 @@ function executeGoTo(
  * @param _world - 游戏世界实例（未使用）
  */
 function executePickUp(
-  pawn: ExecutablePawn,
+  pawn: Pawn,
   toil: Toil,
   map: GameMap,
   _world: World,
@@ -330,7 +276,7 @@ function executePickUp(
  * @param _world - 游戏世界实例（未使用）
  */
 function executeDrop(
-  pawn: ExecutablePawn,
+  pawn: Pawn,
   toil: Toil,
   map: GameMap,
   _world: World,
@@ -370,7 +316,7 @@ function executeDrop(
  * @param world - 游戏世界实例
  */
 function executeWork(
-  pawn: ExecutablePawn,
+  pawn: Pawn,
   toil: Toil,
   job: Job,
   map: GameMap,
@@ -460,7 +406,7 @@ function executeWork(
  * @param toil - Wait 类型的 Toil（localData 中含 waited/waitTicks/eating/nutritionValue）
  */
 function executeWait(
-  pawn: ExecutablePawn,
+  pawn: Pawn,
   toil: Toil,
 ): void {
   const ld = toil.localData;
@@ -491,7 +437,7 @@ function executeWait(
  * @param world - 游戏世界实例
  */
 function executeDeliver(
-  pawn: ExecutablePawn,
+  pawn: Pawn,
   toil: Toil,
   map: GameMap,
   world: World,
@@ -560,7 +506,7 @@ function executeDeliver(
  * @param _world - 游戏世界实例（未使用）
  */
 function executeInteract(
-  pawn: ExecutablePawn,
+  pawn: Pawn,
   toil: Toil,
   map: GameMap,
   _world: World,
@@ -602,7 +548,7 @@ function executeInteract(
  * @param job   - 当前工作
  * @param world - 游戏世界实例
  */
-function advanceToil(pawn: ExecutablePawn, job: Job, world: World): void {
+function advanceToil(pawn: Pawn, job: Job, world: World): void {
   job.currentToilIndex++;
   pawn.ai.currentToilIndex = job.currentToilIndex;
 
@@ -619,7 +565,7 @@ function advanceToil(pawn: ExecutablePawn, job: Job, world: World): void {
  * @param map   - 当前地图（可为 null）
  * @param world - 游戏世界实例
  */
-function completeJob(pawn: ExecutablePawn, map: GameMap | null, world: World): void {
+function completeJob(pawn: Pawn, map: GameMap | null, world: World): void {
   const job = pawn.ai.currentJob;
   if (!job) return;
 

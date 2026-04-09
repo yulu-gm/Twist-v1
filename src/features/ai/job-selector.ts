@@ -20,6 +20,8 @@ import { World } from '../../world/world';
 import { GameMap } from '../../world/game-map';
 import { estimateDistance } from '../pathfinding/path.service';
 import { Job, JobCandidate } from './ai.types';
+import type { Pawn } from '../pawn/pawn.types';
+import type { Designation } from '../designation/designation.types';
 import { Blueprint } from '../construction/blueprint.types';
 import { ConstructionSite } from '../construction/construction-site.types';
 import { createMineJob } from './jobs/mine-job';
@@ -27,75 +29,6 @@ import { createHarvestJob } from './jobs/harvest-job';
 import { createConstructJob } from './jobs/construct-job';
 import { createHaulJob } from './jobs/haul-job';
 import { createEatJob } from './jobs/eat-job';
-
-/**
- * 工作选择系统使用的 Pawn 鸭子类型接口。
- */
-interface SelectablePawn {
-  /** Pawn 唯一标识符 */
-  id: string;
-  /** 对象种类 */
-  kind: ObjectKind;
-  /** 当前所在格子坐标 */
-  cell: { x: number; y: number };
-
-  // ── AI 状态 ──
-  ai: {
-    /** 当前工作（null 表示空闲） */
-    currentJob: Job | null;
-    /** 当前 Toil 索引 */
-    currentToilIndex: number;
-    /** Toil 临时状态 */
-    toilState: Record<string, unknown>;
-    /** 空闲 Tick 计数 */
-    idleTicks: number;
-  };
-
-  // ── 移动状态 ──
-  movement: {
-    path: { x: number; y: number }[];
-    pathIndex: number;
-    moveProgress: number;
-    speed: number;
-    prevCell: { x: number; y: number } | null;
-  };
-
-  // ── 背包 ──
-  inventory: {
-    carrying: string | null;
-    carryCapacity: number;
-  };
-
-  // ── 需求 ──
-  needs: {
-    /** 饱食度（0~100） */
-    food: number;
-    /** 疲劳度（0~100） */
-    rest: number;
-  };
-}
-
-/**
- * 指派对象的鸭子类型接口（采矿、收割、砍伐等）。
- */
-interface DesignationObj {
-  /** 指派唯一标识符 */
-  id: string;
-  /** 对象种类 */
-  kind: ObjectKind;
-  /** 指派所在格子坐标 */
-  cell: { x: number; y: number };
-  /** 是否已被销毁 */
-  destroyed: boolean;
-  /** 指派类型（mine/harvest/cut） */
-  designationType: string;
-  /** 目标对象 ID（如植物 ID） */
-  targetObjectId?: string;
-  /** 目标格子坐标 */
-  targetCell?: CellCoord;
-  /** 优先级 */
-  priority?: number;
-}
 
 /** 漫步工作计数器 */
 let wanderJobCounter = 0;
@@ -123,7 +56,7 @@ export const jobSelectionSystem: SystemRegistration = {
  * @param map   - 当前处理的地图
  */
 function processMap(world: World, map: GameMap): void {
-  const pawns = map.objects.allOfKind(ObjectKind.Pawn) as SelectablePawn[];
+  const pawns = map.objects.allOfKind(ObjectKind.Pawn);
 
   for (const pawn of pawns) {
     // 仅为空闲的 Pawn 分配工作
@@ -191,7 +124,7 @@ function processMap(world: World, map: GameMap): void {
  * @returns 候选工作列表（含分数），由调用方排序选择
  */
 function gatherCandidates(
-  pawn: SelectablePawn,
+  pawn: Pawn,
   map: GameMap,
   _world: World,
 ): JobCandidate[] {
@@ -207,7 +140,7 @@ function gatherCandidates(
   }
 
   // ── 2. 检查指派任务（采矿、收割、砍伐） ──
-  const designations = map.objects.allOfKind(ObjectKind.Designation) as DesignationObj[];
+  const designations = map.objects.allOfKind(ObjectKind.Designation);
   for (const desig of designations) {
     if (desig.destroyed) continue;
     if (map.reservations.isReserved(desig.id)) continue;
@@ -308,7 +241,7 @@ function gatherCandidates(
  * @returns 进食工作候选项（含分数），若无食物则返回 null
  */
 function findFoodJob(
-  pawn: SelectablePawn,
+  pawn: Pawn,
   map: GameMap,
 ): JobCandidate | null {
   const items = map.objects.allWithTag('food');
@@ -347,7 +280,7 @@ function findFoodJob(
  * @returns 漫步 Job，若找不到有效目标则返回 null
  */
 function createWanderJob(
-  pawn: SelectablePawn,
+  pawn: Pawn,
   map: GameMap,
   world: World,
 ): Job | null {
@@ -400,7 +333,7 @@ function createWanderJob(
  * @param world  - 游戏世界实例
  */
 function assignJob(
-  pawn: SelectablePawn,
+  pawn: Pawn,
   job: Job,
   _map: GameMap,
   world: World,

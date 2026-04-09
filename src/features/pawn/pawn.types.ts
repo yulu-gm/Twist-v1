@@ -71,8 +71,8 @@ export interface Pawn extends MapObjectBase {
 
   // ── 移动相关 ──
   movement: {
-    /** 当前移动路径（格子坐标数组），null 表示无路径 */
-    path: CellCoord[] | null;
+    /** 当前移动路径（格子坐标数组），空数组表示无路径 */
+    path: CellCoord[];
     /** 当前路径中正在前往的节点索引 */
     pathIndex: number;
     /** 当前格子间的移动进度（0~1） */
