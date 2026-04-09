@@ -6,7 +6,12 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "generate:module-map": "node tools/generate-project-module-map.mjs",
+    "benchmark:search-proj-info:validate": "node tools/benchmark/search_proj_info/validate-benchmark.mjs",
+    "benchmark:search-proj-info:scaffold": "node tools/benchmark/search_proj_info/scaffold-run.mjs",
+    "benchmark:search-proj-info:report": "node tools/benchmark/search_proj_info/report-benchmark.mjs",
+    "benchmark:search-proj-info:run": "node tools/benchmark/search_proj_info/run-corpus-benchmark.mjs"
   },
   "dependencies": {
     "phaser": "^3.90.0"

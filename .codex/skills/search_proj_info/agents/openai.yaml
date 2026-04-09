@@ -1,0 +1,4 @@
+interface:
+  display_name: "Project Search Guide"
+  short_description: "Locate Twist-v1 code with the module map"
+  default_prompt: "Use $search_proj_info to locate the right Twist-v1 modules and files before doing any broad code search."

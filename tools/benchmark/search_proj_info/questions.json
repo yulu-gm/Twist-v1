@@ -1,0 +1,233 @@
+{
+  "schema_version": 1,
+  "benchmark_id": "search_proj_info_v1",
+  "map_paths": {
+    "json": "project-map/project-module-map.json",
+    "markdown": "project-map/project-module-map.md"
+  },
+  "arms": [
+    "baseline",
+    "treatment"
+  ],
+  "questions": [
+    {
+      "id": "q01_startup_main_loop",
+      "category": "startup",
+      "prompt": "启动、系统注册和主循环推进的关键入口在哪里？请定位最关键的文件。",
+      "must_hit_files": [
+        "src/main.ts",
+        "src/adapter/main-scene.ts",
+        "src/core/tick-runner.ts"
+      ],
+      "secondary_files": [
+        "src/adapter/bootstrap.ts"
+      ],
+      "target_modules": [
+        "main",
+        "adapter",
+        "core"
+      ]
+    },
+    {
+      "id": "q02_pawn_job_selection",
+      "category": "ai",
+      "prompt": "Pawn 的工作选择逻辑在哪里？请定位选工和任务生命周期相关文件。",
+      "must_hit_files": [
+        "src/features/ai/job-selector.ts",
+        "src/features/ai/job-lifecycle.ts"
+      ],
+      "secondary_files": [
+        "src/features/pawn/pawn.types.ts",
+        "src/features/ai/ai.types.ts"
+      ],
+      "target_modules": [
+        "features.ai",
+        "features.pawn"
+      ]
+    },
+    {
+      "id": "q03_mining_drag_to_execution",
+      "category": "flow",
+      "prompt": "采矿从拖框输入到实际执行的链路在哪里？请给出最关键的文件入口。",
+      "must_hit_files": [
+        "src/adapter/input/input-handler.ts",
+        "src/features/designation/designation.commands.ts",
+        "src/features/ai/jobs/mine-job.ts",
+        "src/features/ai/toil-handlers/work.handler.ts"
+      ],
+      "secondary_files": [
+        "plan/业务场景解释.md"
+      ],
+      "target_modules": [
+        "adapter",
+        "features.designation",
+        "features.ai",
+        "doc.flows"
+      ]
+    },
+    {
+      "id": "q04_room_and_pathgrid",
+      "category": "world",
+      "prompt": "房间重建和 pathGrid 更新分别在哪里处理？",
+      "must_hit_files": [
+        "src/world/path-grid.ts",
+        "src/features/room/room.system.ts",
+        "src/features/construction/construction.system.ts"
+      ],
+      "secondary_files": [
+        "src/world/game-map.ts"
+      ],
+      "target_modules": [
+        "world",
+        "features.room",
+        "features.construction"
+      ]
+    },
+    {
+      "id": "q05_save_load_entry",
+      "category": "save",
+      "prompt": "存档读取从哪里开始？请定位加载入口和关键数据结构。",
+      "must_hit_files": [
+        "src/features/save/save.commands.ts",
+        "src/features/save/save.types.ts"
+      ],
+      "secondary_files": [
+        "src/world/world.ts",
+        "src/core/serialization.ts"
+      ],
+      "target_modules": [
+        "features.save",
+        "world"
+      ]
+    },
+    {
+      "id": "q06_render_sync_layer",
+      "category": "render",
+      "prompt": "渲染同步和对象 renderer 在哪一层？请定位主同步器和至少两个 renderer 文件。",
+      "must_hit_files": [
+        "src/adapter/render/render-sync.ts",
+        "src/adapter/render/object-renderers/pawn-renderer.ts",
+        "src/adapter/render/object-renderers/item-renderer.ts"
+      ],
+      "secondary_files": [
+        "src/presentation/presentation-state.ts",
+        "src/adapter/render/object-renderers/plant-renderer.ts"
+      ],
+      "target_modules": [
+        "adapter",
+        "presentation"
+      ]
+    },
+    {
+      "id": "q07_defs_registration",
+      "category": "defs",
+      "prompt": "Defs 和静态数据的注册入口在哪里？请定位统一注册点和至少三类 defs 文件。",
+      "must_hit_files": [
+        "src/defs/index.ts",
+        "src/world/def-database.ts",
+        "src/defs/terrains.ts"
+      ],
+      "secondary_files": [
+        "src/defs/buildings.ts",
+        "src/defs/items.ts",
+        "src/defs/jobs.ts",
+        "src/defs/plants.ts"
+      ],
+      "target_modules": [
+        "defs",
+        "world"
+      ]
+    },
+    {
+      "id": "q08_player_intent_commands",
+      "category": "commands",
+      "prompt": "玩家输入的区域、指派、建造命令分别在哪里进入 simulation？",
+      "must_hit_files": [
+        "src/features/zone/zone.commands.ts",
+        "src/features/designation/designation.commands.ts",
+        "src/features/construction/construction.commands.ts"
+      ],
+      "secondary_files": [
+        "src/core/command-bus.ts",
+        "src/main.ts"
+      ],
+      "target_modules": [
+        "features.zone",
+        "features.designation",
+        "features.construction",
+        "core"
+      ]
+    },
+    {
+      "id": "q09_presentation_bridge",
+      "category": "presentation",
+      "prompt": "PresentationState 的定义和主要读取方在哪里？请定位桥梁定义和两个主要消费点。",
+      "must_hit_files": [
+        "src/presentation/presentation-state.ts",
+        "src/adapter/main-scene.ts",
+        "src/adapter/input/input-handler.ts"
+      ],
+      "secondary_files": [
+        "src/adapter/ui/dom-ui-manager.ts",
+        "src/adapter/render/world-preview.ts"
+      ],
+      "target_modules": [
+        "presentation",
+        "adapter"
+      ]
+    },
+    {
+      "id": "q10_core_runtime_relationship",
+      "category": "core",
+      "prompt": "CommandBus、TickRunner、EventBus 三者的核心入口分别在哪里？",
+      "must_hit_files": [
+        "src/core/command-bus.ts",
+        "src/core/tick-runner.ts",
+        "src/core/event-bus.ts"
+      ],
+      "secondary_files": [
+        "src/main.ts",
+        "src/adapter/main-scene.ts"
+      ],
+      "target_modules": [
+        "core",
+        "main",
+        "adapter"
+      ]
+    },
+    {
+      "id": "q11_plants_generation_vs_growth",
+      "category": "content",
+      "prompt": "初始植被生成和植物生长更新分别在哪里？请定位启动层和 feature 层的关键文件。",
+      "must_hit_files": [
+        "src/main.ts",
+        "src/features/plant/plant.system.ts",
+        "src/features/plant/plant.factory.ts"
+      ],
+      "secondary_files": [
+        "src/features/plant/plant.types.ts"
+      ],
+      "target_modules": [
+        "main",
+        "features.plant"
+      ]
+    },
+    {
+      "id": "q12_reservation_system",
+      "category": "reservation",
+      "prompt": "预约系统在地图层和 feature 层分别有哪些关键入口？",
+      "must_hit_files": [
+        "src/world/reservation-table.ts",
+        "src/features/reservation/reservation.table.ts"
+      ],
+      "secondary_files": [
+        "src/world/game-map.ts",
+        "src/features/reservation/reservation.types.ts"
+      ],
+      "target_modules": [
+        "world",
+        "features.reservation"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,59 @@
+{
+  "benchmark_id": "search_proj_info_v1",
+  "inputs": [
+    "tools/benchmark/search_proj_info/results/corpus-benchmark.jsonl"
+  ],
+  "arms": {
+    "baseline": {
+      "runs": 60,
+      "strict_accuracy": 1,
+      "median_latency_ms": 11,
+      "median_search_tokens": 146879,
+      "median_answer_tokens": 39,
+      "median_total_tokens": 146936.5,
+      "median_num_search_ops": 97,
+      "median_num_files_opened": 96,
+      "median_num_repo_wide_searches": 1,
+      "median_must_hit_recall": 1
+    },
+    "treatment": {
+      "runs": 60,
+      "strict_accuracy": 0.8333333333333334,
+      "median_latency_ms": 6,
+      "median_search_tokens": 69241.5,
+      "median_answer_tokens": 36.5,
+      "median_total_tokens": 69288.5,
+      "median_num_search_ops": 44.5,
+      "median_num_files_opened": 42.5,
+      "median_num_repo_wide_searches": 0,
+      "median_must_hit_recall": 1
+    }
+  },
+  "paired": {
+    "latency_ms": {
+      "pairs": 12,
+      "median_delta": -6,
+      "median_saving_ratio": 0.5227272727272727
+    },
+    "search_tokens": {
+      "pairs": 12,
+      "median_delta": -64424,
+      "median_saving_ratio": 0.4734470351112126
+    },
+    "total_tokens": {
+      "pairs": 12,
+      "median_delta": -64438,
+      "median_saving_ratio": 0.47329940015854016
+    },
+    "num_search_ops": {
+      "pairs": 12,
+      "median_delta": -29,
+      "median_saving_ratio": 0.30395256916996044
+    },
+    "num_repo_wide_searches": {
+      "pairs": 12,
+      "median_delta": -1,
+      "median_saving_ratio": 1
+    }
+  }
+}

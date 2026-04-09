@@ -1,0 +1,1376 @@
+{
+  "schema_version": 1,
+  "project": {
+    "name": "opus-world",
+    "language": "TypeScript",
+    "runtime": "Vite + Phaser",
+    "primary_entry": "src/main.ts",
+    "architecture_style": "main -> core/world/defs/features -> adapter/presentation",
+    "purpose": "为 agent 提供高密度模块导航，先读 map 再做局部搜索。"
+  },
+  "layers": [
+    {
+      "id": "main",
+      "path": "src/main.ts",
+      "summary": "启动入口与装配层。",
+      "downstream": [
+        "core",
+        "world",
+        "defs",
+        "features",
+        "adapter"
+      ]
+    },
+    {
+      "id": "core",
+      "path": "src/core",
+      "summary": "全局基础设施与通用运行时组件。",
+      "downstream": [
+        "world",
+        "features",
+        "adapter"
+      ]
+    },
+    {
+      "id": "world",
+      "path": "src/world",
+      "summary": "世界根数据、地图容器和 map 级子系统。",
+      "downstream": [
+        "features",
+        "adapter"
+      ]
+    },
+    {
+      "id": "defs",
+      "path": "src/defs",
+      "summary": "静态定义和注册入口。",
+      "downstream": [
+        "main",
+        "features",
+        "adapter"
+      ]
+    },
+    {
+      "id": "features",
+      "path": "src/features",
+      "summary": "业务特性目录，负责 simulation 规则和 command/system 实现。",
+      "downstream": [
+        "adapter via world state"
+      ]
+    },
+    {
+      "id": "adapter",
+      "path": "src/adapter",
+      "summary": "Phaser、输入、渲染、UI 和调试适配层。",
+      "downstream": [
+        "presentation"
+      ]
+    },
+    {
+      "id": "presentation",
+      "path": "src/presentation",
+      "summary": "非 simulation 的展示态桥梁。",
+      "downstream": [
+        "adapter"
+      ]
+    },
+    {
+      "id": "plan",
+      "path": "plan",
+      "summary": "项目内架构蓝图、流程解释和演化审计文档。",
+      "downstream": [
+        "human and agent guidance"
+      ]
+    }
+  ],
+  "modules": [
+    {
+      "id": "main",
+      "kind": "entry",
+      "summary": "应用启动与装配入口，负责构建 defs、world、初始内容、系统注册和 Phaser 启动。",
+      "key_files": [
+        "src/main.ts"
+      ],
+      "exports_or_roles": [
+        "generateTerrain",
+        "spawnInitialVegetation",
+        "spawnInitialPawns",
+        "buildSystems",
+        "registerCommands"
+      ],
+      "depends_on": [
+        "core",
+        "world",
+        "defs",
+        "features.*",
+        "adapter"
+      ],
+      "used_by": [
+        "vite entry"
+      ],
+      "search_hints": [
+        "启动流程",
+        "buildSystems",
+        "registerCommands",
+        "初始地图生成",
+        "boot"
+      ],
+      "doc_refs": [
+        "plan/opus architecture.md",
+        "plan/业务场景解释.md"
+      ]
+    },
+    {
+      "id": "core",
+      "kind": "layer",
+      "summary": "核心引擎基础设施，提供时钟、命令总线、事件总线、对象池、网格与 tick 调度。",
+      "key_files": [
+        "src/core/tick-runner.ts",
+        "src/core/command-bus.ts",
+        "src/core/types.ts",
+        "src/core/object-pool.ts"
+      ],
+      "exports_or_roles": [
+        "SystemRegistration",
+        "TickRunner",
+        "shouldRunThisTick",
+        "Command",
+        "ValidationResult",
+        "ExecutionResult",
+        "CommandHandler",
+        "ExecutedCommand",
+        "CommandBus",
+        "ObjectId"
+      ],
+      "depends_on": [],
+      "used_by": [
+        "main",
+        "world",
+        "features.*",
+        "adapter"
+      ],
+      "search_hints": [
+        "tick 顺序",
+        "command bus",
+        "event bus",
+        "基础类型",
+        "对象池"
+      ],
+      "doc_refs": [
+        "plan/opus architecture.md",
+        "plan/基建检查报告.md"
+      ]
+    },
+    {
+      "id": "world",
+      "kind": "layer",
+      "summary": "世界根数据与地图级容器，管理 GameMap、DefDatabase 桥接以及区域/房间/预约等子系统。",
+      "key_files": [
+        "src/world/world.ts",
+        "src/world/game-map.ts",
+        "src/world/def-database.ts"
+      ],
+      "exports_or_roles": [
+        "Faction",
+        "StoryState",
+        "World",
+        "createWorld",
+        "GameMap",
+        "createGameMap",
+        "DefCategory",
+        "BuildingDef",
+        "ItemDef",
+        "PlantDef"
+      ],
+      "depends_on": [
+        "core"
+      ],
+      "used_by": [
+        "main",
+        "features.*",
+        "adapter"
+      ],
+      "search_hints": [
+        "World 结构",
+        "GameMap",
+        "pathGrid",
+        "rooms",
+        "reservations"
+      ],
+      "doc_refs": [
+        "plan/opus architecture.md",
+        "plan/业务场景解释.md"
+      ]
+    },
+    {
+      "id": "defs",
+      "kind": "layer",
+      "summary": "静态定义数据层，集中注册 terrain/building/item/plant/job 等 Def。",
+      "key_files": [
+        "src/defs/index.ts",
+        "src/defs/terrains.ts",
+        "src/defs/buildings.ts",
+        "src/defs/items.ts"
+      ],
+      "exports_or_roles": [
+        "buildDefDatabase",
+        "TERRAIN_DEFS",
+        "BUILDING_DEFS",
+        "ITEM_DEFS"
+      ],
+      "depends_on": [
+        "world"
+      ],
+      "used_by": [
+        "main",
+        "features.*",
+        "adapter.render"
+      ],
+      "search_hints": [
+        "DefDatabase",
+        "terrain defs",
+        "building defs",
+        "item defs",
+        "job defs"
+      ],
+      "doc_refs": [
+        "plan/opus architecture.md"
+      ]
+    },
+    {
+      "id": "adapter",
+      "kind": "layer",
+      "summary": "适配器层，连接 Phaser、输入、渲染、DOM UI 与调试工具，不承载 simulation 规则。",
+      "key_files": [
+        "src/adapter/main-scene.ts",
+        "src/adapter/render/render-sync.ts",
+        "src/adapter/input/input-handler.ts"
+      ],
+      "exports_or_roles": [
+        "MainScene",
+        "RenderSync",
+        "InputHandler"
+      ],
+      "depends_on": [
+        "world",
+        "core",
+        "presentation",
+        "features.*"
+      ],
+      "used_by": [
+        "main"
+      ],
+      "search_hints": [
+        "MainScene",
+        "Phaser",
+        "渲染同步",
+        "DOM UI",
+        "输入拖拽"
+      ],
+      "doc_refs": [
+        "plan/V1友好交互-落地计划.md",
+        "plan/业务场景解释.md"
+      ]
+    },
+    {
+      "id": "presentation",
+      "kind": "layer",
+      "summary": "展示态桥梁，存放选中、悬停、工具模式、预览等不属于 simulation 的瞬态状态。",
+      "key_files": [
+        "src/presentation/presentation-state.ts"
+      ],
+      "exports_or_roles": [
+        "OverlayType",
+        "PlacementPreview",
+        "DesignationPreview",
+        "PresentationState",
+        "ToolType",
+        "switchTool",
+        "createPresentationState"
+      ],
+      "depends_on": [
+        "core"
+      ],
+      "used_by": [
+        "adapter"
+      ],
+      "search_hints": [
+        "PresentationState",
+        "ToolType",
+        "选中态",
+        "预览态"
+      ],
+      "doc_refs": [
+        "plan/V1友好交互-落地计划.md",
+        "plan/代码坏味道审计报告.md"
+      ]
+    },
+    {
+      "id": "features.ai",
+      "kind": "feature",
+      "summary": "AI 调度与 toil 执行层，负责候选工作生成、任务生命周期和具体 toil handler。",
+      "key_files": [
+        "src/features/ai/job-selector.ts",
+        "src/features/ai/toil-executor.ts",
+        "src/features/ai/job-lifecycle.ts"
+      ],
+      "exports_or_roles": [
+        "jobSelectionSystem",
+        "processMap",
+        "gatherCandidates",
+        "findFoodJob",
+        "createWanderJob",
+        "assignJob",
+        "toilExecutorSystem",
+        "advanceToil",
+        "completeJob"
+      ],
+      "depends_on": [
+        "features.pawn",
+        "features.pathfinding",
+        "features.designation",
+        "features.construction",
+        "world",
+        "core"
+      ],
+      "used_by": [
+        "main",
+        "features.movement"
+      ],
+      "search_hints": [
+        "工作选择",
+        "wander",
+        "toil handler",
+        "cleanupProtocol",
+        "job lifecycle"
+      ],
+      "doc_refs": [
+        "plan/业务场景解释.md",
+        "plan/基建检查报告.md"
+      ],
+      "file_count": 19,
+      "files": [
+        "src/features/ai/ai.types.ts",
+        "src/features/ai/cleanup.ts",
+        "src/features/ai/job-lifecycle.ts",
+        "src/features/ai/job-selector.ts",
+        "src/features/ai/jobs/adjacent-util.ts",
+        "src/features/ai/jobs/construct-job.ts",
+        "src/features/ai/jobs/eat-job.ts",
+        "src/features/ai/jobs/harvest-job.ts",
+        "src/features/ai/jobs/haul-job.ts",
+        "src/features/ai/jobs/mine-job.ts",
+        "src/features/ai/toil-executor.ts",
+        "src/features/ai/toil-handlers/deliver.handler.ts",
+        "src/features/ai/toil-handlers/drop.handler.ts",
+        "src/features/ai/toil-handlers/goto.handler.ts",
+        "src/features/ai/toil-handlers/interact.handler.ts",
+        "src/features/ai/toil-handlers/pickup.handler.ts",
+        "src/features/ai/toil-handlers/toil-handler.types.ts",
+        "src/features/ai/toil-handlers/wait.handler.ts",
+        "src/features/ai/toil-handlers/work.handler.ts"
+      ]
+    },
+    {
+      "id": "features.building",
+      "kind": "feature",
+      "summary": "建筑对象 schema、工厂和查询，以及建筑 tick 行为。",
+      "key_files": [
+        "src/features/building/building.types.ts",
+        "src/features/building/building.factory.ts",
+        "src/features/building/building.systems.ts"
+      ],
+      "exports_or_roles": [
+        "Building",
+        "createBuilding",
+        "buildingTickSystem"
+      ],
+      "depends_on": [
+        "core",
+        "world",
+        "defs"
+      ],
+      "used_by": [
+        "features.construction",
+        "adapter.render"
+      ],
+      "search_hints": [
+        "building factory",
+        "building tick",
+        "building queries"
+      ],
+      "doc_refs": [
+        "plan/opus architecture.md"
+      ],
+      "file_count": 4,
+      "files": [
+        "src/features/building/building.factory.ts",
+        "src/features/building/building.queries.ts",
+        "src/features/building/building.systems.ts",
+        "src/features/building/building.types.ts"
+      ]
+    },
+    {
+      "id": "features.construction",
+      "kind": "feature",
+      "summary": "蓝图、工地、建造命令与施工进度处理，是从蓝图到建筑的主链路。",
+      "key_files": [
+        "src/features/construction/construction.commands.ts",
+        "src/features/construction/construction.system.ts",
+        "src/features/construction/construction.queries.ts"
+      ],
+      "exports_or_roles": [
+        "placeBlueprintHandler",
+        "cancelConstructionHandler",
+        "constructionCommandHandlers",
+        "constructionProgressSystem",
+        "processBlueprints",
+        "processConstructionSites",
+        "getAllBlueprints",
+        "getAllConstructionSites"
+      ],
+      "depends_on": [
+        "features.building",
+        "features.item",
+        "features.designation",
+        "world",
+        "core"
+      ],
+      "used_by": [
+        "main",
+        "features.ai",
+        "adapter.input"
+      ],
+      "search_hints": [
+        "place blueprint",
+        "construction progress",
+        "cancel construction",
+        "construction site"
+      ],
+      "doc_refs": [
+        "plan/业务场景解释.md",
+        "plan/opus architecture.md"
+      ],
+      "file_count": 5,
+      "files": [
+        "src/features/construction/blueprint.types.ts",
+        "src/features/construction/construction-site.types.ts",
+        "src/features/construction/construction.commands.ts",
+        "src/features/construction/construction.queries.ts",
+        "src/features/construction/construction.system.ts"
+      ]
+    },
+    {
+      "id": "features.corpse",
+      "kind": "feature",
+      "summary": "尸体对象创建与腐烂系统。",
+      "key_files": [
+        "src/features/corpse/corpse.factory.ts",
+        "src/features/corpse/corpse.system.ts",
+        "src/features/corpse/corpse.types.ts"
+      ],
+      "exports_or_roles": [
+        "createCorpse",
+        "corpseDecaySystem",
+        "corpseDecayExecute",
+        "Corpse"
+      ],
+      "depends_on": [
+        "core",
+        "world"
+      ],
+      "used_by": [
+        "main",
+        "adapter.render"
+      ],
+      "search_hints": [
+        "corpse decay",
+        "corpse factory"
+      ],
+      "doc_refs": [
+        "plan/opus architecture.md"
+      ],
+      "file_count": 3,
+      "files": [
+        "src/features/corpse/corpse.factory.ts",
+        "src/features/corpse/corpse.system.ts",
+        "src/features/corpse/corpse.types.ts"
+      ]
+    },
+    {
+      "id": "features.designation",
+      "kind": "feature",
+      "summary": "指派对象、指派命令和 work 生成入口，连接玩家意图与可执行工作。",
+      "key_files": [
+        "src/features/designation/designation.commands.ts",
+        "src/features/designation/designation.system.ts",
+        "src/features/designation/designation.queries.ts"
+      ],
+      "exports_or_roles": [
+        "designateHarvestHandler",
+        "designateMineHandler",
+        "designateCutHandler",
+        "cancelDesignationHandler",
+        "designationCommandHandlers",
+        "resolveMap",
+        "resolveMapId",
+        "createDesignation",
+        "workGenerationSystem",
+        "scanDesignationsForWork"
+      ],
+      "depends_on": [
+        "world",
+        "defs",
+        "core"
+      ],
+      "used_by": [
+        "main",
+        "adapter.input",
+        "features.ai"
+      ],
+      "search_hints": [
+        "designate mine",
+        "designate cut",
+        "cancel designation",
+        "work generation"
+      ],
+      "doc_refs": [
+        "plan/业务场景解释.md"
+      ],
+      "file_count": 4,
+      "files": [
+        "src/features/designation/designation.commands.ts",
+        "src/features/designation/designation.queries.ts",
+        "src/features/designation/designation.system.ts",
+        "src/features/designation/designation.types.ts"
+      ]
+    },
+    {
+      "id": "features.fire",
+      "kind": "feature",
+      "summary": "火焰对象行为与扩散/熄灭更新。",
+      "key_files": [
+        "src/features/fire/fire.system.ts",
+        "src/features/fire/fire.types.ts"
+      ],
+      "exports_or_roles": [
+        "fireSystem",
+        "fireExecute",
+        "Fire"
+      ],
+      "depends_on": [
+        "world",
+        "core"
+      ],
+      "used_by": [
+        "main",
+        "adapter.render"
+      ],
+      "search_hints": [
+        "fire system",
+        "fire types"
+      ],
+      "doc_refs": [
+        "plan/opus architecture.md"
+      ],
+      "file_count": 2,
+      "files": [
+        "src/features/fire/fire.system.ts",
+        "src/features/fire/fire.types.ts"
+      ]
+    },
+    {
+      "id": "features.item",
+      "kind": "feature",
+      "summary": "物品对象 schema、工厂和查询，供掉落、搬运、消耗等系统复用。",
+      "key_files": [
+        "src/features/item/item.factory.ts",
+        "src/features/item/item.types.ts",
+        "src/features/item/item.queries.ts"
+      ],
+      "exports_or_roles": [
+        "createItem",
+        "createItemRaw",
+        "Item",
+        "getAllItems",
+        "getItemById",
+        "getItemsAt"
+      ],
+      "depends_on": [
+        "core",
+        "defs",
+        "world"
+      ],
+      "used_by": [
+        "main",
+        "features.ai",
+        "features.construction",
+        "adapter.render"
+      ],
+      "search_hints": [
+        "item factory",
+        "createItemRaw",
+        "stackCount",
+        "food tag"
+      ],
+      "doc_refs": [
+        "plan/业务场景解释.md",
+        "plan/基建检查报告.md"
+      ],
+      "file_count": 3,
+      "files": [
+        "src/features/item/item.factory.ts",
+        "src/features/item/item.queries.ts",
+        "src/features/item/item.types.ts"
+      ]
+    },
+    {
+      "id": "features.movement",
+      "kind": "feature",
+      "summary": "Pawn 移动状态与逐 tick 移动推进逻辑。",
+      "key_files": [
+        "src/features/movement/movement.system.ts",
+        "src/features/movement/movement.types.ts"
+      ],
+      "exports_or_roles": [
+        "movementSystem",
+        "processMap",
+        "MOVE_SPEED_DEFAULT",
+        "MovementState",
+        "createDefaultMovement"
+      ],
+      "depends_on": [
+        "features.pawn",
+        "world",
+        "core"
+      ],
+      "used_by": [
+        "main",
+        "features.ai",
+        "adapter.render"
+      ],
+      "search_hints": [
+        "movement system",
+        "moveProgress",
+        "pathIndex"
+      ],
+      "doc_refs": [
+        "plan/V1友好交互-落地计划.md",
+        "plan/业务场景解释.md"
+      ],
+      "file_count": 2,
+      "files": [
+        "src/features/movement/movement.system.ts",
+        "src/features/movement/movement.types.ts"
+      ]
+    },
+    {
+      "id": "features.pathfinding",
+      "kind": "feature",
+      "summary": "寻路服务与路径结果类型，支撑 GoTo 等行动。",
+      "key_files": [
+        "src/features/pathfinding/path.service.ts",
+        "src/features/pathfinding/path.types.ts",
+        "src/features/pathfinding/path.grid.ts"
+      ],
+      "exports_or_roles": [
+        "estimateDistance",
+        "findPath",
+        "isReachable",
+        "reconstructPath",
+        "getTerrainMoveCost",
+        "PathOptions",
+        "PathResult"
+      ],
+      "depends_on": [
+        "world",
+        "core"
+      ],
+      "used_by": [
+        "features.ai",
+        "adapter.preview"
+      ],
+      "search_hints": [
+        "findPath",
+        "isReachable",
+        "MinHeap",
+        "adjacent passable"
+      ],
+      "doc_refs": [
+        "plan/基建检查报告.md",
+        "plan/业务场景解释.md"
+      ],
+      "file_count": 3,
+      "files": [
+        "src/features/pathfinding/path.grid.ts",
+        "src/features/pathfinding/path.service.ts",
+        "src/features/pathfinding/path.types.ts"
+      ]
+    },
+    {
+      "id": "features.pawn",
+      "kind": "feature",
+      "summary": "Pawn schema、工厂、命令和需求衰减系统。",
+      "key_files": [
+        "src/features/pawn/pawn.factory.ts",
+        "src/features/pawn/pawn.commands.ts",
+        "src/features/pawn/pawn.systems.ts",
+        "src/features/pawn/pawn.types.ts"
+      ],
+      "exports_or_roles": [
+        "createPawn",
+        "defaultSchedule",
+        "defaultSkills",
+        "draftPawnHandler",
+        "undraftPawnHandler",
+        "forceJobHandler",
+        "pawnCommandHandlers",
+        "getPawn",
+        "nextJobId",
+        "needDecaySystem"
+      ],
+      "depends_on": [
+        "core",
+        "world"
+      ],
+      "used_by": [
+        "main",
+        "features.ai",
+        "features.movement",
+        "adapter.render"
+      ],
+      "search_hints": [
+        "createPawn",
+        "needs decay",
+        "draft pawn",
+        "force job",
+        "pawn schema"
+      ],
+      "doc_refs": [
+        "plan/业务场景解释.md",
+        "plan/opus architecture.md"
+      ],
+      "file_count": 5,
+      "files": [
+        "src/features/pawn/pawn.commands.ts",
+        "src/features/pawn/pawn.factory.ts",
+        "src/features/pawn/pawn.queries.ts",
+        "src/features/pawn/pawn.systems.ts",
+        "src/features/pawn/pawn.types.ts"
+      ]
+    },
+    {
+      "id": "features.plant",
+      "kind": "feature",
+      "summary": "植物对象创建与生长逻辑。",
+      "key_files": [
+        "src/features/plant/plant.factory.ts",
+        "src/features/plant/plant.system.ts",
+        "src/features/plant/plant.types.ts"
+      ],
+      "exports_or_roles": [
+        "createPlant",
+        "growPlantsSystem",
+        "growPlantsExecute",
+        "Plant"
+      ],
+      "depends_on": [
+        "core",
+        "defs",
+        "world"
+      ],
+      "used_by": [
+        "main",
+        "features.designation",
+        "adapter.render"
+      ],
+      "search_hints": [
+        "grow plants",
+        "tree",
+        "berry bush",
+        "growthProgress"
+      ],
+      "doc_refs": [
+        "plan/业务场景解释.md"
+      ],
+      "file_count": 3,
+      "files": [
+        "src/features/plant/plant.factory.ts",
+        "src/features/plant/plant.system.ts",
+        "src/features/plant/plant.types.ts"
+      ]
+    },
+    {
+      "id": "features.reservation",
+      "kind": "feature",
+      "summary": "地图预约表的 feature 侧桥接与清理逻辑。",
+      "key_files": [
+        "src/features/reservation/reservation.table.ts",
+        "src/features/reservation/reservation.types.ts"
+      ],
+      "exports_or_roles": [
+        "reservationCleanupSystem",
+        "reservationCleanupExecute"
+      ],
+      "depends_on": [
+        "world",
+        "core"
+      ],
+      "used_by": [
+        "main",
+        "features.ai"
+      ],
+      "search_hints": [
+        "reservation cleanup",
+        "Reservation type"
+      ],
+      "doc_refs": [
+        "plan/业务场景解释.md"
+      ],
+      "file_count": 2,
+      "files": [
+        "src/features/reservation/reservation.table.ts",
+        "src/features/reservation/reservation.types.ts"
+      ]
+    },
+    {
+      "id": "features.room",
+      "kind": "feature",
+      "summary": "房间重建系统与房间类型桥接。",
+      "key_files": [
+        "src/features/room/room.system.ts",
+        "src/features/room/room.types.ts"
+      ],
+      "exports_or_roles": [
+        "roomRebuildSystem",
+        "rebuildRooms"
+      ],
+      "depends_on": [
+        "world",
+        "features.building",
+        "core"
+      ],
+      "used_by": [
+        "main",
+        "adapter.debug"
+      ],
+      "search_hints": [
+        "room rebuild",
+        "markDirty",
+        "room graph"
+      ],
+      "doc_refs": [
+        "plan/业务场景解释.md"
+      ],
+      "file_count": 2,
+      "files": [
+        "src/features/room/room.system.ts",
+        "src/features/room/room.types.ts"
+      ]
+    },
+    {
+      "id": "features.save",
+      "kind": "feature",
+      "summary": "存档命令、存储读取和存档数据结构。",
+      "key_files": [
+        "src/features/save/save.commands.ts",
+        "src/features/save/save.types.ts"
+      ],
+      "exports_or_roles": [
+        "saveGameHandler",
+        "loadGameHandler",
+        "saveCommandHandlers",
+        "serializeObject",
+        "deserializeObject",
+        "serializeZone",
+        "deserializeZone",
+        "SaveData",
+        "MapSaveData"
+      ],
+      "depends_on": [
+        "world",
+        "core",
+        "features.*"
+      ],
+      "used_by": [
+        "main",
+        "debug tooling"
+      ],
+      "search_hints": [
+        "save game",
+        "load game",
+        "localStorage",
+        "SaveData"
+      ],
+      "doc_refs": [
+        "plan/基建检查报告.md",
+        "plan/代码坏味道审计报告.md"
+      ],
+      "file_count": 2,
+      "files": [
+        "src/features/save/save.commands.ts",
+        "src/features/save/save.types.ts"
+      ]
+    },
+    {
+      "id": "features.zone",
+      "kind": "feature",
+      "summary": "区域命令、查询与 zone 类型桥接。",
+      "key_files": [
+        "src/features/zone/zone.commands.ts",
+        "src/features/zone/zone.queries.ts",
+        "src/features/zone/zone.types.ts"
+      ],
+      "exports_or_roles": [
+        "zoneSetCellsHandler",
+        "zoneDeleteHandler",
+        "zoneCommandHandlers",
+        "nextZoneId",
+        "getAllZones",
+        "getZoneAt"
+      ],
+      "depends_on": [
+        "world",
+        "core"
+      ],
+      "used_by": [
+        "main",
+        "adapter.input"
+      ],
+      "search_hints": [
+        "zone set cells",
+        "zone delete",
+        "storage zone"
+      ],
+      "doc_refs": [
+        "plan/opus architecture.md"
+      ],
+      "file_count": 3,
+      "files": [
+        "src/features/zone/zone.commands.ts",
+        "src/features/zone/zone.queries.ts",
+        "src/features/zone/zone.types.ts"
+      ]
+    },
+    {
+      "id": "doc.architecture",
+      "kind": "doc",
+      "summary": "总架构蓝图，定义 Simulation/Presentation 分离、Command 入口和 feature-based 组织。",
+      "key_files": [
+        "plan/opus architecture.md"
+      ],
+      "exports_or_roles": [],
+      "depends_on": [],
+      "used_by": [
+        "main",
+        "core",
+        "world",
+        "features.*",
+        "adapter"
+      ],
+      "search_hints": [
+        "架构原则",
+        "World 数据模型",
+        "GameMap",
+        "对象类型系统"
+      ],
+      "doc_refs": [
+        "plan/opus architecture.md"
+      ]
+    },
+    {
+      "id": "doc.flows",
+      "kind": "doc",
+      "summary": "业务流程解释，适合回答“某个交互从输入到执行的链路在哪里”。",
+      "key_files": [
+        "plan/业务场景解释.md"
+      ],
+      "exports_or_roles": [],
+      "depends_on": [],
+      "used_by": [
+        "features.ai",
+        "adapter.input",
+        "main"
+      ],
+      "search_hints": [
+        "行为调度流程",
+        "采矿流程",
+        "建造流程"
+      ],
+      "doc_refs": [
+        "plan/业务场景解释.md"
+      ]
+    },
+    {
+      "id": "doc.audit",
+      "kind": "doc",
+      "summary": "基建检查与坏味道报告，适合定位热点文件、演化瓶颈和高风险模块。",
+      "key_files": [
+        "plan/基建检查报告.md",
+        "plan/代码坏味道审计报告.md"
+      ],
+      "exports_or_roles": [],
+      "depends_on": [],
+      "used_by": [
+        "maintainers"
+      ],
+      "search_hints": [
+        "大文件热点",
+        "演化瓶颈",
+        "坏味道",
+        "优先级建议"
+      ],
+      "doc_refs": [
+        "plan/基建检查报告.md",
+        "plan/代码坏味道审计报告.md"
+      ]
+    }
+  ],
+  "patterns": [
+    {
+      "name": "四层主链路",
+      "description": "主入口从 main 装配 world/core/defs/features，再由 adapter 驱动渲染与输入。",
+      "paths": [
+        "src/main.ts",
+        "src/core",
+        "src/world",
+        "src/defs",
+        "src/features",
+        "src/adapter"
+      ]
+    },
+    {
+      "name": "Feature 目录模式",
+      "description": "feature 通常按 types / factory / queries / system / commands 拆分，AI 额外包含 jobs 和 toil-handlers。",
+      "paths": [
+        "src/features"
+      ]
+    },
+    {
+      "name": "Simulation 与 Presentation 分离",
+      "description": "simulation 规则不依赖 Phaser 或 DOM，展示态通过 presentation-state 作为桥梁。",
+      "paths": [
+        "src/presentation/presentation-state.ts",
+        "src/adapter",
+        "plan/opus architecture.md"
+      ]
+    },
+    {
+      "name": "命令入口统一",
+      "description": "玩家、UI、调试工具的外部写入都经由 command bus 与具体 command handlers 进入 world。",
+      "paths": [
+        "src/core/command-bus.ts",
+        "src/main.ts",
+        "src/features/*/*.commands.ts"
+      ]
+    },
+    {
+      "name": "Tick 阶段化执行",
+      "description": "系统执行按 command processing -> work generation -> AI decision -> reservation -> execution -> world update -> cleanup -> event dispatch 组织。",
+      "paths": [
+        "src/core/tick-runner.ts",
+        "src/main.ts"
+      ]
+    }
+  ],
+  "lookups": [
+    {
+      "question": "启动/注册/主循环在哪里？",
+      "modules": [
+        "main",
+        "adapter",
+        "core"
+      ],
+      "files": [
+        "src/main.ts",
+        "src/adapter/main-scene.ts",
+        "src/core/tick-runner.ts"
+      ],
+      "why": "主装配在 main，tick 推进在 MainScene，系统执行顺序在 TickRunner。"
+    },
+    {
+      "question": "Pawn 的工作选择逻辑在哪里？",
+      "modules": [
+        "features.ai",
+        "features.pawn"
+      ],
+      "files": [
+        "src/features/ai/job-selector.ts",
+        "src/features/ai/job-lifecycle.ts",
+        "src/features/pawn/pawn.types.ts"
+      ],
+      "why": "选工、分配和 job 生命周期都集中在 AI feature，Pawn schema 决定了 ai/needs 字段形状。"
+    },
+    {
+      "question": "采矿从拖框到执行的链路在哪？",
+      "modules": [
+        "adapter",
+        "features.designation",
+        "features.ai"
+      ],
+      "files": [
+        "src/adapter/input/input-handler.ts",
+        "src/features/designation/designation.commands.ts",
+        "src/features/ai/jobs/mine-job.ts",
+        "src/features/ai/toil-handlers/work.handler.ts"
+      ],
+      "why": "输入层下发指派命令，designation 落地为对象，AI 再把指派转成可执行 job 和 toil。"
+    },
+    {
+      "question": "房间重建和 pathGrid 更新在哪处理？",
+      "modules": [
+        "world",
+        "features.room",
+        "features.construction"
+      ],
+      "files": [
+        "src/world/game-map.ts",
+        "src/world/path-grid.ts",
+        "src/features/room/room.system.ts",
+        "src/features/construction/construction.system.ts"
+      ],
+      "why": "pathGrid 是地图级基础设施，房间重建是 feature，建造完成后会触发路径和房间相关更新。"
+    },
+    {
+      "question": "存档读取从哪里开始？",
+      "modules": [
+        "features.save",
+        "world"
+      ],
+      "files": [
+        "src/features/save/save.commands.ts",
+        "src/features/save/save.types.ts",
+        "src/world/world.ts"
+      ],
+      "why": "save.commands 同时承载保存和加载入口，并在加载时重建世界与地图容器。"
+    },
+    {
+      "question": "渲染同步和对象 renderer 在哪一层？",
+      "modules": [
+        "adapter",
+        "presentation"
+      ],
+      "files": [
+        "src/adapter/render/render-sync.ts",
+        "src/adapter/render/object-renderers/pawn-renderer.ts",
+        "src/presentation/presentation-state.ts"
+      ],
+      "why": "渲染与 renderer 都在 adapter 层，presentation-state 负责非 simulation 的 UI 桥接状态。"
+    },
+    {
+      "question": "Defs 和静态数据去哪看？",
+      "modules": [
+        "defs",
+        "world"
+      ],
+      "files": [
+        "src/defs/index.ts",
+        "src/defs/terrains.ts",
+        "src/defs/buildings.ts",
+        "src/world/def-database.ts"
+      ],
+      "why": "defs 负责定义内容，DefDatabase 负责统一注册与访问。"
+    },
+    {
+      "question": "区域、指派、建造这些玩家意图在哪里入库？",
+      "modules": [
+        "features.zone",
+        "features.designation",
+        "features.construction"
+      ],
+      "files": [
+        "src/features/zone/zone.commands.ts",
+        "src/features/designation/designation.commands.ts",
+        "src/features/construction/construction.commands.ts"
+      ],
+      "why": "用户输入最终都会经由 command handler 落地为 simulation 对象或状态变更。"
+    }
+  ],
+  "lookup_index": {
+    "src/main.ts": [
+      "启动/注册/主循环在哪里？"
+    ],
+    "src/adapter/main-scene.ts": [
+      "启动/注册/主循环在哪里？"
+    ],
+    "src/core/tick-runner.ts": [
+      "启动/注册/主循环在哪里？"
+    ],
+    "src/features/ai/job-selector.ts": [
+      "Pawn 的工作选择逻辑在哪里？"
+    ],
+    "src/features/ai/job-lifecycle.ts": [
+      "Pawn 的工作选择逻辑在哪里？"
+    ],
+    "src/features/pawn/pawn.types.ts": [
+      "Pawn 的工作选择逻辑在哪里？"
+    ],
+    "src/adapter/input/input-handler.ts": [
+      "采矿从拖框到执行的链路在哪？"
+    ],
+    "src/features/designation/designation.commands.ts": [
+      "采矿从拖框到执行的链路在哪？",
+      "区域、指派、建造这些玩家意图在哪里入库？"
+    ],
+    "src/features/ai/jobs/mine-job.ts": [
+      "采矿从拖框到执行的链路在哪？"
+    ],
+    "src/features/ai/toil-handlers/work.handler.ts": [
+      "采矿从拖框到执行的链路在哪？"
+    ],
+    "src/world/game-map.ts": [
+      "房间重建和 pathGrid 更新在哪处理？"
+    ],
+    "src/world/path-grid.ts": [
+      "房间重建和 pathGrid 更新在哪处理？"
+    ],
+    "src/features/room/room.system.ts": [
+      "房间重建和 pathGrid 更新在哪处理？"
+    ],
+    "src/features/construction/construction.system.ts": [
+      "房间重建和 pathGrid 更新在哪处理？"
+    ],
+    "src/features/save/save.commands.ts": [
+      "存档读取从哪里开始？"
+    ],
+    "src/features/save/save.types.ts": [
+      "存档读取从哪里开始？"
+    ],
+    "src/world/world.ts": [
+      "存档读取从哪里开始？"
+    ],
+    "src/adapter/render/render-sync.ts": [
+      "渲染同步和对象 renderer 在哪一层？"
+    ],
+    "src/adapter/render/object-renderers/pawn-renderer.ts": [
+      "渲染同步和对象 renderer 在哪一层？"
+    ],
+    "src/presentation/presentation-state.ts": [
+      "渲染同步和对象 renderer 在哪一层？"
+    ],
+    "src/defs/index.ts": [
+      "Defs 和静态数据去哪看？"
+    ],
+    "src/defs/terrains.ts": [
+      "Defs 和静态数据去哪看？"
+    ],
+    "src/defs/buildings.ts": [
+      "Defs 和静态数据去哪看？"
+    ],
+    "src/world/def-database.ts": [
+      "Defs 和静态数据去哪看？"
+    ],
+    "src/features/zone/zone.commands.ts": [
+      "区域、指派、建造这些玩家意图在哪里入库？"
+    ],
+    "src/features/construction/construction.commands.ts": [
+      "区域、指派、建造这些玩家意图在哪里入库？"
+    ]
+  },
+  "hotspots": [
+    {
+      "path": "src/adapter/input/input-handler.ts",
+      "lines": 443,
+      "reason": "输入监听、拖拽状态、命令下发和预览计算都集中在这里。"
+    },
+    {
+      "path": "src/main.ts",
+      "lines": 403,
+      "reason": "启动、系统注册、命令注册和初始内容生成都在这里汇合，是全局装配热点。"
+    },
+    {
+      "path": "src/features/ai/job-selector.ts",
+      "lines": 354,
+      "reason": "空闲判定、候选收集、评分、预约和 wander 回退都在这里。"
+    },
+    {
+      "path": "src/features/save/save.commands.ts",
+      "lines": 340,
+      "reason": "保存/加载、序列化、localStorage 访问和世界重建耦合在同一入口。"
+    },
+    {
+      "path": "src/features/designation/designation.commands.ts",
+      "lines": 315,
+      "reason": "文件体量较大，通常意味着更多上下文切换和更高的检索成本。"
+    },
+    {
+      "path": "src/core/types.ts",
+      "lines": 304,
+      "reason": "文件体量较大，通常意味着更多上下文切换和更高的检索成本。"
+    },
+    {
+      "path": "src/features/construction/construction.commands.ts",
+      "lines": 292,
+      "reason": "文件体量较大，通常意味着更多上下文切换和更高的检索成本。"
+    },
+    {
+      "path": "src/features/pathfinding/path.service.ts",
+      "lines": 269,
+      "reason": "文件体量较大，通常意味着更多上下文切换和更高的检索成本。"
+    }
+  ],
+  "docs": [
+    {
+      "id": "architecture",
+      "path": "plan/opus architecture.md",
+      "summary": "最完整的架构蓝图，适合先理解分层、World/GameMap 和对象模型。",
+      "useFor": [
+        "架构总览",
+        "层间边界",
+        "核心模型"
+      ]
+    },
+    {
+      "id": "flows",
+      "path": "plan/业务场景解释.md",
+      "summary": "按实际业务链路解释输入、指派、AI 选工、toil 执行之间的跳转关系。",
+      "useFor": [
+        "交互链路",
+        "采矿流程",
+        "建造流程",
+        "行为调度"
+      ]
+    },
+    {
+      "id": "infra-audit",
+      "path": "plan/基建检查报告.md",
+      "summary": "指出大文件、结构热点与未来扩展瓶颈，适合快速锁定高风险区域。",
+      "useFor": [
+        "热点文件",
+        "演化风险",
+        "重构切入点"
+      ]
+    },
+    {
+      "id": "smell-audit",
+      "path": "plan/代码坏味道审计报告.md",
+      "summary": "补充职责混乱、重复规则与缺少测试保护网等问题观察。",
+      "useFor": [
+        "问题背景",
+        "热点定位",
+        "重构理由"
+      ]
+    }
+  ],
+  "inventory": {
+    "src_files": 114,
+    "plan_files": 9,
+    "features": [
+      "ai",
+      "building",
+      "construction",
+      "corpse",
+      "designation",
+      "fire",
+      "item",
+      "movement",
+      "pathfinding",
+      "pawn",
+      "plant",
+      "reservation",
+      "room",
+      "save",
+      "zone"
+    ]
+  }
+}
