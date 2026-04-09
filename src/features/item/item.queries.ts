@@ -6,6 +6,7 @@
  */
 
 import type { GameMap } from '../../world/game-map';
+import type { CellCoord, DefId } from '../../core/types';
 import { ObjectKind } from '../../core/types';
 import type { Item } from './item.types';
 
@@ -37,4 +38,26 @@ export function getItemById(map: GameMap, id: string): Item | undefined {
  */
 export function getItemsAt(map: GameMap, x: number, y: number): Item[] {
   return getAllItems(map).filter(i => i.cell.x === x && i.cell.y === y);
+}
+
+/**
+ * 获取指定格子上的所有物品
+ * @param map - 游戏地图对象
+ * @param cell - 格子坐标
+ * @returns 该格子上的全部物品
+ */
+export function getItemsAtCell(map: GameMap, cell: CellCoord): Item[] {
+  return getItemsAt(map, cell.x, cell.y);
+}
+
+/**
+ * 判断某格是否只包含单一物品类型，且该类型与目标 defId 一致
+ * @param map - 游戏地图对象
+ * @param cell - 格子坐标
+ * @param defId - 目标物品定义 ID
+ * @returns 空格或只含相同 defId 时返回 true
+ */
+export function isCellCompatibleForItemDef(map: GameMap, cell: CellCoord, defId: DefId): boolean {
+  const items = getItemsAtCell(map, cell);
+  return items.every(item => item.defId === defId);
 }

@@ -14,6 +14,7 @@ import { ObjectKind, ObjectId, MapObjectBase } from '../../core/types';
 import { TILE_SIZE, LAYER_DEPTH, LayerName, kindToLayer, getSpriteColor } from './render-utils';
 import { SpriteRegistry } from './sprite-registry';
 import { TerrainRenderer } from './terrain-renderer';
+import { ZoneRenderer } from './zone-renderer';
 import type { ObjectRenderer } from './object-renderers/types';
 import { PawnRenderer } from './object-renderers/pawn-renderer';
 import { PlantRenderer } from './object-renderers/plant-renderer';
@@ -40,6 +41,7 @@ export class RenderSync {
 
   // ── 子系统 ──
   private terrainRenderer: TerrainRenderer;
+  private zoneRenderer: ZoneRenderer;
   private pawnRenderer: PawnRenderer;
   private rendererMap = new Map<ObjectKind, ObjectRenderer>();
   private defaultRenderer: DefaultRenderer;
@@ -54,6 +56,7 @@ export class RenderSync {
 
     // 初始化子系统
     this.terrainRenderer = new TerrainRenderer(scene, world, map);
+    this.zoneRenderer = new ZoneRenderer(scene, this.layers.get('zone')!, map);
     this.pawnRenderer = new PawnRenderer(scene, this.layers);
     const plantRenderer = new PlantRenderer(scene, this.layers.get('plant')!);
     const itemRenderer = new ItemRenderer(scene, this.layers.get('item')!);
@@ -86,6 +89,7 @@ export class RenderSync {
    */
   sync(tickProgress = 0): void {
     this.terrainRenderer.syncIfDirty(this.layers);
+    this.zoneRenderer.update();
     this.pawnRenderer.setTickProgress(tickProgress);
 
     const seen = new Set<ObjectId>();

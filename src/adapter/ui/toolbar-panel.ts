@@ -5,7 +5,7 @@
  */
 
 import { World } from '../../world/world';
-import { DesignationType } from '../../core/types';
+import { DesignationType, ZoneType } from '../../core/types';
 import { PresentationState, ToolType, switchTool } from '../../presentation/presentation-state';
 
 /** 工具栏 UI 组件 */
@@ -50,6 +50,14 @@ export class ToolbarUI {
             switchTool(this.presentation, ToolType.Designate);
             this.presentation.activeDesignationType = DesignationType.Cut;
             break;
+          case 'zone':
+            switchTool(this.presentation, ToolType.Zone);
+            this.presentation.activeZoneType = ZoneType.Stockpile;
+            break;
+          case 'stockpile':
+            switchTool(this.presentation, ToolType.Zone);
+            this.presentation.activeZoneType = ZoneType.Stockpile;
+            break;
           case 'cancel':
             switchTool(this.presentation, ToolType.Cancel);
             break;
@@ -62,7 +70,8 @@ export class ToolbarUI {
   update(): void {
     const tool = this.presentation.activeTool;
     const desType = this.presentation.activeDesignationType;
-    const toolKey = `${tool}:${desType ?? ''}`;
+    const zoneType = this.presentation.activeZoneType;
+    const toolKey = `${tool}:${desType ?? ''}:${zoneType ?? ''}`;
 
     if (toolKey === this.prevToolKey) return;
     this.prevToolKey = toolKey;
@@ -90,6 +99,12 @@ export class ToolbarUI {
           break;
         case 'cut':
           isActive = tool === ToolType.Designate && desType === DesignationType.Cut;
+          break;
+        case 'zone':
+          isActive = tool === ToolType.Zone;
+          break;
+        case 'stockpile':
+          isActive = tool === ToolType.Zone && zoneType === ZoneType.Stockpile;
           break;
         case 'cancel':
           isActive = tool === ToolType.Cancel;

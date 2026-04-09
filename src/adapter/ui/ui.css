@@ -116,6 +116,7 @@
 .tool-group {
   display: flex;
   gap: 2px;
+  align-items: center;
 }
 
 .toolbar-sep {
@@ -135,14 +136,28 @@
   transition: background 0.1s, color 0.1s;
 }
 
+.tool-btn-secondary {
+  padding: 3px 10px;
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.03);
+}
+
 .tool-btn:hover {
   background: rgba(255, 255, 255, 0.08);
   color: var(--text-color);
 }
 
+.tool-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
 .tool-btn.active {
   background: var(--accent);
   color: #ffffff;
+}
+
+.tool-btn-secondary.active {
+  border-color: var(--accent);
 }
 
 /* ── 选择面板（右侧卡片式） ── */

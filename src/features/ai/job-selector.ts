@@ -12,18 +12,21 @@
  */
 
 import {
-  ObjectKind, TickPhase, DesignationType, CellCoord, ToilType, ToilState, JobState,
+  ObjectKind, TickPhase, DesignationType, CellCoord, ToilType, ToilState, JobState, ZoneType, cellKey, parseKey,
 } from '../../core/types';
 import { SystemRegistration } from '../../core/tick-runner';
 import { log } from '../../core/logger';
 import { World } from '../../world/world';
 import { GameMap } from '../../world/game-map';
+import type { Zone } from '../../world/zone-manager';
 import { estimateDistance } from '../pathfinding/path.service';
 import { Job, JobCandidate } from './ai.types';
 import type { Pawn } from '../pawn/pawn.types';
 import type { Designation } from '../designation/designation.types';
 import { Blueprint } from '../construction/blueprint.types';
 import { ConstructionSite } from '../construction/construction-site.types';
+import type { Item } from '../item/item.types';
+import { isCellCompatibleForItemDef } from '../item/item.queries';
 import { createMineJob } from './jobs/mine-job';
 import { createHarvestJob } from './jobs/harvest-job';
 import { createConstructJob } from './jobs/construct-job';
@@ -228,7 +231,101 @@ function gatherCandidates(
     candidates.push({ job, score });
   }
 
+  // ── 5. 检查散落物品的存储区搬运 ──
+  const stockpileCandidate = createStockpileHaulCandidate(pawn, map);
+  if (stockpileCandidate) {
+    candidates.push(stockpileCandidate);
+  }
+
   return candidates;
+}
+
+/**
+ * 生成“搬运到存储区”的低优先级候选。
+ *
+ * 规则：
+ * - 只处理带 haulable 标签的物品
+ * - 已位于兼容存储区内的物品不再生成候选
+ * - 仅把物品送往 stockpile 区域中最近、可站立的格子
+ */
+function createStockpileHaulCandidate(
+  pawn: Pawn,
+  map: GameMap,
+): JobCandidate | null {
+  const items = map.objects.allOfKind(ObjectKind.Item) as Item[];
+  let bestItem: Item | null = null;
+  let bestDest: CellCoord | null = null;
+  let bestScore = -Infinity;
+
+  for (const item of items) {
+    if (item.destroyed) continue;
+    if (!item.tags.has('haulable')) continue;
+    if (map.reservations.isReserved(item.id)) continue;
+    if (isItemInCompatibleStockpile(map, item)) continue;
+
+    const dest = findBestStockpileDropCell(map, item);
+    if (!dest) continue;
+
+    const itemDist = estimateDistance(pawn.cell, item.cell);
+    const destDist = estimateDistance(item.cell, dest);
+    const score = 15 - itemDist * 0.45 - destDist * 0.2;
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestItem = item;
+      bestDest = dest;
+    }
+  }
+
+  if (!bestItem || !bestDest) return null;
+
+  const job = createHaulJob(pawn.id, bestItem.id, bestItem.cell, bestDest);
+  return { job, score: bestScore };
+}
+
+/** 判断物品是否已经位于兼容的 stockpile 存储区内 */
+function isItemInCompatibleStockpile(map: GameMap, item: Item): boolean {
+  const zone = map.zones.getZoneAt(cellKey(item.cell));
+  return !!zone
+    && zone.zoneType === ZoneType.Stockpile
+    && isItemAcceptedByStockpile(zone, item)
+    && isCellCompatibleForItemDef(map, item.cell, item.defId);
+}
+
+/**
+ * 为物品寻找最近可用的 stockpile 落点。
+ * 首版 stockpile 规则非常宽松：只要是 stockpile 区域、格子可通行且不被阻碍对象占据即可。
+ */
+function findBestStockpileDropCell(map: GameMap, item: Item): CellCoord | null {
+  let bestCell: CellCoord | null = null;
+  let bestDist = Infinity;
+
+  for (const zone of map.zones.getAll()) {
+    if (zone.zoneType !== ZoneType.Stockpile) continue;
+    if (!isItemAcceptedByStockpile(zone, item)) continue;
+
+    for (const key of zone.cells) {
+      const cell = parseKey(key);
+      if (!map.pathGrid.isPassable(cell.x, cell.y)) continue;
+      if (!map.spatial.isPassable(cell)) continue;
+      if (!isCellCompatibleForItemDef(map, cell, item.defId)) continue;
+
+      const dist = estimateDistance(item.cell, cell);
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestCell = cell;
+      }
+    }
+  }
+
+  return bestCell;
+}
+
+function isItemAcceptedByStockpile(zone: Zone, item: Item): boolean {
+  const stockpile = zone.config.stockpile;
+  if (!stockpile) return true;
+  if (stockpile.allowAllHaulable) return item.tags.has('haulable');
+  return stockpile.allowedDefIds.has(item.defId);
 }
 
 /**

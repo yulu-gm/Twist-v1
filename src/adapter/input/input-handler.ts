@@ -2,7 +2,7 @@
  * @file input-handler.ts
  * @description 输入处理器 — 鼠标点击/拖拽状态机、工具操作执行、放置/指派预览更新
  * @dependencies phaser — 输入系统；world/world — 命令队列；world/game-map — 地图数据；
- *               core/types — CellCoord、ObjectKind、DesignationType；
+ *               core/types — CellCoord、ObjectKind、DesignationType、ZoneType；
  *               presentation — ToolType、PresentationState
  * @part-of adapter/input — 输入处理模块
  */
@@ -10,7 +10,7 @@
 import Phaser from 'phaser';
 import { World } from '../../world/world';
 import type { GameMap } from '../../world/game-map';
-import { CellCoord, ObjectKind, DesignationType } from '../../core/types';
+import { CellCoord, ObjectKind, DesignationType, ZoneType, cellKey } from '../../core/types';
 import { PresentationState, ToolType } from '../../presentation/presentation-state';
 import type { Designation } from '../../features/designation/designation.types';
 import { setupKeyboardBindings } from './keyboard-bindings';
@@ -69,6 +69,8 @@ export class InputHandler {
       if (!pointer.leftButtonDown()) return;
       const cell = this.pointerToCell(pointer);
       if (!cell) return;
+      this.presentation.dragRect = null;
+      this.presentation.zonePreview = null;
       this.dragState = {
         startScreenPos: { x: pointer.x, y: pointer.y },
         startCell: cell,
@@ -111,7 +113,7 @@ export class InputHandler {
 
       if (this.dragState.active) {
         // 拖拽结束 → 执行批量操作
-        const endCell = this.pointerToCell(pointer);
+        const endCell = this.pointerToCell(pointer) ?? this.presentation.dragRect?.endCell;
         if (endCell) {
           this.executeDragAction(this.dragState.startCell, endCell);
         }
@@ -152,6 +154,9 @@ export class InputHandler {
       case ToolType.Designate:
         this.handleDesignate(cell);
         break;
+      case ToolType.Zone:
+        this.handleZone(cell);
+        break;
       case ToolType.Cancel:
         this.handleCancel(cell);
         break;
@@ -171,6 +176,20 @@ export class InputHandler {
     this.world.commandQueue.push({
       type: 'place_blueprint',
       payload: { defId: this.presentation.activeBuildDefId, cell, rotation: 0 },
+    });
+  }
+
+  private handleZone(cell: CellCoord): void {
+    const zoneType = this.presentation.activeZoneType ?? ZoneType.Stockpile;
+    if (this.isCellInAnyZone(cell)) return;
+
+    this.world.commandQueue.push({
+      type: 'zone_set_cells',
+      payload: {
+        mapId: this.map.id,
+        zoneType,
+        cells: [cell],
+      },
     });
   }
 
@@ -213,6 +232,8 @@ export class InputHandler {
 
   /** 取消格子上的指派/蓝图/工地 */
   private handleCancel(cell: CellCoord): void {
+    this.removeCellsFromZones([cell]);
+
     const objIds = this.map.spatial.getAt(cell);
     for (const id of objIds) {
       const obj = this.map.objects.get(id);
@@ -239,10 +260,7 @@ export class InputHandler {
    * 按当前工具遍历矩形内所有格子，对每格执行对应操作
    */
   private executeDragAction(startCell: CellCoord, endCell: CellCoord): void {
-    const minX = Math.max(0, Math.min(startCell.x, endCell.x));
-    const maxX = Math.min(this.map.width - 1, Math.max(startCell.x, endCell.x));
-    const minY = Math.max(0, Math.min(startCell.y, endCell.y));
-    const maxY = Math.min(this.map.height - 1, Math.max(startCell.y, endCell.y));
+    const { minX, minY, maxX, maxY } = this.getClampedBounds(startCell, endCell);
 
     // 截断过大区域
     const w = maxX - minX + 1;
@@ -259,6 +277,9 @@ export class InputHandler {
         break;
       case ToolType.Designate:
         this.dragDesignate(minX, minY, clampedMaxX, clampedMaxY);
+        break;
+      case ToolType.Zone:
+        this.dragZoneCreate(minX, minY, clampedMaxX, clampedMaxY);
         break;
       case ToolType.Cancel:
         this.dragCancel(minX, minY, clampedMaxX, clampedMaxY);
@@ -349,11 +370,44 @@ export class InputHandler {
 
   /** 框选取消：矩形内所有可取消对象批量取消 */
   private dragCancel(minX: number, minY: number, maxX: number, maxY: number): void {
-    for (let y = minY; y <= maxY; y++) {
-      for (let x = minX; x <= maxX; x++) {
-        this.handleCancel({ x, y });
+    const cells = this.getRectCells(minX, minY, maxX, maxY);
+    this.removeCellsFromZones(cells);
+
+    for (const cell of cells) {
+      const objIds = this.map.spatial.getAt(cell);
+      for (const id of objIds) {
+        const obj = this.map.objects.get(id);
+        if (!obj) continue;
+
+        if (obj.kind === ObjectKind.Designation) {
+          this.world.commandQueue.push({
+            type: 'cancel_designation',
+            payload: { designationId: id },
+          });
+        } else if (obj.kind === ObjectKind.Blueprint || obj.kind === ObjectKind.ConstructionSite) {
+          this.world.commandQueue.push({
+            type: 'cancel_construction',
+            payload: { targetId: id },
+          });
+        }
       }
     }
+  }
+
+  /** 框选区域：仅提交未被其他区域占用的格子 */
+  private dragZoneCreate(minX: number, minY: number, maxX: number, maxY: number): void {
+    const zoneType = this.presentation.activeZoneType ?? ZoneType.Stockpile;
+    const cells = this.getRectCells(minX, minY, maxX, maxY).filter((cell) => !this.isCellInAnyZone(cell));
+    if (cells.length === 0) return;
+
+    this.world.commandQueue.push({
+      type: 'zone_set_cells',
+      payload: {
+        mapId: this.map.id,
+        zoneType,
+        cells,
+      },
+    });
   }
 
   /** 检查格子上是否已有同类 designation（防重复） */
@@ -369,6 +423,105 @@ export class InputHandler {
       }
     }
     return false;
+  }
+
+  /** 当前格子是否已经被某个区域占用 */
+  private isCellInAnyZone(cell: CellCoord): boolean {
+    return !!this.map.zones.getZoneAt(cellKey(cell));
+  }
+
+  /** 收集矩形范围内的所有格子 */
+  private getRectCells(minX: number, minY: number, maxX: number, maxY: number): CellCoord[] {
+    const cells: CellCoord[] = [];
+    for (let y = minY; y <= maxY; y++) {
+      for (let x = minX; x <= maxX; x++) {
+        cells.push({ x, y });
+      }
+    }
+    return cells;
+  }
+
+  /** 计算拖拽矩形边界并裁剪到地图内 */
+  private getClampedBounds(startCell: CellCoord, endCell: CellCoord): {
+    minX: number;
+    minY: number;
+    maxX: number;
+    maxY: number;
+  } {
+    return {
+      minX: Math.max(0, Math.min(startCell.x, endCell.x)),
+      maxX: Math.min(this.map.width - 1, Math.max(startCell.x, endCell.x)),
+      minY: Math.max(0, Math.min(startCell.y, endCell.y)),
+      maxY: Math.min(this.map.height - 1, Math.max(startCell.y, endCell.y)),
+    };
+  }
+
+  /** 从若干格子中擦除区域格子 */
+  private removeCellsFromZones(cells: CellCoord[]): void {
+    const zoneCells = Array.from(new Set(
+      cells
+        .filter((cell) => this.isCellInAnyZone(cell))
+        .map((cell) => cellKey(cell)),
+    )).map((key) => {
+      const [x, y] = key.split(',').map(Number);
+      return { x, y };
+    });
+
+    if (zoneCells.length > 0) {
+      this.world.commandQueue.push({
+        type: 'zone_remove_cells',
+        payload: {
+          mapId: this.map.id,
+          cells: zoneCells,
+        },
+      });
+    }
+  }
+
+  /** 更新区域预览态 */
+  private updateZonePreview(): void {
+    if (this.presentation.activeTool !== ToolType.Zone && this.presentation.activeTool !== ToolType.Cancel) {
+      this.presentation.zonePreview = null;
+      return;
+    }
+
+    const dragRect = this.presentation.dragRect;
+    const zoneType = this.presentation.activeTool === ToolType.Zone
+      ? (this.presentation.activeZoneType ?? ZoneType.Stockpile)
+      : null;
+
+    let cells: CellCoord[] = [];
+    if (dragRect) {
+      const { minX, minY, maxX, maxY } = this.getClampedBounds(dragRect.startCell, dragRect.endCell);
+      const w = maxX - minX + 1;
+      const h = maxY - minY + 1;
+      const clampedMaxX = minX + Math.min(w, MAX_DRAG_SIZE) - 1;
+      const clampedMaxY = minY + Math.min(h, MAX_DRAG_SIZE) - 1;
+      cells = this.getRectCells(minX, minY, clampedMaxX, clampedMaxY);
+    } else if (this.presentation.hoveredCell) {
+      cells = [this.presentation.hoveredCell];
+    } else {
+      this.presentation.zonePreview = null;
+      return;
+    }
+
+    const validCells: CellCoord[] = [];
+    const invalidCells: CellCoord[] = [];
+    for (const cell of cells) {
+      const occupied = this.isCellInAnyZone(cell);
+      const isValid = this.presentation.activeTool === ToolType.Zone ? !occupied : occupied;
+      if (isValid) validCells.push(cell);
+      else invalidCells.push(cell);
+    }
+
+    this.presentation.zonePreview = {
+      mode: this.presentation.activeTool === ToolType.Zone ? 'create' : 'erase',
+      zoneType,
+      cells,
+      validCells,
+      invalidCells,
+      valid: validCells.length > 0,
+    };
   }
 
   // ── 每帧更新 ──
@@ -438,5 +591,7 @@ export class InputHandler {
     } else {
       this.presentation.designationPreview = null;
     }
+
+    this.updateZonePreview();
   }
 }
