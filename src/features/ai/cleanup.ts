@@ -45,36 +45,19 @@ export function cleanupProtocol(
 
   // 步骤2：若正在携带物品，丢弃到当前格子
   if (pawn.inventory.carrying) {
-    // 尝试从当前工作的 Toil localData 中恢复物品信息
-    let defId = 'unknown';
-    let count = 1;
-    if (job) {
-      for (const toil of job.toils) {
-        if (toil.localData.pickedDefId) {
-          defId = toil.localData.pickedDefId as string;
-          count = (toil.localData.pickedCount as number) ?? 1;
-          break;
-        }
-        if (toil.localData.defId) {
-          defId = toil.localData.defId as string;
-          count = (toil.localData.count as number) ?? 1;
-          break;
-        }
-      }
-    }
-
+    const carrying = pawn.inventory.carrying;
     const result = placeItemOnMap({
       map,
       defs: world.defs,
-      defId,
-      count,
+      defId: carrying.defId,
+      count: carrying.count,
       preferredCell: pawn.cell,
       searchScope: 'nearest-compatible',
       noCapacityPolicy: 'force-overflow',
     });
 
     if (!result.success || result.remainingCount > 0) {
-      log.warn('ai', `Cleanup drop for pawn ${pawn.id} had remainder for ${defId}`, {
+      log.warn('ai', `Cleanup drop for pawn ${pawn.id} had remainder for ${carrying.defId}`, {
         placedCount: result.placedCount,
         remainingCount: result.remainingCount,
         usedFallback: result.usedFallback,
@@ -82,11 +65,18 @@ export function cleanupProtocol(
       }, pawn.id);
     }
 
-    pawn.inventory.carrying = null;
+    if (result.remainingCount <= 0) {
+      pawn.inventory.carrying = null;
+    } else {
+      pawn.inventory.carrying = {
+        defId: carrying.defId,
+        count: result.remainingCount,
+      };
+    }
     const actualCell = result.usedCells[0] ?? pawn.cell;
     log.debug(
       'ai',
-      `Pawn ${pawn.id} dropped ${defId} x${count} during cleanup at (${actualCell.x},${actualCell.y}) (fallback=${result.usedFallback})`,
+      `Pawn ${pawn.id} dropped ${carrying.defId} x${result.placedCount} during cleanup at (${actualCell.x},${actualCell.y}) (fallback=${result.usedFallback})`,
       undefined,
       pawn.id,
     );

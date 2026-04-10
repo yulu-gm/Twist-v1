@@ -14,6 +14,7 @@ import type { Item } from './item.types';
 import type {
   ItemPlacementSearchScope,
   ItemPlacementSelectionPreference,
+  ItemPlacementCapacitySummary,
 } from './item.types';
 
 const FALLBACK_ITEM_TAGS = new Set(['haulable', 'resource']);
@@ -182,6 +183,43 @@ export function findNearestAcceptingCell(
   return bestCell;
 }
 
+export function getItemPlacementCapacitySummary(
+  map: GameMap,
+  defs: DefDatabase,
+  origin: CellCoord,
+  defId: DefId,
+  searchScope: ItemPlacementSearchScope,
+  options?: FindNearestAcceptingCellOptions,
+): ItemPlacementCapacitySummary {
+  let totalCapacity = 0;
+
+  const considerCell = (cell: CellCoord): void => {
+    totalCapacity += getCellAvailableCapacity(map, defs, cell, defId, searchScope);
+  };
+
+  if (searchScope === 'stockpile-only') {
+    for (const zone of map.zones.getAll()) {
+      if (zone.zoneType !== ZoneType.Stockpile) continue;
+      for (const key of zone.cells) {
+        considerCell(parseKey(key));
+      }
+    }
+  } else {
+    for (let y = 0; y < map.height; y++) {
+      for (let x = 0; x < map.width; x++) {
+        considerCell({ x, y });
+      }
+    }
+  }
+
+  return {
+    totalCapacity,
+    bestCell: totalCapacity > 0
+      ? findNearestAcceptingCell(map, defs, origin, defId, searchScope, options)
+      : null,
+  };
+}
+
 function isItemAcceptedByStockpile(zone: { config: { stockpile?: { allowAllHaulable: boolean; allowedDefIds: Set<DefId> } } }, defId: DefId, itemTags: Set<string>): boolean {
   const stockpile = zone.config.stockpile ?? createDefaultStockpileZoneConfig();
   if (stockpile.allowAllHaulable) {
@@ -199,6 +237,29 @@ function getResolvedMaxStack(defs: DefDatabase, defId: DefId, itemsAtCell: Item[
   const itemDef = defs.items.get(defId);
   const fallback = itemsAtCell[0]?.maxStack ?? FALLBACK_MAX_STACK;
   return Math.max(1, itemDef?.maxStack ?? fallback);
+}
+
+function getCellAvailableCapacity(
+  map: GameMap,
+  defs: DefDatabase,
+  cell: CellCoord,
+  defId: DefId,
+  searchScope: ItemPlacementSearchScope,
+): number {
+  if (!canPlaceItemAtCell(map, defs, cell, defId, searchScope)) {
+    return 0;
+  }
+
+  const items = getItemsAtCell(map, cell);
+  if (items.length === 0) {
+    return getResolvedMaxStack(defs, defId, items);
+  }
+  if (items.some(item => item.defId !== defId)) {
+    return 0;
+  }
+
+  const maxStack = getResolvedMaxStack(defs, defId, items);
+  return items.reduce((capacity, item) => capacity + Math.max(0, maxStack - item.stackCount), 0);
 }
 
 function hasReusableStackAtCell(

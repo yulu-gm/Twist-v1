@@ -19,6 +19,8 @@ let eatJobCounter = 0;
  * @param pawnId   - 需要进食的 Pawn 的 ID
  * @param foodId   - 食物物品对象的 ID
  * @param foodCell - 食物所在的格子坐标
+ * @param requestedCount - 本次计划吃掉的数量
+ * @param nutritionGain  - 本次计划恢复的饱食度
  * @returns 包含三个 Toil 的进食 Job：
  *   1. GoTo   — 移动到食物位置
  *   2. PickUp — 拾取食物
@@ -28,6 +30,8 @@ export function createEatJob(
   pawnId: ObjectId,
   foodId: ObjectId,
   foodCell: CellCoord,
+  requestedCount: number,
+  nutritionGain: number,
 ): Job {
   eatJobCounter++;
   return {
@@ -50,13 +54,13 @@ export function createEatJob(
         targetId: foodId,
         targetCell: foodCell,
         state: ToilState.NotStarted,
-        localData: {},
+        localData: { requestedCount },
       },
       // 步骤3：等待进食（eating 标记触发饱食度恢复）
       {
         type: ToilType.Wait,
         state: ToilState.NotStarted,
-        localData: { waited: 0, waitTicks: 60, eating: true, nutritionValue: 40 },
+        localData: { waited: 0, waitTicks: 60, eating: true, nutritionGain },
       },
     ],
     currentToilIndex: 0,

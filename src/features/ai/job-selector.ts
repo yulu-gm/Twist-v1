@@ -23,7 +23,10 @@ import { estimateDistance } from '../pathfinding/path.service';
 import { Job, JobCandidate } from './ai.types';
 import type { Pawn } from '../pawn/pawn.types';
 import type { Item } from '../item/item.types';
-import { findNearestAcceptingCell, isCellCompatibleForItemDef } from '../item/item.queries';
+import {
+  getItemPlacementCapacitySummary,
+  isCellCompatibleForItemDef,
+} from '../item/item.queries';
 import { createMineJob } from './jobs/mine-job';
 import { createHarvestJob } from './jobs/harvest-job';
 import { createConstructJob } from './jobs/construct-job';
@@ -133,7 +136,7 @@ function gatherCandidates(
   // ── 1. 检查紧急需求 ──
   // 饱食度低于 30 时，寻找食物
   if (pawn.needs.food < 30) {
-    const foodCandidate = findFoodJob(pawn, map);
+    const foodCandidate = findFoodJob(pawn, map, world);
     if (foodCandidate) {
       candidates.push(foodCandidate);
     }
@@ -192,6 +195,9 @@ function gatherCandidates(
         if (item.defId !== matDefId) continue;
         if (map.reservations.isReserved(item.id)) continue;
 
+        const haulCount = Math.min(item.stackCount, needed, pawn.inventory.carryCapacity);
+        if (haulCount <= 0) continue;
+
         const d = estimateDistance(pawn.cell, item.cell);
         if (d < bestItemDist) {
           bestItemDist = d;
@@ -200,7 +206,10 @@ function gatherCandidates(
       }
 
       if (bestItem) {
-        const job = createHaulJob(pawn.id, bestItem.id, bestItem.cell, bp.cell, bp.id);
+        const haulCount = Math.min(bestItem.stackCount, needed, pawn.inventory.carryCapacity);
+        if (haulCount <= 0) continue;
+
+        const job = createHaulJob(pawn.id, bestItem.id, bestItem.cell, bp.cell, haulCount, bp.id);
         const score = 45 - bestItemDist * 0.5;
         candidates.push({ job, score });
         break; // 每个蓝图每个 Pawn 只分配一个搬运任务
@@ -261,25 +270,34 @@ function createStockpileHaulCandidate(
     if (map.reservations.isReserved(item.id)) continue;
     if (isItemInCompatibleStockpile(map, item)) continue;
 
-    const dest = findNearestAcceptingCell(map, world.defs, item.cell, item.defId, 'stockpile-only', {
+    const placementSummary = getItemPlacementCapacitySummary(map, world.defs, item.cell, item.defId, 'stockpile-only', {
       selectionPreference: 'prefer-existing-stacks',
     });
-    if (!dest) continue;
+    if (!placementSummary.bestCell || placementSummary.totalCapacity <= 0) continue;
+
+    const haulCount = Math.min(item.stackCount, placementSummary.totalCapacity, pawn.inventory.carryCapacity);
+    if (haulCount <= 0) continue;
 
     const itemDist = estimateDistance(pawn.cell, item.cell);
-    const destDist = estimateDistance(item.cell, dest);
+    const destDist = estimateDistance(item.cell, placementSummary.bestCell);
     const score = 15 - itemDist * 0.45 - destDist * 0.2;
 
     if (score > bestScore) {
       bestScore = score;
       bestItem = item;
-      bestDest = dest;
+      bestDest = placementSummary.bestCell;
     }
   }
 
   if (!bestItem || !bestDest) return null;
 
-  const job = createHaulJob(pawn.id, bestItem.id, bestItem.cell, bestDest);
+  const bestPlacementSummary = getItemPlacementCapacitySummary(map, world.defs, bestItem.cell, bestItem.defId, 'stockpile-only', {
+    selectionPreference: 'prefer-existing-stacks',
+  });
+  const haulCount = Math.min(bestItem.stackCount, bestPlacementSummary.totalCapacity, pawn.inventory.carryCapacity);
+  if (haulCount <= 0) return null;
+
+  const job = createHaulJob(pawn.id, bestItem.id, bestItem.cell, bestDest, haulCount);
   return { job, score: bestScore };
 }
 
@@ -311,6 +329,7 @@ function isItemAcceptedByStockpile(zone: Zone, item: Item): boolean {
 function findFoodJob(
   pawn: Pawn,
   map: GameMap,
+  world: World,
 ): JobCandidate | null {
   const items = map.objects.allWithTag('food') as Item[];
   let bestItem: Item | null = null;
@@ -329,7 +348,22 @@ function findFoodJob(
 
   if (!bestItem) return null;
 
-  const job = createEatJob(pawn.id, bestItem.id, bestItem.cell);
+  const nutritionPerItem = Math.max(1, world.defs.items.get(bestItem.defId)?.nutritionValue ?? 30);
+  const missingFood = Math.max(1, 100 - pawn.needs.food);
+  const requestedCount = Math.min(
+    bestItem.stackCount,
+    pawn.inventory.carryCapacity,
+    Math.max(1, Math.ceil(missingFood / nutritionPerItem)),
+  );
+  if (requestedCount <= 0) return null;
+
+  const job = createEatJob(
+    pawn.id,
+    bestItem.id,
+    bestItem.cell,
+    requestedCount,
+    requestedCount * nutritionPerItem,
+  );
   // 紧急程度越高分数越高（饱食度越低越紧急）
   const urgency = (30 - pawn.needs.food) / 30; // 0~1，越高越紧急
   const score = 100 + urgency * 200 - bestDist * 0.5;

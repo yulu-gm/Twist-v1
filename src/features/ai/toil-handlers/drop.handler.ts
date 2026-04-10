@@ -12,7 +12,8 @@ import type { ToilHandler } from './toil-handler.types';
 
 /** 执行放置（Drop）Toil */
 export const executeDrop: ToilHandler = ({ pawn, toil, map, world }) => {
-  if (!pawn.inventory.carrying) {
+  const carrying = pawn.inventory.carrying;
+  if (!carrying) {
     log.warn('ai', `Pawn ${pawn.id} has nothing to drop`, undefined, pawn.id);
     toil.state = ToilState.Failed;
     return;
@@ -40,40 +41,71 @@ export const executeDrop: ToilHandler = ({ pawn, toil, map, world }) => {
     return;
   }
 
-  // 从 localData 中获取物品定义 ID 和数量（由 PickUp 步骤填充）
-  const defId = (toil.localData.defId as string) ?? 'unknown';
-  const count = (toil.localData.count as number) ?? 1;
+  const defId = carrying.defId;
+  const count = Math.max(0, Math.floor((toil.localData.count as number) ?? carrying.count));
+  if (count <= 0) {
+    toil.state = ToilState.Failed;
+    return;
+  }
 
-  const result = placeItemOnMap({
+  const stockpileResult = placeItemOnMap({
     map,
     defs: world.defs,
     defId,
-    count,
+    count: Math.min(count, carrying.count),
     preferredCell: target,
     searchScope: 'stockpile-only',
     selectionPreference: 'prefer-existing-stacks',
     noCapacityPolicy: 'fail',
   });
-  if (!result.success || result.remainingCount > 0 || result.placedCount !== count) {
-    log.warn('ai', `Pawn ${pawn.id} failed to drop ${defId} into stockpile`, {
-      placedCount: result.placedCount,
-      remainingCount: result.remainingCount,
-      usedFallback: result.usedFallback,
-      usedCells: result.usedCells,
-    }, pawn.id);
+
+  let remainingCount = stockpileResult.remainingCount;
+  let groundedCount = 0;
+  let groundedCells = stockpileResult.usedCells.slice();
+  if (remainingCount > 0) {
+    const spillResult = placeItemOnMap({
+      map,
+      defs: world.defs,
+      defId,
+      count: remainingCount,
+      preferredCell: pawn.cell,
+      searchScope: 'nearest-compatible',
+      noCapacityPolicy: 'force-overflow',
+    });
+
+    groundedCount = spillResult.placedCount;
+    groundedCells = groundedCells.concat(spillResult.usedCells);
+    remainingCount = spillResult.remainingCount;
+
+    if (!spillResult.success || spillResult.remainingCount > 0) {
+      log.warn('ai', `Pawn ${pawn.id} failed to ground stockpile overflow for ${defId}`, {
+        placedCount: spillResult.placedCount,
+        remainingCount: spillResult.remainingCount,
+        usedFallback: spillResult.usedFallback,
+        usedCells: spillResult.usedCells,
+      }, pawn.id);
+    }
+  }
+
+  const placedTotal = stockpileResult.placedCount + groundedCount;
+  const carriedRemaining = Math.max(0, carrying.count - placedTotal);
+  pawn.inventory.carrying = carriedRemaining > 0 ? { defId, count: carriedRemaining } : null;
+
+  if (remainingCount > 0) {
     toil.state = ToilState.Failed;
     return;
   }
 
-  pawn.inventory.carrying = null;
   pawn.movement.path = [];
   pawn.movement.pathIndex = 0;
   pawn.movement.moveProgress = 0;
 
-  const actualCell = result.usedCells[0] ?? target;
-  log.debug('ai', `Pawn ${pawn.id} dropped ${defId} x${count} at (${actualCell.x},${actualCell.y})`, {
-    usedFallback: result.usedFallback,
-    usedCells: result.usedCells,
+  const actualCell = stockpileResult.usedCells[0] ?? groundedCells[0] ?? target;
+  log.debug('ai', `Pawn ${pawn.id} dropped ${defId} x${placedTotal} at (${actualCell.x},${actualCell.y})`, {
+    stockpilePlaced: stockpileResult.placedCount,
+    groundedCount,
+    usedFallback: stockpileResult.usedFallback || groundedCount > 0,
+    usedCells: groundedCells,
   }, pawn.id);
   toil.state = ToilState.Completed;
 };

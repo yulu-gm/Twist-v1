@@ -50,6 +50,11 @@ export interface PlaceItemOnMapResult {
   success: boolean;
 }
 
+export interface ItemPlacementCapacitySummary {
+  totalCapacity: number;
+  bestCell: CellCoord | null;
+}
+
 // ── KindMap 类型注册 ──
 declare module '../../core/types' {
   interface KindMap {

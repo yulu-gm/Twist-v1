@@ -21,6 +21,7 @@ let haulJobCounter = 0;
  * @param itemId      - 要搬运的物品对象 ID
  * @param itemCell    - 物品当前所在的格子坐标
  * @param destCell    - 搬运目的地的格子坐标
+ * @param count       - 本次计划搬运的数量
  * @param blueprintId - 可选，目标蓝图 ID。若提供则使用 Deliver 交付材料，否则使用 Drop 放置地面
  * @returns 包含四个 Toil 的搬运 Job：
  *   1. GoTo   — 移动到物品位置
@@ -33,6 +34,7 @@ export function createHaulJob(
   itemId: ObjectId,
   itemCell: CellCoord,
   destCell: CellCoord,
+  count: number,
   blueprintId?: ObjectId,
 ): Job {
   haulJobCounter++;
@@ -44,13 +46,13 @@ export function createHaulJob(
         targetId: blueprintId,
         targetCell: destCell,
         state: ToilState.NotStarted,
-        localData: { defId: 'unknown', count: 1 }, // 运行时由 PickUp 步骤填充实际值
+        localData: { defId: 'unknown', count },
       }
     : {
         type: ToilType.Drop,
         targetCell: destCell,
         state: ToilState.NotStarted,
-        localData: { defId: 'unknown', count: 1 }, // 运行时由 PickUp 步骤填充实际值
+        localData: { defId: 'unknown', count },
       };
 
   return {
@@ -73,7 +75,7 @@ export function createHaulJob(
         targetId: itemId,
         targetCell: itemCell,
         state: ToilState.NotStarted,
-        localData: {},
+        localData: { requestedCount: count },
       },
       // 步骤3：移动到目的地
       {

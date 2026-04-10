@@ -22,6 +22,14 @@ import type {
   JobId,
 } from '../../core/types';
 
+// ── 手持物品（地图外的临时堆） ──
+export interface CarriedItemStack {
+  /** 物品定义 ID */
+  defId: DefId;
+  /** 当前手持数量 */
+  count: number;
+}
+
 // ── Toil（劳作：工作中的单个原子步骤） ──
 export interface Toil {
   /** 劳作类型（如前往、采集、搬运等） */
@@ -108,9 +116,9 @@ export interface Pawn extends MapObjectBase {
 
   // ── 物品栏 ──
   inventory: {
-    /** 当前搬运的物品ID，null 表示未搬运 */
-    carrying: ObjectId | null;
-    /** 最大搬运重量 */
+    /** 当前手持的物品堆，null 表示未搬运 */
+    carrying: CarriedItemStack | null;
+    /** 最大搬运件数 */
     carryCapacity: number;
   };
 

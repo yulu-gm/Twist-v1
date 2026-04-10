@@ -19,7 +19,14 @@ export const executeWait: ToilHandler = ({ pawn, toil }) => {
   if ((ld.waited as number) >= waitTicks) {
     // 若此等待是进食的一部分，恢复饱食度
     if (ld.eating) {
-      pawn.needs.food = Math.min(100, pawn.needs.food + (ld.nutritionValue as number ?? 30));
+      if (!pawn.inventory.carrying) {
+        log.warn('ai', `Pawn ${pawn.id} finished eating wait without carried food`, undefined, pawn.id);
+        toil.state = ToilState.Failed;
+        return;
+      }
+
+      pawn.needs.food = Math.min(100, pawn.needs.food + ((ld.nutritionGain as number) ?? 30));
+      pawn.inventory.carrying = null;
       log.debug('ai', `Pawn ${pawn.id} finished eating, food: ${Math.floor(pawn.needs.food)}`, undefined, pawn.id);
     }
     toil.state = ToilState.Completed;
