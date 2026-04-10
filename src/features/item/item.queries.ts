@@ -239,7 +239,7 @@ function getResolvedMaxStack(defs: DefDatabase, defId: DefId, itemsAtCell: Item[
   return Math.max(1, itemDef?.maxStack ?? fallback);
 }
 
-function getCellAvailableCapacity(
+export function getCellAvailableCapacity(
   map: GameMap,
   defs: DefDatabase,
   cell: CellCoord,

@@ -19,12 +19,13 @@ import { log } from '../../core/logger';
 import { World } from '../../world/world';
 import { GameMap } from '../../world/game-map';
 import type { Zone } from '../../world/zone-manager';
-import { estimateDistance } from '../pathfinding/path.service';
+import { estimateDistance, isReachable } from '../pathfinding/path.service';
 import { Job, JobCandidate } from './ai.types';
 import type { Pawn } from '../pawn/pawn.types';
 import type { Item } from '../item/item.types';
 import {
-  getItemPlacementCapacitySummary,
+  findNearestAcceptingCell,
+  getCellAvailableCapacity,
   isCellCompatibleForItemDef,
 } from '../item/item.queries';
 import { createMineJob } from './jobs/mine-job';
@@ -194,6 +195,7 @@ function gatherCandidates(
         if (item.destroyed) continue;
         if (item.defId !== matDefId) continue;
         if (map.reservations.isReserved(item.id)) continue;
+        if (!isReachableHaulRoute(pawn, item, bp.cell, map)) continue;
 
         const haulCount = Math.min(item.stackCount, needed, pawn.inventory.carryCapacity);
         if (haulCount <= 0) continue;
@@ -270,31 +272,29 @@ function createStockpileHaulCandidate(
     if (map.reservations.isReserved(item.id)) continue;
     if (isItemInCompatibleStockpile(map, item)) continue;
 
-    const placementSummary = getItemPlacementCapacitySummary(map, world.defs, item.cell, item.defId, 'stockpile-only', {
-      selectionPreference: 'prefer-existing-stacks',
-    });
-    if (!placementSummary.bestCell || placementSummary.totalCapacity <= 0) continue;
+    const placement = findReachableStockpilePlacement(pawn, item, map, world);
+    if (!placement) continue;
 
-    const haulCount = Math.min(item.stackCount, placementSummary.totalCapacity, pawn.inventory.carryCapacity);
+    const haulCount = Math.min(item.stackCount, placement.totalCapacity, pawn.inventory.carryCapacity);
     if (haulCount <= 0) continue;
 
     const itemDist = estimateDistance(pawn.cell, item.cell);
-    const destDist = estimateDistance(item.cell, placementSummary.bestCell);
+    const destDist = estimateDistance(item.cell, placement.bestCell);
     const score = 15 - itemDist * 0.45 - destDist * 0.2;
 
     if (score > bestScore) {
       bestScore = score;
       bestItem = item;
-      bestDest = placementSummary.bestCell;
+      bestDest = placement.bestCell;
     }
   }
 
   if (!bestItem || !bestDest) return null;
 
-  const bestPlacementSummary = getItemPlacementCapacitySummary(map, world.defs, bestItem.cell, bestItem.defId, 'stockpile-only', {
-    selectionPreference: 'prefer-existing-stacks',
-  });
-  const haulCount = Math.min(bestItem.stackCount, bestPlacementSummary.totalCapacity, pawn.inventory.carryCapacity);
+  const bestPlacement = findReachableStockpilePlacement(pawn, bestItem, map, world);
+  if (!bestPlacement) return null;
+
+  const haulCount = Math.min(bestItem.stackCount, bestPlacement.totalCapacity, pawn.inventory.carryCapacity);
   if (haulCount <= 0) return null;
 
   const job = createHaulJob(pawn.id, bestItem.id, bestItem.cell, bestDest, haulCount);
@@ -326,6 +326,60 @@ function isItemAcceptedByStockpile(zone: Zone, item: Item): boolean {
  * @param map  - 当前地图
  * @returns 进食工作候选项（含分数），若无食物则返回 null
  */
+function isReachableHaulRoute(
+  pawn: Pawn,
+  item: Item,
+  destCell: CellCoord,
+  map: GameMap,
+): boolean {
+  return isReachable(map, pawn.cell, item.cell) && isReachable(map, item.cell, destCell);
+}
+
+function findReachableStockpilePlacement(
+  pawn: Pawn,
+  item: Item,
+  map: GameMap,
+  world: World,
+): { bestCell: CellCoord; totalCapacity: number } | null {
+  if (!isReachable(map, pawn.cell, item.cell)) return null;
+
+  let totalReachableCapacity = 0;
+  for (const zone of map.zones.getAll()) {
+    if (zone.zoneType !== ZoneType.Stockpile) continue;
+    for (const key of zone.cells) {
+      const [x, y] = key.split(',').map(Number);
+      const cell = { x, y };
+      if (!isReachable(map, item.cell, cell)) continue;
+      totalReachableCapacity += getCellAvailableCapacity(map, world.defs, cell, item.defId, 'stockpile-only');
+    }
+  }
+
+  if (totalReachableCapacity <= 0) return null;
+
+  const excludedCells = new Set<string>();
+  while (true) {
+    const candidate = findNearestAcceptingCell(
+      map,
+      world.defs,
+      item.cell,
+      item.defId,
+      'stockpile-only',
+      {
+        excludedCells,
+        selectionPreference: 'prefer-existing-stacks',
+      },
+    );
+    if (!candidate) return null;
+    if (isReachable(map, item.cell, candidate)) {
+      return {
+        bestCell: candidate,
+        totalCapacity: totalReachableCapacity,
+      };
+    }
+    excludedCells.add(cellKey(candidate));
+  }
+}
+
 function findFoodJob(
   pawn: Pawn,
   map: GameMap,
