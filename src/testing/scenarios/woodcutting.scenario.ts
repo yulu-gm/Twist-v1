@@ -5,9 +5,10 @@
  */
 
 import { createScenario } from '../scenario-dsl/scenario.builders';
-import { spawnPawnAction, placeTreeAction } from '../scenario-actions/setup-actions';
-import { designateCutAction } from '../scenario-actions/player-actions';
-import { waitForPawnJobAction, waitForNoPlantAtAction, assertWoodDroppedAction } from '../scenario-actions/wait-conditions';
+import { spawnPawnFixture, placeTreeFixture } from '../scenario-fixtures/world-fixtures';
+import { designateCutCommand } from '../scenario-commands/player-commands';
+import { waitForPawnAnyJob } from '../scenario-probes/pawn-probes';
+import { waitForNoPlantAt, assertWoodDropped } from '../scenario-probes/item-probes';
 
 /**
  * 砍树场景
@@ -29,15 +30,15 @@ export const woodcuttingScenario = createScenario({
     focus: '关注树上的 cut designation、pawn 是否接单并靠近树',
   },
   setup: [
-    placeTreeAction({ x: 12, y: 12 }, 'tree_oak'),
-    spawnPawnAction({ x: 10, y: 12 }, 'Cutter'),
+    placeTreeFixture({ x: 12, y: 12 }, 'tree_oak'),
+    spawnPawnFixture({ x: 10, y: 12 }, 'Cutter'),
   ],
   script: [
-    designateCutAction({ x: 12, y: 12 }),
-    waitForPawnJobAction('等待 pawn 接到砍树工作', 50),
-    waitForNoPlantAtAction('等待树被砍倒', { x: 12, y: 12 }, 300),
+    designateCutCommand({ x: 12, y: 12 }),
+    waitForPawnAnyJob('等待 pawn 接到砍树工作', 'Cutter', 50),
+    waitForNoPlantAt('等待树被砍倒', { x: 12, y: 12 }, 300),
   ],
   expect: [
-    assertWoodDroppedAction({ x: 12, y: 12 }),
+    assertWoodDropped({ x: 12, y: 12 }),
   ],
 });

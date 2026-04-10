@@ -5,8 +5,9 @@
  */
 
 import { createScenario } from '../scenario-dsl/scenario.builders';
-import { spawnPawnAction, spawnItemAction, createStockpileAction } from '../scenario-actions/setup-actions';
-import { waitForItemInStockpileAction, assertItemStackAtAction } from '../scenario-actions/wait-conditions';
+import { spawnPawnFixture, spawnItemFixture } from '../scenario-fixtures/world-fixtures';
+import { createZoneCommand } from '../scenario-commands/zone-commands';
+import { waitForItemAt, assertTotalItemCountInCells } from '../scenario-probes/item-probes';
 
 /**
  * 搬运进 Stockpile 场景
@@ -27,14 +28,14 @@ export const stockpileHaulScenario = createScenario({
     focus: '关注 pawn 是否自动发现未入库物品并搬运到 stockpile 区域',
   },
   setup: [
-    spawnPawnAction({ x: 10, y: 10 }, 'Hauler'),
-    spawnItemAction('wood', { x: 6, y: 10 }, 5),
-    createStockpileAction([{ x: 16, y: 10 }, { x: 17, y: 10 }, { x: 18, y: 10 }]),
+    spawnPawnFixture({ x: 10, y: 10 }, 'Hauler'),
+    spawnItemFixture('wood', { x: 6, y: 10 }, 5),
   ],
   script: [
-    waitForItemInStockpileAction('等待木材进入 stockpile', 'wood', { x: 16, y: 10 }, 300),
+    createZoneCommand('stockpile', [{ x: 16, y: 10 }, { x: 17, y: 10 }, { x: 18, y: 10 }]),
+    waitForItemAt('等待木材进入 stockpile', 'wood', { x: 16, y: 10 }, 300),
   ],
   expect: [
-    assertItemStackAtAction('wood', { x: 16, y: 10 }, 1),
+    assertTotalItemCountInCells('wood', [{ x: 16, y: 10 }, { x: 17, y: 10 }, { x: 18, y: 10 }], 5),
   ],
 });

@@ -67,6 +67,8 @@ function processMap(world: World, map: GameMap): void {
   const pawns = map.objects.allOfKind(ObjectKind.Pawn);
 
   for (const pawn of pawns) {
+    if (pawn.drafted) continue;
+
     // 仅为空闲的 Pawn 分配工作
     if (pawn.ai.currentJob !== null) continue;
 

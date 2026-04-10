@@ -10,7 +10,8 @@
  */
 
 import { createScenarioHarness } from '../scenario-harness/scenario-harness';
-import type { ScenarioDefinition, ScenarioStep, StepResult, ScenarioResult, ScenarioStepContext } from '../scenario-dsl/scenario.types';
+import type { ScenarioDefinition, ScenarioStep, StepResult, ScenarioResult, SetupContext, CommandContext, ProbeContext } from '../scenario-dsl/scenario.types';
+import { createScenarioQueryApi } from '../scenario-probes/query-api';
 import { diffCheckpointSnapshots, DivergenceRecord } from './shadow-runner';
 import type { StepSummary } from './scenario-hud';
 import { bootstrapPhaser } from '../../adapter/bootstrap';
@@ -111,11 +112,11 @@ export function createVisualScenarioController(
 
   /**
    * 在 visual 模式下执行单个步骤
-   * action/assert 步骤立即执行；waitFor 步骤异步等待 Phaser 驱动的 tick
+   * setup/command 步骤立即执行；waitFor 步骤异步等待 Phaser 驱动的 tick；assert 步骤同步检查
    */
   async function executeVisualStep(
     step: ScenarioStep,
-    ctx: ScenarioStepContext,
+    contexts: { setup: SetupContext; command: CommandContext; probe: ProbeContext },
     stepIndex: number,
   ): Promise<StepResult> {
     // 标记步骤为 running
@@ -131,15 +132,20 @@ export function createVisualScenarioController(
 
     try {
       switch (step.kind) {
-        case 'action': {
-          await step.run(ctx);
+        case 'setup': {
+          await step.run(contexts.setup);
+          result.status = 'passed';
+          break;
+        }
+        case 'command': {
+          await step.run(contexts.command);
           result.status = 'passed';
           break;
         }
         case 'waitFor': {
           // 异步等待 — 由 Phaser 游戏循环推进 tick
           let elapsed = 0;
-          while (!step.condition(ctx)) {
+          while (!step.condition(contexts.probe)) {
             if (elapsed >= step.timeoutTicks) {
               result.status = 'failed';
               result.error = step.timeoutMessage ?? `等待超时：在 ${step.timeoutTicks} tick 内未满足条件 — ${step.title}`;
@@ -158,7 +164,7 @@ export function createVisualScenarioController(
           break;
         }
         case 'assert': {
-          const ok = step.assert(ctx);
+          const ok = step.assert(contexts.probe);
           if (ok) {
             result.status = 'passed';
           } else {
@@ -196,7 +202,18 @@ export function createVisualScenarioController(
     // 重新 reset ID 计数器，visual 也从 0 分配，保证两边对象 ID 一致
     visualHarness = createScenarioHarness({ seed: 12345 });
 
-    const ctx: ScenarioStepContext = { harness: visualHarness };
+    // 构建分层上下文
+    const aliases = new Map<string, string>();
+    const query = createScenarioQueryApi(visualHarness, aliases);
+    const setupCtx: SetupContext = { harness: visualHarness };
+    const commandCtx: CommandContext = {
+      issueCommand: (cmd) => visualHarness.world.commandQueue.push(cmd),
+      stepTicks: (count = 1) => visualHarness.stepTicks(count),
+      query,
+    };
+    const probeCtx: ProbeContext = { query };
+    const contexts = { setup: setupCtx, command: commandCtx, probe: probeCtx };
+
     const visualResults: StepResult[] = [];
     let failed = false;
     let stepIndex = 0;
@@ -206,7 +223,7 @@ export function createVisualScenarioController(
 
     // ── 阶段 3：执行 setup 步骤 ──
     for (const step of scenario.setup) {
-      const vr = await executeVisualStep(step, ctx, stepIndex);
+      const vr = await executeVisualStep(step, contexts, stepIndex);
       visualResults.push(vr);
 
       // 从 shadow 缓存取对应结果同步更新 HUD
@@ -249,7 +266,7 @@ export function createVisualScenarioController(
 
     // ── 阶段 5：逐步执行 script 步骤 ──
     for (const step of scenario.script) {
-      const vr = await executeVisualStep(step, ctx, stepIndex);
+      const vr = await executeVisualStep(step, contexts, stepIndex);
       visualResults.push(vr);
 
       // 从 shadow 缓存取对应结果同步更新 HUD
@@ -268,7 +285,7 @@ export function createVisualScenarioController(
     // ── 阶段 6：逐步执行 expect 步骤 ──
     if (!failed) {
       for (const step of scenario.expect) {
-        const vr = await executeVisualStep(step, ctx, stepIndex);
+        const vr = await executeVisualStep(step, contexts, stepIndex);
         visualResults.push(vr);
 
         if (stepIndex < shadowStepResults.length) {

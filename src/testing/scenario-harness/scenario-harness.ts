@@ -2,8 +2,10 @@
  * @file scenario-harness.ts
  * @description Scenario Harness — 统一搭建测试世界、推进 tick、执行场景脚本的核心运行时。
  *              无头与可视模式共享此 harness 实现同源执行。
+ *              按职责分层提供 SetupContext / CommandContext / ProbeContext，
+ *              确保 fixture 只能造局、command 只能发命令、probe 只能观察。
  * @dependencies bootstrap/* — 共享启动基础设施；world/* — 世界和地图；
- *               scenario-dsl — 步骤和场景类型
+ *               scenario-dsl — 步骤和场景类型；scenario-probes — 查询 API
  * @part-of testing/scenario-harness — 场景 harness 层
  */
 
@@ -18,9 +20,12 @@ import type {
   ScenarioResult,
   StepResult,
   ScenarioStep,
-  ScenarioStepContext,
+  SetupContext,
+  CommandContext,
+  ProbeContext,
 } from '../scenario-dsl/scenario.types';
 import { createCheckpointSnapshot, CheckpointSnapshot } from './checkpoint-snapshot';
+import { createScenarioQueryApi } from '../scenario-probes/query-api';
 
 /** Scenario Harness 对外接口 */
 export interface ScenarioHarness {
@@ -39,6 +44,13 @@ export interface ScenarioHarness {
    * 生成当前状态的 checkpoint 快照
    */
   createCheckpoint(): CheckpointSnapshot;
+
+  /**
+   * 注册别名 — 将 alias 映射到对象 ID，供 probe 查询使用
+   * @param alias - 别名（如 'sourceWood'）
+   * @param objectId - 对象 ID
+   */
+  registerAlias(alias: string, objectId: string): void;
 
   /**
    * 执行单个步骤（供 visual controller 逐步调用）
@@ -93,6 +105,9 @@ export function createScenarioHarness(options?: {
   registerDefaultCommands(world);
   world.tickRunner.registerAll(buildDefaultSystems());
 
+  // 别名注册表 — alias → objectId
+  const aliases = new Map<string, string>();
+
   /** 推进指定数量的 tick */
   function stepTicks(count: number): void {
     for (let i = 0; i < count; i++) {
@@ -105,8 +120,28 @@ export function createScenarioHarness(options?: {
     return createCheckpointSnapshot(world, map);
   }
 
+  /** 注册别名 */
+  function registerAlias(alias: string, objectId: string): void {
+    aliases.set(alias, objectId);
+  }
+
+  // 创建查询 API（在 harness 对象初始化后赋值，因为 query 需要 harness 引用）
+  let query: ReturnType<typeof createScenarioQueryApi>;
+
+  // 构建分层上下文
+  let setupContext: SetupContext;
+  let commandContext: CommandContext;
+  let probeContext: ProbeContext;
+
+  /** 发出正式命令 */
+  function issueCommand(command: import('@core/command-bus').Command): void {
+    world.commandQueue.push(command);
+  }
+
   /** 执行单个步骤 */
-  async function executeStep(step: ScenarioStep, ctx: ScenarioStepContext): Promise<StepResult> {
+  async function executeStep(step: ScenarioStep, ctx?: { setup: SetupContext; command: CommandContext; probe: ProbeContext }): Promise<StepResult> {
+    const contexts = ctx ?? { setup: setupContext, command: commandContext, probe: probeContext };
+
     const result: StepResult = {
       title: step.title,
       kind: step.kind,
@@ -115,14 +150,19 @@ export function createScenarioHarness(options?: {
 
     try {
       switch (step.kind) {
-        case 'action': {
-          await step.run(ctx);
+        case 'setup': {
+          await step.run(contexts.setup);
+          result.status = 'passed';
+          break;
+        }
+        case 'command': {
+          await step.run(contexts.command);
           result.status = 'passed';
           break;
         }
         case 'waitFor': {
           let elapsed = 0;
-          while (!step.condition(ctx)) {
+          while (!step.condition(contexts.probe)) {
             if (elapsed >= step.timeoutTicks) {
               result.status = 'failed';
               result.error = step.timeoutMessage ?? `等待超时：在 ${step.timeoutTicks} tick 内未满足条件 — ${step.title}`;
@@ -137,7 +177,7 @@ export function createScenarioHarness(options?: {
           break;
         }
         case 'assert': {
-          const ok = step.assert(ctx);
+          const ok = step.assert(contexts.probe);
           if (ok) {
             result.status = 'passed';
           } else {
@@ -157,13 +197,13 @@ export function createScenarioHarness(options?: {
 
   /** 执行完整场景 */
   async function runScenario(scenario: ScenarioDefinition): Promise<ScenarioResult> {
-    const ctx: ScenarioStepContext = { harness };
+    const contexts = { setup: setupContext, command: commandContext, probe: probeContext };
     const steps: StepResult[] = [];
     let failed = false;
 
     // 执行 setup 步骤
     for (const step of scenario.setup) {
-      const r = await executeStep(step, ctx);
+      const r = await executeStep(step, contexts);
       steps.push(r);
       if (r.status === 'failed') {
         failed = true;
@@ -174,7 +214,7 @@ export function createScenarioHarness(options?: {
     // 执行 script 步骤
     if (!failed) {
       for (const step of scenario.script) {
-        const r = await executeStep(step, ctx);
+        const r = await executeStep(step, contexts);
         steps.push(r);
         if (r.status === 'failed') {
           failed = true;
@@ -186,7 +226,7 @@ export function createScenarioHarness(options?: {
     // 执行 expect 步骤
     if (!failed) {
       for (const step of scenario.expect) {
-        const r = await executeStep(step, ctx);
+        const r = await executeStep(step, contexts);
         steps.push(r);
         if (r.status === 'failed') {
           failed = true;
@@ -205,8 +245,7 @@ export function createScenarioHarness(options?: {
 
   /** 执行单个步骤（供外部逐步调用） */
   async function executeStepPublic(step: ScenarioStep): Promise<StepResult> {
-    const ctx: ScenarioStepContext = { harness };
-    return executeStep(step, ctx);
+    return executeStep(step);
   }
 
   const harness: ScenarioHarness = {
@@ -214,9 +253,16 @@ export function createScenarioHarness(options?: {
     map,
     stepTicks,
     createCheckpoint,
+    registerAlias,
     executeStep: executeStepPublic,
     runScenario,
   };
+
+  // 初始化查询 API 和分层上下文（需要 harness 引用已存在）
+  query = createScenarioQueryApi(harness, aliases);
+  setupContext = { harness };
+  commandContext = { issueCommand, stepTicks, query };
+  probeContext = { query };
 
   return harness;
 }

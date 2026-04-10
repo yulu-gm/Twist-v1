@@ -5,12 +5,8 @@
  */
 
 import { createScenario } from '../scenario-dsl/scenario.builders';
-import { spawnPawnAction, spawnItemAction, setPawnFoodByNameAction } from '../scenario-actions/setup-actions';
-import {
-  waitForPawnJobDefAction,
-  waitForPawnFoodAtLeastAction,
-  assertPawnFoodAtLeastAction,
-} from '../scenario-actions/wait-conditions';
+import { spawnPawnFixture, spawnItemFixture, setPawnFoodFixture } from '../scenario-fixtures/world-fixtures';
+import { waitForPawnJobDef, waitForPawnFoodAtLeast, assertPawnFoodAtLeast } from '../scenario-probes/pawn-probes';
 
 /**
  * 进食场景
@@ -31,15 +27,15 @@ export const eatingScenario = createScenario({
     focus: '关注 pawn 是否在饱食度低于阈值时自动寻找并消费食物',
   },
   setup: [
-    spawnPawnAction({ x: 10, y: 10 }, 'Eater'),
-    spawnItemAction('meal_simple', { x: 12, y: 10 }, 4),
-    setPawnFoodByNameAction('Eater', 5),
+    spawnPawnFixture({ x: 10, y: 10 }, 'Eater'),
+    spawnItemFixture('meal_simple', { x: 12, y: 10 }, 4),
+    setPawnFoodFixture('Eater', 5),
   ],
   script: [
-    waitForPawnJobDefAction('等待 pawn 切到进食工作', 'Eater', 'job_eat', 100),
-    waitForPawnFoodAtLeastAction('等待饱食度恢复', 'Eater', 30, 300),
+    waitForPawnJobDef('等待 pawn 切到进食工作', 'Eater', 'job_eat', 100),
+    waitForPawnFoodAtLeast('等待饱食度恢复', 'Eater', 30, 300),
   ],
   expect: [
-    assertPawnFoodAtLeastAction('Eater', 30),
+    assertPawnFoodAtLeast('Eater', 30),
   ],
 });

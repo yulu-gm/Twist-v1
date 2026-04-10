@@ -5,13 +5,9 @@
  */
 
 import { createScenario } from '../scenario-dsl/scenario.builders';
-import { spawnPawnAction, spawnItemAction } from '../scenario-actions/setup-actions';
-import { placeBlueprintAction } from '../scenario-actions/player-actions';
-import {
-  waitForBlueprintDeliveredAction,
-  waitForBuildingCreatedAction,
-  assertBuildingExistsAction,
-} from '../scenario-actions/wait-conditions';
+import { spawnPawnFixture, spawnItemFixture } from '../scenario-fixtures/world-fixtures';
+import { placeBlueprintCommand } from '../scenario-commands/player-commands';
+import { waitForBlueprintDelivered, waitForBuildingCreated, assertBuildingExists } from '../scenario-probes/building-probes';
 
 /**
  * 建造蓝图场景
@@ -32,15 +28,15 @@ export const blueprintConstructionScenario = createScenario({
     focus: '关注蓝图的材料交付进度和工地的施工进度',
   },
   setup: [
-    spawnPawnAction({ x: 10, y: 10 }, 'Builder'),
-    spawnItemAction('wood', { x: 8, y: 10 }, 20),
-    placeBlueprintAction('wall_wood', { x: 14, y: 10 }),
+    spawnPawnFixture({ x: 10, y: 10 }, 'Builder'),
+    spawnItemFixture('wood', { x: 8, y: 10 }, 20),
   ],
   script: [
-    waitForBlueprintDeliveredAction('等待材料送达蓝图', 'wall_wood', 300),
-    waitForBuildingCreatedAction('等待建筑完成', 'wall_wood', { x: 14, y: 10 }, 600),
+    placeBlueprintCommand('wall_wood', { x: 14, y: 10 }),
+    waitForBlueprintDelivered('等待材料送达蓝图', 'wall_wood', 300),
+    waitForBuildingCreated('等待建筑完成', 'wall_wood', { x: 14, y: 10 }, 600),
   ],
   expect: [
-    assertBuildingExistsAction('wall_wood', { x: 14, y: 10 }),
+    assertBuildingExists('wall_wood', { x: 14, y: 10 }),
   ],
 });

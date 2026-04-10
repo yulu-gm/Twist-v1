@@ -1,42 +1,48 @@
 /**
  * @file scenario-harness.test.ts
- * @description 验证 ScenarioHarness 的核心行为：按顺序执行步骤、等待条件、断言
+ * @description 验证 ScenarioHarness 的核心行为：按顺序执行步骤、等待条件、断言、上下文分层、别名
  */
 
 import { describe, expect, it } from 'vitest';
 import {
-  createActionStep,
   createAssertStep,
+  createCommandStep,
   createScenario,
+  createSetupStep,
   createWaitForStep,
 } from '@testing/scenario-dsl/scenario.builders';
 import { createScenarioHarness } from '@testing/scenario-harness/scenario-harness';
 
 describe('ScenarioHarness', () => {
-  it('按顺序执行 action、waitFor、assert，并记录步骤状态', async () => {
+  it('按顺序执行 setup、command、waitFor、assert，并记录步骤状态', async () => {
     const harness = createScenarioHarness();
-    let counter = 0;
+    let setupRan = false;
+    let commandRan = false;
 
     const scenario = createScenario({
-      id: 'minimal',
-      title: '最小场景',
+      id: 'context-split',
+      title: 'context split',
       setup: [
-        createActionStep('初始化计数器', () => {
-          counter = 1;
+        createSetupStep('mark setup', ({ harness }) => {
+          setupRan = Boolean(harness.map);
         }),
       ],
       script: [
-        createWaitForStep('等待计数器为 1', () => counter === 1, { timeoutTicks: 1 }),
+        createCommandStep('mark command', ({ stepTicks }) => {
+          stepTicks(1);
+          commandRan = true;
+        }),
+        createWaitForStep('wait for markers', () => setupRan && commandRan, { timeoutTicks: 1 }),
       ],
       expect: [
-        createAssertStep('计数器最终为 1', () => counter === 1),
+        createAssertStep('both markers set', () => setupRan && commandRan),
       ],
     });
 
     const result = await harness.runScenario(scenario);
 
     expect(result.status).toBe('passed');
-    expect(result.steps.map(step => step.status)).toEqual(['passed', 'passed', 'passed']);
+    expect(result.steps.map(step => step.status)).toEqual(['passed', 'passed', 'passed', 'passed']);
   });
 
   it('waitFor 超时时报告失败', async () => {
@@ -91,5 +97,23 @@ describe('ScenarioHarness', () => {
     expect(snap.tick).toBe(0);
     expect(snap.pawns).toEqual([]);
     expect(snap.items).toEqual([]);
+  });
+
+  it('tracks aliases and exposes them through the query api', async () => {
+    const harness = createScenarioHarness();
+    harness.registerAlias('sourceWood', 'item_1');
+
+    const scenario = createScenario({
+      id: 'alias-probe',
+      title: 'alias probe',
+      setup: [],
+      script: [],
+      expect: [
+        createAssertStep('alias resolves', ({ query }) => query.resolveAlias('sourceWood') === 'item_1'),
+      ],
+    });
+
+    const result = await harness.runScenario(scenario);
+    expect(result.status).toBe('passed');
   });
 });
