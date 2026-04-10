@@ -6,6 +6,35 @@ import { executeWork } from './toil-handlers/work.handler';
 import { createBlueprint, createConstructionSite, createConstructionTestWorld } from '../construction/construction.test-utils';
 
 describe('construction toil execution', () => {
+  it('interrupts non-eat jobs when food is below the pawn critical hunger threshold', () => {
+    const { world, map, pawn } = createConstructionTestWorld();
+
+    pawn.needs.food = 15;
+    pawn.needsProfile.hungerCriticalThreshold = 20;
+    pawn.ai.currentJob = {
+      id: 'job_construct_low_food',
+      defId: 'job_construct',
+      pawnId: pawn.id,
+      targetCell: { x: 6, y: 6 },
+      toils: [
+        {
+          type: ToilType.GoTo,
+          targetCell: { x: 6, y: 6 },
+          state: ToilState.NotStarted,
+          localData: {},
+        },
+      ],
+      currentToilIndex: 0,
+      reservations: [],
+      state: JobState.Active,
+    };
+
+    toilExecutorSystem.execute(world);
+
+    expect(pawn.ai.currentJob).toBeNull();
+    expect(map.reservations.getAll()).toHaveLength(0);
+  });
+
   it('allows a constructor-side prepare toil to promote a ready blueprint before work starts', () => {
     const { world, map, pawn } = createConstructionTestWorld();
     const blueprint = createBlueprint(map, {

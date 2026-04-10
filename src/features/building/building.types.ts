@@ -29,8 +29,13 @@ export interface Building extends MapObjectBase {
   hpCurrent: number;
   /** 最大生命值 */
   hpMax: number;
+  category?: 'structure' | 'furniture';
 
   // ── 可选组件 ──
+
+  furniture?: {
+    usageType: 'bed' | 'table' | 'chair' | 'storage';
+  };
 
   /** 电力组件：管理建筑的耗电/发电状态 */
   power?: {
@@ -52,6 +57,14 @@ export interface Building extends MapObjectBase {
   interaction?: {
     /** 交互操作发生的格子坐标 */
     interactionCell: CellCoord;
+  };
+  bed?: {
+    ownerPawnId?: string;
+    occupantPawnId?: string;
+    role: 'public' | 'owned' | 'medical' | 'prisoner';
+    autoAssignable: boolean;
+    restRateMultiplier: number;
+    moodBonus: number;
   };
 }
 

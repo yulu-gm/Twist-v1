@@ -17,6 +17,8 @@ import type { UiPorts } from '../kernel/ui-ports';
 import { selectColonistRosterRows, selectColonistInspector } from '../domains/colonist/colonist.selectors';
 import { ColonistRoster } from '../domains/colonist/components/colonist-roster';
 import { ColonistInspector } from '../domains/colonist/components/colonist-inspector';
+import { selectBuildingInspector } from '../domains/building/building.selectors';
+import { BuildingInspector } from '../domains/building/components/building-inspector';
 import { selectTopStatusBar, selectActiveToolId } from '../domains/build/build.selectors';
 import { TopStatusBar } from '../domains/build/components/top-status-bar';
 import { ToolModeBar } from '../domains/build/components/tool-mode-bar';
@@ -63,6 +65,7 @@ export function AppShell({ snapshot, uiState, dispatch, ports }: AppShellProps) 
   const activeToolId = selectActiveToolId(snapshot);
   const rosterRows = selectColonistRosterRows(snapshot, uiState);
   const inspector = selectColonistInspector(snapshot, uiState);
+  const buildingInspector = inspector ? null : selectBuildingInspector(snapshot, uiState);
   const feedback = selectCommandFeedback(snapshot);
   const debugInfo = selectDebugInfo(snapshot);
   const showDebug = selectShowDebugPanel(snapshot);
@@ -79,6 +82,7 @@ export function AppShell({ snapshot, uiState, dispatch, ports }: AppShellProps) 
         onSelect={(id) => ports.selectColonist(id)}
       />
       {inspector && <ColonistInspector viewModel={inspector} />}
+      {buildingInspector && <BuildingInspector viewModel={buildingInspector} />}
       <ToastStack toasts={feedback.toasts} />
       <DebugPanel visible={showDebug} debugInfo={debugInfo} />
       <ToolModeBar

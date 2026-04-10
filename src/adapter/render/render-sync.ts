@@ -11,7 +11,7 @@ import Phaser from 'phaser';
 import { World } from '../../world/world';
 import type { GameMap } from '../../world/game-map';
 import { ObjectKind, ObjectId, MapObjectBase } from '../../core/types';
-import { TILE_SIZE, LAYER_DEPTH, LayerName, kindToLayer, getSpriteColor } from './render-utils';
+import { TILE_SIZE, LAYER_DEPTH, LayerName, kindToLayer, getSpriteColor, getObjectPixelCenter } from './render-utils';
 import { SpriteRegistry } from './sprite-registry';
 import { TerrainRenderer } from './terrain-renderer';
 import { ZoneRenderer } from './zone-renderer';
@@ -103,9 +103,8 @@ export class RenderSync {
 
       let sprite = this.spriteRegistry.get(obj.id);
       if (!sprite) {
-        const cx = obj.cell.x * TILE_SIZE + TILE_SIZE / 2;
-        const cy = obj.cell.y * TILE_SIZE + TILE_SIZE / 2;
-        sprite = renderer.createSprite(obj, cx, cy, color);
+        const center = getObjectPixelCenter(obj.cell, obj.footprint);
+        sprite = renderer.createSprite(obj, center.x, center.y, color);
         this.spriteRegistry.set(obj.id, sprite);
       }
       renderer.updateSprite(sprite, obj, color);

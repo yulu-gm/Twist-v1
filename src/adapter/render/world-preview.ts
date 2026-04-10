@@ -7,6 +7,7 @@
 
 import Phaser from 'phaser';
 import { PresentationState } from '../../presentation/presentation-state';
+import { getObjectPixelCenter } from './render-utils';
 
 /** 地图格子像素大小 */
 const TILE_SIZE = 32;
@@ -54,11 +55,16 @@ export class WorldPreview {
       const fill = pp.valid ? PREVIEW.validFill : PREVIEW.invalidFill;
       const fillAlpha = pp.valid ? PREVIEW.validFillAlpha : PREVIEW.invalidFillAlpha;
       const stroke = pp.valid ? PREVIEW.validStroke : PREVIEW.invalidStroke;
-      if (!this.previewRect) {
-        this.previewRect = this.scene.add.rectangle(0, 0, TILE_SIZE, TILE_SIZE, fill, fillAlpha)
-          .setDepth(50).setStrokeStyle(PREVIEW.strokeWidth, stroke);
+      const width = pp.footprint.width * TILE_SIZE;
+      const height = pp.footprint.height * TILE_SIZE;
+      if (!this.previewRect || this.previewRect.width !== width || this.previewRect.height !== height) {
+        this.previewRect?.destroy();
+        this.previewRect = this.scene.add.rectangle(0, 0, width, height, fill, fillAlpha)
+          .setDepth(50)
+          .setStrokeStyle(PREVIEW.strokeWidth, stroke);
       }
-      this.previewRect.setPosition(pp.cell.x * TILE_SIZE + TILE_SIZE / 2, pp.cell.y * TILE_SIZE + TILE_SIZE / 2);
+      const center = getObjectPixelCenter(pp.cell, pp.footprint);
+      this.previewRect.setPosition(center.x, center.y);
       this.previewRect.setFillStyle(fill, fillAlpha);
       this.previewRect.setStrokeStyle(PREVIEW.strokeWidth, stroke);
       this.previewRect.setVisible(true);

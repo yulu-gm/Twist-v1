@@ -31,7 +31,9 @@ export const speedButtons: readonly SpeedButtonDef[] = [
  */
 export const toolActions: readonly ToolActionDef[] = [
   { id: 'select', tool: 'select', label: 'Select', hotkey: 'Q', group: 0 },
-  { id: 'build', tool: 'build', label: 'Wall', hotkey: 'B', buildDefId: 'wall_wood', group: 1 },
+  { id: 'build_menu', tool: 'build', label: 'Build', hotkey: 'B', group: 1, isBuildToggle: true },
+  { id: 'build_wall', tool: 'build', label: 'Wall', hotkey: '', buildDefId: 'wall_wood', buildCategory: 'structure', group: 1 },
+  { id: 'build_bed', tool: 'build', label: 'Bed', hotkey: '', buildDefId: 'bed_wood', buildCategory: 'furniture', group: 1 },
   { id: 'mine', tool: 'designate', label: 'Mine', hotkey: 'M', designationType: 'mine', group: 2 },
   { id: 'harvest', tool: 'designate', label: 'Harvest', hotkey: 'H', designationType: 'harvest', group: 2 },
   { id: 'cut', tool: 'designate', label: 'Cut', hotkey: 'X', designationType: 'cut', group: 2 },

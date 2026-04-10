@@ -50,15 +50,18 @@ export function selectBuildModeSummary(snapshot: EngineSnapshot): BuildModeSumma
 export function selectActiveToolId(snapshot: EngineSnapshot): string {
   const tool = snapshot.presentation.activeTool;
   const desType = snapshot.presentation.activeDesignationType;
+  const buildDefId = snapshot.presentation.activeBuildDefId;
   const zoneType = snapshot.presentation.activeZoneType;
 
   // 遍历工具动作定义，找到与当前状态匹配的动作
   for (const action of toolActions) {
     if (action.tool === tool) {
-      // 区域菜单切换按钮不参与 ID 匹配
-      if (action.isZoneToggle) continue;
+      // 菜单切换按钮不参与具体子项匹配
+      if (action.isZoneToggle || action.isBuildToggle) continue;
       if (action.designationType) {
         if (action.designationType === desType) return action.id;
+      } else if (action.buildDefId) {
+        if (action.buildDefId === buildDefId) return action.id;
       } else if (action.zoneType) {
         if (action.zoneType === zoneType) return action.id;
       } else {

@@ -21,6 +21,7 @@ import type {
 import type { SeededRandom } from '../../core/seeded-random';
 import type { Pawn } from './pawn.types';
 import { PHYSICAL_OCCUPANT_TAG } from '../../world/occupancy';
+import { applyTraitModifiers, createDefaultNeedsProfile } from './pawn.systems';
 
 /**
  * 生成默认的24小时日程安排
@@ -72,8 +73,13 @@ export function createPawn(params: {
   mapId: MapId;
   factionId: FactionId;
   rng: SeededRandom;
+  traitIds?: string[];
 }): Pawn {
   const { name, cell, mapId, factionId } = params;
+  const { needsProfile, traits } = applyTraitModifiers(
+    createDefaultNeedsProfile(),
+    params.traitIds ?? [],
+  );
 
   return {
     id: nextObjectId(),
@@ -99,7 +105,13 @@ export function createPawn(params: {
       food: 100,
       rest: 100,
       joy: 100,
-      mood: 50,
+      mood: 100,
+    },
+    needsProfile,
+    traits,
+    thoughts: [],
+    needsState: {
+      starvationTicks: 0,
     },
 
     health: {

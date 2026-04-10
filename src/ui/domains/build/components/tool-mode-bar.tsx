@@ -1,38 +1,32 @@
 /**
  * @file tool-mode-bar.tsx
- * @description 底部工具栏组件 — 分组显示所有工具按钮，支持选中高亮和快捷键提示
- * @dependencies build.schemas — toolActions, utilityButtons；build.types — ToolActionDef
- * @part-of ui/domains/build — 建造 UI 领域
+ * @description 搴曢儴宸ュ叿鏍忕粍浠?鈥?鍒嗙粍鏄剧ず鎵€鏈夊伐鍏锋寜閽紝鏀寔閫変腑楂樹寒鍜屽揩鎹烽敭鎻愮ず
+ * @dependencies build.schemas 鈥?toolActions, utilityButtons锛沚uild.types 鈥?ToolActionDef
+ * @part-of ui/domains/build 鈥?寤洪€?UI 棰嗗煙
  */
 
 import { useState, useCallback, useEffect, useRef } from 'preact/hooks';
 import { toolActions, utilityButtons } from '../build.schemas';
 import type { ToolActionDef } from '../build.types';
 
-/** ToolModeBar 组件属性 */
 interface ToolModeBarProps {
-  /** 当前激活的工具动作 ID（用于高亮） */
   activeToolId: string;
-  /** 当前工具类型（用于判断区域菜单主按钮高亮） */
   activeTool: string;
-  /** 工具按钮点击回调 */
   onActivate: (action: ToolActionDef) => void;
 }
 
-/**
- * 底部工具模式栏 — 水平排列的分组工具按钮
- *
- * 按 group 字段将工具分组显示，组间用分隔线隔开。
- * 区域工具组以下拉菜单方式展示子类型（存储区/种植区/动物区）。
- * 末尾追加实用按钮组（暂停/存档/调试），仅显示快捷键提示。
- */
-export function ToolModeBar({ activeToolId, activeTool, onActivate }: ToolModeBarProps) {
-  /** 区域下拉菜单是否展开 */
-  const [zoneMenuOpen, setZoneMenuOpen] = useState(false);
-  /** 区域菜单容器引用（用于点击外部关闭） */
-  const zoneWrapRef = useRef<HTMLDivElement>(null);
+const BUILD_CATEGORY_LABELS: Record<'structure' | 'furniture', string> = {
+  structure: 'Structure',
+  furniture: 'Furniture',
+};
 
-  // 按 group 字段分组
+export function ToolModeBar({ activeToolId, activeTool, onActivate }: ToolModeBarProps) {
+  const [zoneMenuOpen, setZoneMenuOpen] = useState(false);
+  const [buildMenuOpen, setBuildMenuOpen] = useState(false);
+  const [activeBuildCategory, setActiveBuildCategory] = useState<'structure' | 'furniture'>('structure');
+  const zoneWrapRef = useRef<HTMLDivElement>(null);
+  const buildWrapRef = useRef<HTMLDivElement>(null);
+
   const groups = new Map<number, ToolActionDef[]>();
   for (const action of toolActions) {
     const g = groups.get(action.group) ?? [];
@@ -41,56 +35,129 @@ export function ToolModeBar({ activeToolId, activeTool, onActivate }: ToolModeBa
   }
   const sortedGroups = Array.from(groups.entries()).sort((a, b) => a[0] - b[0]);
 
-  /** 切换区域下拉菜单开关 */
+  const activeBuildAction = toolActions.find(action => action.id === activeToolId);
+  const buildActions = toolActions.filter(action => action.buildCategory && !action.isBuildToggle);
+  const buildCategories = (['structure', 'furniture'] as const).filter(category =>
+    buildActions.some(action => action.buildCategory === category),
+  );
+
   const toggleZoneMenu = useCallback(() => {
     setZoneMenuOpen(prev => !prev);
+    setBuildMenuOpen(false);
   }, []);
 
-  /** 区域子项点击 — 激活工具并关闭菜单 */
+  const toggleBuildMenu = useCallback(() => {
+    setBuildMenuOpen(prev => !prev);
+    setZoneMenuOpen(false);
+  }, []);
+
   const handleZoneOption = useCallback((action: ToolActionDef) => {
     onActivate(action);
     setZoneMenuOpen(false);
   }, [onActivate]);
 
-  /** 非区域工具点击 — 激活工具并关闭区域菜单 */
-  const handleNonZoneTool = useCallback((action: ToolActionDef) => {
+  const handleBuildOption = useCallback((action: ToolActionDef) => {
     onActivate(action);
-    setZoneMenuOpen(false);
+    setBuildMenuOpen(false);
   }, [onActivate]);
 
-  // 点击区域菜单外部时关闭菜单
+  const handleNonMenuTool = useCallback((action: ToolActionDef) => {
+    onActivate(action);
+    setZoneMenuOpen(false);
+    setBuildMenuOpen(false);
+  }, [onActivate]);
+
   useEffect(() => {
-    if (!zoneMenuOpen) return;
+    const activeCategory = activeBuildAction?.buildCategory;
+    if (activeCategory) {
+      setActiveBuildCategory(activeCategory);
+    }
+  }, [activeBuildAction?.buildCategory]);
+
+  useEffect(() => {
     const onPointerDown = (e: PointerEvent) => {
-      if (zoneWrapRef.current && !zoneWrapRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (zoneMenuOpen && zoneWrapRef.current && !zoneWrapRef.current.contains(target)) {
         setZoneMenuOpen(false);
       }
+      if (buildMenuOpen && buildWrapRef.current && !buildWrapRef.current.contains(target)) {
+        setBuildMenuOpen(false);
+      }
     };
-    document.addEventListener('pointerdown', onPointerDown, true);
-    return () => document.removeEventListener('pointerdown', onPointerDown, true);
-  }, [zoneMenuOpen]);
 
-  // 切换到非区域工具时自动关闭菜单
+    if (zoneMenuOpen || buildMenuOpen) {
+      document.addEventListener('pointerdown', onPointerDown, true);
+      return () => document.removeEventListener('pointerdown', onPointerDown, true);
+    }
+
+    return undefined;
+  }, [zoneMenuOpen, buildMenuOpen]);
+
   useEffect(() => {
     if (activeTool !== 'zone') {
       setZoneMenuOpen(false);
+    }
+    if (activeTool !== 'build') {
+      setBuildMenuOpen(false);
     }
   }, [activeTool]);
 
   return (
     <nav class="tool-mode-bar">
       {sortedGroups.map(([groupIdx, actions], idx) => {
-        // 判断是否为区域工具组（含 isZoneToggle 的组）
         const isZoneGroup = actions.some(a => a.isZoneToggle);
+        const isBuildGroup = actions.some(a => a.isBuildToggle);
 
         return (
           <>
             {idx > 0 && <div class="tool-mode-bar__sep" />}
-            {isZoneGroup ? (
-              /* 区域工具组 — 下拉菜单布局 */
+            {isBuildGroup ? (
+              <div class="tool-mode-bar__group build-tool-group" key={groupIdx} ref={buildWrapRef}>
+                <div class="build-menu-wrap">
+                  <div class={`build-menu${buildMenuOpen ? ' open' : ''}`}>
+                    <div class="build-menu__categories">
+                      {buildCategories.map(category => (
+                        <button
+                          key={category}
+                          class={`tool-mode-bar__btn tool-mode-bar__btn--secondary build-category-btn${activeBuildCategory === category ? ' active' : ''}`}
+                          onClick={() => setActiveBuildCategory(category)}
+                          aria-label={BUILD_CATEGORY_LABELS[category]}
+                        >
+                          {BUILD_CATEGORY_LABELS[category]}
+                        </button>
+                      ))}
+                    </div>
+                    <div class="build-menu__options">
+                      {buildActions
+                        .filter(action => action.buildCategory === activeBuildCategory)
+                        .map(action => (
+                          <button
+                            key={action.id}
+                            class={`tool-mode-bar__btn tool-mode-bar__btn--secondary build-option${activeToolId === action.id ? ' active' : ''}`}
+                            onClick={() => handleBuildOption(action)}
+                            aria-label={action.label}
+                          >
+                            {action.label}
+                          </button>
+                        ))}
+                    </div>
+                  </div>
+                  {actions.filter(a => a.isBuildToggle).map(action => (
+                    <button
+                      key={action.id}
+                      class={`tool-mode-bar__btn build-main-btn${activeTool === 'build' ? ' active' : ''}${buildMenuOpen ? ' open' : ''}`}
+                      onClick={toggleBuildMenu}
+                      aria-expanded={buildMenuOpen}
+                      aria-label={action.label}
+                    >
+                      {action.hotkey ? `[${action.hotkey}] ` : ''}{action.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : isZoneGroup ? (
               <div class="tool-mode-bar__group zone-tool-group" key={groupIdx} ref={zoneWrapRef}>
                 <div class="zone-menu-wrap">
-                  {/* 区域子类型下拉菜单 */}
                   <div class={`zone-menu${zoneMenuOpen ? ' open' : ''}`}>
                     {actions.filter(a => a.zoneType && !a.isZoneToggle).map(action => (
                       <button
@@ -103,7 +170,6 @@ export function ToolModeBar({ activeToolId, activeTool, onActivate }: ToolModeBa
                       </button>
                     ))}
                   </div>
-                  {/* 区域主按钮 — 点击展开/收起菜单 */}
                   {actions.filter(a => a.isZoneToggle).map(action => (
                     <button
                       key={action.id}
@@ -118,7 +184,6 @@ export function ToolModeBar({ activeToolId, activeTool, onActivate }: ToolModeBa
                 </div>
               </div>
             ) : (
-              /* 普通工具组 */
               <div class="tool-mode-bar__group" key={groupIdx}>
                 {actions.map(action => {
                   const btnClass = [
@@ -129,7 +194,7 @@ export function ToolModeBar({ activeToolId, activeTool, onActivate }: ToolModeBa
                     <button
                       key={action.id}
                       class={btnClass}
-                      onClick={() => handleNonZoneTool(action)}
+                      onClick={() => handleNonMenuTool(action)}
                       aria-label={action.label}
                     >
                       {action.hotkey ? `[${action.hotkey}] ` : ''}{action.label}
@@ -141,7 +206,6 @@ export function ToolModeBar({ activeToolId, activeTool, onActivate }: ToolModeBa
           </>
         );
       })}
-      {/* 实用按钮组 — 仅显示快捷键提示，实际操作由键盘处理 */}
       <div class="tool-mode-bar__sep" />
       <div class="tool-mode-bar__group">
         {utilityButtons.map(btn => (

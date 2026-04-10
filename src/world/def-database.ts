@@ -47,6 +47,13 @@ export interface BuildingDef {
     allowedDefIds: DefId[];
     priority: StoragePriority;
   };
+  category?: 'structure' | 'furniture';
+  furnitureType?: 'bed' | 'table' | 'chair' | 'storage';
+  bedConfig?: {
+    autoAssignable: boolean;
+    restRateMultiplier: number;
+    moodBonus: number;
+  };
   /** 渲染颜色（十六进制色值） */
   color: number;
 }

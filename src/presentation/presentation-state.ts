@@ -12,6 +12,7 @@ import {
   Rotation,
   DesignationType,
   ZoneType,
+  Footprint,
 } from '../core/types';
 
 /**
@@ -44,6 +45,8 @@ export interface PlacementPreview {
   defId: DefId;
   /** 预览所在格子 */
   cell: CellCoord;
+  /** 建筑占地尺寸 */
+  footprint: Footprint;
   /** 旋转角度 */
   rotation: Rotation;
   /** 是否为合法放置位置 */

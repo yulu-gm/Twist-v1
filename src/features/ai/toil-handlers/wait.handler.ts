@@ -1,23 +1,46 @@
-/**
- * @file wait.handler.ts
- * @description Wait Toil handler — 等待指定 tick 数，支持进食恢复
- * @part-of AI 子系统（features/ai/toil-handlers）
- */
-
-import { ToilState } from '../../../core/types';
+import { ObjectKind, ToilState, cellEquals } from '../../../core/types';
 import { log } from '../../../core/logger';
 import type { ToilHandler } from './toil-handler.types';
+import { claimBedOccupancy, getBedSleepCell, movePawnInstantly } from '../sleep.utils';
 
-/** 执行等待（Wait）Toil */
-export const executeWait: ToilHandler = ({ pawn, toil }) => {
+const SLEEP_REST_GAIN_SCALE = 10;
+
+export const executeWait: ToilHandler = ({ pawn, toil, map }) => {
   const ld = toil.localData;
   const waited = (ld.waited as number) ?? 0;
   const waitTicks = (ld.waitTicks as number) ?? 60;
 
   ld.waited = waited + 1;
 
+  if (ld.sleeping) {
+    const bedId = typeof ld.bedId === 'string' ? ld.bedId : undefined;
+    let restGain = pawn.needsProfile.floorRestGainPerTick;
+
+    if (bedId) {
+      if (!claimBedOccupancy(map, pawn, bedId)) {
+        toil.state = ToilState.Failed;
+        return;
+      }
+
+      const bed = map.objects.getAs(bedId, ObjectKind.Building);
+      const sleepCell = getBedSleepCell(map, bedId);
+      if (sleepCell && !cellEquals(pawn.cell, sleepCell)) {
+        movePawnInstantly(map, pawn, sleepCell);
+      }
+
+      restGain = pawn.needsProfile.bedRestGainPerTick * (bed?.bed?.restRateMultiplier ?? 1);
+    }
+
+    pawn.needs.rest = Math.min(100, pawn.needs.rest + restGain * SLEEP_REST_GAIN_SCALE);
+
+    if (pawn.needs.rest >= pawn.needsProfile.wakeTargetRest) {
+      toil.state = ToilState.Completed;
+      log.debug('ai', `Pawn ${pawn.id} woke up with rest ${Math.floor(pawn.needs.rest)}`, undefined, pawn.id);
+    }
+    return;
+  }
+
   if ((ld.waited as number) >= waitTicks) {
-    // 若此等待是进食的一部分，恢复饱食度
     if (ld.eating) {
       if (!pawn.inventory.carrying) {
         log.warn('ai', `Pawn ${pawn.id} finished eating wait without carried food`, undefined, pawn.id);
