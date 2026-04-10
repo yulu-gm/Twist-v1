@@ -14,6 +14,13 @@ import { inspector } from '../../core/inspector';
 import { log } from '../../core/logger';
 import { ObjectKind } from '../../core/types';
 
+/** 扩展 Window 接口，声明 opus 调试 API 全局属性 */
+declare global {
+  interface Window {
+    opus: Record<string, (...args: any[]) => unknown>;
+  }
+}
+
 /**
  * 安装调试控制台到 window.opus
  *
@@ -142,7 +149,7 @@ export function installDebugConsole(world: World, map: GameMap): void {
   };
 
   // 挂载到 window.opus 供浏览器控制台使用
-  (window as any).opus = debugApi;
+  window.opus = debugApi;
 
   console.log(
     '%c[Opus World] Debug console installed. Type opus.status() to get started.',
