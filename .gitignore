@@ -5,3 +5,4 @@ dist/
 *.png
 .DS_Store
 tmp/
+.worktrees/
