@@ -66,6 +66,36 @@ export interface Job {
   state: JobState;
 }
 
+export interface PawnNeedsProfile {
+  foodDecayPerTick: number;
+  restDecayPerTick: number;
+  joyDecayPerTick: number;
+  hungerSeekThreshold: number;
+  hungerCriticalThreshold: number;
+  starvationDamageInterval: number;
+  starvationDamageAmount: number;
+  sleepSeekThreshold: number;
+  sleepCriticalThreshold: number;
+  wakeTargetRest: number;
+  bedRestGainPerTick: number;
+  floorRestGainPerTick: number;
+  floorSleepMoodPenalty: number;
+  mealTargetFood: number;
+}
+
+export interface PawnTrait {
+  traitId: string;
+  label: string;
+  description: string;
+}
+
+export interface PawnThought {
+  type: string;
+  moodOffset: number;
+  remainingTicks: number;
+  sourceId?: ObjectId;
+}
+
 // ── Pawn（棋子：游戏中可操控的角色实体） ──
 export interface Pawn extends MapObjectBase {
   /** 对象类型标识，固定为 Pawn */
@@ -99,6 +129,12 @@ export interface Pawn extends MapObjectBase {
     joy: number;
     /** 心情值（0-100），由其他需求加权计算 */
     mood: number;
+  };
+  needsProfile: PawnNeedsProfile;
+  traits: PawnTrait[];
+  thoughts: PawnThought[];
+  needsState: {
+    starvationTicks: number;
   };
 
   // ── 健康系统 ──

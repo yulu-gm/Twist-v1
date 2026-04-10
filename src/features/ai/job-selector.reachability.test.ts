@@ -37,6 +37,38 @@ function addStockpileCells(map: ReturnType<typeof createGameMap>, coords: Array<
 }
 
 describe('job selector reachability', () => {
+  it('uses the pawn hunger seek threshold from the needs profile', () => {
+    const defs = buildDefDatabase();
+    const world = createWorld({ defs, seed: 12345 });
+    const map = createGameMap({ id: 'main', width: 12, height: 12 });
+    world.maps.set(map.id, map);
+
+    const pawn = createPawn({
+      name: 'Alice',
+      cell: { x: 1, y: 1 },
+      mapId: map.id,
+      factionId: 'player',
+      rng: world.rng,
+    });
+    pawn.needs.food = 40;
+    pawn.needsProfile.hungerSeekThreshold = 50;
+    map.objects.add(pawn);
+
+    const item = createItem({
+      defId: 'meal_simple',
+      cell: { x: 2, y: 1 },
+      mapId: map.id,
+      stackCount: 2,
+      defs,
+    });
+    map.objects.add(item);
+
+    jobSelectionSystem.execute(world);
+
+    expect(pawn.ai.currentJob?.defId).toBe('job_eat');
+    expect(pawn.ai.currentJob?.targetId).toBe(item.id);
+  });
+
   it('does not assign haul jobs for unreachable items', () => {
     const defs = buildDefDatabase();
     const world = createWorld({ defs, seed: 12345 });

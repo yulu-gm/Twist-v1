@@ -542,10 +542,12 @@ export class InputHandler {
     // 更新放置预览
     if (this.presentation.activeTool === ToolType.Build && this.presentation.activeBuildDefId && this.presentation.hoveredCell) {
       const cell = this.presentation.hoveredCell;
+      const footprint = this.world.defs.buildings.get(this.presentation.activeBuildDefId)?.size ?? { width: 1, height: 1 };
       const isPassable = this.map.spatial.isPassable(cell);
       this.presentation.placementPreview = {
         defId: this.presentation.activeBuildDefId,
         cell,
+        footprint,
         rotation: 0,
         valid: isPassable,
       };

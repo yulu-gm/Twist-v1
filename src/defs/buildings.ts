@@ -65,6 +65,13 @@ export const BUILDING_DEFS: BuildingDef[] = [
     workToBuild: 120,
     costList: [{ defId: 'wood', count: 8 }],
     tags: ['furniture', 'bed'],
+    category: 'furniture',
+    furnitureType: 'bed',
+    bedConfig: {
+      autoAssignable: true,
+      restRateMultiplier: 1.25,
+      moodBonus: 5,
+    },
     blocksMovement: false,
     blocksLight: false,
     passable: false,

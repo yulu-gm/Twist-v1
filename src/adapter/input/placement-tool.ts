@@ -46,6 +46,7 @@ export class PlacementTool {
     presentation.placementPreview = {
       defId,
       cell: hoveredCell,
+      footprint: { width: 1, height: 1 },
       rotation: 0,
       valid,
     };

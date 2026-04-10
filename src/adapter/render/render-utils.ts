@@ -5,10 +5,12 @@
  */
 
 import { ObjectKind, MapObjectBase, ZoneType } from '../../core/types';
+import type { CellCoord, Footprint } from '../../core/types';
 import type { DefDatabase } from '../../world/def-database';
 
 /** 地图格子像素大小 */
 export const TILE_SIZE = 32;
+const DEFAULT_FOOTPRINT: Footprint = { width: 1, height: 1 };
 
 /** 渲染层名称与 depth 映射 */
 export const LAYER_DEPTH = {
@@ -129,6 +131,14 @@ export function getSpriteColor(obj: MapObjectBase, defs: DefDatabase): number {
 
 /** 根据对象 footprint 获取精灵像素尺寸 */
 export function getSpriteSize(obj: MapObjectBase): { w: number; h: number } {
-  const fp = obj.footprint ?? { width: 1, height: 1 };
+  const fp = obj.footprint ?? DEFAULT_FOOTPRINT;
   return { w: fp.width * TILE_SIZE, h: fp.height * TILE_SIZE };
+}
+
+/** 根据左上角锚点和占地尺寸，计算对象在像素空间中的中心点。 */
+export function getObjectPixelCenter(cell: CellCoord, footprint: Footprint = DEFAULT_FOOTPRINT): { x: number; y: number } {
+  return {
+    x: cell.x * TILE_SIZE + (footprint.width * TILE_SIZE) / 2,
+    y: cell.y * TILE_SIZE + (footprint.height * TILE_SIZE) / 2,
+  };
 }

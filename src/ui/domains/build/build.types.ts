@@ -27,8 +27,12 @@ export interface ToolActionDef {
   designationType?: string;
   /** 建筑定义 ID（仅 build 工具需要） */
   buildDefId?: string;
+  /** 建造分类（仅 build 菜单子项需要） */
+  buildCategory?: 'structure' | 'furniture';
   /** 区域类型（仅 zone 工具需要） */
   zoneType?: string;
+  /** 是否为建造菜单切换按钮（点击展开/收起子菜单） */
+  isBuildToggle?: boolean;
   /** 是否为区域菜单切换按钮（点击展开/收起子菜单） */
   isZoneToggle?: boolean;
   /** 所属分组编号（用于在工具栏中分组显示） */

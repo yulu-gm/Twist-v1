@@ -65,7 +65,7 @@ function processMap(world: World, map: GameMap): void {
 
     // ── 中途中断检测 ──
     // 紧急需求：饱食度低于 10 时中断当前非进食工作
-    if (pawn.needs.food < 10 && job.defId !== 'job_eat') {
+    if (pawn.needs.food < pawn.needsProfile.hungerCriticalThreshold && job.defId !== 'job_eat') {
       log.info('ai', `Pawn ${pawn.id} interrupted (food critical: ${Math.floor(pawn.needs.food)})`, undefined, pawn.id);
       cleanupProtocol(pawn, map, world);
       continue;

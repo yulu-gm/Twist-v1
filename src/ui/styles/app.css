@@ -163,10 +163,12 @@
 
 /* ── Zone Tool Group (Dropdown) ── */
 
+.build-tool-group,
 .zone-tool-group {
   overflow: visible;
 }
 
+.build-menu-wrap,
 .zone-menu-wrap {
   position: relative;
   display: flex;
@@ -174,6 +176,7 @@
   overflow: visible;
 }
 
+.build-menu,
 .zone-menu {
   display: none;
   position: absolute;
@@ -190,20 +193,41 @@
   z-index: 2;
 }
 
+.build-menu.open,
 .zone-menu.open {
   display: flex;
 }
 
+.build-main-btn.open:not(.active),
 .zone-main-btn.open:not(.active) {
   box-shadow: inset 0 0 0 1px var(--accent);
   color: var(--text-color);
 }
 
+.build-main-btn.active,
 .zone-main-btn.active {
   background: var(--accent);
   color: #ffffff;
 }
 
+.build-menu {
+  min-width: 224px;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.build-menu__categories {
+  display: flex;
+  gap: 4px;
+}
+
+.build-menu__options {
+  display: flex;
+  gap: 4px;
+}
+
+.build-category-btn,
+.build-option,
 .zone-option {
   min-width: 72px;
   text-align: center;

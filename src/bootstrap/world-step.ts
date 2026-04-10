@@ -12,8 +12,25 @@ import type { GameEvent } from '../core/event-bus';
 
 /** advanceWorldTick 的可选配置 */
 export interface AdvanceWorldTickOptions {
-  /** 自定义事件分发回调 — 在 eventBus.dispatch 之前调用，允许外部收集事件 */
+  /** 自定义事件分发回调 - 在 eventBus.dispatch 之前调用，允许外部收集事件 */
   dispatchEvents?: (events: GameEvent[]) => void;
+}
+
+function flushWorldEvents(world: World, options: AdvanceWorldTickOptions = {}): void {
+  if (world.eventBuffer.length === 0) {
+    return;
+  }
+
+  const events = [...world.eventBuffer];
+  options.dispatchEvents?.(events);
+  world.eventBus.dispatch(events);
+  world.eventBuffer.length = 0;
+}
+
+/** 处理当前命令队列，但不推进 tick 或模拟时钟。 */
+export function processWorldCommands(world: World, options: AdvanceWorldTickOptions = {}): void {
+  world.commandBus.processQueue(world);
+  flushWorldEvents(world, options);
 }
 
 /**
@@ -39,10 +56,5 @@ export function advanceWorldTick(world: World, options: AdvanceWorldTickOptions 
   world.tickRunner.executeTick(world);
 
   // 4. 分发并清空事件缓冲
-  if (world.eventBuffer.length > 0) {
-    const events = [...world.eventBuffer];
-    options.dispatchEvents?.(events);
-    world.eventBus.dispatch(events);
-    world.eventBuffer.length = 0;
-  }
+  flushWorldEvents(world, options);
 }

@@ -110,6 +110,11 @@ function spawnInitialPawns(map: GameMap, world: World): void {
   const centerY = Math.floor(map.height / 2);
 
   const names = ['Alice', 'Bob', 'Charlie'];
+  const traitIdsByName: Record<string, string[]> = {
+    Alice: ['glutton'],
+    Bob: ['light_sleeper'],
+    Charlie: ['hardy'],
+  };
 
   for (const name of names) {
     let px = centerX + rng.nextInt(-3, 3);
@@ -128,6 +133,7 @@ function spawnInitialPawns(map: GameMap, world: World): void {
       mapId: map.id,
       factionId: 'player',
       rng,
+      traitIds: traitIdsByName[name] ?? [],
     });
     map.objects.add(pawn);
   }

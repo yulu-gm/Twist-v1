@@ -56,10 +56,16 @@ describe('selectActiveToolId', () => {
     }))).toBe('mine');
   });
 
-  it('returns build for build tool', () => {
+  it('returns build_wall for wall build tool', () => {
     expect(selectActiveToolId(makeSnapshot({
       presentation: { activeTool: 'build', activeDesignationType: null, activeZoneType: null, activeBuildDefId: 'wall_wood', hoveredCell: null, selectedIds: [], showDebugPanel: false, showGrid: false },
-    }))).toBe('build');
+    }))).toBe('build_wall');
+  });
+
+  it('returns build_bed for bed build tool', () => {
+    expect(selectActiveToolId(makeSnapshot({
+      presentation: { activeTool: 'build', activeDesignationType: null, activeZoneType: null, activeBuildDefId: 'bed_wood', hoveredCell: null, selectedIds: [], showDebugPanel: false, showGrid: false },
+    }))).toBe('build_bed');
   });
 
   it('returns zone_stockpile for zone+stockpile', () => {

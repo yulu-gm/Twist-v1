@@ -29,3 +29,27 @@ export function getBuildingById(map: GameMap, id: string): Building | undefined 
   if (obj && obj.kind === ObjectKind.Building) return obj as Building;
   return undefined;
 }
+
+export function getAllBeds(map: GameMap): Building[] {
+  return getAllBuildings(map).filter(building => building.bed !== undefined);
+}
+
+export function getBedByOwner(map: GameMap, pawnId: string): Building | undefined {
+  return getAllBeds(map).find(building => building.bed?.ownerPawnId === pawnId);
+}
+
+export function isBedAvailable(building: Building): boolean {
+  return building.bed !== undefined && building.bed.occupantPawnId === undefined;
+}
+
+export function isBedOwnedBy(building: Building, pawnId: string): boolean {
+  return building.bed?.ownerPawnId === pawnId;
+}
+
+export function findAvailableAutoAssignableBed(map: GameMap): Building | undefined {
+  return getAllBeds(map).find(building => (
+    building.bed?.autoAssignable === true
+    && building.bed.ownerPawnId === undefined
+    && isBedAvailable(building)
+  ));
+}

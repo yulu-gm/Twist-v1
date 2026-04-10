@@ -6,7 +6,7 @@
 
 import Phaser from 'phaser';
 import { ObjectKind, MapObjectBase } from '../../../core/types';
-import { TILE_SIZE, LayerName, kindToLayer, getSpriteSize } from '../render-utils';
+import { LayerName, kindToLayer, getSpriteSize, getObjectPixelCenter } from '../render-utils';
 import type { ObjectRenderer } from './types';
 
 /**
@@ -43,11 +43,10 @@ export class DefaultRenderer implements ObjectRenderer {
   }
 
   updateSprite(sprite: Phaser.GameObjects.GameObject, obj: MapObjectBase, color: number): void {
-    const cx = obj.cell.x * TILE_SIZE + TILE_SIZE / 2;
-    const cy = obj.cell.y * TILE_SIZE + TILE_SIZE / 2;
+    const center = getObjectPixelCenter(obj.cell, obj.footprint);
 
     if (sprite instanceof Phaser.GameObjects.Rectangle) {
-      sprite.setPosition(cx, cy);
+      sprite.setPosition(center.x, center.y);
       sprite.setFillStyle(color);
     }
   }

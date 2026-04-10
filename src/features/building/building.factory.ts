@@ -56,7 +56,14 @@ export function createBuilding(params: {
     rotation,
     hpCurrent: maxHp,
     hpMax: maxHp,
+    category: def?.category,
   };
+
+  if (def?.furnitureType) {
+    building.furniture = {
+      usageType: def.furnitureType,
+    };
+  }
 
   // 若定义了耗电量，挂载电力组件
   // Attach optional power component
@@ -85,6 +92,15 @@ export function createBuilding(params: {
         x: cell.x + def.interactionCellOffset.x,
         y: cell.y + def.interactionCellOffset.y,
       },
+    };
+  }
+
+  if (def?.bedConfig) {
+    building.bed = {
+      role: 'public',
+      autoAssignable: def.bedConfig.autoAssignable,
+      restRateMultiplier: def.bedConfig.restRateMultiplier,
+      moodBonus: def.bedConfig.moodBonus,
     };
   }
 

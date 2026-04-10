@@ -21,7 +21,7 @@ import { DebugOverlay } from './debug/debug-overlay';
 import { installDebugConsole } from './debug/console';
 import { createPresentationState, PresentationState } from '../presentation/presentation-state';
 import type { EngineSnapshotBridge } from '../ui/kernel/ui-bridge';
-import { advanceWorldTick } from '../bootstrap/world-step';
+import { advanceWorldTick, processWorldCommands } from '../bootstrap/world-step';
 
 /** 基础 tick 间隔（毫秒），1x 速度下每 100ms 执行一次 tick */
 const TICK_MS = 100; // base tick interval at 1x
@@ -134,6 +134,10 @@ export class MainScene extends Phaser.Scene {
     }
 
     if (this.world.speed === SimSpeed.Paused) {
+      if (this.world.commandQueue.length > 0) {
+        processWorldCommands(this.world);
+        this.renderSync.sync(0);
+      }
       return;
     }
 
