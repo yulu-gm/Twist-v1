@@ -3,7 +3,8 @@
  * @description 引擎快照读取器 — 从游戏世界状态构建完整的 EngineSnapshot
  * @dependencies world/world — 世界状态；world/game-map — 地图数据；
  *               presentation — 展示层状态；core/types — ObjectKind；
- *               core/clock — 时钟显示格式化；ui-types — 快照类型定义
+ *               core/clock — 时钟显示格式化；ui-types — 快照类型定义；
+ *               features/pawn — Pawn 类型（殖民者数据提取）
  * @part-of ui/kernel — UI 内核层
  *
  * 这是 Phaser 游戏世界与 Preact UI 之间的数据转换层。
@@ -15,6 +16,7 @@ import type { GameMap } from '../../world/game-map';
 import type { PresentationState } from '../../presentation/presentation-state';
 import { ObjectKind } from '../../core/types';
 import { getClockDisplay } from '../../core/clock';
+import type { Pawn } from '../../features/pawn/pawn.types';
 import type { EngineSnapshot, ColonistNode, FeedbackSnapshot } from './ui-types';
 
 /**
@@ -46,23 +48,23 @@ export function readEngineSnapshot(
   const colonists: Record<string, ColonistNode> = {};
   const pawns = map.objects.allOfKind(ObjectKind.Pawn);
   for (const pawn of pawns) {
-    const jobDefId = (pawn as any).ai?.currentJob?.defId ?? 'idle';
+    const jobDefId = pawn.ai?.currentJob?.defId ?? 'idle';
     colonists[pawn.id] = {
       id: pawn.id,
-      name: (pawn as any).name ?? pawn.id,
+      name: pawn.name ?? pawn.id,
       cell: { x: pawn.cell.x, y: pawn.cell.y },
-      factionId: (pawn as any).factionId ?? '',
+      factionId: pawn.factionId ?? '',
       currentJob: jobDefId,
       currentJobLabel: formatJobLabel(jobDefId),
       needs: {
-        food: (pawn as any).needs?.food ?? 0,
-        rest: (pawn as any).needs?.rest ?? 0,
-        joy: (pawn as any).needs?.joy ?? 0,
-        mood: (pawn as any).needs?.mood ?? 0,
+        food: pawn.needs?.food ?? 0,
+        rest: pawn.needs?.rest ?? 0,
+        joy: pawn.needs?.joy ?? 0,
+        mood: pawn.needs?.mood ?? 0,
       },
       health: {
-        hp: (pawn as any).health?.hp ?? 100,
-        maxHp: (pawn as any).health?.maxHp ?? 100,
+        hp: pawn.health?.hp ?? 100,
+        maxHp: pawn.health?.maxHp ?? 100,
       },
     };
   }
