@@ -6,14 +6,14 @@
 
 import Phaser from 'phaser';
 import { World } from '../../world/world';
-import { SimSpeed, DesignationType } from '../../core/types';
+import { SimSpeed, DesignationType, ZoneType } from '../../core/types';
 import { PresentationState, ToolType, OverlayType, switchTool } from '../../presentation/presentation-state';
 
 /**
  * 注册所有键盘快捷键
  *
  * - 速度控制: SPACE 暂停/恢复, 1/2/3 速度档
- * - 工具切换: ESC/Q 选择, B 建造, M 采矿, H 采集, X 砍伐, C 取消
+ * - 工具切换: ESC/Q 选择, B 建造, M 采矿, H 采集, X 砍伐, Z 区域, C 取消
  * - 覆盖层: F1 调试, F2 区域, F3 房间, F4 温度, F5 寻路
  * - 系统: F6 保存, F7 加载, F8 网格线
  */
@@ -66,6 +66,10 @@ export function setupKeyboardBindings(
   kb.on('keydown-X', () => {
     switchTool(presentation, ToolType.Designate);
     presentation.activeDesignationType = DesignationType.Cut;
+  });
+  kb.on('keydown-Z', () => {
+    switchTool(presentation, ToolType.Zone);
+    presentation.activeZoneType = ZoneType.Stockpile;
   });
   kb.on('keydown-C', () => {
     switchTool(presentation, ToolType.Cancel);

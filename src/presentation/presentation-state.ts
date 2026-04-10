@@ -5,7 +5,14 @@
  * @part-of presentation — 展示层，连接游戏逻辑与 UI 渲染
  */
 
-import { ObjectId, CellCoord, DefId, Rotation, DesignationType } from '../core/types';
+import {
+  ObjectId,
+  CellCoord,
+  DefId,
+  Rotation,
+  DesignationType,
+  ZoneType,
+} from '../core/types';
 
 /**
  * 调试覆盖层类型枚举
@@ -58,6 +65,26 @@ export interface DesignationPreview {
 }
 
 /**
+ * 区域预览数据
+ *
+ * 用于展示当前正在创建/擦除的区域格子范围与合法性
+ */
+export interface ZonePreview {
+  /** 预览模式：创建或擦除 */
+  mode: 'create' | 'erase';
+  /** 当前区域类型 */
+  zoneType: ZoneType | null;
+  /** 预览涉及的全部格子 */
+  cells: CellCoord[];
+  /** 其中合法的格子 */
+  validCells: CellCoord[];
+  /** 其中非法的格子 */
+  invalidCells: CellCoord[];
+  /** 预览整体是否有效 */
+  valid: boolean;
+}
+
+/**
  * 展示层状态接口 — 存储所有 UI 相关的瞬态数据
  *
  * 这是游戏逻辑层和 UI 渲染层之间的桥梁，
@@ -82,6 +109,8 @@ export interface PresentationState {
   activeTool: ToolType;
   /** 当前激活的指派子类型（用于 UI 高亮） */
   activeDesignationType: DesignationType | null;
+  /** 当前激活的区域子类型（用于 UI 高亮） */
+  activeZoneType: ZoneType | null;
   /** 当前选中的建筑定义 ID（用于 UI 高亮） */
   activeBuildDefId: DefId | null;
   /** 是否显示调试面板 */
@@ -90,6 +119,8 @@ export interface PresentationState {
   showGrid: boolean;
   /** 拖拽选框（null 表示未在拖拽） */
   dragRect: { startCell: CellCoord; endCell: CellCoord } | null;
+  /** 区域预览（null 表示当前没有区域交互预览） */
+  zonePreview: ZonePreview | null;
 }
 
 /**
@@ -117,12 +148,16 @@ export function switchTool(presentation: PresentationState, tool: ToolType): voi
   if (tool !== ToolType.Designate) {
     presentation.activeDesignationType = null;
   }
+  if (tool !== ToolType.Zone) {
+    presentation.activeZoneType = null;
+  }
   if (tool !== ToolType.Build) {
     presentation.activeBuildDefId = null;
   }
   if (tool !== ToolType.Select) {
     presentation.selectedObjectIds.clear();
   }
+  presentation.zonePreview = null;
 }
 
 /**
@@ -141,9 +176,11 @@ export function createPresentationState(): PresentationState {
     cameraZoom: 1,
     activeTool: ToolType.Select,
     activeDesignationType: null,
+    activeZoneType: null,
     activeBuildDefId: null,
     showDebugPanel: false,
     showGrid: false,
     dragRect: null,
+    zonePreview: null,
   };
 }

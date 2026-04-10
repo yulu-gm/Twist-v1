@@ -4,7 +4,7 @@
  * @part-of adapter/render — 渲染模块
  */
 
-import { ObjectKind, MapObjectBase } from '../../core/types';
+import { ObjectKind, MapObjectBase, ZoneType } from '../../core/types';
 import type { DefDatabase } from '../../world/def-database';
 
 /** 地图格子像素大小 */
@@ -14,6 +14,7 @@ export const TILE_SIZE = 32;
 export const LAYER_DEPTH = {
   terrain: 0,
   grid: 1,
+  zone: 1.5,
   designation: 2,
   item: 3,
   plant: 4,
@@ -23,6 +24,20 @@ export const LAYER_DEPTH = {
 } as const;
 
 export type LayerName = keyof typeof LAYER_DEPTH;
+
+/** 区域类型 → 基础渲染颜色 */
+export function getZoneColor(zoneType: ZoneType): number {
+  switch (zoneType) {
+    case ZoneType.Stockpile:
+      return 0x4dd0e1;
+    case ZoneType.Growing:
+      return 0x66bb6a;
+    case ZoneType.Animal:
+      return 0xffb74d;
+    default:
+      return 0x90a4ae;
+  }
+}
 
 /** ObjectKind → Container 层映射 */
 export function kindToLayer(kind: ObjectKind): LayerName {

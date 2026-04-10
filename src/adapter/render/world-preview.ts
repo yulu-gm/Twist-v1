@@ -37,6 +37,8 @@ export class WorldPreview {
   private designationRect: Phaser.GameObjects.Rectangle | null = null;
   /** 拖拽预览 Graphics */
   private dragGraphics: Phaser.GameObjects.Graphics | null = null;
+  /** 区域预览 Graphics */
+  private zoneGraphics: Phaser.GameObjects.Graphics | null = null;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -82,8 +84,18 @@ export class WorldPreview {
       this.designationRect.setVisible(false);
     }
 
+    // 区域预览：区域工具和取消工具都可能对区域产生彩色预览
+    if (presentation.zonePreview) {
+      this.renderZonePreview(presentation);
+      if (this.dragGraphics) {
+        this.dragGraphics.clear();
+      }
+    } else if (this.zoneGraphics) {
+      this.zoneGraphics.clear();
+    }
+
     // 拖拽选框预览
-    if (presentation.dragRect) {
+    if (!presentation.zonePreview && presentation.dragRect) {
       if (!this.dragGraphics) {
         this.dragGraphics = this.scene.add.graphics().setDepth(50);
       }
@@ -109,6 +121,38 @@ export class WorldPreview {
       );
     } else if (this.dragGraphics) {
       this.dragGraphics.clear();
+    }
+  }
+
+  private renderZonePreview(presentation: PresentationState): void {
+    const zonePreview = presentation.zonePreview;
+    if (!zonePreview) {
+      if (this.zoneGraphics) {
+        this.zoneGraphics.clear();
+      }
+      return;
+    }
+
+    if (!this.zoneGraphics) {
+      this.zoneGraphics = this.scene.add.graphics().setDepth(50);
+    }
+
+    this.zoneGraphics.clear();
+
+    const validSet = new Set(zonePreview.validCells.map((cell) => `${cell.x},${cell.y}`));
+    const validFill = zonePreview.mode === 'erase' ? 0xffb300 : PREVIEW.validFill;
+    const validStroke = zonePreview.mode === 'erase' ? 0xffb300 : PREVIEW.validStroke;
+
+    for (const cell of zonePreview.cells) {
+      const isValid = validSet.has(`${cell.x},${cell.y}`);
+      const fill = isValid ? validFill : PREVIEW.invalidFill;
+      const fillAlpha = isValid ? 0.18 : 0.16;
+      const stroke = isValid ? validStroke : PREVIEW.invalidStroke;
+
+      this.zoneGraphics.fillStyle(fill, fillAlpha);
+      this.zoneGraphics.lineStyle(PREVIEW.strokeWidth, stroke, 0.9);
+      this.zoneGraphics.fillRect(cell.x * TILE_SIZE, cell.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+      this.zoneGraphics.strokeRect(cell.x * TILE_SIZE, cell.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
     }
   }
 }

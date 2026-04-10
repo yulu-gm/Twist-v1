@@ -11,9 +11,11 @@
 import { CommandHandler, Command } from '../../core/command-bus';
 import { GameEvent } from '../../core/event-bus';
 import { CURRENT_SAVE_VERSION, applyMigrations } from '../../core/serialization';
-import { currentIdCounter, resetIdCounter, MapId, Tag, ObjectKind } from '../../core/types';
+import { currentIdCounter, resetIdCounter, MapId, Tag, ObjectKind, ZoneType } from '../../core/types';
 import { World, Faction } from '../../world/world';
-import { createGameMap, Zone } from '../../world/game-map';
+import { createGameMap } from '../../world/game-map';
+import type { Zone } from '../../world/zone-manager';
+import { normalizeZoneConfig } from '../../world/zone-manager';
 import { Grid } from '../../core/grid';
 import { SaveData, MapSaveData } from './save.types';
 
@@ -83,7 +85,7 @@ function serializeZone(zone: Zone): any {
     id: zone.id,
     zoneType: zone.zoneType,
     cells: Array.from(zone.cells),
-    config: zone.config,
+    config: serializeObject(zone.config),
   };
 }
 
@@ -94,11 +96,12 @@ function serializeZone(zone: Zone): any {
  * @returns 还原后的 Zone 对象，cells 恢复为 Set
  */
 function deserializeZone(data: any): Zone {
+  const zoneType = data.zoneType as ZoneType;
   return {
     id: data.id,
-    zoneType: data.zoneType,
+    zoneType,
     cells: new Set(data.cells),
-    config: data.config,
+    config: normalizeZoneConfig(zoneType, data.config),
   };
 }
 
