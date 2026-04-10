@@ -1,114 +1,114 @@
-# Visual Test Workbench Design
+# Visual Test 工作台设计
 
-**Date:** 2026-04-10  
-**Topic:** Redesign the `visual-test` entry into a single-page scenario workbench so users can enter a scenario, manually start it, adjust time controls, debug step progression, and return to scenario selection without refreshing the page  
-**Related Docs:**
+**日期：** 2026-04-10  
+**主题：** 将 `visual-test` 入口重构为单页场景工作台，让用户可以进入场景、手动启动、调节时间、调试步骤推进，并在不刷新的情况下返回场景选择页  
+**关联文档：**
 - [scenario-testing.md](D:/CC/Twist-v1/docs/testing/scenario-testing.md)
 - [2026-04-10-simulation-scenario-testing-design.md](D:/CC/Twist-v1/docs/superpowers/specs/2026-04-10-simulation-scenario-testing-design.md)
 - [2026-04-10-scenario-boundaries-and-long-regression-design.md](D:/CC/Twist-v1/docs/superpowers/specs/2026-04-10-scenario-boundaries-and-long-regression-design.md)
 
 ---
 
-## 1. Background
+## 1. 背景
 
-The current `visual-test` flow already opens `scenario-select.html`, but once a scenario is chosen the page immediately switches into execution mode and leaves no clean session boundary behind.
+当前的 `visual-test` 流程虽然已经会打开 `scenario-select.html`，但用户一旦选中某个场景，页面就会立刻切换到执行态，而且没有留下清晰的会话边界。
 
-The current pain points are:
+目前的痛点主要有：
 
-1. After selecting and running one scenario, there is no supported way to exit back to the selector and run a different scenario in the same page session.
-2. Time control exists only as keyboard shortcuts inherited from the main game scene, so it is effectively undiscoverable inside the visual runner workflow.
-3. The visual runner controller acts like a one-shot executor. It exposes `run()` but does not own a full session lifecycle such as `start`, `pause`, `restart`, `exit`, or `destroy`.
-4. The current selector page directly starts the controller, while the controller bootstraps Phaser without preserving a teardown handle. This makes repeated scenario runs likely to leak old `Phaser.Game` instances, scene input listeners, or stale world state.
+1. 运行完一个场景后，没有正式支持的方式退回选择页并在同一页里改跑其他场景。
+2. 时间控制虽然存在，但它只体现在主游戏场景继承来的键盘快捷键上，在 visual runner 的使用流程里几乎不可发现。
+3. visual runner controller 更像一次性执行器。它只暴露了 `run()`，却不拥有完整的会话生命周期，比如 `start`、`pause`、`restart`、`exit`、`destroy`。
+4. 当前选择页会直接启动 controller，而 controller 在 bootstrap Phaser 时又没有保留 teardown 句柄。这会让重复跑场景时很容易残留旧的 `Phaser.Game` 实例、场景输入监听器，或者脏的 world 状态。
 
-These issues make the visual runner awkward as a debugging surface, especially for longer scenarios where users need to pause, single-step, speed up, or back out and try another scenario.
-
----
-
-## 2. Goals
-
-### 2.1 Primary Goals
-
-1. Turn `visual-test` into a single-page workbench that supports both scenario selection and scenario execution without page reload.
-2. Separate "scenario selected" from "scenario started" so users enter a ready state first and manually choose when execution begins.
-3. Add explicit, visible time controls to the workbench UI rather than relying on hidden keyboard commands.
-4. Support debug-grade stepping controls:
-   - pause
-   - 1x / 2x / 3x speed
-   - step 1 tick
-   - step 10 ticks
-   - run until the next meaningful execution gate
-5. Add a clean return-to-selector flow that destroys the current visual session before loading another scenario.
-6. Ensure restart always creates a fresh scenario session with a fresh world and fresh Phaser instance.
-
-### 2.2 Non-Goals
-
-1. This redesign does not try to replace the existing scenario DSL or headless runner.
-2. This redesign does not attempt to build a full breakpoint debugger for every individual script step.
-3. This redesign does not change core simulation speed semantics in the production runtime.
-4. This redesign does not require introducing a separate routing library or a large app shell framework.
+这些问题会让 visual runner 作为调试界面时非常别扭，尤其是面对较长场景时，用户往往需要暂停、单步、加速，或者退出后重新选场景再试。
 
 ---
 
-## 3. Product Direction
+## 2. 目标
 
-The chosen direction is a **single-page workbench**.
+### 2.1 主要目标
 
-Behaviorally, the workbench should work like this:
+1. 把 `visual-test` 做成单页工作台，同时支持场景选择和场景执行，而且不需要页面刷新。
+2. 把“选中了场景”和“开始跑场景”拆开，让用户先进入 `ready` 状态，再手动决定什么时候开始执行。
+3. 在工作台 UI 上增加明确、可见的时间控制，而不是继续依赖隐藏的键盘快捷键。
+4. 支持调试级别的推进控制：
+   - 暂停
+   - 1x / 2x / 3x 速度
+   - 单步 1 tick
+   - 单步 10 ticks
+   - 运行到下一个有意义的执行门槛
+5. 增加干净的返回选择页流程，在切到其他场景之前先销毁当前 visual session。
+6. 确保 restart 总是创建一个全新的场景会话，包含全新的 world 和全新的 Phaser 实例。
 
-1. Open `visual-test`.
-2. See the scenario list.
-3. Pick a scenario.
-4. Enter a workbench view for that scenario in a `ready` state.
-5. Manually click `Start` to begin execution.
-6. During execution, use visible controls to pause, change speed, single-step, or run to the next gate.
-7. At any time, exit back to the selector without reloading the page.
-8. Restarting the same scenario always creates a brand-new session and returns to `ready`.
+### 2.2 非目标
 
-The key product decision is that **selection is not execution**. Choosing a scenario loads a workbench session, but does not auto-run it.
+1. 这次重构不尝试替换现有的 scenario DSL 或 headless runner。
+2. 这次重构不打算把每一条脚本步骤都做成完整断点调试器。
+3. 这次重构不改变生产运行时里 simulation speed 的核心语义。
+4. 这次重构不要求引入单独的路由库或大型 app shell 框架。
 
 ---
 
-## 4. Recommended Architecture
+## 3. 产品方向
 
-The workbench should be split into three layers:
+本次选择的方向是 **单页工作台**。
 
-### 4.1 Page Shell
+从行为上，这个工作台应该这样工作：
 
-File: [scenario-select-main.ts](D:/CC/Twist-v1/src/testing/visual-runner/scenario-select-main.ts)
+1. 打开 `visual-test`。
+2. 看到场景列表。
+3. 选择一个场景。
+4. 进入该场景的工作台视图，并处于 `ready` 状态。
+5. 手动点击 `Start` 开始执行。
+6. 运行过程中，通过可见控件暂停、调速、单步或运行到下一个门槛。
+7. 任意时刻都可以不刷新页面直接退回选择页。
+8. 重跑同一个场景时，总是新建一套全新的 session，并回到 `ready`。
 
-Responsibilities:
+这里最关键的产品决策是：**选择不等于执行**。用户选择场景时，只是加载了一个工作台 session，并不会自动开跑。
 
-1. Maintain top-level page mode:
-   - selector mode
-   - workbench mode
-2. Read and write the `scenario` URL parameter.
-3. Create and dispose the current controller session.
-4. Wire controller state into the HUD view.
-5. Handle user actions from the HUD:
+---
+
+## 4. 推荐架构
+
+工作台应拆成三层：
+
+### 4.1 页面壳层
+
+文件：[scenario-select-main.ts](D:/CC/Twist-v1/src/testing/visual-runner/scenario-select-main.ts)
+
+职责：
+
+1. 维护页面顶层模式：
+   - selector 模式
+   - workbench 模式
+2. 读取和写入 `scenario` URL 参数。
+3. 创建和释放当前 controller session。
+4. 把 controller state 接到 HUD 视图。
+5. 响应 HUD 发出的用户动作：
    - start
    - pause
    - resume
-   - speed change
+   - 调速
    - step ticks
    - run to next gate
    - restart
    - exit to selector
 
-The page shell should not manipulate the world directly.
+页面壳层不应该直接操作 world。
 
-### 4.2 Session Controller
+### 4.2 会话控制层
 
-File: [visual-scenario-controller.ts](D:/CC/Twist-v1/src/testing/visual-runner/visual-scenario-controller.ts)
+文件：[visual-scenario-controller.ts](D:/CC/Twist-v1/src/testing/visual-runner/visual-scenario-controller.ts)
 
-Responsibilities:
+职责：
 
-1. Own a single visual runner session from creation to teardown.
-2. Build and destroy:
+1. 持有一整个 visual runner session，从创建到销毁。
+2. 创建和销毁：
    - `visualHarness`
    - `shadowHarness`
    - `Phaser.Game`
-3. Track session state and expose it as a single read-only snapshot for the HUD.
-4. Provide explicit session commands:
+3. 跟踪 session state，并以统一的只读快照形式暴露给 HUD。
+4. 提供显式的 session 命令：
    - `start`
    - `pause`
    - `resume`
@@ -118,63 +118,63 @@ Responsibilities:
    - `restart`
    - `destroy`
 
-This is the center of the redesign. The current controller is only a runner; the new controller must be a lifecycle owner.
+这是这次重构的中心。当前 controller 只是个 runner；新的 controller 必须成为生命周期拥有者。
 
-### 4.3 Workbench HUD
+### 4.3 工作台 HUD
 
-File: [scenario-hud.tsx](D:/CC/Twist-v1/src/testing/visual-runner/scenario-hud.tsx)
+文件：[scenario-hud.tsx](D:/CC/Twist-v1/src/testing/visual-runner/scenario-hud.tsx)
 
-Responsibilities:
+职责：
 
-1. Display current scenario metadata and session state.
-2. Render visible action buttons and time controls.
-3. Show current tick, current speed, and current step.
-4. Continue showing visual vs. shadow step progress and divergence data.
-5. Emit user intents through callbacks rather than directly mutating runtime state.
+1. 展示当前场景元信息和 session 状态。
+2. 渲染可见的操作按钮和时间控制。
+3. 展示当前 tick、当前速度和当前步骤。
+4. 继续展示 visual 与 shadow 的步骤进度和 divergence 数据。
+5. 通过回调抛出用户意图，而不是直接修改运行时状态。
 
-The HUD should remain a view layer. It should not hold business state beyond local rendering concerns.
+HUD 仍应保持为视图层，不应持有超出渲染需求之外的业务状态。
 
 ---
 
-## 5. Session State Model
+## 5. 会话状态模型
 
-The workbench should formalize session status instead of inferring it from partial fields.
+工作台应该把 session 状态正式化，而不是继续从零散字段里推断。
 
-Recommended states:
+推荐状态：
 
 1. `idle`
-   No scenario selected.
+   未选择任何场景。
 2. `ready`
-   Scenario selected and session created, but execution has not started.
+   已选择场景并创建 session，但尚未开始执行。
 3. `running`
-   Scenario is actively advancing.
+   场景正在主动推进。
 4. `paused`
-   Scenario has started, but automatic advancement is stopped.
+   场景已经开始，但自动推进已停止。
 5. `completed`
-   Scenario finished successfully.
+   场景成功完成。
 6. `failed`
-   Scenario hit a failed step or runtime error, and the scene remains available for inspection.
+   场景某一步失败或出现运行时错误，但当前画面仍然保留，便于检查。
 
-State rules:
+状态规则：
 
-1. Selecting a scenario transitions `idle -> ready`.
-2. Clicking `Start` transitions `ready -> running`.
-3. Clicking `Pause` transitions `running -> paused`.
-4. Clicking `Resume` transitions `paused -> running`.
-5. Successful completion transitions `running -> completed`.
-6. Failed execution transitions `running -> failed`.
-7. `Restart` always destroys the old session and returns to `ready`.
-8. `Exit to Selector` always destroys the old session and returns to `idle`.
+1. 选择场景时，状态从 `idle -> ready`。
+2. 点击 `Start` 时，状态从 `ready -> running`。
+3. 点击 `Pause` 时，状态从 `running -> paused`。
+4. 点击 `Resume` 时，状态从 `paused -> running`。
+5. 成功完成时，状态从 `running -> completed`。
+6. 执行失败时，状态从 `running -> failed`。
+7. `Restart` 总是销毁旧 session，然后回到 `ready`。
+8. `Exit to Selector` 总是销毁旧 session，然后回到 `idle`。
 
-This state model removes ambiguity around which buttons are legal at any point.
+这个状态模型可以消除“当前到底能不能点、点了会发生什么”的歧义。
 
 ---
 
-## 6. Controller Interface Design
+## 6. Controller 接口设计
 
-The controller should evolve from a one-shot `run()` API into an explicit session API.
+controller 应从一次性的 `run()` API 演进为显式的 session API。
 
-Recommended shape:
+推荐形状如下：
 
 ```ts
 type VisualScenarioController = {
@@ -193,109 +193,109 @@ type VisualScenarioController = {
 
 ### 6.1 `start()`
 
-Responsibilities:
+职责：
 
-1. Bootstrap Phaser if this is the first run of the session.
-2. Run setup work if it has not already completed.
-3. Begin automatic advancement of the visual scenario script.
-4. Emit state changes throughout execution.
+1. 如果当前是本 session 的第一次运行，就先 bootstrap Phaser。
+2. 如果 setup 还没执行完，就先完成 setup。
+3. 开始自动推进 visual scenario script。
+4. 在整个过程中持续发出状态更新。
 
-### 6.2 `pause()` and `resume()`
+### 6.2 `pause()` 和 `resume()`
 
-These should be the canonical entry points for pausing and continuing the session. Both HUD clicks and keyboard shortcuts should flow through them.
+这两个方法应该成为暂停和继续的唯一正式入口。无论是 HUD 按钮还是键盘快捷键，都应流向这里。
 
-Internally this still maps to `world.speed`, but the workbench should no longer depend on hidden keyboard-only affordances.
+内部仍然可以映射到 `world.speed`，但工作台不应该继续依赖“只能靠记住快捷键”的使用方式。
 
 ### 6.3 `setSpeed(speed)`
 
-Supported values:
+支持的值：
 
 1. `Paused`
 2. `Normal`
 3. `Fast`
 4. `UltraFast`
 
-The controller state should expose both the raw enum and a user-facing label so the HUD can display current speed cleanly.
+controller state 应同时暴露原始枚举值和面向用户的 label，以便 HUD 直接展示当前速度。
 
 ### 6.4 `stepTicks(count)`
 
-Purpose:
+目的：
 
-Advance the world manually while paused.
+在暂停状态下手动推进 world。
 
-Constraints:
+约束：
 
-1. Only valid in `paused`.
-2. Should reject or no-op in `ready`, `running`, `completed`, or `failed`.
-3. Must update the HUD after each advancement batch.
-4. Should preserve divergence tracking and current-step tracking.
+1. 只在 `paused` 状态有效。
+2. 在 `ready`、`running`、`completed` 或 `failed` 状态下应拒绝执行或 no-op。
+3. 每次推进后都必须更新 HUD。
+4. 必须保留 divergence 跟踪和当前步骤跟踪。
 
-The chosen workbench controls require at least:
+本次工作台控制至少需要：
 
 1. `stepTicks(1)`
 2. `stepTicks(10)`
 
 ### 6.5 `runUntilNextGate()`
 
-This is the highest-value debug control beyond basic stepping.
+这是在基础单步之上最有价值的调试控制。
 
-A gate should be defined as one of:
+这里的 gate 建议定义为以下之一：
 
-1. a `waitFor` condition becoming satisfied
-2. completion of the next script-step boundary
-3. scenario completion
-4. scenario failure
+1. 某个 `waitFor` 条件第一次满足
+2. 下一条脚本步骤边界完成
+3. 场景完成
+4. 场景失败
 
-This lets users move through long scenarios meaningfully without either tapping `+1 tick` repeatedly or overshooting a point of interest with full-speed execution.
+这样用户在面对长场景时，就不必一直手点 `+1 tick`，也不至于用全速运行一下子错过关键观察点。
 
 ### 6.6 `restart()`
 
-Responsibilities:
+职责：
 
-1. Fully destroy the current session.
-2. Recreate harnesses and fresh controller state using the same scenario and deterministic seed.
-3. Return the new session to `ready`.
-4. Clear tick counters, step summaries, divergence state, and result state.
+1. 完整销毁当前 session。
+2. 用同一场景和确定性 seed 重新创建 harness 和全新的 controller state。
+3. 把新 session 置回 `ready`。
+4. 清空 tick 计数、步骤摘要、divergence 状态和结果状态。
 
-`restart()` must not reuse a dirty world or stale `Phaser.Game`.
+`restart()` 绝不能复用脏的 world 或残留的 `Phaser.Game`。
 
 ### 6.7 `destroy()`
 
-This is mandatory for the redesign.
+这是这次重构的必需接口。
 
-Responsibilities:
+职责：
 
-1. Call `game.destroy(true)` on the active `Phaser.Game` if present.
-2. Remove any leftover DOM content inside `scenario-game-container` if Phaser leaves remnants behind.
-3. Release controller subscriptions or polling loops.
-4. Mark the session as inactive so late async work cannot mutate a dead session.
+1. 如果存在活动中的 `Phaser.Game`，调用 `game.destroy(true)`。
+2. 如果 Phaser 在 `scenario-game-container` 里留下残留 DOM，也要清掉。
+3. 释放 controller 的订阅、轮询或其他异步资源。
+4. 标记 session 为 inactive，避免晚到的异步任务再去更新已经销毁的状态。
 
-Without a formal destroy path, exit and rerun behavior will remain fragile.
+如果没有正式的 destroy 路径，退出和重跑行为就仍然会很脆弱。
 
 ---
 
-## 7. Workbench UI Layout
+## 7. 工作台 UI 布局
 
-The current HUD should become a right-side workbench panel rather than a read-only overlay.
+当前 HUD 应从右侧只读面板升级为右侧工作台面板。
 
-Recommended sections, top to bottom:
+推荐从上到下分成几个区块：
 
-### 7.1 Session Header
+### 7.1 会话头部
 
-Show:
+展示：
 
-1. scenario title
-2. scenario id
+1. 场景标题
+2. 场景 id
 3. session state
-4. current tick
-5. current speed
-6. current step title
+4. 当前 tick
+5. 当前速度
+6. 当前步骤标题
 
-This gives users immediate orientation.
+这样用户一眼就能知道自己现在在哪个场景、处于什么状态。
 
-### 7.2 Primary Actions
+### 7.2 主操作区
 
-Main buttons:
+主要按钮：
 
 1. `Start`
 2. `Pause`
@@ -303,18 +303,18 @@ Main buttons:
 4. `Restart`
 5. `Back to Scenarios`
 
-Visibility rules:
+显示规则：
 
-1. `ready`: show `Start`
-2. `running`: show `Pause`
-3. `paused`: show `Resume`
-4. `completed` and `failed`: show `Restart` and `Back to Scenarios`
+1. `ready`：显示 `Start`
+2. `running`：显示 `Pause`
+3. `paused`：显示 `Resume`
+4. `completed` 和 `failed`：显示 `Restart` 与 `Back to Scenarios`
 
-`Restart` and `Back to Scenarios` may also remain visible in paused/ready states if the layout stays clear.
+如果布局仍然清晰，`Restart` 和 `Back to Scenarios` 也可以在 `paused` 或 `ready` 下持续可见。
 
-### 7.3 Time Controls
+### 7.3 时间控制区
 
-Required visible controls:
+必须有可见控件：
 
 1. `Pause`
 2. `1x`
@@ -324,284 +324,284 @@ Required visible controls:
 6. `+10 ticks`
 7. `Run to Next Gate`
 
-Behavior:
+行为要求：
 
-1. Speed buttons should be available once the session has started.
-2. `+1 tick`, `+10 ticks`, and `Run to Next Gate` should only be enabled in `paused`.
-3. Current speed should be highlighted visually.
+1. 只要 session 已经开始，速度按钮就应该可用。
+2. `+1 tick`、`+10 ticks`、`Run to Next Gate` 只应在 `paused` 下可用。
+3. 当前速度要有明显的高亮或选中态。
 
-### 7.4 Result Summary
+### 7.4 结果摘要区
 
-Show:
+展示：
 
-1. pass/fail/completed summary
-2. divergence presence
-3. last completed step
-4. first failed step, if any
+1. pass / fail / completed 摘要
+2. 是否存在 divergence
+3. 最后一个完成的步骤
+4. 第一条失败的步骤，如果有的话
 
-This gives users a quick read before they scan the full step list.
+这样用户在看完整步骤列表前，先能快速获得一次整体判断。
 
-### 7.5 Step Panels
+### 7.5 步骤面板
 
-Keep the existing dual-column concept:
+保留现在的双列概念：
 
 1. `Visual Runner`
 2. `Shadow Headless Runner`
 
-Continue showing per-step statuses and divergence information, since that remains core to the visual runner's debugging value.
+继续显示每步状态和 divergence 信息，因为这仍然是 visual runner 的核心调试价值。
 
 ---
 
-## 8. URL Behavior
+## 8. URL 行为
 
-The workbench should keep the URL useful without making it responsible for runtime state.
+工作台应该保留 URL 的可用性，但不能让 URL 负责运行时状态。
 
-### 8.1 URL Rules
+### 8.1 URL 规则
 
-1. Selector page with no chosen scenario:
+1. 没有选中场景的选择页：
    - `scenario-select.html`
-2. Chosen scenario in workbench:
+2. 已选中场景并进入工作台：
    - `scenario-select.html?scenario=<id>`
 
-### 8.2 Refresh Behavior
+### 8.2 刷新行为
 
-If the page loads with a valid `scenario=<id>` parameter:
+如果页面带着有效的 `scenario=<id>` 参数加载：
 
-1. the app should load that scenario into `ready`
-2. the app should not auto-run it
+1. 应该把该场景加载到 `ready`
+2. 不应该自动开始执行
 
-This preserves shareable deep links while honoring the chosen manual-start workflow.
+这样既保留了可分享的直达链接，又符合“手动开始”的产品决策。
 
-### 8.3 Exit Behavior
+### 8.3 退出行为
 
-When the user clicks `Back to Scenarios`:
+当用户点击 `Back to Scenarios` 时：
 
-1. destroy the active session
-2. remove the `scenario` parameter from the URL
-3. return to selector mode
-
----
-
-## 9. Execution Flow
-
-### 9.1 Enter Scenario
-
-1. User clicks a scenario card.
-2. Page shell updates the URL with `?scenario=<id>`.
-3. Page shell creates a controller for that scenario.
-4. Controller builds a fresh session and emits `ready`.
-5. Workbench view appears, but no scenario steps run yet.
-
-### 9.2 Start Run
-
-1. User clicks `Start`.
-2. Controller bootstraps Phaser if needed.
-3. Controller begins scenario execution.
-4. Session transitions to `running`.
-
-### 9.3 Pause And Debug
-
-1. User clicks `Pause`.
-2. Controller transitions to `paused`.
-3. User can now:
-   - set speed back to 1x / 2x / 3x before resuming
-   - step 1 tick
-   - step 10 ticks
-   - run to next gate
-
-### 9.4 Restart
-
-1. User clicks `Restart`.
-2. Controller destroys the current session.
-3. Controller recreates a fresh deterministic session.
-4. Workbench returns to `ready`.
-
-### 9.5 Exit To Selector
-
-1. User clicks `Back to Scenarios`.
-2. Controller destroys the current session.
-3. Page shell removes the `scenario` URL parameter.
-4. Selector view becomes active again.
+1. 销毁当前活动 session
+2. 从 URL 中移除 `scenario` 参数
+3. 返回 selector 模式
 
 ---
 
-## 10. Phaser Lifecycle Requirements
+## 9. 执行流程
 
-The current implementation bootstraps Phaser but does not retain a full lifecycle contract around it.
+### 9.1 进入场景
 
-The redesign should make the `Phaser.Game` instance an explicit field of the controller session.
+1. 用户点击某个场景卡片。
+2. 页面壳层把 URL 更新为 `?scenario=<id>`。
+3. 页面壳层为该场景创建 controller。
+4. controller 构建一套全新的 session，并发出 `ready`。
+5. 工作台视图出现，但场景步骤尚未开始执行。
 
-Required rules:
+### 9.2 开始运行
 
-1. Only one live `Phaser.Game` instance may exist per workbench page at a time.
-2. Starting a new scenario must destroy the old game first if one exists.
-3. Restarting the same scenario must destroy and recreate the game.
-4. Exiting to selector must destroy the game and clear the runner container.
+1. 用户点击 `Start`。
+2. controller 在必要时 bootstrap Phaser。
+3. controller 开始执行场景。
+4. session 状态切到 `running`。
 
-This avoids stacked scenes, duplicate keyboard listeners, and stale render state.
+### 9.3 暂停与调试
 
----
+1. 用户点击 `Pause`。
+2. controller 切到 `paused`。
+3. 此时用户可以：
+   - 把速度重新切到 1x / 2x / 3x，然后再恢复运行
+   - 单步 1 tick
+   - 单步 10 ticks
+   - 运行到下一个 gate
 
-## 11. Data Flow
+### 9.4 重跑
 
-Recommended data flow is one-directional:
+1. 用户点击 `Restart`。
+2. controller 销毁当前 session。
+3. controller 重新创建一套新的确定性 session。
+4. 工作台回到 `ready`。
 
-1. Page shell owns the active controller reference.
-2. Controller emits immutable state snapshots.
-3. HUD renders snapshots and exposes callbacks.
-4. Callbacks flow back into the page shell.
-5. Page shell invokes controller methods.
+### 9.5 退出到选择页
 
-The HUD should not access `world`, `harness`, or `Phaser.Game` directly.
-
-This keeps the view testable and avoids accidental runtime coupling.
-
----
-
-## 12. Error Handling
-
-Two error scopes should be treated differently.
-
-### 12.1 Session-Level Failures
-
-Examples:
-
-1. a scenario step fails
-2. a `waitFor` times out
-3. divergence is detected
-
-Handling:
-
-1. transition to `failed`
-2. preserve the scene and HUD state
-3. allow the user to inspect, step, restart, or return to selector
-
-The workbench should not immediately throw the user back to the selector.
-
-### 12.2 Page-Level Failures
-
-Examples:
-
-1. invalid scenario id in URL
-2. controller cannot initialize
-3. Phaser bootstrap fails before a usable session exists
-
-Handling:
-
-1. show a clear error banner
-2. fall back to selector mode where possible
+1. 用户点击 `Back to Scenarios`。
+2. controller 销毁当前 session。
+3. 页面壳层移除 URL 里的 `scenario` 参数。
+4. selector 视图重新变为激活状态。
 
 ---
 
-## 13. Testing Strategy
+## 10. Phaser 生命周期要求
 
-The redesign needs tests for both UI behavior and session boundaries.
+当前实现虽然会 bootstrap Phaser，但并没有围绕它建立完整的生命周期约束。
 
-### 13.1 HUD Component Tests
+重构后，`Phaser.Game` 实例应成为 controller session 的显式字段。
 
-File: [scenario-hud.test.tsx](D:/CC/Twist-v1/src/testing/visual-runner/scenario-hud.test.tsx)
+必须满足的规则：
 
-Add coverage for:
+1. 同一个工作台页面上，任意时刻最多只能有一个活着的 `Phaser.Game` 实例。
+2. 开始新场景前，如果已有旧 game，必须先销毁旧 game。
+3. 重跑同一场景时，必须销毁并重建 game。
+4. 退出回选择页时，必须销毁 game 并清空 runner 容器。
 
-1. `ready`, `running`, `paused`, `completed`, and `failed` button states
-2. current speed label rendering
-3. tick display rendering
-4. enabling and disabling of:
+这样可以避免叠加 scene、重复键盘监听，以及脏的渲染状态。
+
+---
+
+## 11. 数据流
+
+推荐采用单向数据流：
+
+1. 页面壳层持有当前 active controller 引用。
+2. controller 发出不可变的状态快照。
+3. HUD 渲染这些快照，并暴露回调。
+4. 回调再流回页面壳层。
+5. 页面壳层去调用 controller 方法。
+
+HUD 不应该直接访问 `world`、`harness` 或 `Phaser.Game`。
+
+这样可以保持视图层可测试，也能避免不小心产生运行时耦合。
+
+---
+
+## 12. 错误处理
+
+这里应区分两种错误范围。
+
+### 12.1 会话级失败
+
+示例：
+
+1. 某个 scenario step 失败
+2. 某个 `waitFor` 超时
+3. 检测到 divergence
+
+处理方式：
+
+1. 状态转成 `failed`
+2. 保留当前 scene 和 HUD 状态
+3. 允许用户继续检查、单步、重跑或返回选择页
+
+工作台不应该一出错就直接把用户踢回选择页。
+
+### 12.2 页面级失败
+
+示例：
+
+1. URL 里的 scenario id 不存在
+2. controller 无法初始化
+3. Phaser 在可用 session 建立前就 bootstrap 失败
+
+处理方式：
+
+1. 显示明确的错误提示条
+2. 在可能的情况下回落到选择页
+
+---
+
+## 13. 测试策略
+
+这次重构既需要 UI 行为测试，也需要 session 边界测试。
+
+### 13.1 HUD 组件测试
+
+文件：[scenario-hud.test.tsx](D:/CC/Twist-v1/src/testing/visual-runner/scenario-hud.test.tsx)
+
+增加以下覆盖：
+
+1. `ready`、`running`、`paused`、`completed`、`failed` 下按钮是否正确显示
+2. 当前速度 label 是否正确渲染
+3. tick 展示是否正确渲染
+4. 以下控件的启用与禁用：
    - `+1 tick`
    - `+10 ticks`
    - `Run to Next Gate`
 
-### 13.2 Page Shell Tests
+### 13.2 页面壳层测试
 
-The page entry should have extractable logic or helpers so it can be tested without booting a real Phaser session.
+页面入口应抽出可测试的逻辑或 helper，这样不用真正启动 Phaser 也能测试。
 
-Add coverage for:
+增加以下覆盖：
 
-1. selecting a scenario enters `ready` instead of auto-starting
-2. exiting to selector clears the URL
-3. reloading with `?scenario=<id>` lands in `ready`
-4. restart replaces the old controller session rather than reusing it
+1. 选择场景后进入 `ready`，而不是自动开跑
+2. 退出回选择页时会清理 URL
+3. 带 `?scenario=<id>` 刷新时会落到 `ready`
+4. restart 会替换旧 controller session，而不是复用它
 
-### 13.3 Controller Tests
+### 13.3 Controller 测试
 
-Add focused tests around session lifecycle:
+增加围绕 session 生命周期的聚焦测试：
 
-1. `destroy()` destroys the live `Phaser.Game`
-2. `restart()` resets ticks, steps, divergence, and result state
-3. `setSpeed()` updates session state correctly
-4. `stepTicks()` is only valid while paused
-5. `runUntilNextGate()` stops on a valid gate instead of running through to the end
+1. `destroy()` 会销毁活动中的 `Phaser.Game`
+2. `restart()` 会重置 ticks、steps、divergence 和 result 状态
+3. `setSpeed()` 会正确更新 session state
+4. `stepTicks()` 只在 paused 下有效
+5. `runUntilNextGate()` 会停在有效 gate 上，而不是一路跑到底
 
-These tests are essential because the redesign's hardest bugs are session-boundary bugs, not rendering bugs.
+这些测试很关键，因为这次重构最难出问题的地方其实是 session 边界，而不是渲染本身。
 
 ---
 
-## 14. Implementation Notes
+## 14. 实施说明
 
-The most likely code changes are:
+本次实现最可能涉及这些改动：
 
 1. [scenario-select-main.ts](D:/CC/Twist-v1/src/testing/visual-runner/scenario-select-main.ts)
-   - split selector mode from workbench mode
-   - stop auto-running on scenario selection
-   - coordinate URL, controller creation, and exit
+   - 拆开 selector 模式和 workbench 模式
+   - 取消选中场景后的自动开跑
+   - 协调 URL、controller 创建和退出流程
 2. [visual-scenario-controller.ts](D:/CC/Twist-v1/src/testing/visual-runner/visual-scenario-controller.ts)
-   - add session states
-   - own `Phaser.Game`
-   - add explicit lifecycle and debug-control methods
+   - 增加 session states
+   - 持有 `Phaser.Game`
+   - 增加明确的生命周期与调试控制方法
 3. [scenario-hud.tsx](D:/CC/Twist-v1/src/testing/visual-runner/scenario-hud.tsx)
-   - render action buttons
-   - render speed and stepping controls
-   - render richer session status
+   - 渲染操作按钮
+   - 渲染调速和步进控件
+   - 渲染更丰富的 session 状态
 4. [bootstrap.ts](D:/CC/Twist-v1/src/adapter/bootstrap.ts)
-   - likely no behavior change needed
-   - but its `Phaser.Game` return value must be preserved and destroyed by the controller
+   - 大概率不需要改行为
+   - 但它返回的 `Phaser.Game` 必须由 controller 保存并负责销毁
 5. [scenario-select.html](D:/CC/Twist-v1/scenario-select.html)
-   - layout adjustments may be needed if the control panel grows
+   - 如果控制面板变大，可能需要调整布局
 
 ---
 
-## 15. Risks And Trade-Offs
+## 15. 风险与取舍
 
-### 15.1 Risk: Overloading The HUD
+### 15.1 风险：HUD 过载
 
-Adding too many buttons could make the panel cluttered.
+如果按钮太多，右侧面板容易显得拥挤。
 
-Mitigation:
+缓解方式：
 
-1. keep a single-column structure
-2. group controls into sections
-3. only enable advanced debug controls in `paused`
+1. 保持单列结构
+2. 用区块分组控件
+3. 高级调试控件只在 `paused` 下启用
 
-### 15.2 Risk: Async Session Races
+### 15.2 风险：异步会话竞争
 
-If `destroy()` happens while async run work is still in flight, stale promises could update dead state.
+如果 `destroy()` 发生时，仍有异步 run 过程在飞，那么晚到的 Promise 结果可能会更新已经失效的状态。
 
-Mitigation:
+缓解方式：
 
-1. add a session token or `isDisposed` guard
-2. ignore late async completions after teardown
+1. 增加 session token 或 `isDisposed` 守卫
+2. teardown 之后忽略所有晚到的异步完成事件
 
-### 15.3 Risk: Stepping Semantics Drift From Runtime
+### 15.3 风险：步进语义与运行时漂移
 
-If manual stepping bypasses the same runtime path used by normal visual execution, users may see inconsistent behavior.
+如果手动步进没有走和正常 visual execution 一样的推进路径，用户就可能看到不一致行为。
 
-Mitigation:
+缓解方式：
 
-1. route stepping through the same harness and world advancement logic
-2. keep one canonical advancement path inside the controller
+1. 让 stepping 复用同一套 harness 与 world 推进逻辑
+2. 在 controller 内只保留一条 canonical advancement path
 
 ---
 
-## 16. Conclusion
+## 16. 结论
 
-The right redesign is not a small button patch on top of the current selector page. The real need is a proper visual-test workbench with explicit session ownership.
+正确的重构方向不是在现有选择页上简单补几个按钮，而是把它真正做成带有显式 session ownership 的 visual-test 工作台。
 
-The core decisions are:
+这次设计的核心决策是：
 
-1. single-page workbench rather than page-jump flow
-2. scenario selection loads a `ready` session but does not auto-run
-3. visible time controls replace hidden-only keyboard discovery
-4. the controller becomes a lifecycle owner with `start`, `pause`, `resume`, `setSpeed`, `stepTicks`, `runUntilNextGate`, `restart`, and `destroy`
-5. every exit and restart path destroys the old Phaser session first
+1. 用单页工作台，而不是页面跳转式流程
+2. 选择场景时只加载 `ready` session，不自动开跑
+3. 用可见的时间控制替代纯隐藏式快捷键发现方式
+4. 让 controller 成为生命周期拥有者，正式提供 `start`、`pause`、`resume`、`setSpeed`、`stepTicks`、`runUntilNextGate`、`restart`、`destroy`
+5. 每一次退出和重跑都必须先销毁旧的 Phaser session
 
-If these boundaries are implemented cleanly, the visual runner becomes a practical debugging surface instead of a one-shot demo entry.
+如果这些边界落得足够干净，visual runner 就会从一次性演示入口，变成真正可用的调试工作台。
