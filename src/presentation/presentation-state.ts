@@ -111,6 +111,8 @@ export interface PresentationState {
   activeDesignationType: DesignationType | null;
   /** 当前激活的区域子类型（用于 UI 高亮） */
   activeZoneType: ZoneType | null;
+  /** 最近一次使用的区域子类型（供 Z 快捷键回到上次类型） */
+  lastZoneType: ZoneType;
   /** 当前选中的建筑定义 ID（用于 UI 高亮） */
   activeBuildDefId: DefId | null;
   /** 是否显示调试面板 */
@@ -177,6 +179,7 @@ export function createPresentationState(): PresentationState {
     activeTool: ToolType.Select,
     activeDesignationType: null,
     activeZoneType: null,
+    lastZoneType: ZoneType.Stockpile,
     activeBuildDefId: null,
     showDebugPanel: false,
     showGrid: false,

@@ -39,6 +39,20 @@ export function getZoneColor(zoneType: ZoneType): number {
   }
 }
 
+/** 区域类型 → 中文显示名 */
+export function getZoneDisplayName(zoneType: ZoneType): string {
+  switch (zoneType) {
+    case ZoneType.Stockpile:
+      return '存储区';
+    case ZoneType.Growing:
+      return '种植区';
+    case ZoneType.Animal:
+      return '动物区';
+    default:
+      return '存储区';
+  }
+}
+
 /** ObjectKind → Container 层映射 */
 export function kindToLayer(kind: ObjectKind): LayerName {
   switch (kind) {

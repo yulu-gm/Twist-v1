@@ -9,6 +9,12 @@ import { World } from '../../world/world';
 import { SimSpeed, DesignationType, ZoneType } from '../../core/types';
 import { PresentationState, ToolType, OverlayType, switchTool } from '../../presentation/presentation-state';
 
+function activateZoneTool(presentation: PresentationState, zoneType: ZoneType): void {
+  presentation.lastZoneType = zoneType;
+  switchTool(presentation, ToolType.Zone);
+  presentation.activeZoneType = zoneType;
+}
+
 /**
  * 注册所有键盘快捷键
  *
@@ -68,8 +74,7 @@ export function setupKeyboardBindings(
     presentation.activeDesignationType = DesignationType.Cut;
   });
   kb.on('keydown-Z', () => {
-    switchTool(presentation, ToolType.Zone);
-    presentation.activeZoneType = ZoneType.Stockpile;
+    activateZoneTool(presentation, presentation.lastZoneType);
   });
   kb.on('keydown-C', () => {
     switchTool(presentation, ToolType.Cancel);

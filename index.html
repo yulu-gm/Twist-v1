@@ -62,9 +62,15 @@
         <span class="tool-btn" data-tool="cut" tabindex="-1">[X] Cut</span>
       </div>
       <div class="toolbar-sep"></div>
-      <div class="tool-group">
-        <span class="tool-btn" data-tool="zone" tabindex="-1">[Z] Zone</span>
-        <span class="tool-btn tool-btn-secondary" data-tool="stockpile" tabindex="-1">Stockpile</span>
+      <div class="tool-group zone-tool-group">
+        <div class="zone-menu-wrap">
+          <div class="zone-menu" data-zone-menu>
+            <span class="tool-btn tool-btn-secondary zone-option" data-zone-type="stockpile" tabindex="-1">存储区</span>
+            <span class="tool-btn tool-btn-secondary zone-option" data-zone-type="growing" tabindex="-1">种植区</span>
+            <span class="tool-btn tool-btn-secondary zone-option" data-zone-type="animal" tabindex="-1">动物区</span>
+          </div>
+          <span class="tool-btn zone-main-btn" data-zone-menu-toggle tabindex="-1">[Z] 区域</span>
+        </div>
       </div>
       <div class="toolbar-sep"></div>
       <div class="tool-group">

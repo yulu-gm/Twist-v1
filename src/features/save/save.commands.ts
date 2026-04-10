@@ -14,10 +14,10 @@ import { CURRENT_SAVE_VERSION, applyMigrations } from '../../core/serialization'
 import { currentIdCounter, resetIdCounter, MapId, Tag, ObjectKind, ZoneType } from '../../core/types';
 import { World, Faction } from '../../world/world';
 import { createGameMap } from '../../world/game-map';
-import type { Zone } from '../../world/zone-manager';
-import { normalizeZoneConfig } from '../../world/zone-manager';
 import { Grid } from '../../core/grid';
 import { SaveData, MapSaveData } from './save.types';
+import type { Zone } from '../zone/zone.types';
+import { normalizeZoneConfig } from '../zone/zone.types';
 
 /** localStorage 中存档数据的键名 */
 const SAVE_KEY = 'opus_world_save';
