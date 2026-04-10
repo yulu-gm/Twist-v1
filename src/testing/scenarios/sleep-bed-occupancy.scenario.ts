@@ -123,5 +123,3 @@ export const sleepBedOccupancyScenario = createScenario({
     }),
   ],
 });
-
-
