@@ -12,6 +12,8 @@ export default defineConfig({
       '@adapter': path.resolve(__dirname, 'src/adapter'),
       '@defs': path.resolve(__dirname, 'src/defs'),
       '@ui': path.resolve(__dirname, 'src/ui'),
+      '@bootstrap': path.resolve(__dirname, 'src/bootstrap'),
+      '@testing': path.resolve(__dirname, 'src/testing'),
     },
   },
   server: {
@@ -20,5 +22,12 @@ export default defineConfig({
   },
   build: {
     target: 'ES2020',
+    rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, 'index.html'),
+        scenario: path.resolve(__dirname, 'scenario.html'),
+        'scenario-select': path.resolve(__dirname, 'scenario-select.html'),
+      },
+    },
   },
 });

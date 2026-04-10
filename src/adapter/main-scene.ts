@@ -12,7 +12,6 @@ import Phaser from 'phaser';
 import { World } from '../world/world';
 import type { GameMap } from '../world/game-map';
 import { SimSpeed } from '../core/types';
-import { advanceClock } from '../core/clock';
 import { log } from '../core/logger';
 import { RenderSync } from './render/render-sync';
 import { CameraController } from './render/camera-controller';
@@ -22,6 +21,7 @@ import { DebugOverlay } from './debug/debug-overlay';
 import { installDebugConsole } from './debug/console';
 import { createPresentationState, PresentationState } from '../presentation/presentation-state';
 import type { EngineSnapshotBridge } from '../ui/kernel/ui-bridge';
+import { advanceWorldTick } from '../bootstrap/world-step';
 
 /** 基础 tick 间隔（毫秒），1x 速度下每 100ms 执行一次 tick */
 const TICK_MS = 100; // base tick interval at 1x
@@ -147,18 +147,10 @@ export class MainScene extends Phaser.Scene {
     const maxTicksPerFrame = 10; // 防止死亡螺旋：每帧最多执行 10 次 tick
 
     while (this.accumulator >= TICK_MS && ticksThisFrame < maxTicksPerFrame) {
-      this.world.tick++;
-      log.setTick(this.world.tick);
-      advanceClock(this.world.clock);
+      log.setTick(this.world.tick + 1);
 
-      // 执行所有已注册的系统
-      this.world.tickRunner.executeTick(this.world);
-
-      // 分发事件缓冲区中的事件
-      if (this.world.eventBuffer.length > 0) {
-        this.world.eventBus.dispatch(this.world.eventBuffer);
-        this.world.eventBuffer = [];
-      }
+      // 使用共享的 tick 推进函数
+      advanceWorldTick(this.world);
 
       this.accumulator -= TICK_MS;
       ticksThisFrame++;

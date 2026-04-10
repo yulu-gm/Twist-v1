@@ -17,6 +17,7 @@ import type { UiPorts } from '../ui/kernel/ui-ports';
  * @param world - 已初始化的游戏世界对象
  * @param uiBridge - Preact UI 快照桥接（可选）
  * @param uiPorts - Preact UI 端口（可选）
+ * @param parent - 游戏画布的 DOM 容器 ID（默认 'game-container'）
  * @returns 创建好的 Phaser.Game 实例
  *
  * 配置项：
@@ -29,10 +30,11 @@ export function bootstrapPhaser(
   world: World,
   uiBridge?: EngineSnapshotBridge,
   uiPorts?: UiPorts,
+  parent = 'game-container',
 ): Phaser.Game {
   const config: Phaser.Types.Core.GameConfig = {
     type: Phaser.AUTO,
-    parent: 'game-container',
+    parent,
     width: window.innerWidth,
     height: window.innerHeight,
     backgroundColor: '#1a1a2e',

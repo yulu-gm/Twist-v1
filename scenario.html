@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Scenario Testing - Twist-v1</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { background: #1a1a2e; color: #eee; font-family: monospace; overflow: hidden; }
+      #scenario-game-container { width: calc(100vw - 400px); height: 100vh; }
+      #scenario-ui-root { position: fixed; top: 0; right: 0; width: 400px; height: 100vh; z-index: 9999; }
+    </style>
+  </head>
+  <body>
+    <div id="scenario-game-container"></div>
+    <div id="scenario-ui-root"></div>
+    <script type="module" src="/src/testing/visual-runner/scenario-main.ts"></script>
+  </body>
+</html>

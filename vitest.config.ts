@@ -12,6 +12,8 @@ export default defineConfig({
       '@adapter': path.resolve(__dirname, 'src/adapter'),
       '@defs': path.resolve(__dirname, 'src/defs'),
       '@ui': path.resolve(__dirname, 'src/ui'),
+      '@bootstrap': path.resolve(__dirname, 'src/bootstrap'),
+      '@testing': path.resolve(__dirname, 'src/testing'),
     },
   },
   test: {

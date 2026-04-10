@@ -19,7 +19,9 @@
       "@features/*": ["./src/features/*"],
       "@adapter/*": ["./src/adapter/*"],
       "@defs/*": ["./src/defs/*"],
-      "@ui/*": ["./src/ui/*"]
+      "@ui/*": ["./src/ui/*"],
+      "@bootstrap/*": ["./src/bootstrap/*"],
+      "@testing/*": ["./src/testing/*"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "vitest.config.ts"],

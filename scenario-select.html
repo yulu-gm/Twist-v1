@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Scenario Visual Testing - Twist-v1</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { background: #1a1a2e; color: #eee; font-family: monospace; }
+
+      /* ── 场景选择页面 ── */
+      #select-root { display: none; }
+      #select-root.active { display: block; }
+
+      /* ── 场景运行页面 ── */
+      #runner-root { display: none; }
+      #runner-root.active { display: flex; width: 100vw; height: 100vh; overflow: hidden; }
+      #scenario-game-container { flex: 1; height: 100vh; }
+      #scenario-ui-root { position: fixed; top: 0; right: 0; width: 400px; height: 100vh; z-index: 9999; }
+    </style>
+  </head>
+  <body>
+    <!-- 场景选择界面 -->
+    <div id="select-root"></div>
+
+    <!-- 场景运行界面（与 scenario.html 布局一致） -->
+    <div id="runner-root">
+      <div id="scenario-game-container"></div>
+      <div id="scenario-ui-root"></div>
+    </div>
+
+    <script type="module" src="/src/testing/visual-runner/scenario-select-main.ts"></script>
+  </body>
+</html>
