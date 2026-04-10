@@ -7,6 +7,7 @@
 
 import { DefId, CellCoord, MapId, ObjectKind, ObjectId, nextObjectId } from '../../core/types';
 import { Corpse } from './corpse.types';
+import { PHYSICAL_OCCUPANT_TAG } from '../../world/occupancy';
 
 /**
  * 创建一个尸体实体
@@ -29,7 +30,7 @@ export function createCorpse(params: {
     defId: params.defId,
     mapId: params.mapId,
     cell: { x: params.cell.x, y: params.cell.y },
-    tags: new Set(['corpse', 'haulable']),
+    tags: new Set(['corpse', 'haulable', PHYSICAL_OCCUPANT_TAG]),
     destroyed: false,
     originalPawnId: params.originalPawnId,
     decayProgress: 0,

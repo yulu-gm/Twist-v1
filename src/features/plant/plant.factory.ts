@@ -9,6 +9,7 @@
 import { DefId, CellCoord, MapId, ObjectKind, nextObjectId, Tag } from '../../core/types';
 import { Plant } from './plant.types';
 import type { DefDatabase } from '../../world/def-database';
+import { PHYSICAL_OCCUPANT_TAG } from '../../world/occupancy';
 
 /**
  * 创建植物实例
@@ -35,6 +36,7 @@ export function createPlant(params: {
   // 初始化基础标签 'plant'，然后合并定义中的额外标签
   // Start with base tag, then merge tags from Def if available
   const tags = new Set<Tag>(['plant']);
+  tags.add(PHYSICAL_OCCUPANT_TAG);
   if (params.defs) {
     const plantDef = params.defs.plants.get(params.defId);
     if (plantDef) {

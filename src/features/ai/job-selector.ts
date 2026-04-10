@@ -33,6 +33,10 @@ import { createHarvestJob } from './jobs/harvest-job';
 import { createConstructJob } from './jobs/construct-job';
 import { createHaulJob } from './jobs/haul-job';
 import { createEatJob } from './jobs/eat-job';
+import {
+  areBlueprintMaterialsDelivered,
+  hasConstructionOccupants,
+} from '../construction/construction.helpers';
 
 /** 漫步工作计数器 */
 let wanderJobCounter = 0;
@@ -179,6 +183,17 @@ function gatherCandidates(
   for (const bp of blueprints) {
     if (bp.destroyed) continue;
 
+    if (areBlueprintMaterialsDelivered(bp)) {
+      if (map.reservations.isReserved(bp.id)) continue;
+      if (hasConstructionOccupants(map, bp)) continue;
+
+      const dist = estimateDistance(pawn.cell, bp.cell);
+      const job = createConstructJob(pawn.id, bp.id, bp.cell, map, { requiresPrepare: true });
+      const score = 40 - dist * 0.5;
+      candidates.push({ job, score });
+      continue;
+    }
+
     // 检查哪些材料仍需搬运
     for (let i = 0; i < bp.materialsRequired.length; i++) {
       const needed = bp.materialsRequired[i].count - (bp.materialsDelivered[i]?.count ?? 0);
@@ -225,6 +240,7 @@ function gatherCandidates(
     if (site.destroyed) continue;
     if (site.buildProgress >= 1.0) continue;
     if (map.reservations.isReserved(site.id)) continue;
+    if (hasConstructionOccupants(map, site)) continue;
 
     const dist = estimateDistance(pawn.cell, site.cell);
     const job = createConstructJob(pawn.id, site.id, site.cell, map);

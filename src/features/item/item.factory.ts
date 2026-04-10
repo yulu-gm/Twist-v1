@@ -9,6 +9,7 @@ import { ObjectKind, nextObjectId } from '../../core/types';
 import type { CellCoord, DefId, MapId, Tag } from '../../core/types';
 import type { DefDatabase } from '../../world/def-database';
 import type { Item } from './item.types';
+import { PHYSICAL_OCCUPANT_TAG } from '../../world/occupancy';
 
 /**
  * 创建一个新的物品实例
@@ -33,6 +34,7 @@ export function createItem(params: {
   const tags = new Set<string>(def?.tags ?? []);
   tags.add('haulable');
   tags.add('selectable');
+  tags.add(PHYSICAL_OCCUPANT_TAG);
 
   return {
     id: nextObjectId(),
@@ -68,13 +70,15 @@ export function createItemRaw(params: {
   defs?: DefDatabase;
 }): Item {
   const def = params.defs?.items.get(params.defId);
+  const tags = new Set<Tag>(params.tags ?? (def ? new Set(def.tags) : new Set(['haulable', 'resource'])));
+  tags.add(PHYSICAL_OCCUPANT_TAG);
   return {
     id: nextObjectId(),
     kind: ObjectKind.Item,
     defId: params.defId,
     mapId: params.mapId,
     cell: { x: params.cell.x, y: params.cell.y },
-    tags: params.tags ?? (def ? new Set(def.tags) : new Set(['haulable', 'resource'])),
+    tags,
     destroyed: false,
     stackCount: params.stackCount,
     maxStack: params.maxStack ?? def?.maxStack ?? 100,

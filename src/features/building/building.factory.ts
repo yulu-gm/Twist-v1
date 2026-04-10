@@ -10,6 +10,7 @@ import { ObjectKind, Rotation, nextObjectId } from '../../core/types';
 import type { CellCoord, DefId, MapId } from '../../core/types';
 import type { DefDatabase } from '../../world/def-database';
 import type { Building } from './building.types';
+import { PHYSICAL_OCCUPANT_TAG } from '../../world/occupancy';
 
 /**
  * 创建建筑实例
@@ -39,6 +40,7 @@ export function createBuilding(params: {
   const maxHp = def?.maxHp ?? 100;
   const tags = new Set<string>(def?.tags ?? []);
   tags.add('selectable');
+  tags.add(PHYSICAL_OCCUPANT_TAG);
   if (def?.blocksMovement) tags.add('impassable');
 
   // 构建基础建筑对象

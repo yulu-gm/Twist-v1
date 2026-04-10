@@ -10,6 +10,7 @@ import { ObjectKind, TickPhase, nextObjectId, cellKey } from '../../core/types';
 import { SystemRegistration } from '../../core/tick-runner';
 import { World } from '../../world/world';
 import { Fire } from './fire.types';
+import { PHYSICAL_OCCUPANT_TAG } from '../../world/occupancy';
 
 /** 四个基本方向的偏移量（上下左右邻居） */
 const ADJACENT_OFFSETS = [
@@ -84,7 +85,7 @@ function fireExecute(world: World): void {
             defId: 'fire',
             mapId: map.id,
             cell: { x: nx, y: ny },
-            tags: new Set(['fire']),
+            tags: new Set(['fire', PHYSICAL_OCCUPANT_TAG]),
             destroyed: false,
             intensity: fire.intensity * 0.8,
             ticksAlive: 0,

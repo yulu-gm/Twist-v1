@@ -20,6 +20,7 @@ import type {
 } from '../../core/types';
 import type { SeededRandom } from '../../core/seeded-random';
 import type { Pawn } from './pawn.types';
+import { PHYSICAL_OCCUPANT_TAG } from '../../world/occupancy';
 
 /**
  * 生成默认的24小时日程安排
@@ -80,7 +81,7 @@ export function createPawn(params: {
     defId: 'pawn',
     mapId,
     cell: { x: cell.x, y: cell.y },
-    tags: new Set(['selectable', 'pawn']),
+    tags: new Set(['selectable', 'pawn', PHYSICAL_OCCUPANT_TAG]),
     destroyed: false,
 
     name,

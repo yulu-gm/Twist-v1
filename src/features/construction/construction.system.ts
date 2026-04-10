@@ -18,9 +18,10 @@ import { SystemRegistration } from '../../core/tick-runner';
 import { log } from '../../core/logger';
 import { World } from '../../world/world';
 import { GameMap } from '../../world/game-map';
-import { Blueprint } from './blueprint.types';
-import { ConstructionSite } from './construction-site.types';
-import { Building } from '../building/building.types';
+import { createBuilding } from '../building/building.factory';
+import { hasConstructionOccupants } from './construction.helpers';
+import type { ConstructionSite } from './construction-site.types';
+import type { Building } from '../building/building.types';
 
 /**
  * 建造进度系统注册配置
@@ -32,7 +33,6 @@ export const constructionProgressSystem: SystemRegistration = {
   frequency: 1,
   execute(world: World) {
     for (const [, map] of world.maps) {
-      processBlueprints(world, map);
       processConstructionSites(world, map);
     }
   },
@@ -124,6 +124,7 @@ function processConstructionSites(world: World, map: GameMap): void {
   for (const site of sites) {
     if (site.destroyed) continue;
     if (site.buildProgress < 1.0) continue;
+    if (hasConstructionOccupants(map, site)) continue;
 
     // 查找建筑定义
     // Look up building def
@@ -135,19 +136,13 @@ function processConstructionSites(world: World, map: GameMap): void {
 
     // 根据定义创建最终建筑对象
     // Create Building object
-    const building: Building = {
-      id: nextObjectId(),
-      kind: ObjectKind.Building,
+    const building = createBuilding({
       defId: site.targetDefId,
+      cell: site.cell,
       mapId: site.mapId,
-      cell: { x: site.cell.x, y: site.cell.y },
-      footprint: buildingDef.size,
-      tags: new Set(buildingDef.tags),
-      destroyed: false,
-      hpCurrent: buildingDef.maxHp,
-      hpMax: buildingDef.maxHp,
       rotation: site.rotation,
-    };
+      defs: world.defs,
+    });
 
     // 若建筑定义了交互格偏移量，则挂载交互组件
     // Attach interaction component if building has an interaction cell offset

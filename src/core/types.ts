@@ -168,6 +168,7 @@ export enum ToilType {
   Wait = "wait",
   Deliver = "deliver",
   Interact = "interact",
+  PrepareConstruction = "prepare_construction",
 }
 
 /** 劳动步骤的执行状态 */

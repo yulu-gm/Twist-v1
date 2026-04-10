@@ -8,6 +8,7 @@ import { ObjectKind, ToilState, cellEquals } from '../../../core/types';
 import { log } from '../../../core/logger';
 import { findPath } from '../../pathfinding/path.service';
 import { placeItemOnMap } from '../../item/item.placement';
+import { areBlueprintMaterialsDelivered, tryPromoteBlueprintToConstructionSite } from '../../construction/construction.helpers';
 import type { ToilHandler } from './toil-handler.types';
 
 /** 执行交付（Deliver）Toil */
@@ -97,6 +98,11 @@ export const executeDeliver: ToilHandler = ({ pawn, toil, map, world }) => {
     log.warn('ai', `Pawn ${pawn.id} deliver toil missing blueprint target, grounded carried items instead`, undefined, pawn.id);
   } else if (deliveredCount === 0) {
     log.warn('ai', `Pawn ${pawn.id} could not deliver ${defId} to blueprint ${toil.targetId}, grounded carried items instead`, undefined, pawn.id);
+  } else {
+    const blueprint = map.objects.getAs(toil.targetId, ObjectKind.Blueprint);
+    if (blueprint && areBlueprintMaterialsDelivered(blueprint)) {
+      tryPromoteBlueprintToConstructionSite(world, map, blueprint.id, { ignoreIds: [pawn.id] });
+    }
   }
 
   if (remainingCarried > 0) {

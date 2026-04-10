@@ -7,6 +7,7 @@
 import { ObjectKind, ToilState } from '../../../core/types';
 import { log } from '../../../core/logger';
 import { placeItemOnMap } from '../../item/item.placement';
+import { hasConstructionOccupants } from '../../construction/construction.helpers';
 import type { Designation } from '../../designation/designation.types';
 import type { ToilHandler } from './toil-handler.types';
 
@@ -15,16 +16,20 @@ export const executeWork: ToilHandler = ({ pawn, toil, map, world }) => {
   const ld = toil.localData;
   const workDone = (ld.workDone as number) ?? 0;
   const totalWork = (ld.totalWork as number) ?? 100;
+  const constructionTarget = toil.targetId
+    ? map.objects.getAs(toil.targetId, ObjectKind.ConstructionSite)
+    : undefined;
+
+  if (constructionTarget && hasConstructionOccupants(map, constructionTarget)) {
+    return;
+  }
 
   ld.workDone = workDone + 1;
 
   // 如果正在建造建筑工地，更新工地的施工进度
-  if (toil.targetId) {
-    const target = map.objects.getAs(toil.targetId, ObjectKind.ConstructionSite);
-    if (target) {
-      target.workDone += 1;
-      target.buildProgress = target.workDone / target.totalWorkAmount;
-    }
+  if (constructionTarget) {
+    constructionTarget.workDone += 1;
+    constructionTarget.buildProgress = constructionTarget.workDone / constructionTarget.totalWorkAmount;
   }
 
   if ((ld.workDone as number) >= totalWork) {

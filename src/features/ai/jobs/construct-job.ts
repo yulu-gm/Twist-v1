@@ -14,6 +14,10 @@ import { Job } from '../ai.types';
 import type { GameMap } from '../../../world/game-map';
 import { findAdjacentPassable } from './adjacent-util';
 
+interface ConstructJobOptions {
+  requiresPrepare?: boolean;
+}
+
 /** 建造工作计数器，用于生成唯一 Job ID */
 let constructJobCounter = 0;
 
@@ -33,6 +37,7 @@ export function createConstructJob(
   siteId: ObjectId,
   siteCell: CellCoord,
   map?: GameMap,
+  options: ConstructJobOptions = {},
 ): Job {
   constructJobCounter++;
 
@@ -57,6 +62,15 @@ export function createConstructJob(
         state: ToilState.NotStarted,
         localData: {},
       },
+      ...(options.requiresPrepare
+        ? [{
+          type: ToilType.PrepareConstruction,
+          targetId: siteId,
+          targetCell: siteCell,
+          state: ToilState.NotStarted,
+          localData: {},
+        }]
+        : []),
       // 步骤2：执行建造工作
       {
         type: ToilType.Work,
