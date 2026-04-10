@@ -35,8 +35,10 @@ export const toolActions: readonly ToolActionDef[] = [
   { id: 'mine', tool: 'designate', label: 'Mine', hotkey: 'M', designationType: 'mine', group: 2 },
   { id: 'harvest', tool: 'designate', label: 'Harvest', hotkey: 'H', designationType: 'harvest', group: 2 },
   { id: 'cut', tool: 'designate', label: 'Cut', hotkey: 'X', designationType: 'cut', group: 2 },
-  { id: 'zone', tool: 'zone', label: 'Zone', hotkey: 'Z', zoneType: 'stockpile', group: 3 },
-  { id: 'stockpile', tool: 'zone', label: 'Stockpile', hotkey: '', zoneType: 'stockpile', group: 3 },
+  { id: 'zone', tool: 'zone', label: '区域', hotkey: 'Z', group: 3, isZoneToggle: true },
+  { id: 'zone_stockpile', tool: 'zone', label: '存储区', hotkey: '', zoneType: 'stockpile', group: 3 },
+  { id: 'zone_growing', tool: 'zone', label: '种植区', hotkey: '', zoneType: 'growing', group: 3 },
+  { id: 'zone_animal', tool: 'zone', label: '动物区', hotkey: '', zoneType: 'animal', group: 3 },
   { id: 'cancel', tool: 'cancel', label: 'Cancel', hotkey: 'C', group: 4 },
 ];
 

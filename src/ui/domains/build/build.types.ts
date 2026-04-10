@@ -29,6 +29,8 @@ export interface ToolActionDef {
   buildDefId?: string;
   /** 区域类型（仅 zone 工具需要） */
   zoneType?: string;
+  /** 是否为区域菜单切换按钮（点击展开/收起子菜单） */
+  isZoneToggle?: boolean;
   /** 所属分组编号（用于在工具栏中分组显示） */
   group: number;
 }

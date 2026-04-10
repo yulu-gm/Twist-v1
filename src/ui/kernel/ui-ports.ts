@@ -84,6 +84,7 @@ export function createUiPorts(
       }
       if (zoneType) {
         presentation.activeZoneType = zoneType as ZoneType;
+        presentation.lastZoneType = zoneType as ZoneType;
       }
     },
 

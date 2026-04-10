@@ -18,7 +18,7 @@ function makeSnapshot(overrides: Partial<EngineSnapshot> = {}): EngineSnapshot {
     presentation: { activeTool: 'select', activeDesignationType: null, activeZoneType: null, activeBuildDefId: null, hoveredCell: null, selectedIds: [], showDebugPanel: false, showGrid: false },
     selection: { primaryId: null, selectedIds: [] },
     colonists: {},
-    build: { activeTool: 'select', activeDesignationType: null, activeZoneType: null, activeBuildDefId: null, activeModeLabel: 'Select' },
+    build: { activeTool: 'select', activeDesignationType: null, activeZoneType: null, lastZoneType: 'stockpile', activeBuildDefId: null, activeModeLabel: 'Select' },
     feedback: { recentEvents: [] },
     debugInfo: '',
     ...overrides,
@@ -38,7 +38,7 @@ describe('selectTopStatusBar', () => {
 describe('selectBuildModeSummary', () => {
   it('returns tool mode label from snapshot', () => {
     const summary = selectBuildModeSummary(makeSnapshot({
-      build: { activeTool: 'designate', activeDesignationType: 'mine', activeZoneType: null, activeBuildDefId: null, activeModeLabel: 'Mine' },
+      build: { activeTool: 'designate', activeDesignationType: 'mine', activeZoneType: null, lastZoneType: 'stockpile', activeBuildDefId: null, activeModeLabel: 'Mine' },
     }));
     expect(summary.title).toBe('Mine');
     expect(summary.activeTool).toBe('designate');
@@ -60,5 +60,17 @@ describe('selectActiveToolId', () => {
     expect(selectActiveToolId(makeSnapshot({
       presentation: { activeTool: 'build', activeDesignationType: null, activeZoneType: null, activeBuildDefId: 'wall_wood', hoveredCell: null, selectedIds: [], showDebugPanel: false, showGrid: false },
     }))).toBe('build');
+  });
+
+  it('returns zone_stockpile for zone+stockpile', () => {
+    expect(selectActiveToolId(makeSnapshot({
+      presentation: { activeTool: 'zone', activeDesignationType: null, activeZoneType: 'stockpile', activeBuildDefId: null, hoveredCell: null, selectedIds: [], showDebugPanel: false, showGrid: false },
+    }))).toBe('zone_stockpile');
+  });
+
+  it('returns zone_growing for zone+growing', () => {
+    expect(selectActiveToolId(makeSnapshot({
+      presentation: { activeTool: 'zone', activeDesignationType: null, activeZoneType: 'growing', activeBuildDefId: null, hoveredCell: null, selectedIds: [], showDebugPanel: false, showGrid: false },
+    }))).toBe('zone_growing');
   });
 });

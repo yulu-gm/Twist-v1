@@ -83,6 +83,7 @@ export function AppShell({ snapshot, uiState, dispatch, ports }: AppShellProps) 
       <DebugPanel visible={showDebug} debugInfo={debugInfo} />
       <ToolModeBar
         activeToolId={activeToolId}
+        activeTool={snapshot.presentation.activeTool}
         onActivate={(action) => activateToolAction(ports, action)}
       />
     </div>

@@ -404,6 +404,7 @@ function createLazyPorts(world: World, getPresentation: () => PresentationState 
       }
       if (zoneType) {
         p.activeZoneType = zoneType as ZoneType;
+        p.lastZoneType = zoneType as ZoneType;
       }
     },
     jumpCameraTo(_cell: { x: number; y: number }) {
@@ -473,7 +474,7 @@ async function boot(): Promise<void> {
         tick: 0, speed: 0, clockDisplay: '', colonistCount: 0,
         presentation: { activeTool: 'select', activeDesignationType: null, activeZoneType: null, activeBuildDefId: null, hoveredCell: null, selectedIds: [], showDebugPanel: false, showGrid: false },
         selection: { primaryId: null, selectedIds: [] },
-        colonists: {}, build: { activeTool: 'select', activeDesignationType: null, activeZoneType: null, activeBuildDefId: null, activeModeLabel: 'Select' },
+        colonists: {}, build: { activeTool: 'select', activeDesignationType: null, activeZoneType: null, lastZoneType: 'stockpile', activeBuildDefId: null, activeModeLabel: 'Select' },
         feedback: feedbackBuffer, debugInfo: '',
       };
     }

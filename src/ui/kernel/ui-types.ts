@@ -105,6 +105,8 @@ export interface BuildSnapshot {
   activeDesignationType: string | null;
   /** 当前区域类型 */
   activeZoneType: string | null;
+  /** 最近一次使用的区域子类型（供 Z 快捷键回到上次类型） */
+  lastZoneType: string;
   /** 当前建筑定义 ID */
   activeBuildDefId: string | null;
   /** 当前模式的显示标签（如 "Select"、"Build: wall_wood"） */

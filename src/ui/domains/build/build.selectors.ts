@@ -55,6 +55,8 @@ export function selectActiveToolId(snapshot: EngineSnapshot): string {
   // 遍历工具动作定义，找到与当前状态匹配的动作
   for (const action of toolActions) {
     if (action.tool === tool) {
+      // 区域菜单切换按钮不参与 ID 匹配
+      if (action.isZoneToggle) continue;
       if (action.designationType) {
         if (action.designationType === desType) return action.id;
       } else if (action.zoneType) {

@@ -102,6 +102,7 @@ export function readEngineSnapshot(
       activeTool: presentation.activeTool,
       activeDesignationType: presentation.activeDesignationType,
       activeZoneType: presentation.activeZoneType,
+      lastZoneType: presentation.lastZoneType,
       activeBuildDefId: presentation.activeBuildDefId,
       activeModeLabel,
     },

@@ -18,7 +18,7 @@ function makeSnapshot(tick: number): EngineSnapshot {
     presentation: { activeTool: 'select', activeDesignationType: null, activeZoneType: null, activeBuildDefId: null, hoveredCell: null, selectedIds: [], showDebugPanel: false, showGrid: false },
     selection: { primaryId: null, selectedIds: [] },
     colonists: {},
-    build: { activeTool: 'select', activeDesignationType: null, activeZoneType: null, activeBuildDefId: null, activeModeLabel: 'Select' },
+    build: { activeTool: 'select', activeDesignationType: null, activeZoneType: null, lastZoneType: 'stockpile', activeBuildDefId: null, activeModeLabel: 'Select' },
     feedback: { recentEvents: [] },
     debugInfo: '',
   };
