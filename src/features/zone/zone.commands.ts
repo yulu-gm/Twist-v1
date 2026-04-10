@@ -11,8 +11,8 @@ import {
   MapId,
   ZoneId,
   CellCoordKey,
-  cellKey,
   CellCoord,
+  cellKey,
   ZoneType,
 } from '../../core/types';
 import {
@@ -27,16 +27,11 @@ import {
   createDefaultZoneConfig,
   normalizeZoneConfig,
 } from './zone.types';
-
-/** 区域ID自增计数器 */
-let _nextZoneId = 1;
-/**
- * 生成下一个唯一区域ID
- * @returns 格式为 "zone_N" 的区域ID
- */
-function nextZoneId(): ZoneId {
-  return `zone_${_nextZoneId++}`;
-}
+import {
+  buildZoneCellPlacementPlan,
+  getNextZoneId,
+  analyzeZoneCellPlacement,
+} from './zone.analysis';
 
 function isZoneType(value: unknown): value is ZoneType {
   return Object.values(ZoneType).includes(value as ZoneType);
@@ -50,8 +45,8 @@ function toCellKeys(cells: CellCoord[]): CellCoordKey[] {
 
 /**
  * 创建新区域命令处理器
- * 验证：检查地图存在性、zoneType 合法、cells 数组非空、所有格子在地图边界内且未被其他区域占用
- * 执行：始终创建一个新的区域对象
+ * 验证：检查地图存在性、zoneType 合法、cells 数组非空，且至少有一个有效格子
+ * 执行：复用 ZoneManager 的 add / addCells 语义，按分析结果执行创建、扩展或合并
  */
 export const zoneSetCellsHandler: CommandHandler = {
   type: 'zone_set_cells',
@@ -73,23 +68,9 @@ export const zoneSetCellsHandler: CommandHandler = {
       return { valid: false, reason: 'No cells provided for zone' };
     }
 
-    const uniqueCellKeys = toCellKeys(cells);
-
-    // 边界和占用检查
-    for (const cell of cells) {
-      if (cell.x < 0 || cell.x >= map.width || cell.y < 0 || cell.y >= map.height) {
-        return { valid: false, reason: `Cell (${cell.x},${cell.y}) out of bounds` };
-      }
-    }
-
-    for (const key of uniqueCellKeys) {
-      const occupiedZone = map.zones.getZoneAt(key);
-      if (occupiedZone) {
-        return {
-          valid: false,
-          reason: `Cell ${key} already belongs to zone ${occupiedZone.id}`,
-        };
-      }
+    const analysis = analyzeZoneCellPlacement(map, zoneType, cells);
+    if (analysis.validCellCount === 0) {
+      return { valid: false, reason: 'No valid cells provided for zone' };
     }
 
     return { valid: true };
@@ -104,24 +85,69 @@ export const zoneSetCellsHandler: CommandHandler = {
       config?: unknown;
     };
     const map = w.maps.get(mapId)!;
+    const plan = buildZoneCellPlacementPlan(map, zoneType, cells);
 
-    const id = nextZoneId();
-    const cellKeys = toCellKeys(cells);
-    const zone: Zone = {
-      id,
+    if (plan.analysis.validCellCount === 0) {
+      return { events: [] };
+    }
+
+    let zoneId: ZoneId;
+    let created = false;
+
+    if (plan.analysis.targetZoneId === null) {
+      zoneId = getNextZoneId(w);
+      created = true;
+
+      const zone: Zone = {
+        id: zoneId,
+        zoneType,
+        cells: new Set(plan.cellsToAdd),
+        config: config ? normalizeZoneConfig(zoneType, config) : createDefaultZoneConfig(zoneType),
+      };
+      map.zones.add(zone);
+    } else {
+      zoneId = plan.analysis.targetZoneId;
+      map.zones.addCells(zoneId, plan.cellsToAdd);
+    }
+
+    const shouldEmitSummary = created || plan.addedCellCount > 0 || plan.analysis.invalidCellCount > 0;
+    if (!shouldEmitSummary) {
+      return { events: [] };
+    }
+
+    const summaryData = {
+      zoneId,
       zoneType,
-      cells: new Set(cellKeys),
-      config: config ? normalizeZoneConfig(zoneType, config) : createDefaultZoneConfig(zoneType),
+      created,
+      addedCellCount: plan.addedCellCount,
+      mergedZoneIds: plan.analysis.mergedZoneIds,
+      invalidCellCount: plan.analysis.invalidCellCount,
     };
-    map.zones.add(zone);
 
-    return {
-      events: [{
-        type: 'zone_created',
-        tick: w.tick,
-        data: { zoneId: id, zoneType, cellCount: cells.length },
-      }],
-    };
+    const events = created
+      ? [
+          {
+            type: 'zone_created',
+            tick: w.tick,
+            data: {
+              zoneId,
+              zoneType,
+              cellCount: plan.addedCellCount,
+            },
+          },
+          {
+            type: 'zone_updated',
+            tick: w.tick,
+            data: summaryData,
+          },
+        ]
+      : [{
+          type: 'zone_updated',
+          tick: w.tick,
+          data: summaryData,
+        }];
+
+    return { events };
   },
 };
 

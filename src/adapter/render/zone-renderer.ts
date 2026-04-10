@@ -2,14 +2,31 @@
  * @file zone-renderer.ts
  * @description 正式区域渲染器——负责在常规渲染层显示地图上的已建区域
  * @dependencies phaser — 渲染引擎；world/game-map — 地图数据；
- *               core/types — ZoneType、parseKey；render-utils — 区域颜色工具
+ *               core/types — ZoneType、parseKey；render-utils — 区域颜色/显示名工具
  * @part-of adapter/render — 渲染模块
  */
 
 import Phaser from 'phaser';
 import type { GameMap } from '../../world/game-map';
+import type { Zone } from '../../world/zone-manager';
 import { parseKey, ZoneType } from '../../core/types';
-import { TILE_SIZE, getZoneColor } from './render-utils';
+import { TILE_SIZE, getZoneColor, getZoneDisplayName } from './render-utils';
+
+const ZONE_LABEL_OFFSET = 2;
+const ZONE_LABEL_STYLE: Phaser.Types.GameObjects.Text.TextStyle = {
+  fontSize: '12px',
+  color: '#f8f8f2',
+  fontStyle: 'bold',
+  stroke: '#000000',
+  strokeThickness: 4,
+  backgroundColor: 'rgba(0, 0, 0, 0.55)',
+  padding: {
+    left: 4,
+    right: 4,
+    top: 2,
+    bottom: 2,
+  },
+};
 
 /**
  * ZoneRenderer 负责把地图上的区域对象绘制到正式游戏画面中。
@@ -22,10 +39,13 @@ import { TILE_SIZE, getZoneColor } from './render-utils';
 export class ZoneRenderer {
   private map: GameMap;
   private graphics: Phaser.GameObjects.Graphics;
+  private layer: Phaser.GameObjects.Container;
+  private labels = new Map<string, Phaser.GameObjects.Text>();
   private lastSignature = '';
 
   constructor(scene: Phaser.Scene, layer: Phaser.GameObjects.Container, map: GameMap) {
     this.map = map;
+    this.layer = layer;
     this.graphics = scene.add.graphics();
     layer.add(this.graphics);
   }
@@ -52,9 +72,15 @@ export class ZoneRenderer {
         this.graphics.strokeRect(cell.x * TILE_SIZE, cell.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
       }
     }
+
+    this.syncLabels(zones);
   }
 
   destroy(): void {
+    for (const label of this.labels.values()) {
+      label.destroy();
+    }
+    this.labels.clear();
     this.graphics.destroy();
   }
 
@@ -66,6 +92,57 @@ export class ZoneRenderer {
         return `${zone.id}:${zone.zoneType}:${cells}`;
       })
       .join('||');
+  }
+
+  private syncLabels(zones: Zone[]): void {
+    const aliveZoneIds = new Set<string>();
+
+    for (const zone of zones) {
+      if (zone.cells.size === 0) continue;
+
+      aliveZoneIds.add(zone.id);
+      const anchor = this.getZoneLabelAnchor(zone);
+      const labelText = getZoneDisplayName(zone.zoneType);
+      let label = this.labels.get(zone.id);
+
+      if (!label) {
+        label = this.layer.scene.add.text(anchor.x, anchor.y, labelText, ZONE_LABEL_STYLE);
+        label.setOrigin(0, 0);
+        this.layer.add(label);
+        this.labels.set(zone.id, label);
+      } else if (label.text !== labelText) {
+        label.setText(labelText);
+      }
+
+      label.setPosition(anchor.x, anchor.y);
+      label.setVisible(true);
+    }
+
+    for (const [zoneId, label] of this.labels.entries()) {
+      if (aliveZoneIds.has(zoneId)) continue;
+      label.destroy();
+      this.labels.delete(zoneId);
+    }
+  }
+
+  private getZoneLabelAnchor(zone: Zone): { x: number; y: number } {
+    let minX = Number.POSITIVE_INFINITY;
+    let minY = Number.POSITIVE_INFINITY;
+
+    for (const key of zone.cells) {
+      const cell = parseKey(key);
+      if (cell.x < minX) minX = cell.x;
+      if (cell.y < minY) minY = cell.y;
+    }
+
+    if (!Number.isFinite(minX) || !Number.isFinite(minY)) {
+      return { x: 0, y: 0 };
+    }
+
+    return {
+      x: minX * TILE_SIZE + ZONE_LABEL_OFFSET,
+      y: minY * TILE_SIZE + ZONE_LABEL_OFFSET,
+    };
   }
 
   private resolveZoneColor(zoneType: string): number {

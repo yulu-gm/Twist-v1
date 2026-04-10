@@ -13,6 +13,7 @@ import type { GameMap } from '../../world/game-map';
 import { CellCoord, ObjectKind, DesignationType, ZoneType, cellKey } from '../../core/types';
 import { PresentationState, ToolType } from '../../presentation/presentation-state';
 import type { Designation } from '../../features/designation/designation.types';
+import { analyzeZoneCellPlacement } from '../../features/zone/zone.analysis';
 import { setupKeyboardBindings } from './keyboard-bindings';
 
 /** 地图格子像素大小 */
@@ -181,14 +182,15 @@ export class InputHandler {
 
   private handleZone(cell: CellCoord): void {
     const zoneType = this.presentation.activeZoneType ?? ZoneType.Stockpile;
-    if (this.isCellInAnyZone(cell)) return;
+    const analysis = this.analyzeZonePlacement([cell], zoneType);
+    if (analysis.validCellCount === 0) return;
 
     this.world.commandQueue.push({
       type: 'zone_set_cells',
       payload: {
         mapId: this.map.id,
         zoneType,
-        cells: [cell],
+        cells: analysis.validCells,
       },
     });
   }
@@ -397,15 +399,15 @@ export class InputHandler {
   /** 框选区域：仅提交未被其他区域占用的格子 */
   private dragZoneCreate(minX: number, minY: number, maxX: number, maxY: number): void {
     const zoneType = this.presentation.activeZoneType ?? ZoneType.Stockpile;
-    const cells = this.getRectCells(minX, minY, maxX, maxY).filter((cell) => !this.isCellInAnyZone(cell));
-    if (cells.length === 0) return;
+    const analysis = this.analyzeZonePlacement(this.getRectCells(minX, minY, maxX, maxY), zoneType);
+    if (analysis.validCellCount === 0) return;
 
     this.world.commandQueue.push({
       type: 'zone_set_cells',
       payload: {
         mapId: this.map.id,
         zoneType,
-        cells,
+        cells: analysis.validCells,
       },
     });
   }
@@ -428,6 +430,11 @@ export class InputHandler {
   /** 当前格子是否已经被某个区域占用 */
   private isCellInAnyZone(cell: CellCoord): boolean {
     return !!this.map.zones.getZoneAt(cellKey(cell));
+  }
+
+  /** 复用 zone 领域规则分析当前区域创建意图 */
+  private analyzeZonePlacement(cells: CellCoord[], zoneType: ZoneType) {
+    return analyzeZoneCellPlacement(this.map, zoneType, cells);
   }
 
   /** 收集矩形范围内的所有格子 */
@@ -505,14 +512,13 @@ export class InputHandler {
       return;
     }
 
-    const validCells: CellCoord[] = [];
-    const invalidCells: CellCoord[] = [];
-    for (const cell of cells) {
-      const occupied = this.isCellInAnyZone(cell);
-      const isValid = this.presentation.activeTool === ToolType.Zone ? !occupied : occupied;
-      if (isValid) validCells.push(cell);
-      else invalidCells.push(cell);
-    }
+    const zonePlacement = zoneType ? this.analyzeZonePlacement(cells, zoneType) : null;
+    const validCells = this.presentation.activeTool === ToolType.Zone
+      ? (zonePlacement?.validCells ?? [])
+      : cells.filter((cell) => this.isCellInAnyZone(cell));
+    const invalidCells = this.presentation.activeTool === ToolType.Zone
+      ? (zonePlacement?.invalidCells ?? [])
+      : cells.filter((cell) => !this.isCellInAnyZone(cell));
 
     this.presentation.zonePreview = {
       mode: this.presentation.activeTool === ToolType.Zone ? 'create' : 'erase',
