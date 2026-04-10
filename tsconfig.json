@@ -3,6 +3,8 @@
     "target": "ES2020",
     "module": "ESNext",
     "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -10,8 +12,16 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "sourceMap": true
+    "sourceMap": true,
+    "paths": {
+      "@core/*": ["./src/core/*"],
+      "@world/*": ["./src/world/*"],
+      "@features/*": ["./src/features/*"],
+      "@adapter/*": ["./src/adapter/*"],
+      "@defs/*": ["./src/defs/*"],
+      "@ui/*": ["./src/ui/*"]
+    }
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vitest.config.ts"],
   "exclude": ["node_modules", "dist"]
 }

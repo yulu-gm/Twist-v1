@@ -1,0 +1,440 @@
+/* ── App Shell Layout ── */
+
+#ui-root {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+  font-family: var(--font-family);
+  color: var(--text-color);
+  font-size: var(--font-size);
+}
+
+#ui-root * {
+  box-sizing: border-box;
+}
+
+/* Restore pointer events on panels */
+.app-shell > * {
+  pointer-events: auto;
+}
+
+/* ── Top Status Bar ── */
+
+.top-status-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--bar-height-top);
+  background: var(--panel-bg);
+  border-bottom: 1px solid var(--panel-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  pointer-events: auto;
+}
+
+.top-status-bar__left,
+.top-status-bar__center,
+.top-status-bar__right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.top-status-bar__left { min-width: 120px; }
+.top-status-bar__right { min-width: 120px; justify-content: flex-end; }
+
+.top-status-bar__clock {
+  font-size: var(--font-size-lg);
+  font-weight: bold;
+}
+
+.top-status-bar__muted {
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+}
+
+/* ── Speed Buttons ── */
+
+.speed-group {
+  display: flex;
+  gap: 2px;
+}
+
+.speed-btn {
+  padding: 2px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  user-select: none;
+  font-size: var(--font-size-sm);
+  font-family: var(--font-family);
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  transition: background 0.1s;
+}
+
+.speed-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-color);
+}
+
+.speed-btn.is-active {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+/* ── Tool Mode Bar (Bottom Toolbar) ── */
+
+.tool-mode-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: var(--bar-height-bottom);
+  background: var(--panel-bg);
+  border-top: 1px solid var(--panel-border);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 12px;
+  font-size: var(--font-size-sm);
+  pointer-events: auto;
+}
+
+.tool-mode-bar__group {
+  display: flex;
+  gap: 2px;
+}
+
+.tool-mode-bar__sep {
+  width: 1px;
+  height: 20px;
+  background: var(--panel-border);
+  margin: 0 4px;
+}
+
+.tool-mode-bar__btn {
+  padding: 4px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  font-family: var(--font-family);
+  font-size: var(--font-size-sm);
+  transition: background 0.1s, color 0.1s;
+}
+
+.tool-mode-bar__btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-color);
+}
+
+.tool-mode-bar__btn.is-active {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+/* ── Inspector / Selection Panel ── */
+
+.inspector-panel {
+  position: absolute;
+  right: 10px;
+  top: 46px;
+  bottom: 54px;
+  width: 280px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+}
+
+.inspector-panel__header {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--panel-border);
+  font-size: var(--font-size);
+  font-weight: bold;
+}
+
+.inspector-panel__body {
+  padding: 6px 10px;
+  font-size: var(--font-size-sm);
+  line-height: 1.6;
+}
+
+/* ── Shared: Panel ── */
+
+.ui-panel {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  pointer-events: auto;
+}
+
+.ui-panel__title {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--panel-border);
+  font-size: var(--font-size);
+  font-weight: bold;
+}
+
+.ui-panel__body {
+  padding: 6px 10px;
+}
+
+/* ── Shared: Stat Row ── */
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--font-size-sm);
+}
+
+.stat-row__label {
+  color: var(--text-muted);
+}
+
+/* ── Shared: Progress Bar ── */
+
+.progress-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-sm);
+}
+
+.progress-bar__label {
+  width: 36px;
+  color: var(--text-muted);
+}
+
+.progress-bar__track {
+  flex: 1;
+  height: 6px;
+  background: #333;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-bar__fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.15s;
+}
+
+.progress-bar__value {
+  width: 28px;
+  text-align: right;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* ── Shared: Badge ── */
+
+.badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.badge--idle { background: #444; color: var(--text-muted); }
+.badge--working { background: #2a5a2a; color: var(--success); }
+.badge--alert { background: #5a2a2a; color: var(--danger); }
+
+/* ── Shared: Tabs ── */
+
+.tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.tabs__btn {
+  padding: 6px 12px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  font-family: var(--font-family);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: color 0.1s, border-color 0.1s;
+}
+
+.tabs__btn:hover {
+  color: var(--text-color);
+}
+
+.tabs__btn.is-active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* ── Colonist Roster ── */
+
+.colonist-roster {
+  position: absolute;
+  left: 10px;
+  top: 46px;
+  width: 200px;
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+  pointer-events: auto;
+}
+
+.colonist-roster__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.colonist-roster__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 4px 10px;
+  background: none;
+  border: none;
+  font-family: var(--font-family);
+  font-size: var(--font-size-sm);
+  color: var(--text-color);
+  cursor: pointer;
+  transition: background 0.1s;
+  text-align: left;
+}
+
+.colonist-roster__row:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.colonist-roster__row.is-active {
+  background: rgba(74, 144, 217, 0.2);
+}
+
+.colonist-roster__name {
+  font-weight: bold;
+}
+
+.colonist-roster__job {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+/* ── Debug Panel ── */
+
+.debug-panel {
+  position: absolute;
+  top: 46px;
+  right: 300px;
+  width: 280px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  padding: 8px 10px;
+  pointer-events: auto;
+}
+
+.debug-panel__text {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  font-family: var(--font-family);
+  color: var(--text-color);
+  white-space: pre-wrap;
+  line-height: 1.4;
+}
+
+/* ── Toast Stack ── */
+
+.toast-stack {
+  position: absolute;
+  top: 46px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  pointer-events: auto;
+  z-index: 20;
+}
+
+.toast {
+  padding: 6px 16px;
+  border-radius: 4px;
+  font-size: var(--font-size-sm);
+  animation: toast-in 0.2s ease-out;
+}
+
+.toast--error {
+  background: rgba(217, 74, 74, 0.9);
+  color: #fff;
+}
+
+.toast--info {
+  background: rgba(74, 144, 217, 0.9);
+  color: #fff;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Notification Center ── */
+
+.notification-center {
+  position: absolute;
+  right: 10px;
+  top: 46px;
+  bottom: 54px;
+  width: 320px;
+  overflow-y: auto;
+  pointer-events: auto;
+}
+
+.notification-center__item {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--panel-border);
+  font-size: var(--font-size-sm);
+}
+
+.notification-center__title {
+  font-weight: bold;
+}
+
+.notification-center__summary {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.notification-center__tick {
+  color: var(--text-muted);
+  font-size: 10px;
+  float: right;
+}
+
+/* ── Section ── */
+
+.ui-section {
+  padding: 6px 0;
+}
+
+.ui-section__title {
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}

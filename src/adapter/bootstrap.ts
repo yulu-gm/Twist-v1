@@ -8,11 +8,15 @@
 import Phaser from 'phaser';
 import { World } from '../world/world';
 import { MainScene } from './main-scene';
+import type { EngineSnapshotBridge } from '../ui/kernel/ui-bridge';
+import type { UiPorts } from '../ui/kernel/ui-ports';
 
 /**
  * 创建并启动 Phaser 游戏实例
  *
  * @param world - 已初始化的游戏世界对象
+ * @param uiBridge - Preact UI 快照桥接（可选）
+ * @param uiPorts - Preact UI 端口（可选）
  * @returns 创建好的 Phaser.Game 实例
  *
  * 配置项：
@@ -21,7 +25,11 @@ import { MainScene } from './main-scene';
  * - 像素风格渲染（pixelArt + roundPixels）
  * - 使用 MainScene 作为唯一场景
  */
-export function bootstrapPhaser(world: World): Phaser.Game {
+export function bootstrapPhaser(
+  world: World,
+  uiBridge?: EngineSnapshotBridge,
+  uiPorts?: UiPorts,
+): Phaser.Game {
   const config: Phaser.Types.Core.GameConfig = {
     type: Phaser.AUTO,
     parent: 'game-container',
@@ -32,7 +40,7 @@ export function bootstrapPhaser(world: World): Phaser.Game {
       mode: Phaser.Scale.RESIZE,
       autoCenter: Phaser.Scale.CENTER_BOTH,
     },
-    scene: new MainScene(world),
+    scene: new MainScene(world, uiBridge),
     pixelArt: true,
     roundPixels: true,
   };

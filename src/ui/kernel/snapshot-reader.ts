@@ -1,0 +1,174 @@
+/**
+ * @file snapshot-reader.ts
+ * @description 引擎快照读取器 — 从游戏世界状态构建完整的 EngineSnapshot
+ * @dependencies world/world — 世界状态；world/game-map — 地图数据；
+ *               presentation — 展示层状态；core/types — ObjectKind；
+ *               core/clock — 时钟显示格式化；ui-types — 快照类型定义
+ * @part-of ui/kernel — UI 内核层
+ *
+ * 这是 Phaser 游戏世界与 Preact UI 之间的数据转换层。
+ * 每帧由 bridge.emit() 调用一次，将可变的游戏对象转换为不可变的纯数据快照。
+ */
+
+import type { World } from '../../world/world';
+import type { GameMap } from '../../world/game-map';
+import type { PresentationState } from '../../presentation/presentation-state';
+import { ObjectKind } from '../../core/types';
+import { getClockDisplay } from '../../core/clock';
+import type { EngineSnapshot, ColonistNode, FeedbackSnapshot } from './ui-types';
+
+/**
+ * 读取引擎快照 — 从游戏状态构建完整的 UI 数据包
+ *
+ * @param world - 游戏世界对象
+ * @param map - 当前激活的地图
+ * @param presentation - 展示层状态
+ * @param feedbackBuffer - 事件反馈缓冲（由 eventBus.onAny 持续填充）
+ * @returns 完整的引擎快照，供 UI 组件消费
+ *
+ * 操作：
+ * 1. 提取选中 ID 列表
+ * 2. 遍历所有 Pawn 构建殖民者数据映射
+ * 3. 格式化工具模式标签
+ * 4. 构建调试信息文本
+ * 5. 组装并返回完整快照
+ */
+export function readEngineSnapshot(
+  world: World,
+  map: GameMap,
+  presentation: PresentationState,
+  feedbackBuffer: FeedbackSnapshot,
+): EngineSnapshot {
+  const selectedIds = Array.from(presentation.selectedObjectIds);
+  const primaryId = selectedIds.length === 1 ? selectedIds[0] : null;
+
+  // 遍历所有 Pawn 对象，提取殖民者数据
+  const colonists: Record<string, ColonistNode> = {};
+  const pawns = map.objects.allOfKind(ObjectKind.Pawn);
+  for (const pawn of pawns) {
+    const jobDefId = (pawn as any).ai?.currentJob?.defId ?? 'idle';
+    colonists[pawn.id] = {
+      id: pawn.id,
+      name: (pawn as any).name ?? pawn.id,
+      cell: { x: pawn.cell.x, y: pawn.cell.y },
+      factionId: (pawn as any).factionId ?? '',
+      currentJob: jobDefId,
+      currentJobLabel: formatJobLabel(jobDefId),
+      needs: {
+        food: (pawn as any).needs?.food ?? 0,
+        rest: (pawn as any).needs?.rest ?? 0,
+        joy: (pawn as any).needs?.joy ?? 0,
+        mood: (pawn as any).needs?.mood ?? 0,
+      },
+      health: {
+        hp: (pawn as any).health?.hp ?? 100,
+        maxHp: (pawn as any).health?.maxHp ?? 100,
+      },
+    };
+  }
+
+  // 格式化工具模式标签（如 "Select"、"Build: wall_wood"）
+  const activeModeLabel = formatToolModeLabel(
+    presentation.activeTool,
+    presentation.activeDesignationType,
+    presentation.activeBuildDefId,
+  );
+
+  // 构建调试面板的信息文本
+  const debugInfo = buildDebugInfo(map, presentation);
+
+  return {
+    tick: world.tick,
+    speed: world.speed,
+    clockDisplay: getClockDisplay(world.clock),
+    colonistCount: pawns.length,
+    presentation: {
+      activeTool: presentation.activeTool,
+      activeDesignationType: presentation.activeDesignationType,
+      activeBuildDefId: presentation.activeBuildDefId,
+      hoveredCell: presentation.hoveredCell ? { x: presentation.hoveredCell.x, y: presentation.hoveredCell.y } : null,
+      selectedIds,
+      showDebugPanel: presentation.showDebugPanel,
+      showGrid: presentation.showGrid,
+    },
+    selection: {
+      primaryId,
+      selectedIds,
+    },
+    colonists,
+    build: {
+      activeTool: presentation.activeTool,
+      activeDesignationType: presentation.activeDesignationType,
+      activeBuildDefId: presentation.activeBuildDefId,
+      activeModeLabel,
+    },
+    feedback: feedbackBuffer,
+    debugInfo,
+  };
+}
+
+/**
+ * 格式化任务定义 ID 为可读标签
+ *
+ * @param defId - 任务定义 ID（如 'idle'、'job_haul_item'）
+ * @returns 格式化后的标签（如 'Idle'、'Haul Item'）
+ */
+function formatJobLabel(defId: string): string {
+  if (defId === 'idle') return 'Idle';
+  return defId
+    .replace(/^job_/, '')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase());
+}
+
+/**
+ * 格式化工具模式为显示标签
+ *
+ * @param tool - 工具类型
+ * @param desType - 指派类型（可选）
+ * @param buildDefId - 建筑定义 ID（可选）
+ * @returns 模式标签（如 'Select'、'Build: wall_wood'、'Mine'）
+ */
+function formatToolModeLabel(
+  tool: string,
+  desType: string | null,
+  buildDefId: string | null,
+): string {
+  switch (tool) {
+    case 'select': return 'Select';
+    case 'build': return buildDefId ? `Build: ${buildDefId}` : 'Build';
+    case 'designate': return desType ? `${desType.charAt(0).toUpperCase()}${desType.slice(1)}` : 'Designate';
+    case 'zone': return 'Zone';
+    case 'cancel': return 'Cancel';
+    default: return tool;
+  }
+}
+
+/**
+ * 构建调试面板的信息文本
+ *
+ * @param map - 当前地图（用于查询地形/对象/预约）
+ * @param presentation - 展示层状态（用于获取悬停格子信息）
+ * @returns 预格式化的多行调试字符串
+ */
+function buildDebugInfo(map: GameMap, presentation: PresentationState): string {
+  let dbg = `--- Debug ---\n`;
+  dbg += `Tool: ${presentation.activeTool}\n`;
+  const hovered = presentation.hoveredCell;
+  if (hovered) {
+    dbg += `Hover: (${hovered.x}, ${hovered.y})\n`;
+    const terrain = map.terrain.get(hovered.x, hovered.y);
+    dbg += `Terrain: ${terrain}\n`;
+    const objs = map.spatial.getAt(hovered);
+    dbg += `Objects: ${objs.length}\n`;
+    for (const id of objs) {
+      const o = map.objects.get(id);
+      if (o) dbg += `  ${o.kind}: ${o.id}\n`;
+    }
+    dbg += `Passable: ${map.spatial.isPassable(hovered)}\n`;
+  }
+  dbg += `Total objects: ${map.objects.size}\n`;
+  const reservations = map.reservations.getAll();
+  dbg += `Reservations: ${reservations.length}\n`;
+  return dbg;
+}

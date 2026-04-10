@@ -1,0 +1,16 @@
+:root {
+  --panel-bg: rgba(30, 32, 40, 0.92);
+  --panel-border: #3a3f4a;
+  --text-color: #e0e0e0;
+  --text-muted: #8a8f9a;
+  --accent: #4a90d9;
+  --accent-hover: #5aa0e9;
+  --danger: #d94a4a;
+  --success: #44cc44;
+  --font-family: 'Consolas', 'Courier New', monospace;
+  --font-size: 13px;
+  --font-size-sm: 11px;
+  --font-size-lg: 16px;
+  --bar-height-top: 36px;
+  --bar-height-bottom: 44px;
+}

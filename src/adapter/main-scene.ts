@@ -3,7 +3,7 @@
  * @description Phaser 主场景，负责游戏循环的 tick 推进、系统执行和渲染同步
  * @dependencies phaser — 渲染引擎；world/world — 游戏世界；core/types — SimSpeed；
  *               core/clock — 时钟推进；render/* — 渲染同步和摄像机；
- *               input/* — 输入处理；ui/* — UI 管理；debug/* — 调试工具；
+ *               input/* — 输入处理；debug/* — 调试工具；
  *               presentation — 展示层状态
  * @part-of adapter — 适配器层
  */
@@ -17,11 +17,11 @@ import { log } from '../core/logger';
 import { RenderSync } from './render/render-sync';
 import { CameraController } from './render/camera-controller';
 import { InputHandler } from './input/input-handler';
-import { DomUIManager } from './ui/dom-ui-manager';
 import { WorldPreview } from './render/world-preview';
 import { DebugOverlay } from './debug/debug-overlay';
 import { installDebugConsole } from './debug/console';
 import { createPresentationState, PresentationState } from '../presentation/presentation-state';
+import type { EngineSnapshotBridge } from '../ui/kernel/ui-bridge';
 
 /** 基础 tick 间隔（毫秒），1x 速度下每 100ms 执行一次 tick */
 const TICK_MS = 100; // base tick interval at 1x
@@ -37,9 +37,11 @@ const TICK_MS = 100; // base tick interval at 1x
 export class MainScene extends Phaser.Scene {
   // ── 核心引用 ──
   /** 游戏世界状态 */
-  private world: World;
+  world: World;
+  /** 展示层状态：存储选中、悬停、预览等 UI 状态 */
+  presentation!: PresentationState;
   /** 当前激活的地图 */
-  private activeMap!: GameMap;
+  activeMap!: GameMap;
 
   // ── 子系统 ──
   /** 渲染同步器：将世界对象同步为 Phaser 精灵 */
@@ -48,31 +50,29 @@ export class MainScene extends Phaser.Scene {
   private cameraController!: CameraController;
   /** 输入处理器：处理鼠标点击和键盘快捷键 */
   private inputHandler!: InputHandler;
-  /** DOM UI 管理器：管理顶栏、工具栏、选择面板、调试面板 */
-  private domUI!: DomUIManager;
   /** 世界空间预览：建筑放置和指派预览矩形 */
   private worldPreview!: WorldPreview;
   /** 调试覆盖层：渲染区域/房间/温度等可视化 */
   private debugOverlay!: DebugOverlay;
-  /** 展示层状态：存储选中、悬停、预览等 UI 状态 */
-  private presentation!: PresentationState;
 
   // ── tick 累积器 ──
   /** 累积的帧间隔时间（毫秒），达到 TICK_MS 时消耗并执行 tick */
   private accumulator = 0;
-
+  /** Preact UI 桥接：每帧发射快照供 UI 渲染 */
+  private uiBridge: EngineSnapshotBridge | null;
   /** 上一帧的 showGrid 值，用于检测变化 */
   private prevShowGrid = false;
 
-  constructor(world: World) {
+  constructor(world: World, uiBridge?: EngineSnapshotBridge) {
     super({ key: 'MainScene' });
     this.world = world;
+    this.uiBridge = uiBridge ?? null;
   }
 
   /**
    * 场景创建回调 — 初始化所有子系统
    *
-   * 操作：获取首个地图 → 创建展示状态 → 初始化渲染/摄像机/输入/UI/调试 →
+   * 操作：获取首个地图 → 创建展示状态 → 初始化渲染/摄像机/输入/调试 →
    *       安装调试控制台 → 执行首次完整渲染
    */
   create(): void {
@@ -88,7 +88,6 @@ export class MainScene extends Phaser.Scene {
     this.renderSync = new RenderSync(this, this.world, this.activeMap);
     this.cameraController = new CameraController(this, this.activeMap);
     this.inputHandler = new InputHandler(this, this.world, this.activeMap, this.presentation);
-    this.domUI = new DomUIManager(this.world, this.activeMap, this.presentation);
     this.worldPreview = new WorldPreview(this);
     this.debugOverlay = new DebugOverlay(this, this.world, this.activeMap, this.presentation);
 
@@ -122,9 +121,11 @@ export class MainScene extends Phaser.Scene {
   update(_time: number, delta: number): void {
     // 始终更新输入和 UI（即使暂停时也需响应操作）
     this.inputHandler.update();
-    this.domUI.update();
     this.worldPreview.update(this.presentation);
     this.debugOverlay.update();
+
+    // 通知 Preact UI 桥接发射新快照
+    if (this.uiBridge) this.uiBridge.emit();
 
     // 网格线开关同步
     if (this.presentation.showGrid !== this.prevShowGrid) {

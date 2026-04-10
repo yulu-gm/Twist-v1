@@ -14,11 +14,14 @@ import { buildDefDatabase } from './defs/index';
 import { SimSpeed, TickPhase, ObjectKind } from './core/types';
 import { log } from './core/logger';
 
-// CSS 导入 — Vite 自动处理
-import './adapter/ui/ui.css';
 import { inspector } from './core/inspector';
 import { bootstrapPhaser } from './adapter/bootstrap';
 import { SystemRegistration } from './core/tick-runner';
+import { mountUiApp } from './ui/app/app-root';
+import { createEngineSnapshotBridge } from './ui/kernel/ui-bridge';
+import { createUiPorts } from './ui/kernel/ui-ports';
+import { readEngineSnapshot } from './ui/kernel/snapshot-reader';
+import type { FeedbackSnapshot } from './ui/kernel/ui-types';
 
 // 导入功能模块
 import { createPawn } from './features/pawn/pawn.factory';
@@ -41,6 +44,10 @@ import { corpseDecaySystem } from './features/corpse/corpse.system';
 import { roomRebuildSystem } from './features/room/room.system';
 import { buildingTickSystem } from './features/building/building.systems';
 import type { World } from './world/world';
+import type { PresentationState } from './presentation/presentation-state';
+import { switchTool, ToolType } from './presentation/presentation-state';
+import type { UiPorts } from './ui/kernel/ui-ports';
+import type { DesignationType, ObjectId } from './core/types';
 
 /**
  * 生成地形 — 用随机噪声为地图分配地形类型
@@ -356,6 +363,52 @@ function registerCommands(world: World): void {
  * 8. 设置检查器
  * 9. 启动 Phaser 渲染引擎
  */
+function createLazyPorts(world: World, getPresentation: () => PresentationState | undefined): UiPorts {
+  function pres(): PresentationState {
+    const p = getPresentation();
+    if (!p) throw new Error('Presentation not ready');
+    return p;
+  }
+
+  return {
+    dispatchCommand(command) {
+      world.commandQueue.push(command);
+    },
+    setSpeed(speed: number) {
+      world.commandQueue.push({ type: 'set_speed', payload: { speed } });
+    },
+    selectObjects(ids: ObjectId[]) {
+      const p = pres();
+      p.selectedObjectIds.clear();
+      for (const id of ids) p.selectedObjectIds.add(id);
+      if (ids.length > 0 && p.activeTool !== ToolType.Select) {
+        switchTool(p, ToolType.Select);
+      }
+    },
+    selectColonist(id: string) {
+      const p = pres();
+      p.selectedObjectIds.clear();
+      p.selectedObjectIds.add(id);
+      if (p.activeTool !== ToolType.Select) {
+        switchTool(p, ToolType.Select);
+      }
+    },
+    setTool(tool: string, designationType?: string | null, buildDefId?: string | null) {
+      const p = pres();
+      switchTool(p, tool as ToolType);
+      if (designationType) {
+        p.activeDesignationType = designationType as DesignationType;
+      }
+      if (buildDefId) {
+        p.activeBuildDefId = buildDefId;
+      }
+    },
+    jumpCameraTo(_cell: { x: number; y: number }) {
+      // Will be wired to Phaser camera later
+    },
+  };
+}
+
 async function boot(): Promise<void> {
   log.info('general', 'Booting Opus World...');
 
@@ -395,8 +448,50 @@ async function boot(): Promise<void> {
 
   log.info('general', `World created: ${map.objects.size} objects on ${map.width}x${map.height} map`);
 
-  // 9. 启动 Phaser 渲染引擎
-  bootstrapPhaser(world);
+  // 9. 创建事件反馈缓冲
+  const feedbackBuffer: FeedbackSnapshot = { recentEvents: [] };
+  world.eventBus.onAny((event) => {
+    feedbackBuffer.recentEvents.unshift({
+      type: event.type,
+      tick: event.tick,
+      summary: typeof event.data === 'object' ? JSON.stringify(event.data) : String(event.data),
+    });
+    if (feedbackBuffer.recentEvents.length > 40) {
+      feedbackBuffer.recentEvents.length = 40;
+    }
+  });
+
+  // 10. 创建 UI 桥接（延迟读取 — 场景创建后才有 presentation 和 activeMap）
+  let sceneRef: any = null;
+  const bridge = createEngineSnapshotBridge(() => {
+    if (!sceneRef?.presentation) {
+      // 场景尚未创建，返回空快照
+      return {
+        tick: 0, speed: 0, clockDisplay: '', colonistCount: 0,
+        presentation: { activeTool: 'select', activeDesignationType: null, activeBuildDefId: null, hoveredCell: null, selectedIds: [], showDebugPanel: false, showGrid: false },
+        selection: { primaryId: null, selectedIds: [] },
+        colonists: {}, build: { activeTool: 'select', activeDesignationType: null, activeBuildDefId: null, activeModeLabel: 'Select' },
+        feedback: feedbackBuffer, debugInfo: '',
+      };
+    }
+    return readEngineSnapshot(world, sceneRef.activeMap, sceneRef.presentation, feedbackBuffer);
+  });
+
+  // 11. 启动 Phaser 渲染引擎
+  const game = bootstrapPhaser(world, bridge);
+
+  // 获取场景引用（Phaser 创建后可用）
+  game.events.on('ready', () => {
+    sceneRef = game.scene.getScene('MainScene');
+  });
+
+  // 12. 挂载 Preact UI
+  const uiRoot = document.getElementById('ui-root');
+  if (uiRoot) {
+    // ports 需要延迟创建（presentation 在场景 create 时初始化）
+    const lazyPorts = createLazyPorts(world, () => sceneRef?.presentation);
+    mountUiApp(uiRoot, bridge, lazyPorts);
+  }
 }
 
 boot().catch(console.error);

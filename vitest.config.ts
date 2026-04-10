@@ -1,5 +1,5 @@
 import preact from '@preact/preset-vite';
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 import path from 'path';
 
 export default defineConfig({
@@ -14,11 +14,8 @@ export default defineConfig({
       '@ui': path.resolve(__dirname, 'src/ui'),
     },
   },
-  server: {
-    port: 3000,
-    open: true,
-  },
-  build: {
-    target: 'ES2020',
+  test: {
+    environment: 'jsdom',
+    setupFiles: ['./src/ui/test/setup.ts'],
   },
 });
