@@ -10,7 +10,7 @@ import { ScenarioHud } from './scenario-hud';
 
 describe('ScenarioHud', () => {
   it('并排展示 visual 与 headless 两个步骤队列', () => {
-    const { getByText } = render(
+    const { container, getByText } = render(
       h(ScenarioHud, {
         title: '砍树',
         visualSteps: [{ title: '下达砍树指令', status: 'running' }],
@@ -23,6 +23,7 @@ describe('ScenarioHud', () => {
     expect(getByText('Shadow Headless Runner')).toBeTruthy();
     expect(getByText('Scenario: 砍树')).toBeTruthy();
     expect(getByText('无分歧')).toBeTruthy();
+    expect((container.firstElementChild as HTMLElement | null)?.style.fontFamily).toContain('Microsoft YaHei UI');
   });
 
   it('有分歧时展示分歧面板', () => {

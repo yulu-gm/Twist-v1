@@ -10,6 +10,9 @@ import { h } from 'preact';
 import type { ScenarioStepStatus } from '../scenario-dsl/scenario.types';
 import type { DivergenceRecord } from './shadow-runner';
 
+const scenarioFontFamily =
+  '"Cascadia Mono", "Consolas", "Microsoft YaHei UI", "PingFang SC", "Noto Sans Mono CJK SC", monospace';
+
 /** 步骤摘要 — 用于 HUD 展示 */
 export interface StepSummary {
   /** 步骤标题 */
@@ -86,7 +89,7 @@ export function ScenarioHud(props: ScenarioHudProps) {
         height: '100vh',
         backgroundColor: 'rgba(0,0,0,0.85)',
         color: '#eee',
-        fontFamily: 'monospace',
+        fontFamily: scenarioFontFamily,
         fontSize: '12px',
         overflow: 'auto',
         zIndex: 9999,

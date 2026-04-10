@@ -21,19 +21,21 @@ const BED_CELLS = [
 let bedSleepers: string[] = [];
 let floorSleepers: string[] = [];
 let restoredSleepers: string[] = [];
+let bedOwners: string[] = [];
 
 export const sleepBedOccupancyScenario = createScenario({
   id: 'sleep-bed-occupancy',
   title: '三人两床的睡眠占床',
-  description: '验证两张空床会被两名小人占据，第三名小人会走地板睡，并且三人都能恢复 rest。',
+  description: '验证两张空床会被两名小人占据，第三名小人会走地板睡，并且床位会在选中睡眠工作时自动认领 owner。',
   report: {
-    focus: '关注 sleep job 分配、床位 occupant 占用、第三人 floor sleep，以及醒来后的床位释放。',
+    focus: '关注 sleep job 分配、床位 owner/occupant 写入、第三人 floor sleep，以及醒来后的 occupant 释放。',
   },
   setup: [
     createSetupStep('重置场景记录', () => {
       bedSleepers = [];
       floorSleepers = [];
       restoredSleepers = [];
+      bedOwners = [];
     }),
     spawnPawnFixture({ x: 8, y: 10 }, 'Sleeper-A'),
     spawnPawnFixture({ x: 8, y: 12 }, 'Sleeper-B'),
@@ -69,6 +71,20 @@ export const sleepBedOccupancyScenario = createScenario({
       timeoutTicks: 80,
       timeoutMessage: '三名小人没有按预期形成“两床一地板”的睡眠分配',
     }),
+    createWaitForStep('等待两张床都完成 owner 认领', ({ query }) => {
+      const bedA = query.findBuildingAt('bed_wood', BED_CELLS[0]) as any;
+      const bedB = query.findBuildingAt('bed_wood', BED_CELLS[1]) as any;
+      const owners = [bedA?.bed?.ownerPawnId, bedB?.bed?.ownerPawnId].filter((owner): owner is string => !!owner);
+      const uniqueOwners = new Set(owners);
+      if (uniqueOwners.size !== 2) {
+        return false;
+      }
+      bedOwners = Array.from(uniqueOwners);
+      return true;
+    }, {
+      timeoutTicks: 20,
+      timeoutMessage: '两张床没有在选中睡眠工作后完成 owner 认领',
+    }),
     createWaitForStep('等待两张床都被占据', ({ query }) => {
       const bedA = query.findBuildingAt('bed_wood', BED_CELLS[0]) as any;
       const bedB = query.findBuildingAt('bed_wood', BED_CELLS[1]) as any;
@@ -93,13 +109,13 @@ export const sleepBedOccupancyScenario = createScenario({
       timeoutTicks: 240,
       timeoutMessage: '并非所有小人都通过睡眠恢复到了有效休息度',
     }),
-    createWaitForStep('等待床位在醒来后释放', ({ query }) => {
+    createWaitForStep('等待床位在醒来后释放 occupant', ({ query }) => {
       const bedA = query.findBuildingAt('bed_wood', BED_CELLS[0]) as any;
       const bedB = query.findBuildingAt('bed_wood', BED_CELLS[1]) as any;
       return !bedA?.bed?.occupantPawnId && !bedB?.bed?.occupantPawnId;
     }, {
       timeoutTicks: 80,
-      timeoutMessage: '小人醒来后床位没有释放',
+      timeoutMessage: '小人醒来后床位 occupant 没有释放',
     }),
   ],
   expect: [
@@ -114,12 +130,15 @@ export const sleepBedOccupancyScenario = createScenario({
     }, {
       failureMessage: '至少有一名小人的休息度没有恢复到有效休息度',
     }),
+    createAssertStep('应有两张床被不同小人认领为 owner', () => bedOwners.length === 2, {
+      failureMessage: `床 owner 认领数量不正确: ${bedOwners.join(', ')}`,
+    }),
     createAssertStep('两张床最终都应为空闲状态', ({ query }) => {
       const bedA = query.findBuildingAt('bed_wood', BED_CELLS[0]) as any;
       const bedB = query.findBuildingAt('bed_wood', BED_CELLS[1]) as any;
       return !bedA?.bed?.occupantPawnId && !bedB?.bed?.occupantPawnId;
     }, {
-      failureMessage: '至少有一张床在场景结束时仍被占据',
+      failureMessage: '至少有一张床在场景结束时仍被 occupant 占据',
     }),
   ],
 });

@@ -43,7 +43,7 @@ describe('building furniture support', () => {
       mapId: map.id,
       defs,
     });
-    ownedBed.bed!.ownerPawnId = 'pawn_alice';
+    ownedBed.bed!.ownerPawnId = 'Alice';
 
     const occupiedBed = createBuilding({
       defId: 'bed_wood',
@@ -65,8 +65,8 @@ describe('building furniture support', () => {
     map.objects.add(freeBed);
 
     expect(getAllBeds(map)).toHaveLength(3);
-    expect(getBedByOwner(map, 'pawn_alice')?.id).toBe(ownedBed.id);
-    expect(isBedOwnedBy(ownedBed, 'pawn_alice')).toBe(true);
+    expect(getBedByOwner(map, 'Alice')?.id).toBe(ownedBed.id);
+    expect(isBedOwnedBy(ownedBed, 'Alice')).toBe(true);
     expect(isBedAvailable(occupiedBed)).toBe(false);
     expect(isBedAvailable(freeBed)).toBe(true);
     expect(findAvailableAutoAssignableBed(map)?.id).toBe(freeBed.id);

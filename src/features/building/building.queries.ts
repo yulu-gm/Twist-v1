@@ -34,16 +34,16 @@ export function getAllBeds(map: GameMap): Building[] {
   return getAllBuildings(map).filter(building => building.bed !== undefined);
 }
 
-export function getBedByOwner(map: GameMap, pawnId: string): Building | undefined {
-  return getAllBeds(map).find(building => building.bed?.ownerPawnId === pawnId);
+export function getBedByOwner(map: GameMap, ownerName: string): Building | undefined {
+  return getAllBeds(map).find(building => building.bed?.ownerPawnId === ownerName);
 }
 
 export function isBedAvailable(building: Building): boolean {
   return building.bed !== undefined && building.bed.occupantPawnId === undefined;
 }
 
-export function isBedOwnedBy(building: Building, pawnId: string): boolean {
-  return building.bed?.ownerPawnId === pawnId;
+export function isBedOwnedBy(building: Building, ownerName: string): boolean {
+  return building.bed?.ownerPawnId === ownerName;
 }
 
 export function findAvailableAutoAssignableBed(map: GameMap): Building | undefined {

@@ -39,6 +39,7 @@ describe('sleep behavior', () => {
 
     expect(pawn.ai.currentJob?.defId).toBe('job_sleep');
     expect(pawn.ai.currentJob?.targetId).toBe(bed.id);
+    expect(bed.bed?.ownerPawnId).toBe(pawn.name);
   });
 
   it('moves a bed sleeper onto the bed footprint while sleeping', () => {
