@@ -98,7 +98,7 @@ function processMap(world: World, map: GameMap): void {
     }
 
     if (toil.state === ToilState.Completed) {
-      advanceToil(pawn, job, world);
+      advanceToil(pawn, job, map, world);
       continue;
     }
 

@@ -8,8 +8,10 @@
 import { ObjectKind, ToilType, ToilState, JobState } from '../../core/types';
 import type { CellCoord, ObjectId, JobId } from '../../core/types';
 import type { CommandHandler, Command, ValidationResult, ExecutionResult } from '../../core/command-bus';
+import type { GameMap } from '../../world/game-map';
 import type { World } from '../../world/world';
 import type { Pawn, Job, Toil } from './pawn.types';
+import { cleanupProtocol } from '../ai/cleanup';
 
 // ── 辅助函数 ──
 
@@ -23,6 +25,19 @@ function getPawn(world: World, pawnId: ObjectId): Pawn | undefined {
   for (const [, map] of world.maps) {
     const obj = map.objects.get(pawnId);
     if (obj && obj.kind === ObjectKind.Pawn) return obj as Pawn;
+  }
+  return undefined;
+}
+
+/**
+ * 在世界中同时查找 Pawn 及其所在地图。
+ */
+function getPawnLocation(world: World, pawnId: ObjectId): { pawn: Pawn; map: GameMap } | undefined {
+  for (const [, map] of world.maps) {
+    const obj = map.objects.get(pawnId);
+    if (obj && obj.kind === ObjectKind.Pawn) {
+      return { pawn: obj as Pawn, map };
+    }
   }
   return undefined;
 }
@@ -56,16 +71,12 @@ export const draftPawnHandler: CommandHandler = {
   /** 执行：将棋子设为征召状态，中断当前工作，发出 pawn_drafted 事件 */
   execute(world: World, cmd: Command): ExecutionResult {
     const pawnId = cmd.payload.pawnId as ObjectId;
-    const pawn = getPawn(world, pawnId)!;
-    pawn.drafted = true;
-
-    // 征召时取消当前工作
+    const location = getPawnLocation(world, pawnId)!;
+    const { pawn, map } = location;
     if (pawn.ai.currentJob) {
-      pawn.ai.currentJob.state = JobState.Interrupted;
-      pawn.ai.currentJob = null;
-      pawn.ai.currentToilIndex = 0;
-      pawn.ai.toilState = {};
+      cleanupProtocol(pawn, map, world);
     }
+    pawn.drafted = true;
 
     return {
       events: [{
@@ -136,7 +147,12 @@ export const forceJobHandler: CommandHandler = {
   execute(world: World, cmd: Command): ExecutionResult {
     const pawnId = cmd.payload.pawnId as ObjectId;
     const targetCell = cmd.payload.targetCell as CellCoord;
-    const pawn = getPawn(world, pawnId)!;
+    const location = getPawnLocation(world, pawnId)!;
+    const { pawn, map } = location;
+
+    if (pawn.ai.currentJob) {
+      cleanupProtocol(pawn, map, world);
+    }
 
     /** 构建一个 GoTo 劳作步骤 */
     const gotoToil: Toil = {
@@ -156,11 +172,6 @@ export const forceJobHandler: CommandHandler = {
       reservations: [],
       state: JobState.Starting,
     };
-
-    // 替换当前工作（如有）
-    if (pawn.ai.currentJob) {
-      pawn.ai.currentJob.state = JobState.Interrupted;
-    }
 
     pawn.ai.currentJob = job;
     pawn.ai.currentToilIndex = 0;

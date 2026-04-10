@@ -43,6 +43,7 @@ import { saveCommandHandlers } from './features/save/save.commands';
 import { corpseDecaySystem } from './features/corpse/corpse.system';
 import { roomRebuildSystem } from './features/room/room.system';
 import { buildingTickSystem } from './features/building/building.systems';
+import { releaseMissingTargetReservations } from './features/reservation/reservation.cleanup';
 import type { World } from './world/world';
 import type { PresentationState } from './presentation/presentation-state';
 import { switchTool, ToolType } from './presentation/presentation-state';
@@ -214,13 +215,7 @@ function buildSystems(): SystemRegistration[] {
     frequency: 1,
     execute: (w: any) => {
       for (const [, gmap] of w.maps) {
-      // 释放已销毁对象的预约
-      for (const res of gmap.reservations.getAll()) {
-          const obj = gmap.objects.get(res.targetId);
-          if (obj && obj.destroyed) {
-            gmap.reservations.release(res.id);
-          }
-        }
+        releaseMissingTargetReservations(gmap);
       }
     },
   });
@@ -498,4 +493,6 @@ async function boot(): Promise<void> {
   }
 }
 
-boot().catch(console.error);
+if (!(import.meta as ImportMeta & { vitest?: unknown }).vitest) {
+  boot().catch(console.error);
+}

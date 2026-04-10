@@ -20,6 +20,17 @@ import { log } from '../../core/logger';
 import { Blueprint } from './blueprint.types';
 import type { ConstructionSite } from './construction-site.types';
 import { placeItemOnMap } from '../item/item.placement';
+import { cleanupProtocol } from '../ai/cleanup';
+
+function isWorkingOnConstructionTarget(
+  pawn: { ai?: { currentJob?: { targetId?: string; toils: Array<{ targetId?: string }> } | null } },
+  targetId: string,
+): boolean {
+  const job = pawn.ai?.currentJob;
+  if (!job) return false;
+  if (job.targetId === targetId) return true;
+  return job.toils.some(toil => toil.targetId === targetId);
+}
 
 // ── 放置蓝图命令 ──
 
@@ -270,29 +281,12 @@ export const cancelConstructionHandler: CommandHandler = {
       map.reservations.release(res.id);
     }
 
-    // 中断所有正在对该对象执行工作的棋子，重置其AI状态和移动路径
+    // 中断所有正在对该对象执行工作的棋子，统一走 cleanup 协议
     // Interrupt any pawns whose current job targets this object
     const pawns = map.objects.allOfKind(ObjectKind.Pawn);
     for (const pawn of pawns) {
-      if (pawn.ai?.currentJob?.targetId === targetId) {
-        // Interrupt pawn: release their reservations and reset AI
-        if (pawn.ai.currentJob.reservations) {
-          for (const resId of pawn.ai.currentJob.reservations) {
-            map.reservations.release(resId);
-          }
-        }
-        map.reservations.releaseAllByPawn(pawn.id);
-        pawn.ai.currentJob = null;
-        pawn.ai.currentToilIndex = 0;
-        pawn.ai.toilState = {};
-        pawn.movement.path = [];
-        pawn.movement.pathIndex = 0;
-
-        world.eventBuffer.push({
-          type: 'job_interrupted',
-          tick: world.tick,
-          data: { pawnId: pawn.id, reason: 'construction_cancelled' },
-        });
+      if (isWorkingOnConstructionTarget(pawn, targetId)) {
+        cleanupProtocol(pawn, map, world, 'construction_cancelled');
       }
     }
 

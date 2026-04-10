@@ -13,13 +13,14 @@ import type { World } from '../../world/world';
 
 /**
  * 推进到下一个 Toil 步骤。若所有步骤已完成则完成整个工作。
+ * 完成时需要传入 map，以便在生命周期层统一释放 reservation。
  */
-export function advanceToil(pawn: Pawn, job: Job, world: World): void {
+export function advanceToil(pawn: Pawn, job: Job, map: GameMap, world: World): void {
   job.currentToilIndex++;
   pawn.ai.currentToilIndex = job.currentToilIndex;
 
   if (job.currentToilIndex >= job.toils.length) {
-    completeJob(pawn, null, world);
+    completeJob(pawn, map, world);
   }
 }
 

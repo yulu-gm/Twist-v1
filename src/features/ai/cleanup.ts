@@ -26,11 +26,13 @@ import type { Pawn } from '../pawn/pawn.types';
  * @param pawn  - 需要清理的 Pawn
  * @param map   - Pawn 所在的地图
  * @param world - 游戏世界实例
+ * @param reason - 可选中断原因，供调用方保留上下文
  */
 export function cleanupProtocol(
   pawn: Pawn,
   map: GameMap,
   world: World,
+  reason?: string,
 ): void {
   const job = pawn.ai.currentJob;
 
@@ -100,6 +102,7 @@ export function cleanupProtocol(
     data: {
       pawnId: pawn.id,
       jobId,
+      ...(reason ? { reason } : {}),
     },
   });
 
