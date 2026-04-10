@@ -67,11 +67,12 @@ export function readEngineSnapshot(
     };
   }
 
-  // 格式化工具模式标签（如 "Select"、"Build: wall_wood"）
+  // 格式化工具模式标签（如 "Select"、"Build: wall_wood"、"Zone: stockpile"）
   const activeModeLabel = formatToolModeLabel(
     presentation.activeTool,
     presentation.activeDesignationType,
     presentation.activeBuildDefId,
+    presentation.activeZoneType,
   );
 
   // 构建调试面板的信息文本
@@ -85,6 +86,7 @@ export function readEngineSnapshot(
     presentation: {
       activeTool: presentation.activeTool,
       activeDesignationType: presentation.activeDesignationType,
+      activeZoneType: presentation.activeZoneType,
       activeBuildDefId: presentation.activeBuildDefId,
       hoveredCell: presentation.hoveredCell ? { x: presentation.hoveredCell.x, y: presentation.hoveredCell.y } : null,
       selectedIds,
@@ -99,6 +101,7 @@ export function readEngineSnapshot(
     build: {
       activeTool: presentation.activeTool,
       activeDesignationType: presentation.activeDesignationType,
+      activeZoneType: presentation.activeZoneType,
       activeBuildDefId: presentation.activeBuildDefId,
       activeModeLabel,
     },
@@ -127,18 +130,20 @@ function formatJobLabel(defId: string): string {
  * @param tool - 工具类型
  * @param desType - 指派类型（可选）
  * @param buildDefId - 建筑定义 ID（可选）
- * @returns 模式标签（如 'Select'、'Build: wall_wood'、'Mine'）
+ * @param zoneType - 区域类型（可选）
+ * @returns 模式标签（如 'Select'、'Build: wall_wood'、'Zone: stockpile'）
  */
 function formatToolModeLabel(
   tool: string,
   desType: string | null,
   buildDefId: string | null,
+  zoneType: string | null,
 ): string {
   switch (tool) {
     case 'select': return 'Select';
     case 'build': return buildDefId ? `Build: ${buildDefId}` : 'Build';
     case 'designate': return desType ? `${desType.charAt(0).toUpperCase()}${desType.slice(1)}` : 'Designate';
-    case 'zone': return 'Zone';
+    case 'zone': return zoneType ? `Zone: ${zoneType}` : 'Zone';
     case 'cancel': return 'Cancel';
     default: return tool;
   }

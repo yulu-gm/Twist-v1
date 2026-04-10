@@ -141,6 +141,22 @@
   color: #ffffff;
 }
 
+/* 次级工具按钮（如 Stockpile 子项） */
+.tool-mode-bar__btn--secondary {
+  padding: 3px 10px;
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.tool-mode-bar__btn--secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.tool-mode-bar__btn--secondary.is-active {
+  border-color: var(--accent);
+  background: none;
+}
+
 /* ── Inspector / Selection Panel ── */
 
 .inspector-panel {

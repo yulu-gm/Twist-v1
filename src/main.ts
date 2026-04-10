@@ -47,7 +47,7 @@ import type { World } from './world/world';
 import type { PresentationState } from './presentation/presentation-state';
 import { switchTool, ToolType } from './presentation/presentation-state';
 import type { UiPorts } from './ui/kernel/ui-ports';
-import type { DesignationType, ObjectId } from './core/types';
+import type { DesignationType, ObjectId, ZoneType } from './core/types';
 
 /**
  * 生成地形 — 用随机噪声为地图分配地形类型
@@ -393,7 +393,7 @@ function createLazyPorts(world: World, getPresentation: () => PresentationState 
         switchTool(p, ToolType.Select);
       }
     },
-    setTool(tool: string, designationType?: string | null, buildDefId?: string | null) {
+    setTool(tool: string, designationType?: string | null, buildDefId?: string | null, zoneType?: string | null) {
       const p = pres();
       switchTool(p, tool as ToolType);
       if (designationType) {
@@ -401,6 +401,9 @@ function createLazyPorts(world: World, getPresentation: () => PresentationState 
       }
       if (buildDefId) {
         p.activeBuildDefId = buildDefId;
+      }
+      if (zoneType) {
+        p.activeZoneType = zoneType as ZoneType;
       }
     },
     jumpCameraTo(_cell: { x: number; y: number }) {
@@ -468,9 +471,9 @@ async function boot(): Promise<void> {
       // 场景尚未创建，返回空快照
       return {
         tick: 0, speed: 0, clockDisplay: '', colonistCount: 0,
-        presentation: { activeTool: 'select', activeDesignationType: null, activeBuildDefId: null, hoveredCell: null, selectedIds: [], showDebugPanel: false, showGrid: false },
+        presentation: { activeTool: 'select', activeDesignationType: null, activeZoneType: null, activeBuildDefId: null, hoveredCell: null, selectedIds: [], showDebugPanel: false, showGrid: false },
         selection: { primaryId: null, selectedIds: [] },
-        colonists: {}, build: { activeTool: 'select', activeDesignationType: null, activeBuildDefId: null, activeModeLabel: 'Select' },
+        colonists: {}, build: { activeTool: 'select', activeDesignationType: null, activeZoneType: null, activeBuildDefId: null, activeModeLabel: 'Select' },
         feedback: feedbackBuffer, debugInfo: '',
       };
     }

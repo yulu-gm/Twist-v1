@@ -14,7 +14,7 @@
 import type { Command } from '../../core/command-bus';
 import type { PresentationState } from '../../presentation/presentation-state';
 import { switchTool, ToolType } from '../../presentation/presentation-state';
-import type { DesignationType, ObjectId } from '../../core/types';
+import type { DesignationType, ObjectId, ZoneType } from '../../core/types';
 
 /**
  * UI 端口接口 — Preact UI 层的副作用出口
@@ -31,8 +31,8 @@ export interface UiPorts {
   selectObjects(ids: ObjectId[]): void;
   /** 选中单个殖民者，自动切换到 Select 工具 */
   selectColonist(id: string): void;
-  /** 切换工具，可选附带指派类型和建筑定义 ID */
-  setTool(tool: string, designationType?: string | null, buildDefId?: string | null): void;
+  /** 切换工具，可选附带指派类型、建筑定义 ID 和区域类型 */
+  setTool(tool: string, designationType?: string | null, buildDefId?: string | null, zoneType?: string | null): void;
   /** 跳转摄像机到指定格子（待接入 Phaser 摄像机） */
   jumpCameraTo(cell: { x: number; y: number }): void;
 }
@@ -74,13 +74,16 @@ export function createUiPorts(
       }
     },
 
-    setTool(tool: string, designationType?: string | null, buildDefId?: string | null): void {
+    setTool(tool: string, designationType?: string | null, buildDefId?: string | null, zoneType?: string | null): void {
       switchTool(presentation, tool as ToolType);
       if (designationType) {
         presentation.activeDesignationType = designationType as DesignationType;
       }
       if (buildDefId) {
         presentation.activeBuildDefId = buildDefId;
+      }
+      if (zoneType) {
+        presentation.activeZoneType = zoneType as ZoneType;
       }
     },
 

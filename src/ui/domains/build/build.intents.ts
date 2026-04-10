@@ -15,7 +15,7 @@ import type { ToolActionDef } from './build.types';
  * @param action - 要激活的工具动作定义
  */
 export function activateToolAction(ports: UiPorts, action: ToolActionDef): void {
-  ports.setTool(action.tool, action.designationType ?? null, action.buildDefId ?? null);
+  ports.setTool(action.tool, action.designationType ?? null, action.buildDefId ?? null, action.zoneType ?? null);
 }
 
 /**

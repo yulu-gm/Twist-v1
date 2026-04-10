@@ -42,20 +42,23 @@ export function selectBuildModeSummary(snapshot: EngineSnapshot): BuildModeSumma
  * 选择当前激活的工具动作 ID — 用于高亮工具栏按钮
  *
  * @param snapshot - 引擎快照
- * @returns 匹配的工具动作 ID（如 'select'、'mine'），无匹配时默认 'select'
+ * @returns 匹配的工具动作 ID（如 'select'、'mine'、'stockpile'），无匹配时默认 'select'
  *
- * 匹配逻辑：遍历 toolActions，比较 tool 和 designationType，
- * designate 类工具需同时匹配指派类型才算命中
+ * 匹配逻辑：遍历 toolActions，比较 tool、designationType 和 zoneType，
+ * designate/zone 类工具需同时匹配子类型才算命中
  */
 export function selectActiveToolId(snapshot: EngineSnapshot): string {
   const tool = snapshot.presentation.activeTool;
   const desType = snapshot.presentation.activeDesignationType;
+  const zoneType = snapshot.presentation.activeZoneType;
 
   // 遍历工具动作定义，找到与当前状态匹配的动作
   for (const action of toolActions) {
     if (action.tool === tool) {
       if (action.designationType) {
         if (action.designationType === desType) return action.id;
+      } else if (action.zoneType) {
+        if (action.zoneType === zoneType) return action.id;
       } else {
         return action.id;
       }

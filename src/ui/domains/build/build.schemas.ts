@@ -26,7 +26,8 @@ export const speedButtons: readonly SpeedButtonDef[] = [
  * - 0: 选择工具
  * - 1: 建造工具
  * - 2: 指派工具（采矿/收获/砍伐）
- * - 3: 取消工具
+ * - 3: 区域工具（仓储区等）
+ * - 4: 取消工具
  */
 export const toolActions: readonly ToolActionDef[] = [
   { id: 'select', tool: 'select', label: 'Select', hotkey: 'Q', group: 0 },
@@ -34,7 +35,9 @@ export const toolActions: readonly ToolActionDef[] = [
   { id: 'mine', tool: 'designate', label: 'Mine', hotkey: 'M', designationType: 'mine', group: 2 },
   { id: 'harvest', tool: 'designate', label: 'Harvest', hotkey: 'H', designationType: 'harvest', group: 2 },
   { id: 'cut', tool: 'designate', label: 'Cut', hotkey: 'X', designationType: 'cut', group: 2 },
-  { id: 'cancel', tool: 'cancel', label: 'Cancel', hotkey: 'C', group: 3 },
+  { id: 'zone', tool: 'zone', label: 'Zone', hotkey: 'Z', zoneType: 'stockpile', group: 3 },
+  { id: 'stockpile', tool: 'zone', label: 'Stockpile', hotkey: '', zoneType: 'stockpile', group: 3 },
+  { id: 'cancel', tool: 'cancel', label: 'Cancel', hotkey: 'C', group: 4 },
 ];
 
 // ── 实用按钮 ──

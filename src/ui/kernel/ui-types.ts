@@ -47,6 +47,8 @@ export interface PresentationSnapshot {
   activeTool: string;
   /** 当前指派类型（mine/harvest/cut 等），仅 designate 工具有值 */
   activeDesignationType: string | null;
+  /** 当前区域类型（stockpile 等），仅 zone 工具有值 */
+  activeZoneType: string | null;
   /** 当前建筑定义 ID，仅 build 工具有值 */
   activeBuildDefId: string | null;
   /** 鼠标悬停的格子坐标 */
@@ -101,6 +103,8 @@ export interface BuildSnapshot {
   activeTool: string;
   /** 当前指派类型 */
   activeDesignationType: string | null;
+  /** 当前区域类型 */
+  activeZoneType: string | null;
   /** 当前建筑定义 ID */
   activeBuildDefId: string | null;
   /** 当前模式的显示标签（如 "Select"、"Build: wall_wood"） */

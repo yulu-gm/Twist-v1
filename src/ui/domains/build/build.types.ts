@@ -27,6 +27,8 @@ export interface ToolActionDef {
   designationType?: string;
   /** 建筑定义 ID（仅 build 工具需要） */
   buildDefId?: string;
+  /** 区域类型（仅 zone 工具需要） */
+  zoneType?: string;
   /** 所属分组编号（用于在工具栏中分组显示） */
   group: number;
 }

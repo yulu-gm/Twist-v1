@@ -38,16 +38,24 @@ export function ToolModeBar({ activeToolId, onActivate }: ToolModeBarProps) {
         <>
           {idx > 0 && <div class="tool-mode-bar__sep" />}
           <div class="tool-mode-bar__group" key={groupIdx}>
-            {actions.map(action => (
-              <button
-                key={action.id}
-                class={`tool-mode-bar__btn ${activeToolId === action.id ? 'is-active' : ''}`}
-                onClick={() => onActivate(action)}
-                aria-label={action.label}
-              >
-                [{action.hotkey}] {action.label}
-              </button>
-            ))}
+            {actions.map(action => {
+              const isSecondary = !action.hotkey;
+              const btnClass = [
+                'tool-mode-bar__btn',
+                isSecondary ? 'tool-mode-bar__btn--secondary' : '',
+                activeToolId === action.id ? 'is-active' : '',
+              ].filter(Boolean).join(' ');
+              return (
+                <button
+                  key={action.id}
+                  class={btnClass}
+                  onClick={() => onActivate(action)}
+                  aria-label={action.label}
+                >
+                  {action.hotkey ? `[${action.hotkey}] ` : ''}{action.label}
+                </button>
+              );
+            })}
           </div>
         </>
       ))}

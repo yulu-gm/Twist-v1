@@ -15,10 +15,10 @@ function makeSnapshot(overrides: Partial<EngineSnapshot> = {}): EngineSnapshot {
     speed: 1,
     clockDisplay: 'Year 1, Spring, Day 1, 6:00',
     colonistCount: 3,
-    presentation: { activeTool: 'select', activeDesignationType: null, activeBuildDefId: null, hoveredCell: null, selectedIds: [], showDebugPanel: false, showGrid: false },
+    presentation: { activeTool: 'select', activeDesignationType: null, activeZoneType: null, activeBuildDefId: null, hoveredCell: null, selectedIds: [], showDebugPanel: false, showGrid: false },
     selection: { primaryId: null, selectedIds: [] },
     colonists: {},
-    build: { activeTool: 'select', activeDesignationType: null, activeBuildDefId: null, activeModeLabel: 'Select' },
+    build: { activeTool: 'select', activeDesignationType: null, activeZoneType: null, activeBuildDefId: null, activeModeLabel: 'Select' },
     feedback: { recentEvents: [] },
     debugInfo: '',
     ...overrides,
@@ -38,7 +38,7 @@ describe('selectTopStatusBar', () => {
 describe('selectBuildModeSummary', () => {
   it('returns tool mode label from snapshot', () => {
     const summary = selectBuildModeSummary(makeSnapshot({
-      build: { activeTool: 'designate', activeDesignationType: 'mine', activeBuildDefId: null, activeModeLabel: 'Mine' },
+      build: { activeTool: 'designate', activeDesignationType: 'mine', activeZoneType: null, activeBuildDefId: null, activeModeLabel: 'Mine' },
     }));
     expect(summary.title).toBe('Mine');
     expect(summary.activeTool).toBe('designate');
@@ -52,13 +52,13 @@ describe('selectActiveToolId', () => {
 
   it('returns mine for designate+mine', () => {
     expect(selectActiveToolId(makeSnapshot({
-      presentation: { activeTool: 'designate', activeDesignationType: 'mine', activeBuildDefId: null, hoveredCell: null, selectedIds: [], showDebugPanel: false, showGrid: false },
+      presentation: { activeTool: 'designate', activeDesignationType: 'mine', activeZoneType: null, activeBuildDefId: null, hoveredCell: null, selectedIds: [], showDebugPanel: false, showGrid: false },
     }))).toBe('mine');
   });
 
   it('returns build for build tool', () => {
     expect(selectActiveToolId(makeSnapshot({
-      presentation: { activeTool: 'build', activeDesignationType: null, activeBuildDefId: 'wall_wood', hoveredCell: null, selectedIds: [], showDebugPanel: false, showGrid: false },
+      presentation: { activeTool: 'build', activeDesignationType: null, activeZoneType: null, activeBuildDefId: 'wall_wood', hoveredCell: null, selectedIds: [], showDebugPanel: false, showGrid: false },
     }))).toBe('build');
   });
 });
