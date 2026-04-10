@@ -19,8 +19,7 @@ import { World } from '../../world/world';
 import { log } from '../../core/logger';
 import { Blueprint } from './blueprint.types';
 import type { ConstructionSite } from './construction-site.types';
-import type { Pawn } from '../pawn/pawn.types';
-import { createItemRaw } from '../item/item.factory';
+import { placeItemOnMap } from '../item/item.placement';
 
 // ── 放置蓝图命令 ──
 
@@ -203,16 +202,31 @@ export const cancelConstructionHandler: CommandHandler = {
       const bp = obj as Blueprint;
       for (const mat of bp.materialsDelivered) {
         if (mat.count > 0) {
-          const item = createItemRaw({
-            defId: mat.defId, cell: bp.cell, mapId: mapId as string, stackCount: mat.count,
+          const result = placeItemOnMap({
+            map,
+            defs: world.defs,
+            defId: mat.defId,
+            count: mat.count,
+            preferredCell: bp.cell,
+            searchScope: 'nearest-compatible',
+            noCapacityPolicy: 'force-overflow',
           });
-          map.objects.add(item);
+          if (!result.success || result.remainingCount > 0) {
+            log.warn('construction', `Blueprint refund placement had remainder for ${mat.defId}`, {
+              placedCount: result.placedCount,
+              remainingCount: result.remainingCount,
+              usedFallback: result.usedFallback,
+              usedCells: result.usedCells,
+            });
+          }
 
-          events.push({
-            type: 'item_dropped',
-            tick: world.tick,
-            data: { itemId: item.id, defId: mat.defId, count: mat.count, cell: bp.cell },
-          });
+          if (result.placedCount > 0) {
+            events.push({
+              type: 'item_dropped',
+              tick: world.tick,
+              data: { defId: mat.defId, count: result.placedCount, cell: result.usedCells[0] ?? bp.cell },
+            });
+          }
         }
       }
     }
@@ -227,9 +241,23 @@ export const cancelConstructionHandler: CommandHandler = {
         for (const cost of buildingDef.costList) {
           const refundCount = Math.floor(cost.count * refundRatio);
           if (refundCount > 0) {
-            map.objects.add(createItemRaw({
-              defId: cost.defId, cell: site.cell, mapId: mapId as string, stackCount: refundCount,
-            }));
+            const result = placeItemOnMap({
+              map,
+              defs: world.defs,
+              defId: cost.defId,
+              count: refundCount,
+              preferredCell: site.cell,
+              searchScope: 'nearest-compatible',
+              noCapacityPolicy: 'force-overflow',
+            });
+            if (!result.success || result.remainingCount > 0) {
+              log.warn('construction', `Construction refund placement had remainder for ${cost.defId}`, {
+                placedCount: result.placedCount,
+                remainingCount: result.remainingCount,
+                usedFallback: result.usedFallback,
+                usedCells: result.usedCells,
+              });
+            }
           }
         }
       }

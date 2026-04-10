@@ -12,7 +12,7 @@
  */
 
 import {
-  ObjectKind, TickPhase, DesignationType, CellCoord, ToilType, ToilState, JobState, ZoneType, cellKey, parseKey,
+  ObjectKind, TickPhase, DesignationType, CellCoord, ToilType, ToilState, JobState, ZoneType, cellKey,
 } from '../../core/types';
 import { SystemRegistration } from '../../core/tick-runner';
 import { log } from '../../core/logger';
@@ -22,11 +22,8 @@ import type { Zone } from '../../world/zone-manager';
 import { estimateDistance } from '../pathfinding/path.service';
 import { Job, JobCandidate } from './ai.types';
 import type { Pawn } from '../pawn/pawn.types';
-import type { Designation } from '../designation/designation.types';
-import { Blueprint } from '../construction/blueprint.types';
-import { ConstructionSite } from '../construction/construction-site.types';
 import type { Item } from '../item/item.types';
-import { isCellCompatibleForItemDef } from '../item/item.queries';
+import { findNearestAcceptingCell, isCellCompatibleForItemDef } from '../item/item.queries';
 import { createMineJob } from './jobs/mine-job';
 import { createHarvestJob } from './jobs/harvest-job';
 import { createConstructJob } from './jobs/construct-job';
@@ -129,7 +126,7 @@ function processMap(world: World, map: GameMap): void {
 function gatherCandidates(
   pawn: Pawn,
   map: GameMap,
-  _world: World,
+  world: World,
 ): JobCandidate[] {
   const candidates: JobCandidate[] = [];
 
@@ -187,7 +184,7 @@ function gatherCandidates(
 
       // 寻找距离最近的同类型物品
       const items = map.objects.allOfKind(ObjectKind.Item);
-      let bestItem: any = null;
+      let bestItem: Item | null = null;
       let bestItemDist = Infinity;
 
       for (const item of items) {
@@ -232,7 +229,7 @@ function gatherCandidates(
   }
 
   // ── 5. 检查散落物品的存储区搬运 ──
-  const stockpileCandidate = createStockpileHaulCandidate(pawn, map);
+  const stockpileCandidate = createStockpileHaulCandidate(pawn, map, world);
   if (stockpileCandidate) {
     candidates.push(stockpileCandidate);
   }
@@ -246,11 +243,12 @@ function gatherCandidates(
  * 规则：
  * - 只处理带 haulable 标签的物品
  * - 已位于兼容存储区内的物品不再生成候选
- * - 仅把物品送往 stockpile 区域中最近、可站立的格子
+ * - 仅把物品送往 stockpile 区域中“当前可接受且有容量”的格子
  */
 function createStockpileHaulCandidate(
   pawn: Pawn,
   map: GameMap,
+  world: World,
 ): JobCandidate | null {
   const items = map.objects.allOfKind(ObjectKind.Item) as Item[];
   let bestItem: Item | null = null;
@@ -263,7 +261,9 @@ function createStockpileHaulCandidate(
     if (map.reservations.isReserved(item.id)) continue;
     if (isItemInCompatibleStockpile(map, item)) continue;
 
-    const dest = findBestStockpileDropCell(map, item);
+    const dest = findNearestAcceptingCell(map, world.defs, item.cell, item.defId, 'stockpile-only', {
+      selectionPreference: 'prefer-existing-stacks',
+    });
     if (!dest) continue;
 
     const itemDist = estimateDistance(pawn.cell, item.cell);
@@ -292,35 +292,6 @@ function isItemInCompatibleStockpile(map: GameMap, item: Item): boolean {
     && isCellCompatibleForItemDef(map, item.cell, item.defId);
 }
 
-/**
- * 为物品寻找最近可用的 stockpile 落点。
- * 首版 stockpile 规则非常宽松：只要是 stockpile 区域、格子可通行且不被阻碍对象占据即可。
- */
-function findBestStockpileDropCell(map: GameMap, item: Item): CellCoord | null {
-  let bestCell: CellCoord | null = null;
-  let bestDist = Infinity;
-
-  for (const zone of map.zones.getAll()) {
-    if (zone.zoneType !== ZoneType.Stockpile) continue;
-    if (!isItemAcceptedByStockpile(zone, item)) continue;
-
-    for (const key of zone.cells) {
-      const cell = parseKey(key);
-      if (!map.pathGrid.isPassable(cell.x, cell.y)) continue;
-      if (!map.spatial.isPassable(cell)) continue;
-      if (!isCellCompatibleForItemDef(map, cell, item.defId)) continue;
-
-      const dist = estimateDistance(item.cell, cell);
-      if (dist < bestDist) {
-        bestDist = dist;
-        bestCell = cell;
-      }
-    }
-  }
-
-  return bestCell;
-}
-
 function isItemAcceptedByStockpile(zone: Zone, item: Item): boolean {
   const stockpile = zone.config.stockpile;
   if (!stockpile) return true;
@@ -341,8 +312,8 @@ function findFoodJob(
   pawn: Pawn,
   map: GameMap,
 ): JobCandidate | null {
-  const items = map.objects.allWithTag('food');
-  let bestItem: any = null;
+  const items = map.objects.allWithTag('food') as Item[];
+  let bestItem: Item | null = null;
   let bestDist = Infinity;
 
   for (const item of items) {

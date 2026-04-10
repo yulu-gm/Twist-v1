@@ -6,7 +6,7 @@
 
 import { ObjectKind, ToilState } from '../../../core/types';
 import { log } from '../../../core/logger';
-import { createItemRaw } from '../../item/item.factory';
+import { placeItemOnMap } from '../../item/item.placement';
 import type { Designation } from '../../designation/designation.types';
 import type { ToilHandler } from './toil-handler.types';
 
@@ -48,11 +48,23 @@ export const executeWork: ToilHandler = ({ pawn, toil, map, world }) => {
               map.pathGrid.setPassable(tc.x, tc.y, true);
 
               if (terrainDef.mineYield) {
-                map.objects.add(createItemRaw({
+                const result = placeItemOnMap({
+                  map,
+                  defs: world.defs,
                   defId: terrainDef.mineYield.defId,
-                  cell: tc, mapId: map.id,
-                  stackCount: terrainDef.mineYield.count,
-                }));
+                  count: terrainDef.mineYield.count,
+                  preferredCell: tc,
+                  searchScope: 'nearest-compatible',
+                  noCapacityPolicy: 'force-overflow',
+                });
+                if (!result.success || result.remainingCount > 0) {
+                  log.warn('ai', `Mine yield placement had remainder at (${tc.x},${tc.y})`, {
+                    placedCount: result.placedCount,
+                    remainingCount: result.remainingCount,
+                    usedFallback: result.usedFallback,
+                    usedCells: result.usedCells,
+                  }, pawn.id);
+                }
               }
             }
           }
@@ -63,11 +75,23 @@ export const executeWork: ToilHandler = ({ pawn, toil, map, world }) => {
             if (plant && plant.kind === ObjectKind.Plant) {
               const plantDef = world.defs.plants.get(plant.defId);
               if (plantDef?.harvestYield) {
-                map.objects.add(createItemRaw({
+                const result = placeItemOnMap({
+                  map,
+                  defs: world.defs,
                   defId: plantDef.harvestYield.defId,
-                  cell: plant.cell, mapId: map.id,
-                  stackCount: plantDef.harvestYield.count,
-                }));
+                  count: plantDef.harvestYield.count,
+                  preferredCell: plant.cell,
+                  searchScope: 'nearest-compatible',
+                  noCapacityPolicy: 'force-overflow',
+                });
+                if (!result.success || result.remainingCount > 0) {
+                  log.warn('ai', `Harvest yield placement had remainder at (${plant.cell.x},${plant.cell.y})`, {
+                    placedCount: result.placedCount,
+                    remainingCount: result.remainingCount,
+                    usedFallback: result.usedFallback,
+                    usedCells: result.usedCells,
+                  }, pawn.id);
+                }
               }
               plant.destroyed = true;
             }

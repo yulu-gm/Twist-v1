@@ -7,14 +7,10 @@
  * @part-of AI 子系统（features/ai）
  */
 
-import {
-  CellCoord, ObjectId, ObjectKind, ZoneType, cellKey,
-} from '../../core/types';
 import { log } from '../../core/logger';
 import { GameMap } from '../../world/game-map';
 import { World } from '../../world/world';
-import { createItemRaw } from '../item/item.factory';
-import { isCellCompatibleForItemDef } from '../item/item.queries';
+import { placeItemOnMap } from '../item/item.placement';
 import type { Pawn } from '../pawn/pawn.types';
 
 /**
@@ -49,9 +45,6 @@ export function cleanupProtocol(
 
   // 步骤2：若正在携带物品，丢弃到当前格子
   if (pawn.inventory.carrying) {
-    const carriedId = pawn.inventory.carrying;
-    pawn.inventory.carrying = null;
-
     // 尝试从当前工作的 Toil localData 中恢复物品信息
     let defId = 'unknown';
     let count = 1;
@@ -70,14 +63,33 @@ export function cleanupProtocol(
       }
     }
 
-    // 在地面重新创建物品对象
-    const dropCell = findSafeDropCell(map, pawn.cell, defId) ?? pawn.cell;
-    const droppedItem = createItemRaw({
-      defId, cell: dropCell, mapId: map.id, stackCount: count,
+    const result = placeItemOnMap({
+      map,
+      defs: world.defs,
+      defId,
+      count,
+      preferredCell: pawn.cell,
+      searchScope: 'nearest-compatible',
+      noCapacityPolicy: 'force-overflow',
     });
-    map.objects.add(droppedItem);
 
-    log.debug('ai', `Pawn ${pawn.id} dropped ${defId} x${count} during cleanup`, undefined, pawn.id);
+    if (!result.success || result.remainingCount > 0) {
+      log.warn('ai', `Cleanup drop for pawn ${pawn.id} had remainder for ${defId}`, {
+        placedCount: result.placedCount,
+        remainingCount: result.remainingCount,
+        usedFallback: result.usedFallback,
+        usedCells: result.usedCells,
+      }, pawn.id);
+    }
+
+    pawn.inventory.carrying = null;
+    const actualCell = result.usedCells[0] ?? pawn.cell;
+    log.debug(
+      'ai',
+      `Pawn ${pawn.id} dropped ${defId} x${count} during cleanup at (${actualCell.x},${actualCell.y}) (fallback=${result.usedFallback})`,
+      undefined,
+      pawn.id,
+    );
   }
 
   // 步骤3：重置 Pawn 的 AI 状态
@@ -102,42 +114,4 @@ export function cleanupProtocol(
   });
 
   log.info('ai', `Cleanup protocol executed for pawn ${pawn.id}, job ${jobId}`, undefined, pawn.id);
-}
-
-function findSafeDropCell(map: GameMap, origin: CellCoord, defId: string): CellCoord | null {
-  if (canDropItemAt(map, origin, defId)) {
-    return origin;
-  }
-
-  let bestCell: CellCoord | null = null;
-  let bestDistance = Infinity;
-
-  for (let y = 0; y < map.height; y++) {
-    for (let x = 0; x < map.width; x++) {
-      const cell = { x, y };
-      if (!canDropItemAt(map, cell, defId)) continue;
-
-      const distance = Math.abs(origin.x - x) + Math.abs(origin.y - y);
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        bestCell = cell;
-      }
-    }
-  }
-
-  return bestCell;
-}
-
-function canDropItemAt(map: GameMap, cell: CellCoord, defId: string): boolean {
-  if (!map.pathGrid.isPassable(cell.x, cell.y)) return false;
-  if (!map.spatial.isPassable(cell)) return false;
-  if (!isCellCompatibleForItemDef(map, cell, defId)) return false;
-
-  const zone = map.zones.getZoneAt(cellKey(cell));
-  if (!zone || zone.zoneType !== ZoneType.Stockpile) return true;
-
-  const stockpile = zone.config.stockpile;
-  if (!stockpile) return true;
-  if (stockpile.allowAllHaulable) return true;
-  return stockpile.allowedDefIds.has(defId);
 }

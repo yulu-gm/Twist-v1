@@ -55,6 +55,7 @@ export function createItem(params: {
  * @param params.stackCount - 堆叠数量
  * @param params.tags - 标签集合（默认 haulable + resource）
  * @param params.maxStack - 最大堆叠数（默认 100）
+ * @param params.defs - 可选定义数据库；提供后会优先使用 defs 中的 maxStack 和 tags
  * @returns 完整初始化的物品对象
  */
 export function createItemRaw(params: {
@@ -64,16 +65,18 @@ export function createItemRaw(params: {
   stackCount: number;
   tags?: Set<Tag>;
   maxStack?: number;
+  defs?: DefDatabase;
 }): Item {
+  const def = params.defs?.items.get(params.defId);
   return {
     id: nextObjectId(),
     kind: ObjectKind.Item,
     defId: params.defId,
     mapId: params.mapId,
     cell: { x: params.cell.x, y: params.cell.y },
-    tags: params.tags ?? new Set(['haulable', 'resource']),
+    tags: params.tags ?? (def ? new Set(def.tags) : new Set(['haulable', 'resource'])),
     destroyed: false,
     stackCount: params.stackCount,
-    maxStack: params.maxStack ?? 100,
+    maxStack: params.maxStack ?? def?.maxStack ?? 100,
   };
 }
