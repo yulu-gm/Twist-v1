@@ -44,8 +44,8 @@ describe('selectColonistRosterRows', () => {
     const rows = selectColonistRosterRows(
       makeSnapshot({
         colonists: {
-          b: { id: 'b', name: 'Bob', cell: { x: 0, y: 0 }, factionId: '', currentJob: 'idle', currentJobLabel: 'Idle', needs: { food: 50, rest: 50, joy: 50, mood: 50 }, health: { hp: 100, maxHp: 100 } },
-          a: { id: 'a', name: 'Alice', cell: { x: 0, y: 0 }, factionId: '', currentJob: 'idle', currentJobLabel: 'Idle', needs: { food: 50, rest: 50, joy: 50, mood: 80 }, health: { hp: 100, maxHp: 100 } },
+          b: { id: 'b', name: 'Bob', cell: { x: 0, y: 0 }, factionId: '', currentJob: 'idle', currentJobLabel: 'Idle', needs: { food: 50, rest: 50, joy: 50, mood: 50 }, health: { hp: 100, maxHp: 100 }, workDecision: null },
+          a: { id: 'a', name: 'Alice', cell: { x: 0, y: 0 }, factionId: '', currentJob: 'idle', currentJobLabel: 'Idle', needs: { food: 50, rest: 50, joy: 50, mood: 80 }, health: { hp: 100, maxHp: 100 }, workDecision: null },
         },
       }),
       makeUiState(),
@@ -57,8 +57,8 @@ describe('selectColonistRosterRows', () => {
     const rows = selectColonistRosterRows(
       makeSnapshot({
         colonists: {
-          a: { id: 'a', name: 'Alice', cell: { x: 0, y: 0 }, factionId: '', currentJob: 'idle', currentJobLabel: 'Idle', needs: { food: 50, rest: 50, joy: 50, mood: 74 }, health: { hp: 100, maxHp: 100 } },
-          b: { id: 'b', name: 'Bob', cell: { x: 0, y: 0 }, factionId: '', currentJob: 'job_mine', currentJobLabel: 'Mine', needs: { food: 50, rest: 50, joy: 50, mood: 21 }, health: { hp: 100, maxHp: 100 } },
+          a: { id: 'a', name: 'Alice', cell: { x: 0, y: 0 }, factionId: '', currentJob: 'idle', currentJobLabel: 'Idle', needs: { food: 50, rest: 50, joy: 50, mood: 74 }, health: { hp: 100, maxHp: 100 }, workDecision: null },
+          b: { id: 'b', name: 'Bob', cell: { x: 0, y: 0 }, factionId: '', currentJob: 'job_mine', currentJobLabel: 'Mine', needs: { food: 50, rest: 50, joy: 50, mood: 21 }, health: { hp: 100, maxHp: 100 }, workDecision: null },
         },
       }),
       makeUiState({ colonistSort: 'mood' }),
@@ -70,8 +70,8 @@ describe('selectColonistRosterRows', () => {
     const rows = selectColonistRosterRows(
       makeSnapshot({
         colonists: {
-          a: { id: 'a', name: 'Alice', cell: { x: 0, y: 0 }, factionId: '', currentJob: 'idle', currentJobLabel: 'Idle', needs: { food: 50, rest: 50, joy: 50, mood: 50 }, health: { hp: 100, maxHp: 100 } },
-          b: { id: 'b', name: 'Bob', cell: { x: 0, y: 0 }, factionId: '', currentJob: 'idle', currentJobLabel: 'Idle', needs: { food: 50, rest: 50, joy: 50, mood: 50 }, health: { hp: 100, maxHp: 100 } },
+          a: { id: 'a', name: 'Alice', cell: { x: 0, y: 0 }, factionId: '', currentJob: 'idle', currentJobLabel: 'Idle', needs: { food: 50, rest: 50, joy: 50, mood: 50 }, health: { hp: 100, maxHp: 100 }, workDecision: null },
+          b: { id: 'b', name: 'Bob', cell: { x: 0, y: 0 }, factionId: '', currentJob: 'idle', currentJobLabel: 'Idle', needs: { food: 50, rest: 50, joy: 50, mood: 50 }, health: { hp: 100, maxHp: 100 }, workDecision: null },
         },
       }),
       makeUiState({ colonistSearch: 'ali' }),
@@ -84,7 +84,7 @@ describe('selectColonistRosterRows', () => {
     const rows = selectColonistRosterRows(
       makeSnapshot({
         colonists: {
-          a: { id: 'a', name: 'Alice', cell: { x: 0, y: 0 }, factionId: '', currentJob: 'idle', currentJobLabel: 'Idle', needs: { food: 50, rest: 50, joy: 50, mood: 50 }, health: { hp: 100, maxHp: 100 } },
+          a: { id: 'a', name: 'Alice', cell: { x: 0, y: 0 }, factionId: '', currentJob: 'idle', currentJobLabel: 'Idle', needs: { food: 50, rest: 50, joy: 50, mood: 50 }, health: { hp: 100, maxHp: 100 }, workDecision: null },
         },
         selection: { primaryId: 'a', selectedIds: ['a'] },
       }),

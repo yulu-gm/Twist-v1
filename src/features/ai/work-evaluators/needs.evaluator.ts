@@ -31,7 +31,7 @@ export const eatWorkEvaluator: WorkEvaluator = {
   label: 'Eat',
   priority: 100,
   evaluate(pawn: Pawn, map: GameMap, world: World): WorkEvaluation {
-    const blocked = (code: 'need_not_triggered' | 'no_target', text: string): WorkEvaluation => ({
+    const blocked = (code: 'need_not_triggered' | 'no_target' | 'target_reserved', text: string): WorkEvaluation => ({
       kind: 'eat',
       label: 'Eat',
       priority: 100,
