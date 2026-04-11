@@ -73,6 +73,20 @@ export function readEngineSnapshot(
         hp: pawn.health?.hp ?? 100,
         maxHp: pawn.health?.maxHp ?? 100,
       },
+      workDecision: pawn.ai.workDecision ? {
+        evaluatedAtTick: pawn.ai.workDecision.evaluatedAtTick,
+        selectedWorkKind: pawn.ai.workDecision.selectedWorkKind,
+        selectedWorkLabel: pawn.ai.workDecision.selectedWorkLabel,
+        activeToilLabel: pawn.ai.workDecision.activeToilLabel,
+        activeToilState: pawn.ai.workDecision.activeToilState,
+        options: pawn.ai.workDecision.options.map(option => ({
+          kind: option.kind,
+          label: option.label,
+          status: option.status === 'available' ? 'deferred' as const : option.status as 'active' | 'blocked' | 'deferred',
+          detail: option.detail,
+          failureReasonText: option.failureReasonText,
+        })),
+      } : null,
     };
   }
 

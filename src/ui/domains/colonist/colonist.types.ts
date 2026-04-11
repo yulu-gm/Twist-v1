@@ -38,6 +38,18 @@ export interface NeedViewModel {
 }
 
 /**
+ * 工作队列行视图模型 — inspector 中单行工作状态的渲染数据
+ */
+export interface WorkQueueRowViewModel {
+  /** 工作类别显示标签 */
+  label: string;
+  /** 行状态样式：active（绿色）/ blocked（灰色+原因）/ deferred（浅灰色） */
+  tone: 'active' | 'blocked' | 'deferred';
+  /** 次级文本：active 显示 toil 标签和状态，blocked 显示失败原因，deferred 为 null */
+  detail: string | null;
+}
+
+/**
  * 殖民者检查器视图模型 — 选中单个殖民者时的详情面板数据
  */
 export interface ColonistInspectorViewModel {
@@ -55,4 +67,6 @@ export interface ColonistInspectorViewModel {
   health: { hp: number; maxHp: number };
   /** 需求条列表 */
   needs: NeedViewModel[];
+  /** 工作队列行列表（来自冻结决策快照） */
+  workQueue: WorkQueueRowViewModel[];
 }

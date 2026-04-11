@@ -103,7 +103,7 @@ describe('selectColonistInspector', () => {
     const vm = selectColonistInspector(
       makeSnapshot({
         colonists: {
-          a: { id: 'a', name: 'Alice', cell: { x: 5, y: 10 }, factionId: 'player', currentJob: 'job_construct', currentJobLabel: 'Construct', needs: { food: 62, rest: 41, joy: 80, mood: 55 }, health: { hp: 80, maxHp: 100 } },
+          a: { id: 'a', name: 'Alice', cell: { x: 5, y: 10 }, factionId: 'player', currentJob: 'job_construct', currentJobLabel: 'Construct', needs: { food: 62, rest: 41, joy: 80, mood: 55 }, health: { hp: 80, maxHp: 100 }, workDecision: null },
         },
         selection: { primaryId: 'a', selectedIds: ['a'] },
       }),
@@ -115,5 +115,45 @@ describe('selectColonistInspector', () => {
     expect(vm!.needs).toHaveLength(4);
     expect(vm!.needs[0].key).toBe('food');
     expect(vm!.needs[0].value).toBe(62);
+    expect(vm!.workQueue).toEqual([]);
+  });
+
+  it('builds work queue rows for the colonist inspector', () => {
+    const vm = selectColonistInspector(
+      makeSnapshot({
+        colonists: {
+          a: {
+            id: 'a',
+            name: 'Alice',
+            cell: { x: 5, y: 10 },
+            factionId: 'player',
+            currentJob: 'job_eat',
+            currentJobLabel: 'Eat',
+            needs: { food: 20, rest: 80, joy: 80, mood: 60 },
+            health: { hp: 80, maxHp: 100 },
+            workDecision: {
+              evaluatedAtTick: 12,
+              selectedWorkKind: 'eat',
+              selectedWorkLabel: 'Eat',
+              activeToilLabel: 'pickup',
+              activeToilState: 'not_started',
+              options: [
+                { kind: 'eat', label: 'Eat', status: 'active', detail: 'meal_simple', failureReasonText: null },
+                { kind: 'construct', label: 'Construct', status: 'blocked', detail: null, failureReasonText: 'Materials not delivered' },
+                { kind: 'haul_to_stockpile', label: 'Haul To Stockpile', status: 'deferred', detail: null, failureReasonText: null },
+              ],
+            },
+          },
+        },
+        selection: { primaryId: 'a', selectedIds: ['a'] },
+      }),
+      makeUiState(),
+    );
+
+    expect(vm?.workQueue).toEqual([
+      { label: 'Eat', tone: 'active', detail: 'pickup (not_started)' },
+      { label: 'Construct', tone: 'blocked', detail: 'Materials not delivered' },
+      { label: 'Haul To Stockpile', tone: 'deferred', detail: null },
+    ]);
   });
 });

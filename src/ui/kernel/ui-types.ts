@@ -72,6 +72,40 @@ export interface SelectionSnapshot {
 }
 
 /**
+ * 殖民者工作决策选项节点 — 单个工作类别在快照中的展示数据
+ */
+export interface ColonistWorkDecisionOptionNode {
+  /** 工作类别标识 */
+  kind: string;
+  /** 工作类别显示名 */
+  label: string;
+  /** 决策状态：active / blocked / deferred */
+  status: 'active' | 'blocked' | 'deferred';
+  /** 可选的简短上下文 */
+  detail: string | null;
+  /** blocked 原因文案 */
+  failureReasonText: string | null;
+}
+
+/**
+ * 殖民者工作决策节点 — 最近一次选工过程的冻结快照
+ */
+export interface ColonistWorkDecisionNode {
+  /** 快照产生时的 tick */
+  evaluatedAtTick: number;
+  /** 被选中的工作类别 kind */
+  selectedWorkKind: string | null;
+  /** 被选中的工作类别显示名 */
+  selectedWorkLabel: string | null;
+  /** 当前活跃 toil 的标签 */
+  activeToilLabel: string | null;
+  /** 当前活跃 toil 的状态 */
+  activeToilState: string | null;
+  /** 按优先级排序的全部工作选项 */
+  options: ColonistWorkDecisionOptionNode[];
+}
+
+/**
  * 殖民者节点 — 单个殖民者在快照中的完整数据
  *
  * 从 Pawn 游戏对象中提取的纯数据，用于 UI 渲染
@@ -93,6 +127,8 @@ export interface ColonistNode {
   needs: { food: number; rest: number; joy: number; mood: number };
   /** 生命值 */
   health: { hp: number; maxHp: number };
+  /** 工作决策快照（null 表示尚未产生决策） */
+  workDecision: ColonistWorkDecisionNode | null;
 }
 
 /** 建筑快照节点 — UI 展示所需的建筑序列化数据 */

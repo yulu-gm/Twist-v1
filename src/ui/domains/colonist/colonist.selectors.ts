@@ -8,7 +8,7 @@
  */
 
 import type { EngineSnapshot, UiState, ColonistNode } from '../../kernel/ui-types';
-import type { ColonistRosterRow, ColonistInspectorViewModel, NeedViewModel } from './colonist.types';
+import type { ColonistRosterRow, ColonistInspectorViewModel, NeedViewModel, WorkQueueRowViewModel } from './colonist.types';
 import { needDefs } from './colonist.schemas';
 
 /**
@@ -77,7 +77,7 @@ export function selectColonistInspector(
  * 从殖民者节点数据构建检查器视图模型
  *
  * @param c - 殖民者节点（来自快照）
- * @returns 包含需求条列表的完整检查器视图模型
+ * @returns 包含需求条列表和工作队列的完整检查器视图模型
  */
 function buildInspectorViewModel(c: ColonistNode): ColonistInspectorViewModel {
   const needs: NeedViewModel[] = needDefs.map(def => ({
@@ -95,5 +95,28 @@ function buildInspectorViewModel(c: ColonistNode): ColonistInspectorViewModel {
     jobLabel: c.currentJobLabel,
     health: c.health,
     needs,
+    workQueue: buildWorkQueue(c),
   };
+}
+
+/**
+ * 从殖民者节点的工作决策快照构建工作队列行
+ *
+ * @param c - 殖民者节点（来自快照）
+ * @returns 工作队列行列表，无快照时返回空数组
+ */
+function buildWorkQueue(c: ColonistNode): WorkQueueRowViewModel[] {
+  if (!c.workDecision) return [];
+
+  return c.workDecision.options.map(option => {
+    if (option.status === 'active') {
+      const toilLabel = c.workDecision?.activeToilLabel ?? 'unknown';
+      const toilState = c.workDecision?.activeToilState ?? 'unknown';
+      return { label: option.label, tone: 'active' as const, detail: `${toilLabel} (${toilState})` };
+    }
+    if (option.status === 'blocked') {
+      return { label: option.label, tone: 'blocked' as const, detail: option.failureReasonText };
+    }
+    return { label: option.label, tone: 'deferred' as const, detail: null };
+  });
 }
