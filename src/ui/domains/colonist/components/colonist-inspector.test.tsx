@@ -1,6 +1,6 @@
 /**
  * @file colonist-inspector.test.tsx
- * @description 殖民者检查器组件测试 — 验证名称、任务、需求条和生命值的渲染
+ * @description 殖民者检查器组件测试 — 验证名称、任务、需求条、生命值和工作队列的渲染
  * @part-of ui/domains/colonist — 殖民者 UI 领域
  */
 
@@ -24,6 +24,7 @@ function makeViewModel(overrides: Partial<ColonistInspectorViewModel> = {}): Col
       { key: 'food', label: 'Food', value: 62, color: '#cc8844' },
       { key: 'rest', label: 'Rest', value: 41, color: '#4488cc' },
     ],
+    workQueue: [],
     ...overrides,
   };
 }
@@ -48,5 +49,27 @@ describe('ColonistInspector', () => {
   it('renders health info', () => {
     render(<ColonistInspector viewModel={makeViewModel()} />);
     expect(screen.getByText('80/100')).toBeInTheDocument();
+  });
+});
+
+describe('ColonistInspector work queue', () => {
+  it('renders active, blocked, and deferred work rows', () => {
+    render(<ColonistInspector viewModel={makeViewModel({
+      workQueue: [
+        { label: 'Eat', tone: 'active', detail: 'pickup (not_started)' },
+        { label: 'Construct', tone: 'blocked', detail: 'Materials not delivered' },
+        { label: 'Haul To Stockpile', tone: 'deferred', detail: null },
+      ],
+    })} />);
+
+    expect(screen.getByText('Work Queue')).toBeInTheDocument();
+    expect(screen.getByText('pickup (not_started)')).toBeInTheDocument();
+    expect(screen.getByText('Materials not delivered')).toBeInTheDocument();
+    expect(screen.getByText('Haul To Stockpile')).toBeInTheDocument();
+  });
+
+  it('renders an empty state when no decision snapshot is available', () => {
+    render(<ColonistInspector viewModel={makeViewModel({ workQueue: [] })} />);
+    expect(screen.getByText('No decision snapshot yet')).toBeInTheDocument();
   });
 });

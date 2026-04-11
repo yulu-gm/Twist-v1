@@ -18,11 +18,12 @@ interface ColonistInspectorProps {
 }
 
 /**
- * 殖民者详情检查器 — 显示选中殖民者的属性和需求
+ * 殖民者详情检查器 — 显示选中殖民者的属性、需求和工作队列
  *
- * 分为两个区段：
+ * 分为三个区段：
  * - Info：位置、任务、阵营、生命值
  * - Needs：食物、休息、娱乐、心情的进度条
+ * - Work Queue：按优先级排列的工作决策状态（active/blocked/deferred）
  */
 export function ColonistInspector({ viewModel }: ColonistInspectorProps) {
   return (
@@ -45,6 +46,21 @@ export function ColonistInspector({ viewModel }: ColonistInspectorProps) {
               color={need.color}
             />
           ))}
+        </Section>
+
+        <Section title="Work Queue">
+          {viewModel.workQueue.length === 0 ? (
+            <div class="colonist-work-queue__empty">No decision snapshot yet</div>
+          ) : (
+            <ul class="colonist-work-queue">
+              {viewModel.workQueue.map((row) => (
+                <li key={`${row.label}-${row.tone}`} class={`colonist-work-queue__row is-${row.tone}`}>
+                  <div class="colonist-work-queue__label">{row.label}</div>
+                  {row.detail && <div class="colonist-work-queue__detail">{row.detail}</div>}
+                </li>
+              ))}
+            </ul>
+          )}
         </Section>
       </div>
     </div>
