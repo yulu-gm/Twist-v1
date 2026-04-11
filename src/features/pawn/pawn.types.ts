@@ -21,6 +21,7 @@ import type {
   JobState,
   JobId,
 } from '../../core/types';
+import type { PawnWorkDecisionSnapshot } from '../ai/work-types';
 
 // ── 手持物品（地图外的临时堆） ──
 export interface CarriedItemStack {
@@ -197,6 +198,8 @@ export interface Pawn extends MapObjectBase {
     toilState: Record<string, unknown>;
     /** 空闲 tick 计数（用于 AI 决策间隔） */
     idleTicks: number;
+    /** 工作决策快照 — 最近一次选工过程的冻结说明 */
+    workDecision: PawnWorkDecisionSnapshot | null;
   };
 
   // ── 日程安排 ──

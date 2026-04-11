@@ -132,6 +132,7 @@ export function createPawn(params: {
       currentToilIndex: 0,
       toilState: {},
       idleTicks: 0,
+      workDecision: null,
     },
 
     schedule: {
