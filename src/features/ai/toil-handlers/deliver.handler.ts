@@ -64,14 +64,19 @@ export const executeDeliver: ToilHandler = ({ pawn, toil, map, world }) => {
     }
   }
 
+  const blueprint = toil.targetId
+    ? map.objects.getAs(toil.targetId, ObjectKind.Blueprint)
+    : null;
+
   let fallbackResult = null;
-  if (remainingCarried > 0) {
+  if (remainingCarried > 0 && !blueprint) {
     fallbackResult = placeItemOnMap({
       map,
       defs: world.defs,
       defId,
       count: remainingCarried,
       preferredCell: pawn.cell,
+      excludedCells: blueprint ? getBlueprintFootprintCells(blueprint) : undefined,
       searchScope: 'nearest-compatible',
       noCapacityPolicy: 'force-overflow',
     });
@@ -97,15 +102,14 @@ export const executeDeliver: ToilHandler = ({ pawn, toil, map, world }) => {
   if (!toil.targetId) {
     log.warn('ai', `Pawn ${pawn.id} deliver toil missing blueprint target, grounded carried items instead`, undefined, pawn.id);
   } else if (deliveredCount === 0) {
-    log.warn('ai', `Pawn ${pawn.id} could not deliver ${defId} to blueprint ${toil.targetId}, grounded carried items instead`, undefined, pawn.id);
+    log.warn('ai', `Pawn ${pawn.id} could not deliver ${defId} to blueprint ${toil.targetId}, retained carried items instead`, undefined, pawn.id);
   } else {
-    const blueprint = map.objects.getAs(toil.targetId, ObjectKind.Blueprint);
     if (blueprint && areBlueprintMaterialsDelivered(blueprint)) {
       tryPromoteBlueprintToConstructionSite(world, map, blueprint.id, { ignoreIds: [pawn.id] });
     }
   }
 
-  if (remainingCarried > 0) {
+  if (remainingCarried > 0 && !blueprint) {
     toil.state = ToilState.Failed;
     return;
   }

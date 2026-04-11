@@ -105,6 +105,12 @@ export function createScenarioQueryApi(
       }) ?? null;
     },
 
+    findConstructionSiteAt(targetDefId, cell) {
+      return harness.map.objects.allOfKind(ObjectKind.ConstructionSite).find((site: any) => {
+        return site.targetDefId === targetDefId && site.cell.x === cell.x && site.cell.y === cell.y;
+      }) ?? null;
+    },
+
     findBlueprintsByTargetDef(defId) {
       return harness.map.objects.allOfKind(ObjectKind.Blueprint).filter(
         (blueprint: any) => blueprint.targetDefId === defId,

@@ -32,6 +32,7 @@ import { createMineJob } from './jobs/mine-job';
 import { createHarvestJob } from './jobs/harvest-job';
 import { createConstructJob } from './jobs/construct-job';
 import { createHaulJob } from './jobs/haul-job';
+import { createCarryJob } from './jobs/carry-job';
 import { createEatJob } from './jobs/eat-job';
 import { createSleepJob } from './jobs/sleep-job';
 import {
@@ -99,6 +100,8 @@ function processMap(world: World, map: GameMap): void {
     // 灏濊瘯鍒嗛厤鏈€浼樺伐浣滐紝閫愪釜灏濊瘯棰勭暀鐩爣璧勬簮
     let assigned = false;
     for (const candidate of candidates) {
+      if (isJobBlockedByCarriedItems(pawn, candidate.job)) continue;
+
       if (candidate.job.targetId) {
         const resId = map.reservations.tryReserve({
           claimantId: pawn.id,
@@ -145,6 +148,7 @@ function gatherCandidates(
   world: World,
 ): JobCandidate[] {
   const candidates: JobCandidate[] = [];
+  const carryResolutionCandidate = createCarryResolutionCandidate(pawn, map, world);
 
   // 鈹€鈹€ 1. 妫€鏌ョ揣鎬ラ渶姹?鈹€鈹€
   // 楗遍搴︿綆浜?30 鏃讹紝瀵绘壘椋熺墿
@@ -208,10 +212,12 @@ function gatherCandidates(
 
     // 妫€鏌ュ摢浜涙潗鏂欎粛闇€鎼繍
     for (let i = 0; i < bp.materialsRequired.length; i++) {
-      const needed = bp.materialsRequired[i].count - (bp.materialsDelivered[i]?.count ?? 0);
-      if (needed <= 0) continue;
-
+      const requiredCount = bp.materialsRequired[i].count;
+      const deliveredCount = bp.materialsDelivered[i]?.count ?? 0;
       const matDefId = bp.materialsRequired[i].defId;
+      const inFlightCount = getBlueprintMaterialInFlightCount(map, bp.id, matDefId);
+      const needed = requiredCount - deliveredCount - inFlightCount;
+      if (needed <= 0) continue;
 
       // 瀵绘壘璺濈鏈€杩戠殑鍚岀被鍨嬬墿鍝?
       const items = map.objects.allOfKind(ObjectKind.Item);
@@ -273,7 +279,167 @@ function gatherCandidates(
     candidates.push(stockpileCandidate);
   }
 
+  if (carryResolutionCandidate) {
+    candidates.push(carryResolutionCandidate);
+  }
+
   return candidates;
+}
+
+function getBlueprintMaterialInFlightCount(
+  map: GameMap,
+  blueprintId: string,
+  materialDefId: string,
+): number {
+  let total = 0;
+  const pawns = map.objects.allOfKind(ObjectKind.Pawn);
+
+  for (const pawn of pawns) {
+    total += getDeliverJobPlannedCount(pawn, map, blueprintId, materialDefId);
+  }
+
+  return total;
+}
+
+function getDeliverJobPlannedCount(
+  pawn: Pawn,
+  map: GameMap,
+  blueprintId: string,
+  materialDefId: string,
+): number {
+  const job = pawn.ai.currentJob;
+  if (!job || job.defId !== 'job_deliver_materials') return 0;
+  if (job.state === JobState.Done || job.state === JobState.Failed) return 0;
+
+  const deliverToil = job.toils.find(toil => toil.type === ToilType.Deliver);
+  if (!deliverToil || deliverToil.targetId !== blueprintId) return 0;
+  if (deliverToil.state === ToilState.Completed || deliverToil.state === ToilState.Failed) return 0;
+
+  if (pawn.inventory.carrying?.defId === materialDefId) {
+    return pawn.inventory.carrying.count;
+  }
+
+  const deliverDefId = typeof deliverToil.localData.defId === 'string'
+    ? deliverToil.localData.defId
+    : null;
+  if (deliverDefId && deliverDefId !== 'unknown' && deliverDefId !== materialDefId) {
+    return 0;
+  }
+
+  const pickupToil = job.toils.find(toil => toil.type === ToilType.PickUp);
+  if (!pickupToil || !pickupToil.targetId) return 0;
+
+  const pickupItem = map.objects.getAs(pickupToil.targetId, ObjectKind.Item);
+  if (!pickupItem || pickupItem.destroyed || pickupItem.defId !== materialDefId) return 0;
+
+  const requestedCount = Math.max(
+    0,
+    Math.floor((pickupToil.localData.requestedCount as number) ?? (deliverToil.localData.count as number) ?? 0),
+  );
+
+  return requestedCount;
+}
+
+function createCarryResolutionCandidate(
+  pawn: Pawn,
+  map: GameMap,
+  world: World,
+): JobCandidate | null {
+  const carrying = pawn.inventory.carrying;
+  if (!carrying) return null;
+
+  const blueprintCandidate = findCarryResolutionBlueprintCandidate(pawn, map, carrying.defId);
+  if (blueprintCandidate) {
+    return {
+      job: createCarryJob(
+        pawn.id,
+        blueprintCandidate.blueprint.cell,
+        Math.min(carrying.count, blueprintCandidate.needed),
+        blueprintCandidate.blueprint.id,
+      ),
+      score: 8 - blueprintCandidate.distance * 0.1,
+    };
+  }
+
+  const targetCell = findReachableAcceptingCell(pawn, map, world, carrying.defId, 'stockpile-only')
+    ?? findReachableAcceptingCell(pawn, map, world, carrying.defId, 'nearest-compatible');
+  if (!targetCell) return null;
+
+  return {
+    job: createCarryJob(pawn.id, targetCell, carrying.count),
+    score: 4 - estimateDistance(pawn.cell, targetCell) * 0.1,
+  };
+}
+
+function findCarryResolutionBlueprintCandidate(
+  pawn: Pawn,
+  map: GameMap,
+  materialDefId: string,
+): { blueprint: { id: string; cell: CellCoord }; needed: number; distance: number } | null {
+  const blueprints = map.objects.allOfKind(ObjectKind.Blueprint);
+  let bestCandidate: { blueprint: { id: string; cell: CellCoord }; needed: number; distance: number } | null = null;
+
+  for (const blueprint of blueprints) {
+    if (blueprint.destroyed || areBlueprintMaterialsDelivered(blueprint)) continue;
+    if (!isReachable(map, pawn.cell, blueprint.cell)) continue;
+
+    for (let i = 0; i < blueprint.materialsRequired.length; i++) {
+      const required = blueprint.materialsRequired[i];
+      const delivered = blueprint.materialsDelivered[i];
+      if (!required || required.defId !== materialDefId || delivered?.defId !== materialDefId) continue;
+
+      const inFlight = getBlueprintMaterialInFlightCount(map, blueprint.id, materialDefId);
+      const needed = required.count - (delivered?.count ?? 0) - inFlight;
+      if (needed <= 0) continue;
+
+      const distance = estimateDistance(pawn.cell, blueprint.cell);
+      if (!bestCandidate || distance < bestCandidate.distance) {
+        bestCandidate = {
+          blueprint: { id: blueprint.id, cell: blueprint.cell },
+          needed,
+          distance,
+        };
+      }
+
+      break;
+    }
+  }
+
+  return bestCandidate;
+}
+
+function findReachableAcceptingCell(
+  pawn: Pawn,
+  map: GameMap,
+  world: World,
+  defId: string,
+  searchScope: 'stockpile-only' | 'nearest-compatible',
+): CellCoord | null {
+  const excludedCells = new Set<string>();
+
+  while (true) {
+    const candidate = findNearestAcceptingCell(
+      map,
+      world.defs,
+      pawn.cell,
+      defId,
+      searchScope,
+      {
+        excludedCells,
+        selectionPreference: 'prefer-existing-stacks',
+      },
+    );
+    if (!candidate) return null;
+    if (isReachable(map, pawn.cell, candidate)) {
+      return candidate;
+    }
+    excludedCells.add(cellKey(candidate));
+  }
+}
+
+function isJobBlockedByCarriedItems(pawn: Pawn, job: Job): boolean {
+  return pawn.inventory.carrying != null
+    && job.toils.some(toil => toil.type === ToilType.PickUp);
 }
 
 function findSleepCandidates(

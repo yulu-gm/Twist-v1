@@ -10,6 +10,7 @@ import type {
   MapObjectBase,
   QualityLevel,
   CellCoord,
+  CellCoordKey,
   DefId,
 } from '../../core/types';
 
@@ -37,6 +38,7 @@ export interface PlaceItemOnMapParams {
   defId: DefId;
   count: number;
   preferredCell: CellCoord;
+  excludedCells?: Set<CellCoordKey>;
   searchScope: ItemPlacementSearchScope;
   selectionPreference?: ItemPlacementSelectionPreference;
   noCapacityPolicy: ItemNoCapacityPolicy;

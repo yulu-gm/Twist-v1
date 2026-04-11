@@ -40,6 +40,7 @@ export interface ScenarioQueryApi {
   totalItemCountInCells(defId: string, cells: CellCoord[]): number;
   totalMaterialCountInWorld(defId: string): number;
   findBuildingAt(defId: string, cell: CellCoord): unknown | null;
+  findConstructionSiteAt(targetDefId: string, cell: CellCoord): unknown | null;
   findBlueprintsByTargetDef(defId: string): unknown[];
   findPlantAt(cell: CellCoord): unknown | null;
 }

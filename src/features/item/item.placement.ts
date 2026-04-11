@@ -49,7 +49,7 @@ export function placeItemOnMap(params: PlaceItemOnMapParams): PlaceItemOnMapResu
   let placedCount = 0;
   let usedFallback = false;
 
-  const excludedCells = new Set<CellCoordKey>();
+  const excludedCells = new Set<CellCoordKey>(params.excludedCells ?? []);
 
   while (remaining > 0) {
     const candidate = findNearestAcceptingCell(
@@ -96,20 +96,23 @@ export function placeItemOnMap(params: PlaceItemOnMapParams): PlaceItemOnMapResu
       preferredCell,
     );
 
-    const overflowPlaced = forcePlaceRemainingAtCell(
+    const overflowCell = resolveForceOverflowCell(params.map, preferredCell, excludedCells);
+    if (overflowCell) {
+      const overflowPlaced = forcePlaceRemainingAtCell(
       params.map,
       params.defs,
-      preferredCell,
+      overflowCell,
       params.defId,
       remaining,
       resolved.maxStack,
       resolved.tags,
-    );
-    if (overflowPlaced > 0) {
-      placedCount += overflowPlaced;
-      remaining -= overflowPlaced;
-      recordUsedCell(preferredCell, usedCellKeys, usedCells);
-      usedFallback = true;
+      );
+      if (overflowPlaced > 0) {
+        placedCount += overflowPlaced;
+        remaining -= overflowPlaced;
+        recordUsedCell(overflowCell, usedCellKeys, usedCells);
+        usedFallback = true;
+      }
     }
   }
 
@@ -222,6 +225,34 @@ function forcePlaceRemainingAtCell(
   }
 
   return placed;
+}
+
+function resolveForceOverflowCell(
+  map: GameMap,
+  preferredCell: CellCoord,
+  excludedCells: Set<CellCoordKey>,
+): CellCoord | null {
+  if (!excludedCells.has(cellKey(preferredCell))) {
+    return preferredCell;
+  }
+
+  let bestCell: CellCoord | null = null;
+  let bestDistance = Infinity;
+
+  for (let y = 0; y < map.height; y++) {
+    for (let x = 0; x < map.width; x++) {
+      const candidate = { x, y };
+      if (excludedCells.has(cellKey(candidate))) continue;
+
+      const distance = Math.abs(preferredCell.x - x) + Math.abs(preferredCell.y - y);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestCell = candidate;
+      }
+    }
+  }
+
+  return bestCell;
 }
 
 function resolvePlacementDef(defs: DefDatabase, defId: DefId): { tags: Set<string>; maxStack: number } {
