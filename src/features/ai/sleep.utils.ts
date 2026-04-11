@@ -1,7 +1,15 @@
+/**
+ * @file sleep.utils.ts
+ * @description 睡眠工作相关的纯工具函数 — 床位占用、睡眠格子选取、棋子瞬移、床位释放
+ * @dependencies core/types, world/game-map, features/pawn/pawn.types
+ * @part-of features/ai — AI 子系统
+ */
+
 import { CellCoord, ObjectKind } from '../../core/types';
 import type { GameMap } from '../../world/game-map';
 import type { Pawn } from '../pawn/pawn.types';
 
+/** 获取床位占地范围内的所有格子坐标列表 */
 function getBedFootprintCells(origin: CellCoord, footprint: { width: number; height: number }): CellCoord[] {
   const cells: CellCoord[] = [];
 
@@ -14,10 +22,12 @@ function getBedFootprintCells(origin: CellCoord, footprint: { width: number; hei
   return cells;
 }
 
+/** 计算两格之间的曼哈顿距离 */
 function manhattanDistance(a: CellCoord, b: CellCoord): number {
   return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
 }
 
+/** 尝试让棋子占用指定床位；若床位已被其他棋子占用则返回 false */
 export function claimBedOccupancy(
   map: GameMap,
   pawn: Pawn,
@@ -34,6 +44,10 @@ export function claimBedOccupancy(
   return true;
 }
 
+/**
+ * 获取棋子在床上实际睡觉的格子坐标
+ * 优先选取靠近交互格且靠近床位中心的格子；若床位不存在或已销毁则返回 null
+ */
 export function getBedSleepCell(
   map: GameMap,
   bedId: string,
@@ -71,6 +85,7 @@ export function getBedSleepCell(
     })[0];
 }
 
+/** 将棋子瞬间移动到目标格子，并更新空间索引和移动状态 */
 export function movePawnInstantly(
   map: GameMap,
   pawn: Pawn,
@@ -84,6 +99,7 @@ export function movePawnInstantly(
   pawn.movement.moveProgress = 0;
 }
 
+/** 释放棋子当前睡眠工作所占用的床位，使其可被其他棋子使用 */
 export function releaseOccupiedBedForPawn(
   map: GameMap | null,
   pawn: Pawn,

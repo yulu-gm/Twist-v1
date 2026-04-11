@@ -1,8 +1,8 @@
 /**
  * @file pawn.systems.ts
- * @description 妫嬪瓙闇€姹傝“鍑忕郴缁燂紝姣?tick 闄嶄綆椋熺墿銆佷紤鎭€佸ū涔愬€煎苟閲嶆柊璁＄畻蹇冩儏
- * @dependencies core/types 鈥?TickPhase, ObjectKind; core/tick-runner 鈥?绯荤粺娉ㄥ唽鎺ュ彛; world/world; pawn.types
- * @part-of features/pawn 妫嬪瓙鍔熻兘妯″潡
+ * @description 棋子需求衰减系统，每 tick 降低食物、休息、娱乐值并重新计算心情
+ * @dependencies core/types — TickPhase, ObjectKind; core/tick-runner — 系统注册接口; world/world; pawn.types
+ * @part-of features/pawn 棋子功能模块
  */
 
 import { TickPhase, ObjectKind } from '../../core/types';
@@ -10,9 +10,12 @@ import type { SystemRegistration } from '../../core/tick-runner';
 import type { World } from '../../world/world';
 import type { Pawn, PawnNeedsProfile, PawnThought, PawnTrait } from './pawn.types';
 
+/** 需求系统每隔多少 tick 执行一次 */
 const NEED_SYSTEM_INTERVAL_TICKS = 10;
+/** 动态想法（如饥饿、疲劳）的默认持续时长（tick 数） */
 const DYNAMIC_THOUGHT_DURATION = NEED_SYSTEM_INTERVAL_TICKS;
 
+/** 内置特质定义表：特质ID -> 特质元数据及需求档案修改函数 */
 const TRAIT_DEFS: Record<string, PawnTrait & { apply: (profile: PawnNeedsProfile) => void }> = {
   glutton: {
     traitId: 'glutton',
@@ -46,20 +49,24 @@ const TRAIT_DEFS: Record<string, PawnTrait & { apply: (profile: PawnNeedsProfile
   },
 };
 
+/** 将数值限制在 [0, 100] 范围内 */
 function clamp100(v: number): number {
   return v < 0 ? 0 : v > 100 ? 100 : v;
 }
 
+/** 将数值限制在不低于 min */
 function clampMin(v: number, min: number): number {
   return v < min ? min : v;
 }
 
+/** 从棋子想法列表中移除指定类型（可选指定来源ID）的想法 */
 function removeThought(pawn: Pawn, type: string, sourceId?: string): void {
   pawn.thoughts = pawn.thoughts.filter(thought => (
     thought.type !== type || thought.sourceId !== sourceId
   ));
 }
 
+/** 添加或刷新棋子的指定类型想法，若已存在则更新数值和剩余时长 */
 export function addOrRefreshThought(
   pawn: Pawn,
   type: string,
@@ -84,6 +91,7 @@ export function addOrRefreshThought(
   });
 }
 
+/** 推进棋子所有想法的剩余时长，移除已过期的想法 */
 function tickThoughts(pawn: Pawn): void {
   const nextThoughts: PawnThought[] = [];
   for (const thought of pawn.thoughts) {
@@ -95,6 +103,7 @@ function tickThoughts(pawn: Pawn): void {
   pawn.thoughts = nextThoughts;
 }
 
+/** 根据当前需求值同步动态想法（饥饿、疲劳等），确保只有对应状态的想法存在 */
 function syncNeedThoughts(pawn: Pawn): void {
   if (pawn.needs.food <= 0) {
     addOrRefreshThought(pawn, 'Starving', -25, DYNAMIC_THOUGHT_DURATION);
@@ -119,6 +128,7 @@ function syncNeedThoughts(pawn: Pawn): void {
   }
 }
 
+/** 当食物值为0时，累计饥饿 tick 并按间隔扣除血量 */
 function applyStarvationDamage(pawn: Pawn): void {
   if (pawn.needs.food > 0) {
     pawn.needsState.starvationTicks = 0;
@@ -133,6 +143,7 @@ function applyStarvationDamage(pawn: Pawn): void {
   }
 }
 
+/** 根据需求值和活跃想法重新计算并写入棋子心情值，返回计算结果 */
 export function recomputeMood(pawn: Pawn): number {
   const needsMoodBase = (
     pawn.needs.food * 0.4 +
@@ -145,6 +156,7 @@ export function recomputeMood(pawn: Pawn): number {
   return mood;
 }
 
+/** 创建棋子需求档案的默认初始值 */
 export function createDefaultNeedsProfile(): PawnNeedsProfile {
   return {
     foodDecayPerTick: 0.06,
@@ -164,6 +176,7 @@ export function createDefaultNeedsProfile(): PawnNeedsProfile {
   };
 }
 
+/** 将特质修改应用到基础需求档案，返回修改后的档案和特质元数据列表 */
 export function applyTraitModifiers(
   baseProfile: PawnNeedsProfile,
   traitIds: string[],

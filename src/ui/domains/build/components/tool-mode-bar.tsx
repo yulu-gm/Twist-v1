@@ -1,8 +1,8 @@
 /**
  * @file tool-mode-bar.tsx
- * @description 搴曢儴宸ュ叿鏍忕粍浠?鈥?鍒嗙粍鏄剧ず鎵€鏈夊伐鍏锋寜閽紝鏀寔閫変腑楂樹寒鍜屽揩鎹烽敭鎻愮ず
- * @dependencies build.schemas 鈥?toolActions, utilityButtons锛沚uild.types 鈥?ToolActionDef
- * @part-of ui/domains/build 鈥?寤洪€?UI 棰嗗煙
+ * @description 底部工具栏组件 — 分组显示所有工具按钮，支持选中高亮和快捷键提示
+ * @dependencies build.schemas — toolActions, utilityButtons；build.types — ToolActionDef
+ * @part-of ui/domains/build — 建造 UI 领域
  */
 
 import { useState, useCallback, useEffect, useRef } from 'preact/hooks';

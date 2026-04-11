@@ -1,8 +1,8 @@
 /**
  * @file scenario-registry.ts
- * @description 鍦烘櫙娉ㄥ唽琛?鈥?闆嗕腑绠＄悊鎵€鏈夊彲杩愯鐨勪笟鍔″満鏅€?
- *              浠庡熀纭€姝ｅ悜閾捐矾鍒板鏉備腑鏂仮澶嶏紝鐢辨祬鍏ユ繁渚夸簬鍥炲綊濂椾欢浠庤交鍒伴噸瀹氫綅闂銆?
- * @part-of testing 鈥?娴嬭瘯绯荤粺
+ * @description 场景注册表 — 集中管理所有可运行的业务场景。
+ *              从基础正向链路到复杂中断恢复，由浅入深便于回归套件从轻到重定位问题。
+ * @part-of testing — 测试系统
  */
 
 import { woodcuttingScenario } from './scenarios/woodcutting.scenario';
@@ -16,7 +16,7 @@ import { sleepBedOccupancyScenario } from './scenarios/sleep-bed-occupancy.scena
 import { bedBlueprintSleepScenario } from './scenarios/bed-blueprint-sleep.scenario';
 import type { ScenarioDefinition } from './scenario-dsl/scenario.types';
 
-/** 鎵€鏈夊凡娉ㄥ唽鐨勪笟鍔″満鏅?*/
+/** 所有已注册的业务场景 */
 export const scenarioRegistry: readonly ScenarioDefinition[] = [
   woodcuttingScenario,
   stockpileHaulScenario,

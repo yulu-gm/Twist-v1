@@ -16,6 +16,7 @@ export interface AdvanceWorldTickOptions {
   dispatchEvents?: (events: GameEvent[]) => void;
 }
 
+/** 将事件缓冲中的事件分发出去并清空缓冲，若缓冲为空则直接返回 */
 function flushWorldEvents(world: World, options: AdvanceWorldTickOptions = {}): void {
   if (world.eventBuffer.length === 0) {
     return;

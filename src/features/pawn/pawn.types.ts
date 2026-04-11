@@ -66,33 +66,57 @@ export interface Job {
   state: JobState;
 }
 
+/** 棋子需求数值档案 — 描述需求衰减速率、阈值和恢复参数 */
 export interface PawnNeedsProfile {
+  /** 每 tick 食物衰减量 */
   foodDecayPerTick: number;
+  /** 每 tick 休息衰减量 */
   restDecayPerTick: number;
+  /** 每 tick 娱乐衰减量 */
   joyDecayPerTick: number;
+  /** 食物低于此值时触发寻找食物 */
   hungerSeekThreshold: number;
+  /** 食物低于此值视为饥饿危急 */
   hungerCriticalThreshold: number;
+  /** 饥饿伤害触发间隔（tick 数） */
   starvationDamageInterval: number;
+  /** 每次饥饿伤害扣除的血量 */
   starvationDamageAmount: number;
+  /** 休息低于此值时触发寻找睡眠 */
   sleepSeekThreshold: number;
+  /** 休息低于此值视为极度疲劳 */
   sleepCriticalThreshold: number;
+  /** 睡醒时休息值恢复到的目标值 */
   wakeTargetRest: number;
+  /** 在床上每 tick 恢复的休息值 */
   bedRestGainPerTick: number;
+  /** 在地板上每 tick 恢复的休息值 */
   floorRestGainPerTick: number;
+  /** 在地板睡觉时的心情惩罚值 */
   floorSleepMoodPenalty: number;
+  /** 进食后食物恢复到的目标值 */
   mealTargetFood: number;
 }
 
+/** 棋子特质 — 永久修改棋子属性参数的个性标签 */
 export interface PawnTrait {
+  /** 特质唯一标识 */
   traitId: string;
+  /** 特质显示名称 */
   label: string;
+  /** 特质描述文本 */
   description: string;
 }
 
+/** 棋子想法 — 有时限的心情偏移事件 */
 export interface PawnThought {
+  /** 想法类型标识（如 'Hungry'、'Tired'） */
   type: string;
+  /** 对心情值的偏移量（正值为加成，负值为惩罚） */
   moodOffset: number;
+  /** 剩余持续 tick 数 */
   remainingTicks: number;
+  /** 触发该想法的来源对象ID（可选） */
   sourceId?: ObjectId;
 }
 
@@ -130,10 +154,15 @@ export interface Pawn extends MapObjectBase {
     /** 心情值（0-100），由其他需求加权计算 */
     mood: number;
   };
+  /** 需求衰减参数档案（由特质调整后的数值） */
   needsProfile: PawnNeedsProfile;
+  /** 棋子特质列表 */
   traits: PawnTrait[];
+  /** 当前活跃的想法列表（影响心情） */
   thoughts: PawnThought[];
+  /** 需求系统的持久状态数据 */
   needsState: {
+    /** 饥饿持续 tick 计数（用于计算饥饿伤害间隔） */
     starvationTicks: number;
   };
 

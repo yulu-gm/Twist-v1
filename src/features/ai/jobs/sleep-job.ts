@@ -1,10 +1,19 @@
+/**
+ * @file sleep-job.ts
+ * @description 睡眠工作工厂函数 — 创建有床位目标或就地休息的睡眠 Job
+ * @dependencies core/types, features/ai/ai.types
+ * @part-of features/ai — AI 子系统
+ */
+
 import {
   CellCoord, ObjectId, ToilType, ToilState, JobState,
 } from '../../../core/types';
 import type { Job } from '../ai.types';
 
+/** 睡眠工作 ID 计数器，用于生成唯一 Job ID */
 let sleepJobCounter = 0;
 
+/** 创建睡眠工作 — 有床位时前往床位并在床上休息，否则就地休息 */
 export function createSleepJob(
   pawnId: ObjectId,
   target: { bedId: ObjectId; interactionCell: CellCoord } | null,

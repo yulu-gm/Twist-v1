@@ -1,14 +1,14 @@
 /**
  * @file job-selector.ts
- * @description 宸ヤ綔閫夋嫨绯荤粺 鈥斺€?姣?Tick 涓虹┖闂茬殑 Pawn 閫夋嫨鏈€浼樺伐浣溿€?
- *              鏀堕泦鎵€鏈夊€欓€変换鍔★紙杩涢銆侀噰鐭裤€佹敹鍓层€佹惉杩愭潗鏂欍€佸缓閫狅級锛?
- *              鎸夋晥鐢ㄥ垎鏁版帓搴忓苟灏濊瘯棰勭暀鐩爣锛岄€夊嚭鏈€浣冲伐浣滃垎閰嶇粰 Pawn銆?
- *              鑻ユ棤鍙敤宸ヤ綔鍒欏垎閰嶉殢鏈烘极姝ヤ换鍔°€?
- * @dependencies core/types 鈥?鍩虹绫诲瀷涓庢灇涓撅紱core/tick-runner 鈥?绯荤粺娉ㄥ唽锛沜ore/logger 鈥?鏃ュ織锛?
- *               world 鈥?World/GameMap锛沺athfinding 鈥?璺濈浼扮畻锛?
- *               ai.types 鈥?Job/JobCandidate锛沜onstruction 鈥?Blueprint/ConstructionSite 绫诲瀷锛?
- *               jobs/* 鈥?鍚勭被宸ヤ綔宸ュ巶鍑芥暟
- * @part-of AI 瀛愮郴缁燂紙features/ai锛?
+ * @description 工作选择系统 —— 每 Tick 为空闲的 Pawn 选择最优工作。
+ *              收集所有候选任务（进食、采矿、收割、搬运材料、建造），
+ *              按效用分数排序并尝试预留目标，选出最佳工作分配给 Pawn。
+ *              若无可用工作则分配随机漫步任务。
+ * @dependencies core/types — 基础类型与枚举；core/tick-runner — 系统注册；core/logger — 日志；
+ *               world — World/GameMap；pathfinding — 距离估算；
+ *               ai.types — Job/JobCandidate；construction — Blueprint/ConstructionSite 类型；
+ *               jobs/* — 各类工作工厂函数
+ * @part-of AI 子系统（features/ai）
  */
 
 import {

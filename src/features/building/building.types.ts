@@ -29,11 +29,14 @@ export interface Building extends MapObjectBase {
   hpCurrent: number;
   /** 最大生命值 */
   hpMax: number;
+  /** 建筑分类：结构类或家具类 */
   category?: 'structure' | 'furniture';
 
   // ── 可选组件 ──
 
+  /** 家具组件：描述家具的使用类型 */
   furniture?: {
+    /** 使用类型（床/桌子/椅子/储物） */
     usageType: 'bed' | 'table' | 'chair' | 'storage';
   };
 
@@ -58,12 +61,19 @@ export interface Building extends MapObjectBase {
     /** 交互操作发生的格子坐标 */
     interactionCell: CellCoord;
   };
+  /** 床位组件：描述床的所有权、占用状态和属性 */
   bed?: {
+    /** 床位所有者棋子ID（undefined 表示无主） */
     ownerPawnId?: string;
+    /** 当前占用床位的棋子ID（undefined 表示无人） */
     occupantPawnId?: string;
+    /** 床位角色：公共/私有/医疗/囚犯 */
     role: 'public' | 'owned' | 'medical' | 'prisoner';
+    /** 是否允许自动分配给无床棋子 */
     autoAssignable: boolean;
+    /** 在此床睡觉时的休息恢复速率倍率 */
     restRateMultiplier: number;
+    /** 在此床睡觉带来的心情加成 */
     moodBonus: number;
   };
 }
