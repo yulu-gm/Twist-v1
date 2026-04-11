@@ -25,6 +25,7 @@ export default defineConfig({
     environment: 'node',
     environmentMatchGlobs: [
       ['src/testing/visual-runner/**/*.test.tsx', 'jsdom'],
+      ['src/testing/visual-runner/**/*.test.ts', 'jsdom'],
     ],
   },
 });

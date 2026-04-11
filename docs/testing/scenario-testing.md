@@ -31,10 +31,26 @@ npm run scenario:visual
 
 # 切换其他场景 — 修改 URL 参数
 # http://localhost:3000/scenario-select.html              ← 场景选择页面
-# http://localhost:3000/scenario-select.html?scenario=eating  ← 直接运行指定场景
-# http://localhost:3000/scenario.html?scenario=stockpile-haul
-# http://localhost:3000/scenario.html?scenario=blueprint-construction
+# http://localhost:3000/scenario-select.html?scenario=eating  ← 进入指定场景工作台
 ```
+
+### 工作台使用流程
+
+进入 `scenario-select.html` 后：
+
+1. 先选择场景卡片
+2. 进入 `ready` 状态的工作台（不自动开跑）
+3. 手动点击 `Start` 开始运行
+4. 可在右侧工作台使用以下控件：
+   - `Pause` — 暂停执行
+   - `1x / 2x / 3x` — 切换 simulation 速度
+   - `+1 tick` — 手动步进 1 tick（仅 paused 下可用）
+   - `+10 ticks` — 手动步进 10 ticks（仅 paused 下可用）
+   - `Run to Next Gate` — 运行到下一个 waitFor/command 完成点（仅 paused 下可用）
+   - `Restart` — 销毁当前 session 并重新回到 ready
+   - `Back to Scenarios` — 返回场景选择页（不刷新页面）
+
+带 `?scenario=<id>` 的 URL 刷新后会自动进入对应场景的 `ready` 状态，不会自动开跑。
 
 ## 已有场景
 
@@ -67,11 +83,12 @@ src/testing/
   headless/               # 无头运行器和测试
     headless-scenario-runner.ts
     scenario-regression.test.ts
-  visual-runner/          # 可视运行器和 HUD
-    scenario-main.ts
-    visual-scenario-controller.ts
-    scenario-hud.tsx
-    shadow-runner.ts
+  visual-runner/          # 可视运行器和工作台
+    scenario-select-main.ts           # 入口 — 启动工作台
+    scenario-workbench-app.ts         # 页面壳层 — selector/workbench 模式协调
+    visual-scenario-controller.ts     # session 生命周期拥有者
+    scenario-hud.tsx                  # 工作台 HUD 控制面板
+    shadow-runner.ts                  # visual/headless 快照对比
   scenario-registry.ts    # 场景注册表
 ```
 

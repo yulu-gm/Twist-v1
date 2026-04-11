@@ -1,7 +1,9 @@
 /**
  * @file scenario-main.ts
  * @description 可视模式入口 — 启动真实 Phaser 场景并挂载 Scenario HUD，
- *              自动执行指定场景脚本并同步运行 shadow headless runner
+ *              自动执行指定场景脚本并同步运行 shadow headless runner。
+ *              此入口用于单场景直接运行（scenario.html），
+ *              工作台模式请使用 scenario-select-main.ts。
  * @dependencies visual-scenario-controller — 协调器；scenario-hud — HUD 组件；
  *               scenario-registry — 场景注册表
  * @part-of testing/visual-runner — 可视运行层
@@ -33,8 +35,12 @@ const hudContainer: HTMLElement = hudRoot;
 function renderHud(state: ControllerState) {
   render(
     h(ScenarioHud, {
+      scenarioId: state.scenarioId,
       title: state.title,
+      sessionStatus: state.sessionStatus,
       currentTick: state.currentTick,
+      currentSpeed: state.currentSpeed,
+      currentSpeedLabel: state.currentSpeedLabel,
       currentStepTitle: state.currentStepTitle,
       visualSteps: state.visualSteps,
       shadowSteps: state.shadowSteps,
@@ -44,14 +50,17 @@ function renderHud(state: ControllerState) {
   );
 }
 
-// 创建控制器并运行
+// 创建控制器并启动
 const controller = createVisualScenarioController(scenario, renderHud);
 
-// 启动运行
-controller.run().then(result => {
-  console.log(`[Scenario] ${scenario.title}: ${result.status}`);
-  for (const step of result.steps) {
-    console.log(`  [${step.status}] ${step.title}${step.ticksElapsed != null ? ` (${step.ticksElapsed} ticks)` : ''}`);
-    if (step.error) console.log(`    ERROR: ${step.error}`);
+// 单场景直接运行模式 — 自动开始执行
+controller.start().then(() => {
+  const result = controller.getState().result;
+  if (result) {
+    console.log(`[Scenario] ${scenario.title}: ${result.status}`);
+    for (const step of result.steps) {
+      console.log(`  [${step.status}] ${step.title}${step.ticksElapsed != null ? ` (${step.ticksElapsed} ticks)` : ''}`);
+      if (step.error) console.log(`    ERROR: ${step.error}`);
+    }
   }
 });
