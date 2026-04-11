@@ -1,85 +1,133 @@
 {
   "$schema": "https://aka.ms/codetour-schema",
-  "title": "Opus World 新人导览",
-  "description": "给新加入开发者的一条上手路径：从运行入口、架构原则和启动流程，到 World、Tick、输入命令链、AI 调度与浏览器调试入口。",
+  "title": "Opus World 新人全景导览",
+  "description": "给新加入开发的同学的一条完整架构主线：从仓库入口、运行与验证脚本、架构契约和启动装配开始，依次走过 defs、World/GameMap、Command/Tick、核心 feature、Presentation/Adapter、UI 桥接、场景测试与浏览器调试工具，帮助你快速建立对项目现状的整体模型。",
   "ref": "blank-start",
   "steps": [
     {
       "directory": "src",
-      "title": "先建立目录感",
-      "description": "你现在站在项目的主战场。这里同时放着 simulation、adapter、defs 和 presentation，意味着上手时最好先建立分层感，再沿主链路往下读；直接扎进某个 feature 往往会只见树木不见森林。"
+      "title": "先建立项目地图",
+      "description": "现在的 `src` 已经不只是早期的 simulation + adapter。你会同时看到 `bootstrap`、`ui`、`testing`、`world`、`core`、`features` 和 `presentation`，它们分别承担装配、界面、验证、数据模型、运行时基础设施、业务规则和展示态桥接。新人先建立这个分层感，再往下读具体 feature，会轻松很多。"
     },
     {
       "file": "package.json",
       "line": 6,
-      "title": "确认运行面",
-      "description": "这里定义了最小工具链：`vite` 开发、`tsc && vite build` 构建，依赖也很克制。对新人来说，这说明难点主要在游戏模拟而不是工程脚手架；一个容易忽略的点是仓库当前没有测试脚本，前期验证更依赖手工回归和调试工具。"
+      "title": "先看怎么跑和怎么验",
+      "description": "这里定义了当前仓库的几个真实入口：`npm run dev` 负责主游戏，`npm run test` 跑单测，`npm run test:scenario` 跑 headless 场景回归，`npm run scenario:visual:select` 打开可视化场景工作台，`npm run generate:module-map` 生成项目导航地图。和旧版本不同，这个仓库现在已经有成体系的测试与场景验证入口，新人不要再默认只能靠手工回归。"
     },
     {
       "file": "plan/opus architecture.md",
       "line": 15,
-      "title": "先读架构契约",
-      "description": "这份文档写的是代码的设计约束，而不只是背景介绍。它明确了 Simulation/Presentation 分离、Command 统一入口和确定性优先，新人先读这里会更容易判断后面的实现为什么长成这样；很多看似绕的结构，其实是在服务这些约束。"
+      "title": "先读架构契约而不是实现细节",
+      "description": "这份文档仍然是理解项目的最佳前置材料。它讲清了 `Simulation/Presentation` 分离、`Command` 是唯一外部写入口、`Feature-based` 组织和确定性优先这些原则。后面你看到很多“为什么不直接改对象”“为什么要经过 commandQueue”的设计，答案都已经写在这里。"
     },
     {
       "file": "src/main.ts",
-      "line": 359,
-      "title": "从启动入口看全局装配",
-      "description": "`boot()` 是整套运行链路的装配点：加载 defs、创建 world、建图、注册命令和系统，最后再把 Phaser 启起来。这里最适合建立模块地图，因为它几乎串到了所有核心子系统；但要注意，它负责接线，不是具体玩法规则的归宿。"
+      "line": 233,
+      "title": "从 boot 看整体装配",
+      "description": "`boot()` 是最值得新人先完整读一遍的函数。它构建 defs、创建 world 和 map、生成初始内容、注册命令和系统、创建 UI bridge，最后再把 Phaser 和 Preact 挂起来。这个文件的价值在于帮你建立“项目是怎么接起来的”，而不是承载具体玩法规则。"
+    },
+    {
+      "file": "src/bootstrap/default-registrations.ts",
+      "line": 52,
+      "title": "装配逻辑已经从 main 抽出来了",
+      "description": "如果你印象里系统注册和命令注册全都堆在 `main.ts`，那已经过时了。现在生产入口和测试 harness 复用同一套默认注册：`buildDefaultSystems()` 负责 Tick 各阶段的系统列表，`registerDefaultCommands()` 负责把建造、指派、pawn、zone、save 和 debug 命令接进 command bus。这里是理解“默认游戏规则组合”的最好入口。"
+    },
+    {
+      "file": "src/world/def-database.ts",
+      "line": 156,
+      "title": "先把静态定义系统看懂",
+      "description": "项目里的 terrain、building、item、plant、job、recipe 都会汇总进 `DefDatabase`。具体内容在 `src/defs/*`，而统一注册和访问规则落在这里。新人常见误区是直接把 def 当常量散着找；更稳的路径是先理解这个中心注册表，再回到 `src/defs/index.ts` 看启动时如何装进去。"
     },
     {
       "file": "src/world/world.ts",
       "line": 45,
-      "title": "抓住最高层状态容器",
-      "description": "`World` 是整个 simulation 的根对象，里面既有长期状态，也有 `commandQueue`、`eventBuffer`、`tickRunner` 这种运行时基础设施。新人理解了这里，就知道“状态放哪、命令从哪进、事件往哪出”；一个常见误区是把它看成纯存档数据，实际上它还承载了执行管线。"
+      "title": "World 是 simulation 的根容器",
+      "description": "`World` 不只是存档数据壳子，它还持有 `commandQueue`、`eventBuffer`、`commandBus`、`tickRunner` 这些运行时基础设施。理解这里之后，你会更容易回答几个高频问题：外部意图从哪里进、系统按什么节奏跑、事件往哪里出、全局速度和随机性放在哪里。"
     },
     {
       "file": "src/world/game-map.ts",
       "line": 30,
-      "title": "地图不是一张地形表",
-      "description": "`GameMap` 把地形、对象池、空间索引、区域、房间、预约和寻路缓存绑在一起，所以它更像一个地图级子世界。后面很多 feature 都会围着它转，新人读到某个系统时经常会回到这里确认依赖；关键 gotcha 是对象查询通常不直接扫全量，而是借助 `objects`、`spatial` 和 `reservations` 这些配套结构。"
-    },
-    {
-      "file": "src/core/tick-runner.ts",
-      "line": 68,
-      "title": "理解固定 Tick 流水线",
-      "description": "这里定义了每个 tick 的执行顺序：命令处理、工作生成、AI 决策、预约、执行、世界更新、清理和事件派发。新人只要记住这条流水线，跨模块追踪行为就会简单很多；别漏掉一个细节：`world.tick` 的递增不在这里做，而是在外层场景更新中完成。"
-    },
-    {
-      "file": "src/adapter/main-scene.ts",
-      "line": 122,
-      "title": "Phaser 只是桥，不是游戏本体",
-      "description": "`MainScene.update()` 把帧时间换成逻辑 tick，再调用 `tickRunner` 和渲染同步器，因此它是 presentation 与 simulation 对接的关键桥梁。新人从这里能看清“每帧”和“每 tick”的边界；一个容易错过的点是暂停时 UI、输入和调试层仍然会更新。"
-    },
-    {
-      "file": "src/presentation/presentation-state.ts",
-      "line": 66,
-      "title": "把展示态和模拟态分开看",
-      "description": "`PresentationState` 只存选中、悬停、预览、覆盖层和当前工具这些屏幕状态，不应该承载真实世界规则。新人如果要改 UI 或交互，先分清自己是在改 presentation 还是 simulation，会少走很多弯路；特别是 `switchTool()` 会顺手清理子状态，这一点很影响交互行为。"
-    },
-    {
-      "file": "src/adapter/input/input-handler.ts",
-      "line": 144,
-      "title": "用户操作先变成意图",
-      "description": "`handleClick()` 根据当前工具把点击分发成选择、建造、指派或取消，而真正写入世界的是压进 `world.commandQueue` 的命令。对新人来说，这一步能解释为什么输入层很少直接改对象；拖拽和单击看起来像直接操作地图，实际上只是生成不同粒度的意图。"
+      "title": "GameMap 是地图级子世界",
+      "description": "`GameMap` 不只是地形网格。它把 `objects`、`spatial`、`zones`、`rooms`、`reservations`、`pathGrid` 这些地图级结构绑在一起，所以很多 feature 最后都会围着它转。读系统时如果不确定某个数据应该从哪里拿，回到这里通常就能厘清。"
     },
     {
       "file": "src/core/command-bus.ts",
       "line": 82,
       "title": "Command 是统一写入口",
-      "description": "`processQueue()` 会为每条命令找 handler、先校验再执行，并把事件推到缓冲区里。这里是架构原则真正落地的地方，所以新人加新交互时通常都要经过这层；别忽略 rejected 分支，没有 handler 或验证失败也会留下事件痕迹。"
+      "description": "`processQueue()` 展示了外部意图落地的标准协议：找到 handler、先校验、再执行、产出事件。它把输入层、UI、debug 工具和自动化脚本统一到了同一个入口上。以后你要加新交互，第一反应应该是“命令长什么样、谁注册 handler”，而不是“在哪里直接改对象字段”。"
+    },
+    {
+      "file": "src/core/tick-runner.ts",
+      "line": 67,
+      "title": "Tick 主循环决定系统顺序",
+      "description": "`TickRunner.executeTick()` 把每个 tick 拆成命令处理、工作生成、AI 决策、预约、执行、世界更新、清理和事件分发这些阶段。跨模块追行为时，先记住这条固定流水线，很多“为什么先发生 A 再发生 B”的问题就能快速落到阶段顺序上。"
+    },
+    {
+      "file": "src/features/designation/designation.commands.ts",
+      "line": 309,
+      "title": "玩家意图通常先落到 designation/zone/build",
+      "description": "这个文件代表了 feature 层里很典型的一类入口：把玩家意图编码成 command handler。像采矿、砍树、取消指派这类操作，都先在这里落为世界中的 designation，再由后续系统把它转成可执行工作。看懂这一层，你会更容易理解“输入”和“执行”为什么被故意拆开。"
+    },
+    {
+      "file": "src/features/construction/construction.system.ts",
+      "line": 30,
+      "title": "建造链路展示了 feature 如何接力",
+      "description": "`constructionProgressSystem` 和 `processBlueprints()` 能很好地展示项目里 feature 协作的味道：蓝图先存在世界中，材料齐全后转换为施工工地，再由后续执行阶段推进进度。它不是单文件闭环，而是通过 command、查询和系统分段推进。"
     },
     {
       "file": "src/features/ai/job-selector.ts",
-      "line": 126,
-      "title": "小人行为由系统调度，不靠对象方法",
-      "description": "`gatherCandidates()` 把进食、指派、搬运材料和施工都整理成候选工作，再按分数选择最优项。新人想理解“为什么小人去做这件事”时，几乎总会回到这里；一个关键 gotcha 是空闲并不等于停着不动，长时间没分到正式工作会退化成 wander job。"
+      "line": 142,
+      "title": "小人行为是系统调度出来的",
+      "description": "`gatherCandidates()` 把觅食、指派、搬运、施工、睡眠等候选工作汇总起来，再由评分逻辑选出当前任务。新人想搞懂“为什么小人去做这件事”时，几乎总会回到这里。一个重要认知是：行为不是对象方法自发触发，而是 AI 系统在 tick 中反复评估并分配出来的。"
+    },
+    {
+      "file": "src/presentation/presentation-state.ts",
+      "line": 96,
+      "title": "PresentationState 只存展示态",
+      "description": "这里专门放选中、悬停、预览、覆盖层、当前工具这些屏幕状态。它们不进入 `World`，也不该承载 simulation 规则。你如果要改 UI 体验或操作模式，先确认自己是在改 `presentation`，还是在改真正的世界状态，这会少走很多弯路。"
+    },
+    {
+      "file": "src/adapter/input/input-handler.ts",
+      "line": 147,
+      "title": "输入层负责把操作翻译成命令",
+      "description": "`handleClick()` 是很好的阅读锚点：它根据当前工具把点击转换成选择、建造、指派、分区或取消，并把相应命令压进 `world.commandQueue`。输入层看起来像在直接操作地图，但实际职责是翻译用户意图，而不是直接改 simulation 数据。"
+    },
+    {
+      "file": "src/adapter/main-scene.ts",
+      "line": 121,
+      "title": "MainScene 把帧循环接到 simulation",
+      "description": "`MainScene.update()` 同时驱动输入、预览、debug overlay、tick 推进和渲染同步。这里能帮助新人把“每帧更新”和“每个 simulation tick”区分开，也能看清 Phaser 在本项目里的真实角色：它是适配器和宿主，不是规则本体。"
+    },
+    {
+      "file": "src/ui/kernel/ui-bridge.ts",
+      "line": 29,
+      "title": "现在 UI 通过快照桥接引擎",
+      "description": "旧 tour 没覆盖这块，但现在它已经是项目现状的重要组成部分。`createEngineSnapshotBridge()` 把 Phaser/engine 侧状态读成稳定快照，再通知 Preact 订阅者刷新。这个桥的意义是让 UI 读 engine，而不是把 UI 直接耦合进 simulation。"
+    },
+    {
+      "file": "src/ui/app/app-root.tsx",
+      "line": 30,
+      "title": "Preact UI 已经是正式入口的一部分",
+      "description": "`AppRoot` 通过 `useEngineSnapshot()` 消费 bridge，再把数据和交互端口传给 `AppShell`。这说明现在的界面层不只是临时 DOM 面板，而是一个有 `kernel / domains / components / styles` 分层的正式子系统。想改面板、列表、通知或选择器，可以从这里顺着往下追。"
+    },
+    {
+      "file": "src/testing/scenario-registry.ts",
+      "line": 20,
+      "title": "测试不只是单测，还有场景注册表",
+      "description": "`scenarioRegistry` 集中列出了当前可运行的业务场景：砍树、搬运、吃饭、蓝图建造、仓储区生命周期、睡眠与床位占用等。它一头连着 headless 场景回归，一头连着可视化工作台，是新人理解“我们如何验证复杂行为链”的最好入口。"
+    },
+    {
+      "file": "src/testing/visual-runner/scenario-workbench-app.ts",
+      "line": 42,
+      "title": "Visual Workbench 是理解行为链的捷径",
+      "description": "`bootstrapScenarioWorkbench()` 展示了可视化场景工作台如何从 URL 选择场景、创建 controller、渲染 HUD，并在 selector/workbench 两种模式之间切换。对新人来说，这是一条非常高价值的路径：你不用一上来就改游戏主入口，也能在受控环境里观察一条业务链怎么跑。"
     },
     {
       "file": "src/adapter/debug/console.ts",
-      "line": 42,
-      "title": "用浏览器控制台快速验理解",
-      "description": "`window.opus` 暴露了检查对象、看 reservation、推进 tick、注入命令和查看状态的快捷入口。新人读完前面的链路后，最好的下一步不是盲改代码，而是先在浏览器里跑 `opus.status()`、`opus.pawns()` 或 `opus.advance(50)` 验证自己的心智模型；这会比单靠肉眼看画面更快定位理解偏差。"
+      "line": 49,
+      "title": "最后学会用浏览器调试入口",
+      "description": "`installDebugConsole()` 会把一组调试 API 挂到 `window.opus`。`opus.status()`、`opus.pawns()`、`opus.cmd()`、`opus.advance(n)` 这些入口对新人特别有用，因为它们能帮你快速验证自己对 world、command 和 tick 流的理解，而不是只靠肉眼盯画面猜发生了什么。"
     }
   ]
 }
