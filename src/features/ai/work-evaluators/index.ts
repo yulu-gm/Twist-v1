@@ -7,7 +7,10 @@
 
 import type { WorkEvaluator } from '../work-evaluator.types';
 import { eatWorkEvaluator, sleepWorkEvaluator } from './needs.evaluator';
+import { designationMineWorkEvaluator, designationHarvestWorkEvaluator } from './designation.evaluator';
+import { deliverMaterialsWorkEvaluator, constructWorkEvaluator } from './construction.evaluator';
 import { haulToStockpileWorkEvaluator } from './hauling.evaluator';
+import { resolveCarryingWorkEvaluator } from './carrying.evaluator';
 import { wanderWorkEvaluator } from './wander.evaluator';
 
 /**
@@ -19,6 +22,11 @@ import { wanderWorkEvaluator } from './wander.evaluator';
 export const workEvaluators: WorkEvaluator[] = [
   eatWorkEvaluator,
   sleepWorkEvaluator,
+  designationMineWorkEvaluator,
+  designationHarvestWorkEvaluator,
+  deliverMaterialsWorkEvaluator,
+  constructWorkEvaluator,
   haulToStockpileWorkEvaluator,
+  resolveCarryingWorkEvaluator,
   wanderWorkEvaluator,
 ];
