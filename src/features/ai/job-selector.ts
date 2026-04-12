@@ -205,17 +205,6 @@ function assignJob(
   map: GameMap,
   world: World,
 ): void {
-  if (job.defId === 'job_sleep' && job.targetId) {
-    const bed = map.objects.getAs(job.targetId, ObjectKind.Building);
-    if (
-      bed?.bed
-      && bed.bed.autoAssignable
-      && bed.bed.ownerPawnId === undefined
-    ) {
-      bed.bed.ownerPawnId = pawn.name;
-    }
-  }
-
   pawn.ai.currentJob = job;
   pawn.ai.currentToilIndex = 0;
   pawn.ai.toilState = {};

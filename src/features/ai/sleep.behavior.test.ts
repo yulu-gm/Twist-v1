@@ -31,6 +31,8 @@ describe('sleep behavior', () => {
       mapId: map.id,
       defs,
     });
+    // 预先分配床位所有权（不再依赖自动认领）
+    bed.bed!.ownerPawnId = pawn.name;
 
     map.objects.add(pawn);
     map.objects.add(bed);
@@ -64,6 +66,8 @@ describe('sleep behavior', () => {
       mapId: map.id,
       defs,
     });
+    // 预先分配床位所有权（不再依赖自动认领）
+    bed.bed!.ownerPawnId = pawn.name;
 
     map.objects.add(pawn);
     map.objects.add(bed);
@@ -85,6 +89,87 @@ describe('sleep behavior', () => {
       { x: bed.cell.x, y: bed.cell.y + 1 },
     ]).toContainEqual(pawn.cell);
     expect(pawn.cell).not.toEqual(bed.interaction?.interactionCell);
+  });
+
+  it('uses the pawn owned bed and never auto-claims an unowned bed', () => {
+    const defs = buildDefDatabase();
+    const world = createWorld({ defs, seed: 10 });
+    const map = createGameMap({ id: 'main', width: 20, height: 20 });
+    world.maps.set(map.id, map);
+
+    const pawn = createPawn({
+      name: 'OwnerSleeper',
+      cell: { x: 10, y: 10 },
+      mapId: map.id,
+      factionId: 'player',
+      rng: world.rng,
+    });
+    pawn.needs.food = 80;
+    pawn.needs.rest = 10;
+
+    // 创建 pawn 拥有的床位
+    const ownedBed = createBuilding({
+      defId: 'bed_wood',
+      cell: { x: 12, y: 10 },
+      mapId: map.id,
+      defs,
+    });
+    ownedBed.bed!.ownerPawnId = pawn.name;
+
+    // 创建一个无主的闲置床位
+    const strayBed = createBuilding({
+      defId: 'bed_wood',
+      cell: { x: 4, y: 4 },
+      mapId: map.id,
+      defs,
+    });
+
+    map.objects.add(pawn);
+    map.objects.add(ownedBed);
+    map.objects.add(strayBed);
+
+    jobSelectionSystem.execute(world);
+
+    // 应选中自己拥有的床位
+    expect(pawn.ai.currentJob?.defId).toBe('job_sleep');
+    expect(pawn.ai.currentJob?.targetId).toBe(ownedBed.id);
+    // 无主床不应被自动认领
+    expect(strayBed.bed?.ownerPawnId).toBeUndefined();
+  });
+
+  it('falls back to floor sleep when another pawn owns the only bed', () => {
+    const defs = buildDefDatabase();
+    const world = createWorld({ defs, seed: 20 });
+    const map = createGameMap({ id: 'main', width: 20, height: 20 });
+    world.maps.set(map.id, map);
+
+    const pawn = createPawn({
+      name: 'Homeless',
+      cell: { x: 10, y: 10 },
+      mapId: map.id,
+      factionId: 'player',
+      rng: world.rng,
+    });
+    pawn.needs.food = 80;
+    pawn.needs.rest = 10;
+
+    // 创建一个其他 pawn 拥有的床位
+    const bed = createBuilding({
+      defId: 'bed_wood',
+      cell: { x: 12, y: 10 },
+      mapId: map.id,
+      defs,
+    });
+    bed.bed!.ownerPawnId = 'SomeoneElse';
+
+    map.objects.add(pawn);
+    map.objects.add(bed);
+
+    jobSelectionSystem.execute(world);
+
+    // 没有自己的床位时应就地休息（无 targetId）
+    expect(pawn.ai.currentJob?.defId).toBe('job_sleep');
+    expect(pawn.ai.currentJob?.targetId).toBeUndefined();
   });
 
   it('falls back to floor sleep when no bed is available', () => {

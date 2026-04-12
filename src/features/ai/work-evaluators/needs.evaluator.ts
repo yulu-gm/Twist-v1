@@ -18,7 +18,7 @@ import type { World } from '../../../world/world';
 import { estimateDistance } from '../../pathfinding/path.service';
 import { createEatJob } from '../jobs/eat-job';
 import { createSleepJob } from '../jobs/sleep-job';
-import { getAllBeds, getBedByOwner, isBedAvailable } from '../../building/building.queries';
+import { getBedByOwner, isBedAvailable } from '../../building/building.queries';
 
 /**
  * 进食工作评估器 — 评估 pawn 是否需要并可以进食
@@ -145,14 +145,11 @@ export const sleepWorkEvaluator: WorkEvaluator = {
       pawn.needsProfile.sleepSeekThreshold - pawn.needs.rest
     ) / Math.max(1, pawn.needsProfile.sleepSeekThreshold);
 
-    // 尝试找到床位
+    // 尝试找到 pawn 自己拥有的床位
     const ownedBed = getBedByOwner(map, pawn.name);
-    const candidateBed = ownedBed && isBedAvailable(ownedBed)
-      ? ownedBed
-      : findNearestAvailableBed(pawn, map);
 
-    if (candidateBed) {
-      const interactionCell = candidateBed.interaction?.interactionCell ?? candidateBed.cell;
+    if (ownedBed && isBedAvailable(ownedBed)) {
+      const interactionCell = ownedBed.interaction?.interactionCell ?? ownedBed.cell;
       const dist = estimateDistance(pawn.cell, interactionCell);
       const score = 90 + sleepUrgency * 140 - dist * 0.5;
       return {
@@ -162,18 +159,18 @@ export const sleepWorkEvaluator: WorkEvaluator = {
         score,
         failureReasonCode: 'none',
         failureReasonText: null,
-        detail: candidateBed.id,
+        detail: ownedBed.id,
         jobDefId: 'job_sleep',
         evaluatedAtTick: world.tick,
         createJob: () => createSleepJob(
           pawn.id,
-          { bedId: candidateBed.id, interactionCell },
+          { bedId: ownedBed.id, interactionCell },
           pawn.cell,
         ),
       };
     }
 
-    // 无床位时就地休息
+    // 无自有床位时就地休息
     const score = 55 + sleepUrgency * 120;
     return {
       kind: 'sleep',
@@ -189,27 +186,3 @@ export const sleepWorkEvaluator: WorkEvaluator = {
     };
   },
 };
-
-/** 查找最近的可用空闲床位 */
-function findNearestAvailableBed(pawn: Pawn, map: GameMap) {
-  const beds = getAllBeds(map).filter((building) => (
-    building.bed?.autoAssignable === true
-    && building.bed.ownerPawnId === undefined
-    && isBedAvailable(building)
-    && !map.reservations.isReserved(building.id)
-  ));
-
-  let bestBed = beds[0];
-  let bestDistance = Infinity;
-
-  for (const bed of beds) {
-    const interactionCell = bed.interaction?.interactionCell ?? bed.cell;
-    const dist = estimateDistance(pawn.cell, interactionCell);
-    if (dist < bestDistance) {
-      bestDistance = dist;
-      bestBed = bed;
-    }
-  }
-
-  return bestBed;
-}

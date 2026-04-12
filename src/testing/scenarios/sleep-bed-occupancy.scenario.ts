@@ -4,6 +4,7 @@ import {
   createSetupStep,
   createWaitForStep,
 } from '../scenario-dsl/scenario.builders';
+import { ObjectKind } from '@core/types';
 import {
   setPawnRestFixture,
   spawnBuildingFixture,
@@ -26,7 +27,7 @@ let bedOwners: string[] = [];
 export const sleepBedOccupancyScenario = createScenario({
   id: 'sleep-bed-occupancy',
   title: '三人两床的睡眠占床',
-  description: '验证两张空床会被两名小人占据，第三名小人会走地板睡，并且床位会在选中睡眠工作时自动认领 owner。',
+  description: '验证两张已分配 owner 的床会被两名小人占据，第三名无床小人会走地板睡。',
   report: {
     focus: '关注 sleep job 分配、床位 owner/occupant 写入、第三人 floor sleep，以及醒来后的 occupant 释放。',
   },
@@ -45,6 +46,14 @@ export const sleepBedOccupancyScenario = createScenario({
     setPawnRestFixture('Sleeper-C', 10),
     spawnBuildingFixture('bed_wood', BED_CELLS[0]),
     spawnBuildingFixture('bed_wood', BED_CELLS[1]),
+    // 预先分配床位所有权给前两名小人（不再依赖自动认领）
+    createSetupStep('为 Sleeper-A 和 Sleeper-B 分配床位所有权', ({ harness }) => {
+      const beds = harness.map.objects.allOfKind(ObjectKind.Building) as any[];
+      const bedA = beds.find(b => b.bed && b.cell.x === BED_CELLS[0].x && b.cell.y === BED_CELLS[0].y);
+      const bedB = beds.find(b => b.bed && b.cell.x === BED_CELLS[1].x && b.cell.y === BED_CELLS[1].y);
+      if (bedA?.bed) bedA.bed.ownerPawnId = 'Sleeper-A';
+      if (bedB?.bed) bedB.bed.ownerPawnId = 'Sleeper-B';
+    }),
   ],
   script: [
     createWaitForStep('等待三人都切换到睡眠工作', ({ query }) => {
@@ -71,7 +80,7 @@ export const sleepBedOccupancyScenario = createScenario({
       timeoutTicks: 80,
       timeoutMessage: '三名小人没有按预期形成“两床一地板”的睡眠分配',
     }),
-    createWaitForStep('等待两张床都完成 owner 认领', ({ query }) => {
+    createWaitForStep('验证两张床的 owner 已预先分配', ({ query }) => {
       const bedA = query.findBuildingAt('bed_wood', BED_CELLS[0]) as any;
       const bedB = query.findBuildingAt('bed_wood', BED_CELLS[1]) as any;
       const owners = [bedA?.bed?.ownerPawnId, bedB?.bed?.ownerPawnId].filter((owner): owner is string => !!owner);
@@ -83,7 +92,7 @@ export const sleepBedOccupancyScenario = createScenario({
       return true;
     }, {
       timeoutTicks: 20,
-      timeoutMessage: '两张床没有在选中睡眠工作后完成 owner 认领',
+      timeoutMessage: '两张床没有完成 owner 预分配',
     }),
     createWaitForStep('等待两张床都被占据', ({ query }) => {
       const bedA = query.findBuildingAt('bed_wood', BED_CELLS[0]) as any;

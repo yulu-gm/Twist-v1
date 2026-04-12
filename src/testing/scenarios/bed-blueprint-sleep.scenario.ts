@@ -36,9 +36,9 @@ let recoveredNames: string[] = [];
 export const bedBlueprintSleepScenario = createScenario({
   id: 'bed-blueprint-sleep',
   title: '批量建床后投入睡眠',
-  description: '验证多张 bed_wood 蓝图会被建造完成，低休息度小人会按名字认领新床，并在床上睡眠恢复。',
+  description: '验证多张 bed_wood 蓝图会被建造完成，预分配 owner 的低休息度小人会在床上睡眠恢复。',
   report: {
-    focus: '关注多床施工、sleep job 选床、owner 写入 pawn.name，以及 occupant 占用与休息恢复。',
+    focus: '关注多床施工、sleep job 选床、owner 预分配 pawn.name，以及 occupant 占用与休息恢复。',
   },
   setup: [
     createSetupStep('重置场景记录', () => {
@@ -64,7 +64,7 @@ export const bedBlueprintSleepScenario = createScenario({
       timeoutTicks: 1200,
       timeoutMessage: '三张 bed_wood 没有在预期时间内全部建成',
     }),
-    createSetupStep('生成三名 sleeper 并压低休息度', ({ harness }) => {
+    createSetupStep('生成三名 sleeper 并压低休息度，预分配床位所有权', ({ harness }) => {
       for (const name of SLEEPER_NAMES) {
         const sleeper = createPawn({
           name,
@@ -76,8 +76,16 @@ export const bedBlueprintSleepScenario = createScenario({
         sleeper.needs.rest = REST_TRIGGER_VALUE;
         harness.map.objects.add(sleeper);
       }
+      // 预先分配床位所有权给每名 sleeper（不再依赖自动认领）
+      const beds = harness.map.objects.allOfKind(ObjectKind.Building) as any[];
+      for (let i = 0; i < SLEEPER_NAMES.length; i++) {
+        const bed = beds.find(
+          b => b.bed && b.cell.x === BED_CELLS[i].x && b.cell.y === BED_CELLS[i].y,
+        );
+        if (bed?.bed) bed.bed.ownerPawnId = SLEEPER_NAMES[i];
+      }
     }),
-    createWaitForStep('等待三名 sleeper 领取新床睡眠工作', ({ query }) => {
+    createWaitForStep('等待三名 sleeper 使用预分配的床睡眠', ({ query }) => {
       const claimedOwners = new Set<string>();
 
       for (const name of SLEEPER_NAMES) {
@@ -100,7 +108,7 @@ export const bedBlueprintSleepScenario = createScenario({
         && SLEEPER_NAMES.every(name => claimedOwners.has(name));
     }, {
       timeoutTicks: 120,
-      timeoutMessage: '三名 sleeper 没有按名字认领三张新床',
+      timeoutMessage: '三名 sleeper 没有使用预分配的床进行睡眠',
     }),
     createWaitForStep('等待三张木床都被不同 sleeper 占用', ({ query }) => {
       const occupiedBy = new Set<string>();
@@ -160,7 +168,7 @@ export const bedBlueprintSleepScenario = createScenario({
     }, {
       failureMessage: '场景结束时没有看到三张建成的木床',
     }),
-    createAssertStep('三张木床应按 sleeper 名字完成 owner 认领', () => {
+    createAssertStep('三张木床应按 sleeper 名字完成 owner 预分配', () => {
       return ownerNames.length === SLEEPER_NAMES.length
         && SLEEPER_NAMES.every(name => ownerNames.includes(name));
     }, {

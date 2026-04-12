@@ -4,7 +4,6 @@ import { createGameMap } from '../../world/game-map';
 import { createWorld } from '../../world/world';
 import { createBuilding } from './building.factory';
 import {
-  findAvailableAutoAssignableBed,
   getAllBeds,
   getBedByOwner,
   isBedAvailable,
@@ -69,6 +68,5 @@ describe('building furniture support', () => {
     expect(isBedOwnedBy(ownedBed, 'Alice')).toBe(true);
     expect(isBedAvailable(occupiedBed)).toBe(false);
     expect(isBedAvailable(freeBed)).toBe(true);
-    expect(findAvailableAutoAssignableBed(map)?.id).toBe(freeBed.id);
   });
 });

@@ -40,21 +40,12 @@ export function getBedByOwner(map: GameMap, ownerName: string): Building | undef
   return getAllBeds(map).find(building => building.bed?.ownerPawnId === ownerName);
 }
 
-/** 判断床位是否当前无人占用 */
+/** 判断床位是否当前无人占用且未被摧毁 */
 export function isBedAvailable(building: Building): boolean {
-  return building.bed !== undefined && building.bed.occupantPawnId === undefined;
+  return building.bed !== undefined && building.bed.occupantPawnId === undefined && !building.destroyed;
 }
 
 /** 判断床位是否归指定棋子所有 */
 export function isBedOwnedBy(building: Building, ownerName: string): boolean {
   return building.bed?.ownerPawnId === ownerName;
-}
-
-/** 查找第一个可自动分配且当前无主无人的床位 */
-export function findAvailableAutoAssignableBed(map: GameMap): Building | undefined {
-  return getAllBeds(map).find(building => (
-    building.bed?.autoAssignable === true
-    && building.bed.ownerPawnId === undefined
-    && isBedAvailable(building)
-  ));
 }
