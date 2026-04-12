@@ -4,12 +4,13 @@
  * @part-of ui/domains/inspector — Inspector UI 领域
  */
 
-import { render, screen } from '@testing-library/preact';
-import { describe, expect, it, vi } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/preact';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ObjectInspector } from './object-inspector';
 import type { GenericInspectorViewModel, SpecializedInspectorViewModel } from '../inspector.types';
 
 describe('ObjectInspector', () => {
+  afterEach(cleanup);
   it('renders the fallback notice for generic inspector', () => {
     const vm: GenericInspectorViewModel = {
       mode: 'generic',
@@ -57,7 +58,7 @@ describe('ObjectInspector', () => {
     expect(screen.getByTestId('action-cancel_construction')).toBeInTheDocument();
   });
 
-  it('does not render stack tabs when only one object', () => {
+  it('renders stack tabs even when only one object (always visible)', () => {
     const vm: GenericInspectorViewModel = {
       mode: 'generic',
       targetId: 'item_1',
@@ -72,7 +73,8 @@ describe('ObjectInspector', () => {
       <ObjectInspector viewModel={vm} onSelectTarget={() => {}} onRunAction={() => {}} />,
     );
 
-    expect(screen.queryByTestId('object-stack-tabs')).toBeNull();
+    expect(screen.getByTestId('object-stack-tabs')).toBeInTheDocument();
+    expect(screen.getByTestId('stack-tab-item_1')).toBeInTheDocument();
   });
 
   it('renders stack tabs when multiple objects exist', () => {

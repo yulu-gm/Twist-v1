@@ -1,11 +1,15 @@
 /**
  * @file building-inspector.adapter.ts
  * @description Building 对象的 Inspector adapter — 从 BuildingObjectNode 构建专属视图模型
+ * @dependencies ui/components — StatRow, Section；
+ *               inspector.types — InspectorBodyCallbacks
  * @part-of ui/domains/inspector — Inspector UI 领域
  */
 
-import type { ObjectNode } from '../../../kernel/ui-types';
-import type { ObjectInspectorAdapter, AdapterContext, SpecializedInspectorViewModel, InspectorSection, InspectorAction } from '../inspector.types';
+import type { ObjectNode, BuildingObjectNode } from '../../../kernel/ui-types';
+import type { ObjectInspectorAdapter, AdapterContext, SpecializedInspectorViewModel, InspectorSection, InspectorAction, InspectorBodyCallbacks } from '../inspector.types';
+import { StatRow } from '../../../components/stat-row';
+import { Section } from '../../../components/section';
 
 /** 将下划线分隔的标识符转换为首字母大写的可读文本 */
 function toTitleCase(value: string): string {
@@ -23,7 +27,7 @@ export const buildingInspectorAdapter: ObjectInspectorAdapter = {
   },
 
   buildViewModel(object: ObjectNode, context: AdapterContext): SpecializedInspectorViewModel {
-    const building = object as import('../../../kernel/ui-types').BuildingObjectNode;
+    const building = object as BuildingObjectNode;
 
     const sections: InspectorSection[] = [];
     const actions: InspectorAction[] = [];
@@ -68,6 +72,11 @@ export const buildingInspectorAdapter: ObjectInspectorAdapter = {
       });
     }
 
+    /** 从快照中获取可分配的殖民者列表 */
+    const availableOwners = Object.values(context.snapshot.colonists)
+      .map(c => ({ id: c.id, label: c.name }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+
     return {
       mode: 'specialized',
       targetId: context.targetId,
@@ -76,6 +85,39 @@ export const buildingInspectorAdapter: ObjectInspectorAdapter = {
       stack: context.stack,
       sections,
       actions,
+      renderBody: (callbacks: InspectorBodyCallbacks) => (
+        <>
+          <Section title="Info">
+            {infoRows.map(row => (
+              <StatRow key={row.label} label={row.label} value={row.value} />
+            ))}
+          </Section>
+
+          {building.bed && (
+            <Section title="Bed">
+              <StatRow label="Role" value={toTitleCase(building.bed.role)} />
+              <StatRow label="Owner" value={building.bed.ownerPawnId ?? 'Unassigned'} />
+              <StatRow label="Occupant" value={building.bed.occupantPawnId ?? 'Empty'} />
+              <div class="bed-owner-controls">
+                <select
+                  onInput={(e) => {
+                    const value = (e.currentTarget as HTMLSelectElement).value;
+                    if (value) callbacks.onAssignBedOwner(context.targetId, value);
+                  }}
+                >
+                  <option value="" disabled selected>Assign owner</option>
+                  {availableOwners.map((owner) => (
+                    <option key={owner.id} value={owner.id}>{owner.label}</option>
+                  ))}
+                </select>
+                <button type="button" onClick={() => callbacks.onClearBedOwner(context.targetId)}>
+                  Clear Owner
+                </button>
+              </div>
+            </Section>
+          )}
+        </>
+      ),
     };
   },
 };

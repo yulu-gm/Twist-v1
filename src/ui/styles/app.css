@@ -572,3 +572,72 @@
   font-size: 10px;
   color: var(--text-muted);
 }
+
+/* ── Object Stack Tabs ── */
+
+.object-stack-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--panel-border);
+  overflow-x: auto;
+}
+
+.stack-tab {
+  padding: 4px 10px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  font-family: var(--font-family);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.1s, border-color 0.1s;
+}
+
+.stack-tab:hover {
+  color: var(--text-color);
+}
+
+.stack-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* ── Inspector Fallback Notice ── */
+
+.inspector-fallback-notice {
+  padding: 6px 0;
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* ── Inspector Actions ── */
+
+.inspector-actions {
+  display: flex;
+  gap: 4px;
+  padding: 6px 0;
+}
+
+.inspector-actions button {
+  padding: 4px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-family: var(--font-family);
+  font-size: var(--font-size-sm);
+  color: var(--text-color);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--panel-border);
+  transition: background 0.1s;
+}
+
+.inspector-actions button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.inspector-actions button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

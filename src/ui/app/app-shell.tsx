@@ -110,6 +110,8 @@ export function AppShell({ snapshot, uiState, dispatch, ports }: AppShellProps) 
           viewModel={objectInspector}
           onSelectTarget={(targetId) => dispatch({ type: 'set_inspector_target', targetId })}
           onRunAction={(actionId, targetId) => handleInspectorAction(ports, actionId, targetId)}
+          onAssignBedOwner={(bedId, pawnId) => ports.assignBedOwner(bedId, pawnId)}
+          onClearBedOwner={(bedId) => ports.clearBedOwner(bedId)}
         />
       )}
       <ToastStack toasts={feedback.toasts} />

@@ -4,6 +4,7 @@
  * @part-of ui/domains/inspector — Inspector UI 领域
  */
 
+import type { ComponentChildren } from 'preact';
 import type { ObjectNode } from '../../kernel/ui-types';
 
 /** 对象栈条目 — 同格对象导航中的单个对象 */
@@ -46,6 +47,16 @@ export interface InspectorAction {
   enabled: boolean;
 }
 
+/** Inspector body 区域的回调接口 — 传给 renderBody 供交互元素使用 */
+export interface InspectorBodyCallbacks {
+  /** 执行通用操作按钮 */
+  onRunAction: (actionId: string, targetId: string) => void;
+  /** 指派床位所有者 */
+  onAssignBedOwner: (bedId: string, pawnId: string) => void;
+  /** 清除床位所有者 */
+  onClearBedOwner: (bedId: string) => void;
+}
+
 /** Generic fallback 视图模型 — 对象缺少专用 Inspector 时的降级态 */
 export interface GenericInspectorViewModel {
   /** 视图模式标识 */
@@ -76,10 +87,12 @@ export interface SpecializedInspectorViewModel {
   subtitle: string;
   /** 同格对象栈 */
   stack: ObjectStackEntryViewModel[];
-  /** 专属区块列表 */
+  /** 专属区块列表（renderBody 未提供时使用的降级渲染数据） */
   sections: InspectorSection[];
   /** 操作按钮列表 */
   actions: InspectorAction[];
+  /** 自定义渲染体 — adapter 提供的富内容渲染函数，优先于 sections 渲染 */
+  renderBody?: (callbacks: InspectorBodyCallbacks) => ComponentChildren;
 }
 
 /** 统一 Inspector 视图模型联合类型 */

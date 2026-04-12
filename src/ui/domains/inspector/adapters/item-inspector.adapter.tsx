@@ -1,11 +1,14 @@
 /**
  * @file item-inspector.adapter.ts
  * @description Item 对象的 Inspector adapter — 显示物品基本信息与堆叠数量
+ * @dependencies ui/components — StatRow, Section
  * @part-of ui/domains/inspector — Inspector UI 领域
  */
 
-import type { ObjectNode } from '../../../kernel/ui-types';
+import type { ObjectNode, ItemObjectNode } from '../../../kernel/ui-types';
 import type { ObjectInspectorAdapter, AdapterContext, SpecializedInspectorViewModel } from '../inspector.types';
+import { StatRow } from '../../../components/stat-row';
+import { Section } from '../../../components/section';
 
 /** Item Inspector adapter — 物品专属 Inspector */
 export const itemInspectorAdapter: ObjectInspectorAdapter = {
@@ -16,7 +19,7 @@ export const itemInspectorAdapter: ObjectInspectorAdapter = {
   },
 
   buildViewModel(object: ObjectNode, context: AdapterContext): SpecializedInspectorViewModel {
-    const item = object as import('../../../kernel/ui-types').ItemObjectNode;
+    const item = object as ItemObjectNode;
 
     return {
       mode: 'specialized',
@@ -36,6 +39,13 @@ export const itemInspectorAdapter: ObjectInspectorAdapter = {
         },
       ],
       actions: [],
+      renderBody: () => (
+        <Section title="Overview">
+          <StatRow label="Type" value={item.defId} />
+          <StatRow label="Stack" value={String(item.stackCount)} />
+          <StatRow label="Position" value={`(${item.cell.x}, ${item.cell.y})`} />
+        </Section>
+      ),
     };
   },
 };

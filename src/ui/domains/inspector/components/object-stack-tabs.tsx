@@ -14,13 +14,11 @@ interface ObjectStackTabsProps {
 }
 
 /**
- * 同格对象栈导航 — 多个对象时显示切换标签
+ * 同格对象栈导航 — 常驻显示切换标签栏
  *
- * 只有栈中超过一个对象时才渲染
+ * 始终渲染标签栏，避免同格对象数量在 1 与多个之间快速变化时产生闪烁
  */
 export function ObjectStackTabs({ stack, onSelectTarget }: ObjectStackTabsProps) {
-  if (stack.length <= 1) return null;
-
   return (
     <div class="object-stack-tabs" data-testid="object-stack-tabs">
       {stack.map(entry => (
