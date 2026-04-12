@@ -6,7 +6,7 @@ describe('visual scenario registry', () => {
     const scenario = scenarioRegistry.find((entry) => entry.id === 'sleep-bed-occupancy');
 
     expect(scenario).toBeDefined();
-    expect(scenario?.title).toBe('ÈıÈËÁ½´²µÄË¯ÃßÕ¼´²');
-    expect(scenario?.report?.focus).toContain('´²Î»');
+    expect(scenario?.title).toBe('ä¸‰äººä¸¤åºŠçš„ç¡çœ å åºŠ');
+    expect(scenario?.report?.focus).toContain('åºŠä½');
   });
 });
