@@ -1,6 +1,7 @@
 /**
  * @file presentation-state.ts
- * @description 展示层状态定义，存储 UI 相关的瞬态数据（选中、悬停、预览、覆盖层等）
+ * @description 展示层状态定义，存储 UI 相关的瞬态数据（选中、悬停、预览、覆盖层等），
+ *              以及右键返回导航所需的返回栈与相关操作函数
  * @dependencies core/types — ObjectId、CellCoord、DefId、Rotation、DesignationType
  * @part-of presentation — 展示层，连接游戏逻辑与 UI 渲染
  */
@@ -88,6 +89,39 @@ export interface ZonePreview {
 }
 
 /**
+ * 返回栈条目 — 稳定交互状态快照
+ *
+ * 每次工具切换或有效选中时，将当前稳定状态压入栈，
+ * 右键弹出时恢复到该快照。
+ */
+export interface PresentationBackEntry {
+  /** 工具类型 */
+  activeTool: ToolType;
+  /** 指派子类型 */
+  activeDesignationType: DesignationType | null;
+  /** 区域子类型 */
+  activeZoneType: ZoneType | null;
+  /** 建造定义ID */
+  activeBuildDefId: DefId | null;
+  /** 选中对象ID列表（独立拷贝） */
+  selectedObjectIds: ObjectId[];
+}
+
+/**
+ * 工具选择参数 — 传入 applyToolSelection 的选项对象
+ */
+export interface ToolSelectionOptions {
+  /** 目标工具 */
+  tool: ToolType;
+  /** 指派子类型（仅 Designate 工具时使用） */
+  designationType?: DesignationType | null;
+  /** 区域子类型（仅 Zone 工具时使用） */
+  zoneType?: ZoneType | null;
+  /** 建造定义ID（仅 Build 工具时使用） */
+  buildDefId?: DefId | null;
+}
+
+/**
  * 展示层状态接口 — 存储所有 UI 相关的瞬态数据
  *
  * 这是游戏逻辑层和 UI 渲染层之间的桥梁，
@@ -126,6 +160,8 @@ export interface PresentationState {
   dragRect: { startCell: CellCoord; endCell: CellCoord } | null;
   /** 区域预览（null 表示当前没有区域交互预览） */
   zonePreview: ZonePreview | null;
+  /** 右键返回导航栈 — 存储稳定交互状态快照，供 popBackNavigation 恢复 */
+  backStack: PresentationBackEntry[];
 }
 
 /**
@@ -188,5 +224,162 @@ export function createPresentationState(): PresentationState {
     showGrid: false,
     dragRect: null,
     zonePreview: null,
+    /** 初始返回栈为空 */
+    backStack: [],
   };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 返回导航辅助函数
+// 导出供测试使用，实际使用场景通过 applyToolSelection / applyObjectSelection /
+// popBackNavigation 这三个公开入口操作。
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * 从当前展示状态生成一个稳定状态快照，用于压入返回栈
+ */
+export function captureBackEntry(presentation: PresentationState): PresentationBackEntry {
+  return {
+    activeTool: presentation.activeTool,
+    activeDesignationType: presentation.activeDesignationType,
+    activeZoneType: presentation.activeZoneType,
+    activeBuildDefId: presentation.activeBuildDefId,
+    // 独立拷贝，避免引用污染
+    selectedObjectIds: Array.from(presentation.selectedObjectIds),
+  };
+}
+
+/**
+ * 比较两个返回栈条目是否代表相同的稳定状态（用于去重）
+ */
+export function isSameBackEntry(a: PresentationBackEntry, b: PresentationBackEntry): boolean {
+  if (a.activeTool !== b.activeTool) return false;
+  if (a.activeDesignationType !== b.activeDesignationType) return false;
+  if (a.activeZoneType !== b.activeZoneType) return false;
+  if (a.activeBuildDefId !== b.activeBuildDefId) return false;
+  // 比较选中ID列表（顺序无关）
+  if (a.selectedObjectIds.length !== b.selectedObjectIds.length) return false;
+  const setA = new Set(a.selectedObjectIds);
+  return b.selectedObjectIds.every((id) => setA.has(id));
+}
+
+/**
+ * 清除所有瞬态交互状态（悬停、各类预览、拖拽选框）
+ *
+ * 在恢复返回栈条目后调用，确保不残留旧的预览信息。
+ */
+export function clearTransientInteractionState(presentation: PresentationState): void {
+  presentation.hoveredCell = null;
+  presentation.placementPreview = null;
+  presentation.designationPreview = null;
+  presentation.zonePreview = null;
+  presentation.dragRect = null;
+}
+
+/**
+ * 若当前状态与栈顶不同，则将当前状态压入返回栈（去重压栈）
+ */
+export function pushBackEntryIfNeeded(presentation: PresentationState): void {
+  const current = captureBackEntry(presentation);
+  const top = presentation.backStack[presentation.backStack.length - 1];
+  if (!top || !isSameBackEntry(top, current)) {
+    presentation.backStack.push(current);
+  }
+}
+
+/**
+ * 切换工具/子模式的入口 — 带返回栈感知
+ *
+ * 压栈时机：
+ * - 工具类型发生变化，或
+ * - 相同工具但子模式变化（buildDefId / designationType / zoneType 不同）
+ *
+ * 切换到非 Select 工具时，清空 selectedObjectIds。
+ */
+export function applyToolSelection(
+  presentation: PresentationState,
+  options: ToolSelectionOptions,
+): void {
+  const { tool, designationType = null, zoneType = null, buildDefId = null } = options;
+
+  // 判断是否发生了有效变更（工具或子模式不同）
+  const toolChanged = presentation.activeTool !== tool;
+  const submodeChanged =
+    presentation.activeBuildDefId !== buildDefId ||
+    presentation.activeDesignationType !== designationType ||
+    presentation.activeZoneType !== zoneType;
+
+  if (toolChanged || submodeChanged) {
+    // 压入当前状态供右键返回
+    pushBackEntryIfNeeded(presentation);
+  }
+
+  // 应用新工具与子模式
+  presentation.activeTool = tool;
+  presentation.activeDesignationType = tool === ToolType.Designate ? designationType : null;
+  presentation.activeZoneType = tool === ToolType.Zone ? zoneType : null;
+  presentation.activeBuildDefId = tool === ToolType.Build ? buildDefId : null;
+
+  // 非选择模式下清空已选对象
+  if (tool !== ToolType.Select) {
+    presentation.selectedObjectIds = new Set();
+  }
+
+  // 区域预览在工具切换时失效
+  presentation.zonePreview = null;
+}
+
+/**
+ * 选中对象的入口 — 带返回栈感知
+ *
+ * 压栈时机：
+ * - 当前不在 Select 模式（需先切换到 Select）
+ * - 在 Select 模式下，从无选中变为有选中
+ *
+ * 从一个非空选中变为另一个非空选中时，不再压栈（避免连续点击堆栈膨胀）。
+ */
+export function applyObjectSelection(presentation: PresentationState, ids: ObjectId[]): void {
+  const wasEmpty = presentation.selectedObjectIds.size === 0;
+  const notInSelectMode = presentation.activeTool !== ToolType.Select;
+
+  if (notInSelectMode) {
+    // 从其他模式切换到选择模式，压入当前工具状态
+    pushBackEntryIfNeeded(presentation);
+    presentation.activeTool = ToolType.Select;
+    presentation.activeDesignationType = null;
+    presentation.activeZoneType = null;
+    presentation.activeBuildDefId = null;
+    presentation.zonePreview = null;
+  } else if (wasEmpty && ids.length > 0) {
+    // 在选择模式下，从无选中变为有选中，压入空选中状态
+    pushBackEntryIfNeeded(presentation);
+  }
+  // 从一个非空选中变为另一个非空选中：不压栈
+
+  presentation.selectedObjectIds = new Set(ids);
+}
+
+/**
+ * 弹出返回栈，恢复上一个稳定状态
+ *
+ * @returns true 表示成功恢复，false 表示栈已空（仅清除瞬态状态）
+ */
+export function popBackNavigation(presentation: PresentationState): boolean {
+  // 无论是否有历史，都清除瞬态交互状态
+  clearTransientInteractionState(presentation);
+
+  const entry = presentation.backStack.pop();
+  if (!entry) {
+    // 栈已空，无法恢复
+    return false;
+  }
+
+  // 恢复稳定状态
+  presentation.activeTool = entry.activeTool;
+  presentation.activeDesignationType = entry.activeDesignationType;
+  presentation.activeZoneType = entry.activeZoneType;
+  presentation.activeBuildDefId = entry.activeBuildDefId;
+  presentation.selectedObjectIds = new Set(entry.selectedObjectIds);
+
+  return true;
 }
