@@ -70,16 +70,15 @@ describe('selectObjectInspector', () => {
 
   it('returns generic fallback for an object with no adapter', () => {
     const snapshot = makeSnapshot({
-      selection: { primaryId: 'item_1', selectedIds: ['item_1'] },
+      selection: { primaryId: 'unknown_1', selectedIds: ['unknown_1'] },
       objects: {
-        item_1: {
-          id: 'item_1',
-          kind: 'item',
-          label: 'Wood',
-          defId: 'wood',
+        unknown_1: {
+          id: 'unknown_1',
+          kind: 'unknown_kind',
+          label: 'Mystery Object',
+          defId: 'unknown',
           cell: { x: 5, y: 5 },
           footprint: { width: 1, height: 1 },
-          stackCount: 10,
         } as any,
       },
     });
@@ -87,11 +86,11 @@ describe('selectObjectInspector', () => {
     const vm = selectObjectInspector(snapshot, makeUiState());
     expect(vm).not.toBeNull();
     expect(vm!.mode).toBe('generic');
-    expect(vm!.targetId).toBe('item_1');
-    expect(vm!.title).toBe('Wood');
+    expect(vm!.targetId).toBe('unknown_1');
+    expect(vm!.title).toBe('Mystery Object');
     if (vm!.mode === 'generic') {
       expect(vm!.fallbackNotice).toContain('尚未实现专用 Inspector');
-      expect(vm!.stats.some(s => s.label === 'Kind' && s.value === 'item')).toBe(true);
+      expect(vm!.stats.some(s => s.label === 'Kind' && s.value === 'unknown_kind')).toBe(true);
     }
   });
 
@@ -310,6 +309,107 @@ describe('selectObjectInspector', () => {
       expect(vm!.actions.map(a => a.id)).toContain('assign_bed_owner');
       expect(vm!.actions.map(a => a.id)).toContain('clear_bed_owner');
       expect(vm!.sections.some(s => s.title === 'Bed')).toBe(true);
+    }
+  });
+
+  it('uses the blueprint adapter and exposes cancel_construction action', () => {
+    const snapshot = makeSnapshot({
+      selection: { primaryId: 'bp_1', selectedIds: ['bp_1'] },
+      objects: {
+        bp_1: {
+          id: 'bp_1',
+          kind: 'blueprint',
+          label: 'Blueprint: bed_wood',
+          defId: 'blueprint_bed_wood',
+          cell: { x: 4, y: 4 },
+          footprint: { width: 1, height: 2 },
+          targetDefId: 'bed_wood',
+          materialsRequired: [{ defId: 'wood', count: 10 }],
+          materialsDelivered: [{ defId: 'wood', count: 4 }],
+        } as any,
+      },
+    });
+
+    const vm = selectObjectInspector(snapshot, makeUiState());
+    expect(vm!.mode).toBe('specialized');
+    if (vm!.mode === 'specialized') {
+      expect(vm!.actions.map(a => a.id)).toContain('cancel_construction');
+      expect(vm!.sections.some(s => s.title === 'Materials')).toBe(true);
+    }
+  });
+
+  it('uses the construction site adapter with progress display', () => {
+    const snapshot = makeSnapshot({
+      selection: { primaryId: 'site_1', selectedIds: ['site_1'] },
+      objects: {
+        site_1: {
+          id: 'site_1',
+          kind: 'construction_site',
+          label: 'Construction: wall_wood',
+          defId: 'site_wall_wood',
+          cell: { x: 5, y: 5 },
+          footprint: { width: 1, height: 1 },
+          targetDefId: 'wall_wood',
+          buildProgress: 0.45,
+        } as any,
+      },
+    });
+
+    const vm = selectObjectInspector(snapshot, makeUiState());
+    expect(vm!.mode).toBe('specialized');
+    if (vm!.mode === 'specialized') {
+      expect(vm!.subtitle).toBe('Construction Site');
+      expect(vm!.sections[0].rows.some(r => r.label === 'Progress' && r.value === '45%')).toBe(true);
+    }
+  });
+
+  it('uses the item adapter instead of generic fallback', () => {
+    const snapshot = makeSnapshot({
+      selection: { primaryId: 'item_1', selectedIds: ['item_1'] },
+      objects: {
+        item_1: {
+          id: 'item_1',
+          kind: 'item',
+          label: 'Wood',
+          defId: 'wood',
+          cell: { x: 5, y: 5 },
+          footprint: { width: 1, height: 1 },
+          stackCount: 15,
+        } as any,
+      },
+    });
+
+    const vm = selectObjectInspector(snapshot, makeUiState());
+    expect(vm!.mode).toBe('specialized');
+    if (vm!.mode === 'specialized') {
+      expect(vm!.subtitle).toBe('Item');
+      expect(vm!.sections.some(s => s.title === 'Overview')).toBe(true);
+    }
+  });
+
+  it('uses the plant adapter with harvest action when ready', () => {
+    const snapshot = makeSnapshot({
+      selection: { primaryId: 'plant_1', selectedIds: ['plant_1'] },
+      objects: {
+        plant_1: {
+          id: 'plant_1',
+          kind: 'plant',
+          label: 'Oak Tree',
+          defId: 'tree_oak',
+          cell: { x: 7, y: 7 },
+          footprint: { width: 1, height: 1 },
+          growth: 0.85,
+          harvestReady: true,
+        } as any,
+      },
+    });
+
+    const vm = selectObjectInspector(snapshot, makeUiState());
+    expect(vm!.mode).toBe('specialized');
+    if (vm!.mode === 'specialized') {
+      expect(vm!.subtitle).toBe('Plant');
+      expect(vm!.actions.map(a => a.id)).toContain('designate_harvest');
+      expect(vm!.actions.map(a => a.id)).toContain('designate_cut');
     }
   });
 });
