@@ -82,7 +82,7 @@ export function readEngineSnapshot(
         options: pawn.ai.workDecision.options.map(option => ({
           kind: option.kind,
           label: option.label,
-          status: option.status === 'available' ? 'deferred' as const : option.status as 'active' | 'blocked' | 'deferred',
+          status: option.status,
           detail: option.detail,
           failureReasonText: option.failureReasonText,
         })),

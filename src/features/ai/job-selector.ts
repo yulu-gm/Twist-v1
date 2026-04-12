@@ -20,7 +20,7 @@ import { World } from '../../world/world';
 import { GameMap } from '../../world/game-map';
 import { Job } from './ai.types';
 import type { Pawn } from '../pawn/pawn.types';
-import type { WorkEvaluation, WorkOption } from './work-types';
+import type { WorkEvaluation, WorkOption, WorkFailureReasonCode } from './work-types';
 import { workEvaluators } from './work-evaluators';
 
 /**
@@ -71,6 +71,7 @@ function processMap(world: World, map: GameMap): void {
     // ── 3. 从高到低尝试分配，记录 blocked/deferred ──
     let assigned = false;
     let selectedKind: string | null = null;
+    const overrides = new Map<string, { code: WorkFailureReasonCode; text: string }>();
 
     for (const evaluation of evaluations) {
       // 跳过不可用的评估（无 createJob 表示该类别当前无有效选项）
@@ -81,9 +82,10 @@ function processMap(world: World, map: GameMap): void {
 
       // 检查携带冲突
       if (isJobBlockedByCarriedItems(pawn, job)) {
-        evaluation.failureReasonCode = 'carrying_conflict';
-        evaluation.failureReasonText = 'Current carrying stack blocks pickup-based work';
-        evaluation.createJob = null;
+        overrides.set(evaluation.kind, {
+          code: 'carrying_conflict',
+          text: 'Current carrying stack blocks pickup-based work',
+        });
         continue;
       }
 
@@ -97,9 +99,10 @@ function processMap(world: World, map: GameMap): void {
         });
 
         if (resId === null) {
-          evaluation.failureReasonCode = 'target_reserved';
-          evaluation.failureReasonText = 'Target already reserved';
-          evaluation.createJob = null;
+          overrides.set(evaluation.kind, {
+            code: 'target_reserved',
+            text: 'Target already reserved',
+          });
           continue;
         }
 
@@ -113,22 +116,24 @@ function processMap(world: World, map: GameMap): void {
     }
 
     // ── 4. 冻结决策快照 ──
-    freezeWorkDecision(pawn, evaluations, selectedKind, world.tick);
+    freezeWorkDecision(pawn, evaluations, selectedKind, overrides, world.tick);
   }
 }
 
 /**
  * 冻结工作决策快照 — 将排序后的评估结果持久化到 pawn.ai.workDecision
  *
- * @param pawn        - 执行选工的 Pawn
- * @param evaluations - 排序后的评估结果列表
+ * @param pawn         - 执行选工的 Pawn
+ * @param evaluations  - 排序后的评估结果列表（不可变，不应被修改）
  * @param selectedKind - 被选中的工作类别 kind（null 表示无工作可分配）
- * @param worldTick   - 当前世界 tick
+ * @param overrides    - 分配过程中发现的阻塞覆盖（携带冲突、预留失败等）
+ * @param worldTick    - 当前世界 tick
  */
 function freezeWorkDecision(
   pawn: Pawn,
-  evaluations: WorkEvaluation[],
+  evaluations: readonly WorkEvaluation[],
   selectedKind: string | null,
+  overrides: ReadonlyMap<string, { code: WorkFailureReasonCode; text: string }>,
   worldTick: number,
 ): void {
   const currentToil = pawn.ai.currentJob?.toils[pawn.ai.currentJob.currentToilIndex];
@@ -136,18 +141,23 @@ function freezeWorkDecision(
   // 标记状态：被选中的为 active，失败的为 blocked，其余为 deferred
   let foundSelected = false;
   const options: WorkOption[] = evaluations.map((evaluation) => {
+    const override = overrides.get(evaluation.kind);
+    const reasonCode = override?.code ?? evaluation.failureReasonCode;
+    const reasonText = override?.text ?? evaluation.failureReasonText;
+    const hasJob = !override && evaluation.createJob != null;
+
     let status: WorkOption['status'];
     if (evaluation.kind === selectedKind) {
       status = 'active';
       foundSelected = true;
-    } else if (evaluation.failureReasonCode !== 'none') {
+    } else if (reasonCode !== 'none') {
       status = 'blocked';
     } else if (foundSelected || selectedKind !== null) {
       // 在已选工作之后，或有已选工作但不是当前项
       status = 'deferred';
     } else {
       // 没有任何工作被选中时，无 createJob 的标记为 blocked
-      status = evaluation.createJob ? 'deferred' : 'blocked';
+      status = hasJob ? 'deferred' : 'blocked';
     }
 
     return {
@@ -155,8 +165,8 @@ function freezeWorkDecision(
       label: evaluation.label,
       priority: evaluation.priority,
       score: evaluation.score,
-      failureReasonCode: evaluation.failureReasonCode,
-      failureReasonText: evaluation.failureReasonText,
+      failureReasonCode: reasonCode,
+      failureReasonText: reasonText,
       detail: evaluation.detail,
       jobDefId: evaluation.jobDefId,
       evaluatedAtTick: worldTick,

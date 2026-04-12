@@ -105,7 +105,7 @@ function buildInspectorViewModel(c: ColonistNode): ColonistInspectorViewModel {
  * @param c - 殖民者节点（来自快照）
  * @returns 工作队列行列表，无快照时返回空数组
  */
-function buildWorkQueue(c: ColonistNode): WorkQueueRowViewModel[] {
+export function buildWorkQueue(c: ColonistNode): WorkQueueRowViewModel[] {
   if (!c.workDecision) return [];
 
   return c.workDecision.options.map(option => {

@@ -11,7 +11,7 @@ import type { Job } from './ai.types';
 // ── 决策状态枚举 ──
 
 /** 工作选项在冻结快照中的决策状态 */
-export type WorkDecisionStatus = 'available' | 'blocked' | 'active' | 'deferred';
+export type WorkDecisionStatus = 'blocked' | 'active' | 'deferred';
 
 // ── 失败原因码 ──
 

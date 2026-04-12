@@ -5,7 +5,8 @@
  *               pathfinding — 距离估算和可达性检查；
  *               construction — 蓝图材料检查；
  *               item/item.queries — 存储格查找；
- *               ai/jobs — 搬运工作工厂函数
+ *               ai/jobs — 搬运工作工厂函数；
+ *               blueprint-inflight — 在途材料计算
  * @part-of AI 子系统（features/ai）
  */
 
@@ -14,11 +15,12 @@ import type { WorkEvaluation } from '../work-types';
 import type { Pawn } from '../../pawn/pawn.types';
 import type { GameMap } from '../../../world/game-map';
 import type { World } from '../../../world/world';
-import { ObjectKind, ToilType, ToilState, JobState, cellKey } from '../../../core/types';
+import { ObjectKind, cellKey } from '../../../core/types';
 import { estimateDistance, isReachable } from '../../pathfinding/path.service';
 import { findNearestAcceptingCell } from '../../item/item.queries';
 import { createCarryJob } from '../jobs/carry-job';
 import { areBlueprintMaterialsDelivered } from '../../construction/construction.helpers';
+import { getBlueprintMaterialInFlightCount } from './blueprint-inflight';
 
 /**
  * 携带物处理评估器 — 当 pawn 手持物品时寻找放置目标
@@ -162,39 +164,4 @@ function findReachableAcceptingCell(
     }
     excludedCells.add(cellKey(candidate));
   }
-}
-
-/** 获取蓝图材料搬运中的在途数量 */
-function getBlueprintMaterialInFlightCount(
-  map: GameMap,
-  blueprintId: string,
-  materialDefId: string,
-): number {
-  let total = 0;
-  const pawns = map.objects.allOfKind(ObjectKind.Pawn);
-
-  for (const pawn of pawns) {
-    const job = pawn.ai.currentJob;
-    if (!job || job.defId !== 'job_deliver_materials') continue;
-    if (job.state === JobState.Done || job.state === JobState.Failed) continue;
-
-    const deliverToil = job.toils.find(toil => toil.type === ToilType.Deliver);
-    if (!deliverToil || deliverToil.targetId !== blueprintId) continue;
-    if (deliverToil.state === ToilState.Completed || deliverToil.state === ToilState.Failed) continue;
-
-    if (pawn.inventory.carrying?.defId === materialDefId) {
-      total += pawn.inventory.carrying.count;
-      continue;
-    }
-
-    const pickupToil = job.toils.find(toil => toil.type === ToilType.PickUp);
-    if (!pickupToil?.targetId) continue;
-
-    const pickupItem = map.objects.getAs(pickupToil.targetId, ObjectKind.Item);
-    if (!pickupItem || pickupItem.destroyed || pickupItem.defId !== materialDefId) continue;
-
-    total += Math.max(0, Math.floor((pickupToil.localData.requestedCount as number) ?? 0));
-  }
-
-  return total;
 }

@@ -4,7 +4,8 @@
  * @dependencies ai/work-evaluator.types — WorkEvaluator 接口；
  *               pathfinding — 距离估算和可达性检查；
  *               construction — 蓝图材料检查和占用检测；
- *               ai/jobs — 工作工厂函数
+ *               ai/jobs — 工作工厂函数；
+ *               blueprint-inflight — 在途材料计算
  * @part-of AI 子系统（features/ai）
  */
 
@@ -14,7 +15,7 @@ import type { Pawn } from '../../pawn/pawn.types';
 import type { Item } from '../../item/item.types';
 import type { GameMap } from '../../../world/game-map';
 import type { World } from '../../../world/world';
-import { ObjectKind, ToilType, ToilState, JobState } from '../../../core/types';
+import { ObjectKind, ToilType } from '../../../core/types';
 import { estimateDistance, isReachable } from '../../pathfinding/path.service';
 import { createHaulJob } from '../jobs/haul-job';
 import { createConstructJob } from '../jobs/construct-job';
@@ -22,6 +23,7 @@ import {
   areBlueprintMaterialsDelivered,
   hasConstructionOccupants,
 } from '../../construction/construction.helpers';
+import { getBlueprintMaterialInFlightCount } from './blueprint-inflight';
 
 /**
  * 材料搬运评估器 — 为未送齐材料的蓝图寻找材料搬运目标
@@ -229,59 +231,3 @@ export const constructWorkEvaluator: WorkEvaluator = {
     };
   },
 };
-
-/** 获取蓝图材料搬运中的在途数量 */
-function getBlueprintMaterialInFlightCount(
-  map: GameMap,
-  blueprintId: string,
-  materialDefId: string,
-): number {
-  let total = 0;
-  const pawns = map.objects.allOfKind(ObjectKind.Pawn);
-
-  for (const pawn of pawns) {
-    total += getDeliverJobPlannedCount(pawn, map, blueprintId, materialDefId);
-  }
-
-  return total;
-}
-
-/** 获取 pawn 当前搬运工作的计划数量 */
-function getDeliverJobPlannedCount(
-  pawn: { ai: { currentJob: { defId: string; state: string; toils: Array<{ type: string; targetId?: string; state: string; localData: Record<string, unknown> }> } | null }; inventory: { carrying: { defId: string; count: number } | null } },
-  map: GameMap,
-  blueprintId: string,
-  materialDefId: string,
-): number {
-  const job = pawn.ai.currentJob;
-  if (!job || job.defId !== 'job_deliver_materials') return 0;
-  if (job.state === JobState.Done || job.state === JobState.Failed) return 0;
-
-  const deliverToil = job.toils.find(toil => toil.type === ToilType.Deliver);
-  if (!deliverToil || deliverToil.targetId !== blueprintId) return 0;
-  if (deliverToil.state === ToilState.Completed || deliverToil.state === ToilState.Failed) return 0;
-
-  if (pawn.inventory.carrying?.defId === materialDefId) {
-    return pawn.inventory.carrying.count;
-  }
-
-  const deliverDefId = typeof deliverToil.localData.defId === 'string'
-    ? deliverToil.localData.defId
-    : null;
-  if (deliverDefId && deliverDefId !== 'unknown' && deliverDefId !== materialDefId) {
-    return 0;
-  }
-
-  const pickupToil = job.toils.find(toil => toil.type === ToilType.PickUp);
-  if (!pickupToil || !pickupToil.targetId) return 0;
-
-  const pickupItem = map.objects.getAs(pickupToil.targetId, ObjectKind.Item);
-  if (!pickupItem || pickupItem.destroyed || pickupItem.defId !== materialDefId) return 0;
-
-  const requestedCount = Math.max(
-    0,
-    Math.floor((pickupToil.localData.requestedCount as number) ?? (deliverToil.localData.count as number) ?? 0),
-  );
-
-  return requestedCount;
-}
