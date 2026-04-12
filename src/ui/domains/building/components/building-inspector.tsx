@@ -9,10 +9,10 @@ interface BuildingInspectorProps {
 export function BuildingInspector({ viewModel }: BuildingInspectorProps) {
   return (
     <div class="inspector-panel">
-      <div class="inspector-panel__header">{viewModel.label}</div>
+      <div class="inspector-panel__header">{viewModel.base.label}</div>
       <div class="inspector-panel__body">
         <Section title="Info">
-          {viewModel.stats.map((stat) => (
+          {viewModel.base.stats.map((stat) => (
             <StatRow key={stat.label} label={stat.label} value={stat.value} />
           ))}
         </Section>
