@@ -35,6 +35,10 @@ export interface UiPorts {
   setTool(tool: string, designationType?: string | null, buildDefId?: string | null, zoneType?: string | null): void;
   /** 跳转摄像机到指定格子（待接入 Phaser 摄像机） */
   jumpCameraTo(cell: { x: number; y: number }): void;
+  /** 指派床位所有者 */
+  assignBedOwner(bedId: string, pawnId: string): void;
+  /** 清除床位所有者 */
+  clearBedOwner(bedId: string): void;
 }
 
 /**
@@ -90,6 +94,14 @@ export function createUiPorts(
 
     jumpCameraTo(_cell: { x: number; y: number }): void {
       // 待接入 Phaser 摄像机引用后实现
+    },
+
+    assignBedOwner(bedId: string, pawnId: string): void {
+      commandQueue.push({ type: 'assign_bed_owner', payload: { bedId, pawnId } });
+    },
+
+    clearBedOwner(bedId: string): void {
+      commandQueue.push({ type: 'clear_bed_owner', payload: { bedId } });
     },
   };
 }

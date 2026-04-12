@@ -227,6 +227,12 @@ function createLazyPorts(world: World, getPresentation: () => PresentationState 
     jumpCameraTo(_cell: { x: number; y: number }) {
       // Will be wired to Phaser camera later
     },
+    assignBedOwner(bedId: string, pawnId: string) {
+      world.commandQueue.push({ type: 'assign_bed_owner', payload: { bedId, pawnId } });
+    },
+    clearBedOwner(bedId: string) {
+      world.commandQueue.push({ type: 'clear_bed_owner', payload: { bedId } });
+    },
   };
 }
 

@@ -82,7 +82,13 @@ export function AppShell({ snapshot, uiState, dispatch, ports }: AppShellProps) 
         onSelect={(id) => ports.selectColonist(id)}
       />
       {inspector && <ColonistInspector viewModel={inspector} />}
-      {buildingInspector && <BuildingInspector viewModel={buildingInspector} />}
+      {buildingInspector && (
+        <BuildingInspector
+          viewModel={buildingInspector}
+          onAssignOwner={(bedId, pawnId) => ports.assignBedOwner(bedId, pawnId)}
+          onClearOwner={(bedId) => ports.clearBedOwner(bedId)}
+        />
+      )}
       <ToastStack toasts={feedback.toasts} />
       <DebugPanel visible={showDebug} debugInfo={debugInfo} />
       <ToolModeBar
