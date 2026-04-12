@@ -11,9 +11,10 @@ import Phaser from 'phaser';
 import { World } from '../../world/world';
 import type { GameMap } from '../../world/game-map';
 import { CellCoord, ObjectKind, DesignationType, ZoneType, cellKey } from '../../core/types';
-import { PresentationState, ToolType } from '../../presentation/presentation-state';
+import { PresentationState, ToolType, clearTransientInteractionState, popBackNavigation, applyObjectSelection } from '../../presentation/presentation-state';
 import type { Designation } from '../../features/designation/designation.types';
 import { analyzeZoneCellPlacement } from '../../features/zone/zone.analysis';
+import { analyzeBuildingPlacement } from '../../features/construction/construction.placement';
 import { setupKeyboardBindings } from './keyboard-bindings';
 
 /** 地图格子像素大小 */
@@ -65,8 +66,16 @@ export class InputHandler {
 
   /** 注册鼠标输入事件 */
   private setupMouseInputs(): void {
-    // pointerdown：记录起点
+    // 拦截浏览器右键菜单
+    this.bindContextMenuPrevention();
+
+    // pointerdown：记录起点（左键）或执行返回动作（右键）
     this.scene.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      // 右键：执行返回动作
+      if (pointer.rightButtonDown()) {
+        this.handleBackAction();
+        return;
+      }
       if (!pointer.leftButtonDown()) return;
       const cell = this.pointerToCell(pointer);
       if (!cell) return;
@@ -141,6 +150,38 @@ export class InputHandler {
     return { x, y };
   }
 
+  /**
+   * 拦截 Phaser canvas 上的浏览器右键菜单
+   * 仅对游戏画布生效，不影响调试面板或浏览器原生交互
+   */
+  private bindContextMenuPrevention(): void {
+    const canvas = this.scene.game?.canvas;
+    if (canvas) {
+      canvas.addEventListener('contextmenu', (event: Event) => {
+        event.preventDefault();
+      });
+    }
+  }
+
+  /**
+   * 右键返回动作 — 按返回栈逐层回退交互状态
+   *
+   * 执行顺序：
+   * 1. 如果正在拖拽，则取消当前拖拽（不弹栈）
+   * 2. 如果没有拖拽，清理临时预览后弹出返回栈顶层
+   */
+  private handleBackAction(): void {
+    // 优先取消进行中的拖拽
+    if (this.dragState) {
+      this.dragState = null;
+      clearTransientInteractionState(this.presentation);
+      return;
+    }
+
+    // 清理临时预览并恢复上一层稳定状态
+    popBackNavigation(this.presentation);
+  }
+
   // ── 单击处理 ──
 
   /** 单击分发 — 根据当前工具执行对应操作 */
@@ -165,11 +206,8 @@ export class InputHandler {
   }
 
   private handleSelect(cell: CellCoord): void {
-    this.presentation.selectedObjectIds.clear();
-    const objectIds = this.map.spatial.getAt(cell);
-    for (const id of objectIds) {
-      this.presentation.selectedObjectIds.add(id);
-    }
+    const objectIds = Array.from(this.map.spatial.getAt(cell));
+    applyObjectSelection(this.presentation, objectIds);
   }
 
   private handleBuild(cell: CellCoord): void {
@@ -291,15 +329,16 @@ export class InputHandler {
 
   /** 框选：矩形内所有对象加入选中集 */
   private dragSelect(minX: number, minY: number, maxX: number, maxY: number): void {
-    this.presentation.selectedObjectIds.clear();
+    const allIds: string[] = [];
     for (let y = minY; y <= maxY; y++) {
       for (let x = minX; x <= maxX; x++) {
         const objIds = this.map.spatial.getAt({ x, y });
         for (const id of objIds) {
-          this.presentation.selectedObjectIds.add(id);
+          allIds.push(id);
         }
       }
     }
+    applyObjectSelection(this.presentation, allIds);
   }
 
   /** 框建：矩形内每个可放置格子批量放蓝图（仅 1x1） */
@@ -539,17 +578,28 @@ export class InputHandler {
     const pointer = this.scene.input.activePointer;
     this.presentation.hoveredCell = this.pointerToCell(pointer);
 
-    // 更新放置预览
+    // 更新放置预览（使用共享 placement 判定，包含 footprint 边界检查和占地冲突检查）
     if (this.presentation.activeTool === ToolType.Build && this.presentation.activeBuildDefId && this.presentation.hoveredCell) {
       const cell = this.presentation.hoveredCell;
       const footprint = this.world.defs.buildings.get(this.presentation.activeBuildDefId)?.size ?? { width: 1, height: 1 };
-      const isPassable = this.map.spatial.isPassable(cell);
+      // 检查 footprint 是否在地图边界内
+      const inBounds = (
+        cell.x >= 0
+        && cell.y >= 0
+        && cell.x + footprint.width - 1 < this.map.width
+        && cell.y + footprint.height - 1 < this.map.height
+      );
+      // 使用共享 placement 判定检查占地冲突
+      const placement = inBounds
+        ? analyzeBuildingPlacement(this.map, cell, footprint)
+        : { blocked: true };
+
       this.presentation.placementPreview = {
         defId: this.presentation.activeBuildDefId,
         cell,
         footprint,
         rotation: 0,
-        valid: isPassable,
+        valid: inBounds && !placement.blocked,
       };
     } else {
       this.presentation.placementPreview = null;

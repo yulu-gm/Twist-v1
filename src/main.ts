@@ -29,7 +29,7 @@ import type { World } from './world/world';
 // 导入共享的启动基础设施
 import { buildDefaultSystems, registerDefaultCommands } from './bootstrap/default-registrations';
 import type { PresentationState } from './presentation/presentation-state';
-import { switchTool, ToolType } from './presentation/presentation-state';
+import { ToolType, applyObjectSelection, applyToolSelection } from './presentation/presentation-state';
 import type { UiPorts } from './ui/kernel/ui-ports';
 import type { DesignationType, ObjectId, ZoneType } from './core/types';
 
@@ -196,33 +196,20 @@ function createLazyPorts(world: World, getPresentation: () => PresentationState 
     },
     selectObjects(ids: ObjectId[]) {
       const p = pres();
-      p.selectedObjectIds.clear();
-      for (const id of ids) p.selectedObjectIds.add(id);
-      if (ids.length > 0 && p.activeTool !== ToolType.Select) {
-        switchTool(p, ToolType.Select);
-      }
+      applyObjectSelection(p, ids);
     },
     selectColonist(id: string) {
       const p = pres();
-      p.selectedObjectIds.clear();
-      p.selectedObjectIds.add(id);
-      if (p.activeTool !== ToolType.Select) {
-        switchTool(p, ToolType.Select);
-      }
+      applyObjectSelection(p, [id]);
     },
     setTool(tool: string, designationType?: string | null, buildDefId?: string | null, zoneType?: string | null) {
       const p = pres();
-      switchTool(p, tool as ToolType);
-      if (designationType) {
-        p.activeDesignationType = designationType as DesignationType;
-      }
-      if (buildDefId) {
-        p.activeBuildDefId = buildDefId;
-      }
-      if (zoneType) {
-        p.activeZoneType = zoneType as ZoneType;
-        p.lastZoneType = zoneType as ZoneType;
-      }
+      applyToolSelection(p, {
+        tool: tool as ToolType,
+        designationType: (designationType ?? null) as DesignationType | null,
+        buildDefId: buildDefId ?? null,
+        zoneType: (zoneType ?? null) as ZoneType | null,
+      });
     },
     jumpCameraTo(_cell: { x: number; y: number }) {
       // Will be wired to Phaser camera later

@@ -7,13 +7,7 @@
 import Phaser from 'phaser';
 import { World } from '../../world/world';
 import { SimSpeed, DesignationType, ZoneType } from '../../core/types';
-import { PresentationState, ToolType, OverlayType, switchTool } from '../../presentation/presentation-state';
-
-function activateZoneTool(presentation: PresentationState, zoneType: ZoneType): void {
-  presentation.lastZoneType = zoneType;
-  switchTool(presentation, ToolType.Zone);
-  presentation.activeZoneType = zoneType;
-}
+import { PresentationState, ToolType, OverlayType, applyToolSelection } from '../../presentation/presentation-state';
 
 /**
  * 注册所有键盘快捷键
@@ -49,35 +43,39 @@ export function setupKeyboardBindings(
   });
 
   // ── 工具快捷键 ──
+  // ESC: 回到选择工具并清空选中与预览
   kb.on('keydown-ESC', () => {
-    switchTool(presentation, ToolType.Select);
+    applyToolSelection(presentation, { tool: ToolType.Select });
     presentation.placementPreview = null;
     presentation.selectedObjectIds.clear();
   });
+  // Q: 切换到选择工具，记录回退栈
   kb.on('keydown-Q', () => {
-    switchTool(presentation, ToolType.Select);
+    applyToolSelection(presentation, { tool: ToolType.Select });
   });
+  // B: 切换到建造工具，默认 wall_wood
   kb.on('keydown-B', () => {
-    switchTool(presentation, ToolType.Build);
-    presentation.activeBuildDefId = 'wall_wood';
+    applyToolSelection(presentation, { tool: ToolType.Build, buildDefId: 'wall_wood' });
   });
+  // M: 切换到指定工具（采矿）
   kb.on('keydown-M', () => {
-    switchTool(presentation, ToolType.Designate);
-    presentation.activeDesignationType = DesignationType.Mine;
+    applyToolSelection(presentation, { tool: ToolType.Designate, designationType: DesignationType.Mine });
   });
+  // H: 切换到指定工具（采集）
   kb.on('keydown-H', () => {
-    switchTool(presentation, ToolType.Designate);
-    presentation.activeDesignationType = DesignationType.Harvest;
+    applyToolSelection(presentation, { tool: ToolType.Designate, designationType: DesignationType.Harvest });
   });
+  // X: 切换到指定工具（砍伐）
   kb.on('keydown-X', () => {
-    switchTool(presentation, ToolType.Designate);
-    presentation.activeDesignationType = DesignationType.Cut;
+    applyToolSelection(presentation, { tool: ToolType.Designate, designationType: DesignationType.Cut });
   });
+  // Z: 切换到区域工具，使用上次激活的区域类型
   kb.on('keydown-Z', () => {
-    activateZoneTool(presentation, presentation.lastZoneType);
+    applyToolSelection(presentation, { tool: ToolType.Zone, zoneType: presentation.lastZoneType });
   });
+  // C: 切换到取消工具
   kb.on('keydown-C', () => {
-    switchTool(presentation, ToolType.Cancel);
+    applyToolSelection(presentation, { tool: ToolType.Cancel });
   });
 
   // ── 调试面板切换: F1 ──
