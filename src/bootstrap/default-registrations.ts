@@ -32,6 +32,7 @@ import { designationCommandHandlers } from '../features/designation/designation.
 import { pawnCommandHandlers } from '../features/pawn/pawn.commands';
 import { zoneCommandHandlers } from '../features/zone/zone.commands';
 import { saveCommandHandlers } from '../features/save/save.commands';
+import { buildingCommandHandlers } from '../features/building/building.commands';
 import { createItem } from '../features/item/item.factory';
 
 /**
@@ -202,4 +203,5 @@ export function registerDefaultCommands(world: World): void {
   world.commandBus.registerAll(pawnCommandHandlers);
   world.commandBus.registerAll(zoneCommandHandlers);
   world.commandBus.registerAll(saveCommandHandlers);
+  world.commandBus.registerAll(buildingCommandHandlers);
 }
