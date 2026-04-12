@@ -84,7 +84,7 @@ function processMap(world: World, map: GameMap): void {
       if (isJobBlockedByCarriedItems(pawn, job)) {
         overrides.set(evaluation.kind, {
           code: 'carrying_conflict',
-          text: 'Current carrying stack blocks pickup-based work',
+          text: '当前携带物会阻塞需拾取的工作',
         });
         continue;
       }
@@ -101,7 +101,7 @@ function processMap(world: World, map: GameMap): void {
         if (resId === null) {
           overrides.set(evaluation.kind, {
             code: 'target_reserved',
-            text: 'Target already reserved',
+            text: '目标已被预留',
           });
           continue;
         }

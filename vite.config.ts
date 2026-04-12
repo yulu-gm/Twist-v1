@@ -2,6 +2,11 @@ import preact from '@preact/preset-vite';
 import { defineConfig } from 'vite';
 import path from 'path';
 
+const rawDevPort = Number.parseInt(process.env.VITE_PORT ?? '5173', 10);
+const devPort = Number.isInteger(rawDevPort) && rawDevPort > 0 && rawDevPort <= 65535
+  ? rawDevPort
+  : 5173;
+
 export default defineConfig({
   plugins: [preact()],
   resolve: {
@@ -17,7 +22,7 @@ export default defineConfig({
     },
   },
   server: {
-    port: 3000,
+    port: devPort,
     open: true,
   },
   build: {

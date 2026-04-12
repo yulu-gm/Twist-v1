@@ -66,7 +66,7 @@ describe('eatWorkEvaluator', () => {
     expect(result.createJob).not.toBeNull();
     expect(result.score).toBeGreaterThan(0);
     expect(result.kind).toBe('eat');
-    expect(result.label).toBe('Eat');
+    expect(result.label).toBe('吃饭');
   });
 
   it('returns blocked need_not_triggered when not hungry', () => {
@@ -119,7 +119,7 @@ describe('sleepWorkEvaluator', () => {
     expect(result.failureReasonCode).toBe('none');
     expect(result.createJob).not.toBeNull();
     expect(result.kind).toBe('sleep');
-    expect(result.label).toBe('Sleep');
+    expect(result.label).toBe('睡觉');
   });
 
   it('returns blocked need_not_triggered when not tired', () => {
@@ -144,7 +144,7 @@ describe('wanderWorkEvaluator', () => {
 
     const result = wanderWorkEvaluator.evaluate(pawn, env.map, env.world);
     expect(result.failureReasonCode).toBe('need_not_triggered');
-    expect(result.failureReasonText).toBe('Not idle long enough');
+    expect(result.failureReasonText).toBe('空闲时间不足');
     expect(result.createJob).toBeNull();
     expect(result.kind).toBe('wander');
   });
@@ -174,7 +174,7 @@ describe('haulToStockpileWorkEvaluator', () => {
     expect(result.failureReasonCode).toBe('none');
     expect(result.createJob).not.toBeNull();
     expect(result.kind).toBe('haul_to_stockpile');
-    expect(result.label).toBe('Haul To Stockpile');
+    expect(result.label).toBe('搬运到储存区');
   });
 
   it('returns blocked no_target when no haulable items', () => {
@@ -210,6 +210,6 @@ describe('constructWorkEvaluator', () => {
     expect(result.failureReasonCode).toBe('no_target');
     expect(result.createJob).toBeNull();
     expect(result.kind).toBe('construct');
-    expect(result.label).toBe('Construct');
+    expect(result.label).toBe('施工');
   });
 });

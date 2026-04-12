@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { buildLaunchChecks, buildViteCommand, getLaunchTarget } from './launch-dev-utils.mjs';
 
+function restoreEnvVar(name, value) {
+  if (value === undefined) {
+    delete process.env[name];
+    return;
+  }
+  process.env[name] = value;
+}
+
 describe('buildLaunchChecks', () => {
   it('reports missing dependencies for the main launcher', () => {
     const issues = buildLaunchChecks('main', {
@@ -37,10 +45,24 @@ describe('getLaunchTarget', () => {
 
 describe('buildViteCommand', () => {
   it('wraps vite.cmd in a cmd.exe invocation on Windows', () => {
+    const previousPort = process.env.VITE_PORT;
+    delete process.env.VITE_PORT;
     const command = buildViteCommand('visual', 'D:\\CC\\Twist-v1\\node_modules\\.bin\\vite.cmd');
+    restoreEnvVar('VITE_PORT', previousPort);
 
     expect(command.file.toLowerCase()).toContain('cmd');
     expect(command.args.at(-1)).toContain('vite.cmd');
+    expect(command.args.at(-1)).toContain('--port 5173');
     expect(command.args.at(-1)).toContain('--open /scenario-select.html');
+  });
+
+  it('uses VITE_PORT when provided', () => {
+    const previousPort = process.env.VITE_PORT;
+    process.env.VITE_PORT = '8088';
+
+    const command = buildViteCommand('main', 'D:\\CC\\Twist-v1\\node_modules\\.bin\\vite.cmd');
+
+    restoreEnvVar('VITE_PORT', previousPort);
+    expect(command.args.at(-1)).toContain('--port 8088');
   });
 });

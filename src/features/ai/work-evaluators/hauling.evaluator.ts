@@ -32,12 +32,12 @@ import { createHaulJob } from '../jobs/haul-job';
  */
 export const haulToStockpileWorkEvaluator: WorkEvaluator = {
   kind: 'haul_to_stockpile',
-  label: 'Haul To Stockpile',
+  label: '搬运到储存区',
   priority: 15,
   evaluate(pawn: Pawn, map: GameMap, world: World): WorkEvaluation {
     const blocked = (code: 'no_target' | 'no_stockpile_destination', text: string): WorkEvaluation => ({
       kind: 'haul_to_stockpile',
-      label: 'Haul To Stockpile',
+      label: '搬运到储存区',
       priority: 15,
       score: -1,
       failureReasonCode: code,
@@ -77,18 +77,18 @@ export const haulToStockpileWorkEvaluator: WorkEvaluator = {
     }
 
     if (!bestItem || !bestDest) {
-      return blocked('no_target', 'No haulable items outside stockpiles');
+      return blocked('no_target', '没有可搬运且位于储存区外的物品');
     }
 
     // 重新计算最终的可搬运数量
     const finalPlacement = findReachableStockpilePlacement(pawn, bestItem, map, world);
     if (!finalPlacement) {
-      return blocked('no_stockpile_destination', 'No reachable stockpile destination');
+      return blocked('no_stockpile_destination', '没有可达的储存区目标');
     }
 
     const haulCount = Math.min(bestItem.stackCount, finalPlacement.totalCapacity, pawn.inventory.carryCapacity);
     if (haulCount <= 0) {
-      return blocked('no_stockpile_destination', 'No reachable stockpile destination');
+      return blocked('no_stockpile_destination', '没有可达的储存区目标');
     }
 
     // 捕获闭包变量
@@ -98,7 +98,7 @@ export const haulToStockpileWorkEvaluator: WorkEvaluator = {
 
     return {
       kind: 'haul_to_stockpile',
-      label: 'Haul To Stockpile',
+      label: '搬运到储存区',
       priority: 15,
       score: bestScore,
       failureReasonCode: 'none',

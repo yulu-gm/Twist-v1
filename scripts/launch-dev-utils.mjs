@@ -24,9 +24,22 @@ export function getLaunchTarget(mode) {
   return mode === 'visual' ? '/scenario-select.html' : '/';
 }
 
+function resolveDevPort(defaultPort = 5173) {
+  const rawPort = process.env.VITE_PORT;
+  if (!rawPort) return defaultPort;
+
+  const parsed = Number.parseInt(rawPort, 10);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 65535) {
+    return defaultPort;
+  }
+
+  return parsed;
+}
+
 export function buildViteCommand(mode, viteBin) {
+  const port = resolveDevPort();
   const target = getLaunchTarget(mode);
-  const command = `${viteBin} --open${mode === 'visual' ? ` ${target}` : ''}`;
+  const command = `${viteBin} --port ${port} --open${mode === 'visual' ? ` ${target}` : ''}`;
 
   return {
     file: process.env.ComSpec || 'cmd.exe',

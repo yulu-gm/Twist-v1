@@ -56,20 +56,20 @@ describe('ColonistInspector work queue', () => {
   it('renders active, blocked, and deferred work rows', () => {
     render(<ColonistInspector viewModel={makeViewModel({
       workQueue: [
-        { label: 'Eat', tone: 'active', detail: 'pickup (not_started)' },
-        { label: 'Construct', tone: 'blocked', detail: 'Materials not delivered' },
-        { label: 'Haul To Stockpile', tone: 'deferred', detail: null },
+        { label: '吃饭', tone: 'active', detail: '拾取（未开始）' },
+        { label: '施工', tone: 'blocked', detail: '材料尚未送达' },
+        { label: '搬运到储存区', tone: 'deferred', detail: null },
       ],
     })} />);
 
-    expect(screen.getByText('Work Queue')).toBeInTheDocument();
-    expect(screen.getByText('pickup (not_started)')).toBeInTheDocument();
-    expect(screen.getByText('Materials not delivered')).toBeInTheDocument();
-    expect(screen.getByText('Haul To Stockpile')).toBeInTheDocument();
+    expect(screen.getByText('工作队列')).toBeInTheDocument();
+    expect(screen.getByText('拾取（未开始）')).toBeInTheDocument();
+    expect(screen.getByText('材料尚未送达')).toBeInTheDocument();
+    expect(screen.getByText('搬运到储存区')).toBeInTheDocument();
   });
 
   it('renders an empty state when no decision snapshot is available', () => {
     render(<ColonistInspector viewModel={makeViewModel({ workQueue: [] })} />);
-    expect(screen.getByText('No decision snapshot yet')).toBeInTheDocument();
+    expect(screen.getByText('暂无决策快照')).toBeInTheDocument();
   });
 });

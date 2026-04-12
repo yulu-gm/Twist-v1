@@ -2,8 +2,12 @@
 chcp 65001 >nul 2>&1
 title Scenario Visual Testing
 
-:: Kill any process on port 3000
-for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":3000 " ^| findstr "LISTENING"') do (
+set "DEV_PORT=%VITE_PORT%"
+if not defined DEV_PORT set "DEV_PORT=5173"
+set "VITE_PORT=%DEV_PORT%"
+
+:: Kill any process on the target dev port
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":%DEV_PORT% " ^| findstr "LISTENING"') do (
     taskkill /F /PID %%a >nul 2>&1
 )
 

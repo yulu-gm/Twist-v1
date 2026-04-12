@@ -128,19 +128,19 @@ describe('selectColonistInspector', () => {
             cell: { x: 5, y: 10 },
             factionId: 'player',
             currentJob: 'job_eat',
-            currentJobLabel: 'Eat',
+            currentJobLabel: '吃饭',
             needs: { food: 20, rest: 80, joy: 80, mood: 60 },
             health: { hp: 80, maxHp: 100 },
             workDecision: {
               evaluatedAtTick: 12,
               selectedWorkKind: 'eat',
-              selectedWorkLabel: 'Eat',
+              selectedWorkLabel: '吃饭',
               activeToilLabel: 'pickup',
               activeToilState: 'not_started',
               options: [
-                { kind: 'eat', label: 'Eat', status: 'active', detail: 'meal_simple', failureReasonText: null },
-                { kind: 'construct', label: 'Construct', status: 'blocked', detail: null, failureReasonText: 'Materials not delivered' },
-                { kind: 'haul_to_stockpile', label: 'Haul To Stockpile', status: 'deferred', detail: null, failureReasonText: null },
+                { kind: 'eat', label: '吃饭', status: 'active', detail: 'meal_simple', failureReasonText: null },
+                { kind: 'construct', label: '施工', status: 'blocked', detail: null, failureReasonText: '材料尚未送达' },
+                { kind: 'haul_to_stockpile', label: '搬运到储存区', status: 'deferred', detail: null, failureReasonText: null },
               ],
             },
           },
@@ -151,9 +151,9 @@ describe('selectColonistInspector', () => {
     );
 
     expect(vm?.workQueue).toEqual([
-      { label: 'Eat', tone: 'active', detail: 'pickup (not_started)' },
-      { label: 'Construct', tone: 'blocked', detail: 'Materials not delivered' },
-      { label: 'Haul To Stockpile', tone: 'deferred', detail: null },
+      { label: '吃饭', tone: 'active', detail: '拾取（未开始）' },
+      { label: '施工', tone: 'blocked', detail: '材料尚未送达' },
+      { label: '搬运到储存区', tone: 'deferred', detail: null },
     ]);
   });
 });

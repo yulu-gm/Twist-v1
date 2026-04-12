@@ -28,12 +28,12 @@ import { getAllBeds, getBedByOwner, isBedAvailable } from '../../building/buildi
  */
 export const eatWorkEvaluator: WorkEvaluator = {
   kind: 'eat',
-  label: 'Eat',
+  label: '吃饭',
   priority: 100,
   evaluate(pawn: Pawn, map: GameMap, world: World): WorkEvaluation {
     const blocked = (code: 'need_not_triggered' | 'no_target' | 'target_reserved', text: string): WorkEvaluation => ({
       kind: 'eat',
-      label: 'Eat',
+      label: '吃饭',
       priority: 100,
       score: -1,
       failureReasonCode: code,
@@ -46,7 +46,7 @@ export const eatWorkEvaluator: WorkEvaluator = {
 
     // 检查是否触发饥饿阈值
     if (pawn.needs.food >= pawn.needsProfile.hungerSeekThreshold) {
-      return blocked('need_not_triggered', 'Not hungry enough');
+      return blocked('need_not_triggered', '还不够饿');
     }
 
     // 寻找最近的未预留食物
@@ -72,9 +72,9 @@ export const eatWorkEvaluator: WorkEvaluator = {
     if (!bestItem) {
       // 如果存在食物但都被预留，报告 target_reserved
       if (hasReservedFood) {
-        return blocked('target_reserved', 'All food is reserved');
+        return blocked('target_reserved', '所有食物都已被预留');
       }
-      return blocked('no_target', 'No food available');
+      return blocked('no_target', '没有可用食物');
     }
 
     // 计算进食参数
@@ -86,7 +86,7 @@ export const eatWorkEvaluator: WorkEvaluator = {
       Math.max(1, Math.ceil(missingFood / nutritionPerItem)),
     );
     if (requestedCount <= 0) {
-      return blocked('no_target', 'No food available');
+      return blocked('no_target', '没有可用食物');
     }
 
     const hungerSeekThreshold = Math.max(1, pawn.needsProfile.hungerSeekThreshold);
@@ -100,7 +100,7 @@ export const eatWorkEvaluator: WorkEvaluator = {
 
     return {
       kind: 'eat',
-      label: 'Eat',
+      label: '吃饭',
       priority: 100,
       score,
       failureReasonCode: 'none',
@@ -122,18 +122,18 @@ export const eatWorkEvaluator: WorkEvaluator = {
  */
 export const sleepWorkEvaluator: WorkEvaluator = {
   kind: 'sleep',
-  label: 'Sleep',
+  label: '睡觉',
   priority: 95,
   evaluate(pawn: Pawn, map: GameMap, world: World): WorkEvaluation {
     // 检查是否触发疲劳阈值
     if (pawn.needs.rest >= pawn.needsProfile.sleepSeekThreshold) {
       return {
         kind: 'sleep',
-        label: 'Sleep',
+        label: '睡觉',
         priority: 95,
         score: -1,
         failureReasonCode: 'need_not_triggered',
-        failureReasonText: 'Not tired enough',
+        failureReasonText: '还不够困',
         detail: null,
         jobDefId: null,
         evaluatedAtTick: world.tick,
@@ -157,7 +157,7 @@ export const sleepWorkEvaluator: WorkEvaluator = {
       const score = 90 + sleepUrgency * 140 - dist * 0.5;
       return {
         kind: 'sleep',
-        label: 'Sleep',
+        label: '睡觉',
         priority: 95,
         score,
         failureReasonCode: 'none',
@@ -177,7 +177,7 @@ export const sleepWorkEvaluator: WorkEvaluator = {
     const score = 55 + sleepUrgency * 120;
     return {
       kind: 'sleep',
-      label: 'Sleep',
+      label: '睡觉',
       priority: 95,
       score,
       failureReasonCode: 'none',

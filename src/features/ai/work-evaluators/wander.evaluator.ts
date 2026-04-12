@@ -25,18 +25,18 @@ let wanderJobCounter = 0;
  */
 export const wanderWorkEvaluator: WorkEvaluator = {
   kind: 'wander',
-  label: 'Wander',
+  label: '闲逛',
   priority: 1,
   evaluate(pawn: Pawn, map: GameMap, world: World): WorkEvaluation {
     // 空闲不足 30 tick 时不触发漫步
     if (pawn.ai.idleTicks <= 30) {
       return {
         kind: 'wander',
-        label: 'Wander',
+        label: '闲逛',
         priority: 1,
         score: -1,
         failureReasonCode: 'need_not_triggered',
-        failureReasonText: 'Not idle long enough',
+        failureReasonText: '空闲时间不足',
         detail: null,
         jobDefId: null,
         evaluatedAtTick: world.tick,
@@ -46,7 +46,7 @@ export const wanderWorkEvaluator: WorkEvaluator = {
 
     return {
       kind: 'wander',
-      label: 'Wander',
+      label: '闲逛',
       priority: 1,
       score: 0,
       failureReasonCode: 'none',

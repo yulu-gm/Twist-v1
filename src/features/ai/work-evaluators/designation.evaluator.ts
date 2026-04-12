@@ -25,10 +25,10 @@ import type { Job } from '../ai.types';
  */
 export const designationMineWorkEvaluator: WorkEvaluator = {
   kind: 'designation_mine',
-  label: 'Mine',
+  label: '采矿',
   priority: 50,
   evaluate(pawn: Pawn, map: GameMap, world: World): WorkEvaluation {
-    return evaluateDesignation(pawn, map, world, DesignationType.Mine, 'designation_mine', 'Mine', 60);
+    return evaluateDesignation(pawn, map, world, DesignationType.Mine, 'designation_mine', '采矿', 60);
   },
 };
 
@@ -39,10 +39,10 @@ export const designationMineWorkEvaluator: WorkEvaluator = {
  */
 export const designationHarvestWorkEvaluator: WorkEvaluator = {
   kind: 'designation_harvest',
-  label: 'Harvest',
+  label: '收割',
   priority: 50,
   evaluate(pawn: Pawn, map: GameMap, world: World): WorkEvaluation {
-    return evaluateDesignation(pawn, map, world, DesignationType.Harvest, 'designation_harvest', 'Harvest', 50);
+    return evaluateDesignation(pawn, map, world, DesignationType.Harvest, 'designation_harvest', '收割', 50);
   },
 };
 
@@ -62,7 +62,7 @@ function evaluateDesignation(
     priority: 50,
     score: -1,
     failureReasonCode: 'no_target',
-    failureReasonText: `No ${label.toLowerCase()} designations available`,
+    failureReasonText: `暂无可用的${label}指派`,
     detail: null,
     jobDefId: null,
     evaluatedAtTick: world.tick,

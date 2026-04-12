@@ -31,16 +31,16 @@ import { getBlueprintMaterialInFlightCount } from './blueprint-inflight';
  */
 export const resolveCarryingWorkEvaluator: WorkEvaluator = {
   kind: 'resolve_carrying',
-  label: 'Resolve Carrying',
+  label: '处理携带物',
   priority: 20,
   evaluate(pawn: Pawn, map: GameMap, world: World): WorkEvaluation {
     const blocked: WorkEvaluation = {
       kind: 'resolve_carrying',
-      label: 'Resolve Carrying',
+      label: '处理携带物',
       priority: 20,
       score: -1,
       failureReasonCode: 'no_stockpile_destination',
-      failureReasonText: 'No legal destination for carried item',
+      failureReasonText: '当前携带物没有合法放置目标',
       detail: null,
       jobDefId: null,
       evaluatedAtTick: world.tick,
@@ -52,7 +52,7 @@ export const resolveCarryingWorkEvaluator: WorkEvaluator = {
       return {
         ...blocked,
         failureReasonCode: 'no_target',
-        failureReasonText: 'Not carrying anything',
+        failureReasonText: '当前未携带任何物品',
       };
     }
 
@@ -64,7 +64,7 @@ export const resolveCarryingWorkEvaluator: WorkEvaluator = {
       const bpId = blueprintCandidate.blueprint.id;
       return {
         kind: 'resolve_carrying',
-        label: 'Resolve Carrying',
+        label: '处理携带物',
         priority: 20,
         score: 8 - blueprintCandidate.distance * 0.1,
         failureReasonCode: 'none',
@@ -85,7 +85,7 @@ export const resolveCarryingWorkEvaluator: WorkEvaluator = {
     const count = carrying.count;
     return {
       kind: 'resolve_carrying',
-      label: 'Resolve Carrying',
+      label: '处理携带物',
       priority: 20,
       score: 4 - estimateDistance(pawn.cell, targetCell) * 0.1,
       failureReasonCode: 'none',

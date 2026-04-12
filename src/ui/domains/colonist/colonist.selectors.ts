@@ -110,13 +110,53 @@ export function buildWorkQueue(c: ColonistNode): WorkQueueRowViewModel[] {
 
   return c.workDecision.options.map(option => {
     if (option.status === 'active') {
-      const toilLabel = c.workDecision?.activeToilLabel ?? 'unknown';
-      const toilState = c.workDecision?.activeToilState ?? 'unknown';
-      return { label: option.label, tone: 'active' as const, detail: `${toilLabel} (${toilState})` };
+      const toilLabel = formatToilLabel(c.workDecision?.activeToilLabel);
+      const toilState = formatToilState(c.workDecision?.activeToilState);
+      return { label: option.label, tone: 'active' as const, detail: `${toilLabel}（${toilState}）` };
     }
     if (option.status === 'blocked') {
       return { label: option.label, tone: 'blocked' as const, detail: option.failureReasonText };
     }
     return { label: option.label, tone: 'deferred' as const, detail: null };
   });
+}
+
+/** 格式化 toil 标签为中文显示文本 */
+function formatToilLabel(toilLabel: string | null | undefined): string {
+  switch (toilLabel) {
+    case 'goto':
+      return '前往';
+    case 'pickup':
+      return '拾取';
+    case 'drop':
+      return '放下';
+    case 'work':
+      return '作业';
+    case 'wait':
+      return '等待';
+    case 'deliver':
+      return '递送';
+    case 'interact':
+      return '交互';
+    case 'prepare_construction':
+      return '施工准备';
+    default:
+      return '未知';
+  }
+}
+
+/** 格式化 toil 状态为中文显示文本 */
+function formatToilState(toilState: string | null | undefined): string {
+  switch (toilState) {
+    case 'not_started':
+      return '未开始';
+    case 'in_progress':
+      return '进行中';
+    case 'completed':
+      return '已完成';
+    case 'failed':
+      return '失败';
+    default:
+      return '未知';
+  }
 }

@@ -32,12 +32,12 @@ import { getBlueprintMaterialInFlightCount } from './blueprint-inflight';
  */
 export const deliverMaterialsWorkEvaluator: WorkEvaluator = {
   kind: 'deliver_materials',
-  label: 'Deliver Materials',
+  label: '运送材料',
   priority: 45,
   evaluate(pawn: Pawn, map: GameMap, world: World): WorkEvaluation {
     const blocked = (code: 'no_target' | 'no_reachable_material_source', text: string): WorkEvaluation => ({
       kind: 'deliver_materials',
-      label: 'Deliver Materials',
+      label: '运送材料',
       priority: 45,
       score: -1,
       failureReasonCode: code,
@@ -108,13 +108,13 @@ export const deliverMaterialsWorkEvaluator: WorkEvaluator = {
     }
 
     if (!bestCreateJob) {
-      return blocked('no_reachable_material_source', 'No reachable material source');
+      return blocked('no_reachable_material_source', '没有可达的材料来源');
     }
 
     const createJobFn = bestCreateJob;
     return {
       kind: 'deliver_materials',
-      label: 'Deliver Materials',
+      label: '运送材料',
       priority: 45,
       score: bestScore,
       failureReasonCode: 'none',
@@ -135,12 +135,12 @@ export const deliverMaterialsWorkEvaluator: WorkEvaluator = {
  */
 export const constructWorkEvaluator: WorkEvaluator = {
   kind: 'construct',
-  label: 'Construct',
+  label: '施工',
   priority: 40,
   evaluate(pawn: Pawn, map: GameMap, world: World): WorkEvaluation {
     const blocked = (code: 'no_target' | 'materials_not_delivered' | 'target_reserved', text: string): WorkEvaluation => ({
       kind: 'construct',
-      label: 'Construct',
+      label: '施工',
       priority: 40,
       score: -1,
       failureReasonCode: code,
@@ -211,15 +211,15 @@ export const constructWorkEvaluator: WorkEvaluator = {
     if (!bestCreateJob) {
       // 如果有未送齐材料的蓝图，报告 materials_not_delivered
       if (hasUndeliveredBlueprint) {
-        return blocked('materials_not_delivered', 'Materials not delivered');
+        return blocked('materials_not_delivered', '材料尚未送达');
       }
-      return blocked('no_target', 'No construction targets available');
+      return blocked('no_target', '没有可施工目标');
     }
 
     const createJobFn = bestCreateJob;
     return {
       kind: 'construct',
-      label: 'Construct',
+      label: '施工',
       priority: 40,
       score: bestScore,
       failureReasonCode: 'none',

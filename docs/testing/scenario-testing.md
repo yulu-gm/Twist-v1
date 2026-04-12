@@ -30,8 +30,9 @@ npm run scenario:visual:select
 npm run scenario:visual
 
 # 切换其他场景 — 修改 URL 参数
-# http://localhost:3000/scenario-select.html              ← 场景选择页面
-# http://localhost:3000/scenario-select.html?scenario=eating  ← 进入指定场景工作台
+# 默认端口为 5173（可通过环境变量 VITE_PORT 覆盖）
+# http://localhost:5173/scenario-select.html              ← 场景选择页面
+# http://localhost:5173/scenario-select.html?scenario=eating  ← 进入指定场景工作台
 ```
 
 ### 工作台使用流程

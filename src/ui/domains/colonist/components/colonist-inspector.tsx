@@ -23,7 +23,7 @@ interface ColonistInspectorProps {
  * 分为三个区段：
  * - Info：位置、任务、阵营、生命值
  * - Needs：食物、休息、娱乐、心情的进度条
- * - Work Queue：按优先级排列的工作决策状态（active/blocked/deferred）
+ * - 工作队列：按优先级排列的工作决策状态（active/blocked/deferred）
  */
 export function ColonistInspector({ viewModel }: ColonistInspectorProps) {
   return (
@@ -48,9 +48,9 @@ export function ColonistInspector({ viewModel }: ColonistInspectorProps) {
           ))}
         </Section>
 
-        <Section title="Work Queue">
+        <Section title="工作队列">
           {viewModel.workQueue.length === 0 ? (
-            <div class="colonist-work-queue__empty">No decision snapshot yet</div>
+            <div class="colonist-work-queue__empty">暂无决策快照</div>
           ) : (
             <ul class="colonist-work-queue">
               {viewModel.workQueue.map((row) => (
