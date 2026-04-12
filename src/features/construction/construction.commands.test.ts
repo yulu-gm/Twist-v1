@@ -157,7 +157,7 @@ describe('placeBlueprintHandler — 占地冲突验证', () => {
     });
 
     expect(result.valid).toBe(false);
-    expect(result.reason).toContain('Footprint occupied');
+    expect((result as { valid: false; reason: string }).reason).toContain('Footprint occupied');
   });
 
   it('已有施工工地时拒绝在同格放置', () => {
@@ -171,7 +171,7 @@ describe('placeBlueprintHandler — 占地冲突验证', () => {
     });
 
     expect(result.valid).toBe(false);
-    expect(result.reason).toContain('Footprint occupied');
+    expect((result as { valid: false; reason: string }).reason).toContain('Footprint occupied');
   });
 
   it('已有建筑时拒绝放置，但格子上只有棋子或物品时允许放置', () => {
@@ -186,7 +186,7 @@ describe('placeBlueprintHandler — 占地冲突验证', () => {
       payload: { defId: 'wall_wood', cell: { x: 3, y: 3 } },
     });
     expect(resultBlocked.valid).toBe(false);
-    expect(resultBlocked.reason).toContain('Footprint occupied');
+    expect((resultBlocked as { valid: false; reason: string }).reason).toContain('Footprint occupied');
 
     // 在 (7,7) 只有棋子 → 应允许放置
     const pawn = createPawn({ name: 'Bob', cell: { x: 7, y: 7 }, mapId: map.id, factionId: 'player', rng: world.rng });
@@ -222,6 +222,6 @@ describe('placeBlueprintHandler — 占地冲突验证', () => {
 
     // footprint 覆盖 (9,10) 时命中已有蓝图，整体应被拒绝
     expect(result.valid).toBe(false);
-    expect(result.reason).toContain('Footprint occupied');
+    expect((result as { valid: false; reason: string }).reason).toContain('Footprint occupied');
   });
 });

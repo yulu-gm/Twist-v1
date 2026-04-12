@@ -88,6 +88,7 @@ function makePresentationState(selectedIds: ObjectId[] = []): PresentationState 
     showGrid: false,
     dragRect: null,
     zonePreview: null,
+    backStack: [],
   };
 }
 

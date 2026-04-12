@@ -95,6 +95,7 @@ function makePresentationState(): PresentationState {
     showGrid: false,
     dragRect: null,
     zonePreview: null,
+    backStack: [],
   };
 }
 
@@ -130,5 +131,35 @@ describe('WorldPreview', () => {
     expect(rectangles[0].x).toBe(10 * 32 + 16);
     expect(rectangles[0].y).toBe(12 * 32 + 32);
     expect(rectangles[0].visible).toBe(true);
+  });
+
+  it('renders invalid build previews in red when placementPreview.valid is false', () => {
+    const rectangles: FakeRectangle[] = [];
+    const scene = {
+      add: {
+        rectangle: (_x: number, _y: number, width: number, height: number, fillColor: number, fillAlpha: number) => {
+          const rectangle = new FakeRectangle(width, height, fillColor, fillAlpha);
+          rectangles.push(rectangle);
+          return rectangle;
+        },
+        graphics: () => new FakeGraphics(),
+      },
+    } as any;
+
+    const preview = new WorldPreview(scene);
+    const presentation = makePresentationState();
+    presentation.placementPreview = {
+      defId: 'bed_wood',
+      cell: { x: 10, y: 12 },
+      footprint: { width: 1, height: 2 },
+      rotation: Rotation.North,
+      valid: false,
+    };
+
+    preview.update(presentation);
+
+    expect(rectangles).toHaveLength(1);
+    expect(rectangles[0].fillColor).toBe(0xff0000);
+    expect(rectangles[0].strokeColor).toBe(0xff0000);
   });
 });
