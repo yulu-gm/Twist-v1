@@ -33,6 +33,8 @@ export interface UiState {
   notificationCenterOpen: boolean;
   /** 固定选中的殖民者 ID（不随点击改变） */
   pinnedColonistId: string | null;
+  /** Inspector 当前查看目标 ID（与主选中对象独立，用于同格对象切换） */
+  inspectorTargetId: string | null;
 }
 
 // ── 引擎快照子结构 ──

@@ -17,7 +17,8 @@ export type UiAction =
   | { type: 'set_colonist_search'; value: string }
   | { type: 'set_build_search'; value: string }
   | { type: 'toggle_notification_center' }
-  | { type: 'pin_colonist'; colonistId: string | null };
+  | { type: 'pin_colonist'; colonistId: string | null }
+  | { type: 'set_inspector_target'; targetId: string | null };
 
 /**
  * 创建 UI 初始状态
@@ -33,6 +34,7 @@ export function createInitialUiState(): UiState {
     buildSearch: '',
     notificationCenterOpen: false,
     pinnedColonistId: null,
+    inspectorTargetId: null,
   };
 }
 
@@ -59,5 +61,7 @@ export function uiReducer(state: UiState, action: UiAction): UiState {
       return { ...state, notificationCenterOpen: !state.notificationCenterOpen };
     case 'pin_colonist':
       return { ...state, pinnedColonistId: action.colonistId };
+    case 'set_inspector_target':
+      return { ...state, inspectorTargetId: action.targetId };
   }
 }

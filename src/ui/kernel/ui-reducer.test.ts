@@ -55,4 +55,30 @@ describe('uiReducer', () => {
     });
     expect(next.colonistSort).toBe('mood');
   });
+
+  it('defaults inspectorTargetId to null', () => {
+    const state = createInitialUiState();
+    expect(state.inspectorTargetId).toBeNull();
+  });
+
+  it('sets inspector target independently from selection state', () => {
+    const state = createInitialUiState();
+    const next = uiReducer(state, {
+      type: 'set_inspector_target',
+      targetId: 'item_1',
+    });
+    expect(next.inspectorTargetId).toBe('item_1');
+  });
+
+  it('clears inspector target explicitly', () => {
+    const state = {
+      ...createInitialUiState(),
+      inspectorTargetId: 'building_1' as string | null,
+    };
+    const next = uiReducer(state, {
+      type: 'set_inspector_target',
+      targetId: null,
+    });
+    expect(next.inspectorTargetId).toBeNull();
+  });
 });
