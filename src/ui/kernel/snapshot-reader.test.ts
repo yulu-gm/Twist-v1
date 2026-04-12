@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { ToilState } from '../../core/types';
+import { ToilType, ToilState, JobState } from '../../core/types';
 import { buildDefDatabase } from '../../defs';
 import { createGameMap } from '../../world/game-map';
 import { createWorld } from '../../world/world';
@@ -28,6 +28,19 @@ describe('readEngineSnapshot work decision projection', () => {
       factionId: 'player',
       rng: world.rng,
     });
+    // 模拟当前正在执行的工作（snapshot-reader 从 currentJob 实时读取 toil 信息）
+    pawn.ai.currentJob = {
+      id: 'job_eat_1',
+      defId: 'job_eat',
+      pawnId: pawn.id,
+      targetCell: { x: 2, y: 1 },
+      toils: [
+        { type: ToilType.PickUp, targetCell: { x: 2, y: 1 }, state: ToilState.NotStarted, localData: {} },
+      ],
+      currentToilIndex: 0,
+      reservations: [],
+      state: JobState.Active,
+    };
     pawn.ai.workDecision = {
       evaluatedAtTick: 12,
       selectedWorkKind: 'eat',

@@ -77,8 +77,9 @@ export function readEngineSnapshot(
         evaluatedAtTick: pawn.ai.workDecision.evaluatedAtTick,
         selectedWorkKind: pawn.ai.workDecision.selectedWorkKind,
         selectedWorkLabel: pawn.ai.workDecision.selectedWorkLabel,
-        activeToilLabel: pawn.ai.workDecision.activeToilLabel,
-        activeToilState: pawn.ai.workDecision.activeToilState,
+        // 从当前 job 实时读取 toil 信息，而非使用冻结快照中的过期值
+        activeToilLabel: pawn.ai.currentJob?.toils[pawn.ai.currentJob.currentToilIndex]?.type ?? null,
+        activeToilState: pawn.ai.currentJob?.toils[pawn.ai.currentJob.currentToilIndex]?.state ?? null,
         options: pawn.ai.workDecision.options.map(option => ({
           kind: option.kind,
           label: option.label,
