@@ -11,13 +11,13 @@ import type {
   ObjectStackEntryViewModel,
   ObjectInspectorAdapter,
 } from './inspector.types';
+import { inspectorAdapters } from './adapters/inspector-adapters';
 
-/** 已注册的 Inspector adapter 列表（后续 task 添加具体 adapter） */
-let registeredAdapters: ObjectInspectorAdapter[] = [];
+/** 已注册的 Inspector adapter 列表 — 默认使用全局 adapter 注册表 */
+let registeredAdapters: ObjectInspectorAdapter[] = inspectorAdapters;
 
 /**
- * 注册 Inspector adapter 列表
- * 由 inspector-adapters.ts 调用，传入全部 adapter
+ * 注册 Inspector adapter 列表（可用于测试替换）
  */
 export function registerInspectorAdapters(adapters: ObjectInspectorAdapter[]): void {
   registeredAdapters = adapters;

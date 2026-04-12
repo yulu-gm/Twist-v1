@@ -6,6 +6,7 @@
 
 import { describe, expect, it, beforeEach } from 'vitest';
 import { selectObjectInspector, registerInspectorAdapters } from './inspector.selectors';
+import { inspectorAdapters } from './adapters/inspector-adapters';
 import type { EngineSnapshot, UiState } from '../../kernel/ui-types';
 
 function makeUiState(overrides: Partial<UiState> = {}): UiState {
@@ -58,8 +59,8 @@ function makeSnapshot(overrides: Partial<EngineSnapshot> = {}): EngineSnapshot {
 
 describe('selectObjectInspector', () => {
   beforeEach(() => {
-    // 每个测试前清空已注册 adapter，确保 generic fallback
-    registerInspectorAdapters([]);
+    // 默认使用全局 adapter 注册表
+    registerInspectorAdapters(inspectorAdapters);
   });
 
   it('returns null when nothing is selected', () => {
@@ -252,6 +253,63 @@ describe('selectObjectInspector', () => {
     expect(vm!.mode).toBe('specialized');
     if (vm!.mode === 'specialized') {
       expect(vm!.sections[0].title).toBe('Overview');
+    }
+  });
+
+  it('uses the pawn adapter for pawn objects', () => {
+    const snapshot = makeSnapshot({
+      selection: { primaryId: 'pawn_1', selectedIds: ['pawn_1'] },
+      objects: {
+        pawn_1: {
+          id: 'pawn_1',
+          kind: 'pawn',
+          label: 'Alice',
+          defId: 'pawn',
+          cell: { x: 2, y: 2 },
+          footprint: { width: 1, height: 1 },
+          currentJobLabel: 'Idle',
+          needs: { food: 60, rest: 40, joy: 70, mood: 50 },
+          health: { hp: 100, maxHp: 100 },
+          workDecision: null,
+        } as any,
+      },
+    });
+
+    const vm = selectObjectInspector(snapshot, makeUiState());
+    expect(vm).not.toBeNull();
+    expect(vm!.mode).toBe('specialized');
+    expect(vm!.title).toBe('Alice');
+    if (vm!.mode === 'specialized') {
+      expect(vm!.sections.some(s => s.title === 'Needs')).toBe(true);
+      expect(vm!.sections.some(s => s.title === 'Overview')).toBe(true);
+    }
+  });
+
+  it('uses the building adapter for buildings with bed actions', () => {
+    const snapshot = makeSnapshot({
+      selection: { primaryId: 'bed_1', selectedIds: ['bed_1'] },
+      objects: {
+        bed_1: {
+          id: 'bed_1',
+          kind: 'building',
+          label: 'Wood Bed',
+          defId: 'bed_wood',
+          cell: { x: 8, y: 8 },
+          footprint: { width: 1, height: 2 },
+          category: 'furniture',
+          usageType: 'bed',
+          bed: { role: 'owned', ownerPawnId: 'Alice', occupantPawnId: null, autoAssignable: false },
+        } as any,
+      },
+    });
+
+    const vm = selectObjectInspector(snapshot, makeUiState());
+    expect(vm).not.toBeNull();
+    expect(vm!.mode).toBe('specialized');
+    if (vm!.mode === 'specialized') {
+      expect(vm!.actions.map(a => a.id)).toContain('assign_bed_owner');
+      expect(vm!.actions.map(a => a.id)).toContain('clear_bed_owner');
+      expect(vm!.sections.some(s => s.title === 'Bed')).toBe(true);
     }
   });
 });
