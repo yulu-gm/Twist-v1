@@ -2,9 +2,10 @@
  * @file app-shell.tsx
  * @description 应用外壳组件 — 组装所有领域组件的顶层布局容器
  * @dependencies ui/kernel — EngineSnapshot, UiState, UiAction, UiPorts；
- *               ui/domains/colonist — 选择器和组件；
- *               ui/domains/build — 选择器和组件；
- *               ui/domains/feedback — 选择器和组件
+ *               ui/domains/colonist — 殖民者列表；
+ *               ui/domains/inspector — 统一 Object Inspector；
+ *               ui/domains/build — 工具栏；
+ *               ui/domains/feedback — 反馈提示
  * @part-of ui/app — 应用层
  *
  * 这是 Preact UI 的核心组装点。所有领域组件在此处组合，
@@ -14,11 +15,10 @@
 import type { EngineSnapshot, UiState } from '../kernel/ui-types';
 import type { UiAction } from '../kernel/ui-reducer';
 import type { UiPorts } from '../kernel/ui-ports';
-import { selectColonistRosterRows, selectColonistInspector } from '../domains/colonist/colonist.selectors';
+import { selectColonistRosterRows } from '../domains/colonist/colonist.selectors';
 import { ColonistRoster } from '../domains/colonist/components/colonist-roster';
-import { ColonistInspector } from '../domains/colonist/components/colonist-inspector';
-import { selectBuildingInspector } from '../domains/building/building.selectors';
-import { BuildingInspector } from '../domains/building/components/building-inspector';
+import { selectObjectInspector } from '../domains/inspector/inspector.selectors';
+import { ObjectInspector } from '../domains/inspector/components/object-inspector';
 import { selectTopStatusBar, selectActiveToolId } from '../domains/build/build.selectors';
 import { TopStatusBar } from '../domains/build/components/top-status-bar';
 import { ToolModeBar } from '../domains/build/components/tool-mode-bar';
@@ -40,13 +40,38 @@ interface AppShellProps {
 }
 
 /**
+ * Inspector action 分发 — 将 Inspector 操作转换为 UiPorts 调用
+ *
+ * 集中处理所有 Inspector adapter 声明的 action
+ */
+function handleInspectorAction(ports: UiPorts, actionId: string, targetId: string): void {
+  switch (actionId) {
+    case 'assign_bed_owner':
+      // 床位分配需要弹出选择器 — 暂时使用 dispatchCommand 占位
+      break;
+    case 'clear_bed_owner':
+      ports.clearBedOwner(targetId);
+      break;
+    case 'cancel_construction':
+      ports.dispatchCommand({ type: 'cancel_construction', payload: { targetId } });
+      break;
+    case 'designate_harvest':
+      ports.dispatchCommand({ type: 'designate_harvest', payload: { targetId } });
+      break;
+    case 'designate_cut':
+      ports.dispatchCommand({ type: 'designate_cut', payload: { targetId } });
+      break;
+  }
+}
+
+/**
  * 应用外壳 — 顶层布局组件
  *
  * 无数据时渲染空壳占位（仅 header）。
  * 有数据时通过选择器派生各领域视图模型，组装完整 UI：
  * - 顶部：状态栏（时钟/速度/计数）
  * - 左侧：殖民者列表
- * - 右侧：殖民者检查器（单选时显示）
+ * - 右侧：统一 Object Inspector（选中对象时显示）
  * - 右下：Toast 提示栈
  * - 右上：调试面板（F1 切换）
  * - 底部：工具模式栏
@@ -64,8 +89,7 @@ export function AppShell({ snapshot, uiState, dispatch, ports }: AppShellProps) 
   const topBar = selectTopStatusBar(snapshot);
   const activeToolId = selectActiveToolId(snapshot);
   const rosterRows = selectColonistRosterRows(snapshot, uiState);
-  const inspector = selectColonistInspector(snapshot, uiState);
-  const buildingInspector = inspector ? null : selectBuildingInspector(snapshot, uiState);
+  const objectInspector = selectObjectInspector(snapshot, uiState);
   const feedback = selectCommandFeedback(snapshot);
   const debugInfo = selectDebugInfo(snapshot);
   const showDebug = selectShowDebugPanel(snapshot);
@@ -78,15 +102,14 @@ export function AppShell({ snapshot, uiState, dispatch, ports }: AppShellProps) 
       />
       <ColonistRoster
         rows={rosterRows}
-        activeId={inspector?.id ?? null}
+        activeId={snapshot.selection.primaryId}
         onSelect={(id) => ports.selectColonist(id)}
       />
-      {inspector && <ColonistInspector viewModel={inspector} />}
-      {buildingInspector && (
-        <BuildingInspector
-          viewModel={buildingInspector}
-          onAssignOwner={(bedId, pawnId) => ports.assignBedOwner(bedId, pawnId)}
-          onClearOwner={(bedId) => ports.clearBedOwner(bedId)}
+      {objectInspector && (
+        <ObjectInspector
+          viewModel={objectInspector}
+          onSelectTarget={(targetId) => dispatch({ type: 'set_inspector_target', targetId })}
+          onRunAction={(actionId, targetId) => handleInspectorAction(ports, actionId, targetId)}
         />
       )}
       <ToastStack toasts={feedback.toasts} />
