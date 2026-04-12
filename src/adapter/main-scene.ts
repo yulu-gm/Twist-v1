@@ -17,6 +17,7 @@ import { RenderSync } from './render/render-sync';
 import { CameraController } from './render/camera-controller';
 import { InputHandler } from './input/input-handler';
 import { WorldPreview } from './render/world-preview';
+import { SelectionHighlight } from './render/selection-highlight';
 import { DebugOverlay } from './debug/debug-overlay';
 import { installDebugConsole } from './debug/console';
 import { createPresentationState, PresentationState } from '../presentation/presentation-state';
@@ -52,6 +53,8 @@ export class MainScene extends Phaser.Scene {
   private inputHandler!: InputHandler;
   /** 世界空间预览：建筑放置和指派预览矩形 */
   private worldPreview!: WorldPreview;
+  /** 选中高亮：在选中对象周围绘制高亮矩形 */
+  private selectionHighlight!: SelectionHighlight;
   /** 调试覆盖层：渲染区域/房间/温度等可视化 */
   private debugOverlay!: DebugOverlay;
 
@@ -89,6 +92,7 @@ export class MainScene extends Phaser.Scene {
     this.cameraController = new CameraController(this, this.activeMap);
     this.inputHandler = new InputHandler(this, this.world, this.activeMap, this.presentation);
     this.worldPreview = new WorldPreview(this);
+    this.selectionHighlight = new SelectionHighlight(this, this.activeMap);
     this.debugOverlay = new DebugOverlay(this, this.world, this.activeMap, this.presentation);
 
     // 安装调试控制台（window.opus）
@@ -122,6 +126,7 @@ export class MainScene extends Phaser.Scene {
     // 始终更新输入和 UI（即使暂停时也需响应操作）
     this.inputHandler.update();
     this.worldPreview.update(this.presentation);
+    this.selectionHighlight.update(this.presentation);
     this.debugOverlay.update();
 
     // 通知 Preact UI 桥接发射新快照
