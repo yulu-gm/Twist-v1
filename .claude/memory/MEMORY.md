@@ -1,0 +1,7 @@
+- [Project Overview](project_overview.md) — RimWorld-like 殖民地模拟，TS+Vite+Phaser+Preact，确定性模拟/UI分离架构
+- [Project Architecture](project_architecture.md) — 目录结构、AI子系统、测试体系（单元/场景/可视化）
+- [Project Workflow](project_workflow.md) — spec/plan驱动开发流程、分支状态、已知预存问题
+- [User Profile](user_profile.md) — 有经验的游戏开发者，异步委托大任务，期望高质量交付
+- [No Delete Comments](feedback_no_delete_comments.md) — 禁止删除已有注释，代码更新后必须同步更新注释
+- [No Compat](feedback_no_compat.md) — 初创项目不兼容旧代码，新设计应完全落地
+- [Docs Reference](reference_docs.md) — specs/plans在docs/superpowers/，搜索用$search_proj_info

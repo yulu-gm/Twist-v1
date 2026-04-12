@@ -1,5 +1,10 @@
 # Project Rules
 
+## Memory
+
+- 项目记忆文件存放在 `.claude/memory/`，索引为 `.claude/memory/MEMORY.md`。
+- 新增、更新、删除记忆时，优先操作项目内的 `.claude/memory/` 而非用户目录下的全局记忆路径。
+
 ## Project Structure
 
 Twist-v1 目录：
