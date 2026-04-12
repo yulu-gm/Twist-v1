@@ -1,11 +1,12 @@
 /**
  * @file construction.commands.ts
  * @description 建造系统命令处理器，处理放置蓝图和取消建造两个指令
- * @dependencies core/types, core/command-bus, core/event-bus, world/world, core/logger, blueprint.types
+ * @dependencies core/types, core/command-bus, core/event-bus, world/world, core/logger, blueprint.types,
+ *               construction.placement（占地冲突分析）
  * @part-of 建造系统（construction）
  *
  * 组成部分：
- *   - placeBlueprintHandler：放置蓝图命令 —— 在地图上创建建筑蓝图
+ *   - placeBlueprintHandler：放置蓝图命令 —— 在地图上创建建筑蓝图（含占地冲突验证）
  *   - cancelConstructionHandler：取消建造命令 —— 移除蓝图或施工工地并退还材料
  *   - constructionCommandHandlers：导出的命令处理器数组
  */
@@ -21,6 +22,7 @@ import { Blueprint } from './blueprint.types';
 import type { ConstructionSite } from './construction-site.types';
 import { placeItemOnMap } from '../item/item.placement';
 import { cleanupProtocol } from '../ai/cleanup';
+import { analyzeBuildingPlacement } from './construction.placement';
 
 function isWorkingOnConstructionTarget(
   pawn: { ai?: { currentJob?: { targetId?: string; toils: Array<{ targetId?: string }> } | null } },
@@ -47,6 +49,8 @@ export const placeBlueprintHandler: CommandHandler = {
    * @param world - 游戏世界
    * @param cmd - 命令对象，payload 包含 defId（建筑定义ID）、cell（目标格子）、mapId（可选地图ID）
    * @returns 验证结果，{ valid: true } 或 { valid: false, reason: string }
+   *
+   * 验证顺序：地图存在 → 建筑定义存在 → 格子在地图范围内 → 无占地冲突
    */
   validate(world: World, cmd: Command) {
     const { defId, cell } = cmd.payload as {
@@ -77,6 +81,12 @@ export const placeBlueprintHandler: CommandHandler = {
           return { valid: false, reason: `Cell (${checkCell.x},${checkCell.y}) out of bounds` };
         }
       }
+    }
+
+    // 检查占地冲突：蓝图、工地、建筑不可重叠放置
+    const placement = analyzeBuildingPlacement(map, c, size);
+    if (placement.blocked) {
+      return { valid: false, reason: 'Footprint occupied by blueprint, construction site, or building' };
     }
 
     return { valid: true };
