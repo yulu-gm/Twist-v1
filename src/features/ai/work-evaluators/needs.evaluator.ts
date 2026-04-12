@@ -15,7 +15,7 @@ import type { Pawn } from '../../pawn/pawn.types';
 import type { Item } from '../../item/item.types';
 import type { GameMap } from '../../../world/game-map';
 import type { World } from '../../../world/world';
-import { estimateDistance } from '../../pathfinding/path.service';
+import { estimateDistance, isReachable } from '../../pathfinding/path.service';
 import { createEatJob } from '../jobs/eat-job';
 import { createSleepJob } from '../jobs/sleep-job';
 import { getBedByOwner, isBedAvailable } from '../../building/building.queries';
@@ -150,24 +150,27 @@ export const sleepWorkEvaluator: WorkEvaluator = {
 
     if (ownedBed && isBedAvailable(ownedBed)) {
       const interactionCell = ownedBed.interaction?.interactionCell ?? ownedBed.cell;
-      const dist = estimateDistance(pawn.cell, interactionCell);
-      const score = 90 + sleepUrgency * 140 - dist * 0.5;
-      return {
-        kind: 'sleep',
-        label: '睡觉',
-        priority: 95,
-        score,
-        failureReasonCode: 'none',
-        failureReasonText: null,
-        detail: ownedBed.id,
-        jobDefId: 'job_sleep',
-        evaluatedAtTick: world.tick,
-        createJob: () => createSleepJob(
-          pawn.id,
-          { bedId: ownedBed.id, interactionCell },
-          pawn.cell,
-        ),
-      };
+      // 检查床位是否可达，不可达时退化为地铺
+      if (isReachable(map, pawn.cell, interactionCell)) {
+        const dist = estimateDistance(pawn.cell, interactionCell);
+        const score = 90 + sleepUrgency * 140 - dist * 0.5;
+        return {
+          kind: 'sleep',
+          label: '睡觉',
+          priority: 95,
+          score,
+          failureReasonCode: 'none',
+          failureReasonText: null,
+          detail: ownedBed.id,
+          jobDefId: 'job_sleep',
+          evaluatedAtTick: world.tick,
+          createJob: () => createSleepJob(
+            pawn.id,
+            { bedId: ownedBed.id, interactionCell },
+            pawn.cell,
+          ),
+        };
+      }
     }
 
     // 无自有床位时就地休息
