@@ -58,7 +58,7 @@ export const bedBlueprintSleepScenario = createScenario({
       const beds = BED_CELLS
         .map(cell => query.findBuildingAt('bed_wood', cell))
         .filter((bed): bed is NonNullable<typeof bed> => bed !== null);
-      builtBedIds = beds.map(bed => bed.id);
+      builtBedIds = beds.map(bed => (bed as any).id);
       return beds.length === BED_CELLS.length;
     }, {
       timeoutTicks: 1200,
