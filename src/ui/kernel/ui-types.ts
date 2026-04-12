@@ -162,6 +162,102 @@ export interface BuildingNode {
   };
 }
 
+// ── 统一对象节点类型（Inspector 数据源） ──
+
+/** 对象节点基础接口 — 所有对象共享的字段 */
+export interface ObjectNodeBase {
+  /** 对象唯一标识 */
+  id: string;
+  /** 对象类型 */
+  kind: string;
+  /** 对象显示名称 */
+  label: string;
+  /** 对象定义 ID */
+  defId: string;
+  /** 所在格子坐标 */
+  cell: { x: number; y: number };
+  /** 占地尺寸 */
+  footprint: { width: number; height: number };
+  /** 标签列表（可选） */
+  tags?: string[];
+  /** 是否已销毁 */
+  destroyed?: boolean;
+}
+
+/** Pawn 对象节点 — 同时复用 ColonistNode 数据 */
+export interface PawnObjectNode extends ObjectNodeBase {
+  kind: 'pawn';
+  /** 当前任务标签 */
+  currentJobLabel: string;
+  /** 需求值 */
+  needs: { food: number; rest: number; joy: number; mood: number };
+  /** 生命值 */
+  health: { hp: number; maxHp: number };
+  /** 工作决策快照 */
+  workDecision: ColonistWorkDecisionNode | null;
+}
+
+/** Building 对象节点 — 同时复用 BuildingNode 数据 */
+export interface BuildingObjectNode extends ObjectNodeBase {
+  kind: 'building';
+  /** 建筑分类 */
+  category?: 'structure' | 'furniture';
+  /** 家具使用类型 */
+  usageType?: 'bed' | 'table' | 'chair' | 'storage';
+  /** 床位数据 */
+  bed?: {
+    role: 'public' | 'owned' | 'medical' | 'prisoner';
+    ownerPawnId: string | null;
+    occupantPawnId: string | null;
+    autoAssignable: boolean;
+  };
+}
+
+/** Blueprint 对象节点 */
+export interface BlueprintObjectNode extends ObjectNodeBase {
+  kind: 'blueprint';
+  /** 目标建筑定义 ID */
+  targetDefId: string;
+  /** 所需材料列表 */
+  materialsRequired: Array<{ defId: string; count: number }>;
+  /** 已运送材料列表 */
+  materialsDelivered: Array<{ defId: string; count: number }>;
+}
+
+/** ConstructionSite 对象节点 */
+export interface ConstructionSiteObjectNode extends ObjectNodeBase {
+  kind: 'construction_site';
+  /** 目标建筑定义 ID */
+  targetDefId: string;
+  /** 建造进度（0-1） */
+  buildProgress: number;
+}
+
+/** Item 对象节点 */
+export interface ItemObjectNode extends ObjectNodeBase {
+  kind: 'item';
+  /** 堆叠数量 */
+  stackCount: number;
+}
+
+/** Plant 对象节点 */
+export interface PlantObjectNode extends ObjectNodeBase {
+  kind: 'plant';
+  /** 生长进度（0-1） */
+  growth: number;
+  /** 是否可收获 */
+  harvestReady: boolean;
+}
+
+/** 统一对象节点联合类型 */
+export type ObjectNode =
+  | PawnObjectNode
+  | BuildingObjectNode
+  | BlueprintObjectNode
+  | ConstructionSiteObjectNode
+  | ItemObjectNode
+  | PlantObjectNode;
+
 /**
  * 建造快照 — 当前工具/建造模式的只读投影
  */
@@ -215,6 +311,8 @@ export interface EngineSnapshot {
   colonists: Record<string, ColonistNode>;
   /** 地图上所有建筑的快照（key 为建筑ID） */
   buildings?: Record<string, BuildingNode>;
+  /** 统一对象节点字典 — Inspector 数据源（key 为对象ID） */
+  objects: Record<string, ObjectNode>;
   /** 建造模式快照 */
   build: BuildSnapshot;
   /** 反馈事件快照 */

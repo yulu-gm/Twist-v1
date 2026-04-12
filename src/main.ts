@@ -285,7 +285,7 @@ async function boot(): Promise<void> {
         presentation: { activeTool: 'select', activeDesignationType: null, activeZoneType: null, activeBuildDefId: null, hoveredCell: null, selectedIds: [], showDebugPanel: false, showGrid: false },
         selection: { primaryId: null, selectedIds: [] },
         colonists: {}, build: { activeTool: 'select', activeDesignationType: null, activeZoneType: null, lastZoneType: 'stockpile', activeBuildDefId: null, activeModeLabel: 'Select' },
-        feedback: feedbackBuffer, debugInfo: '',
+        feedback: feedbackBuffer, debugInfo: '', objects: {},
       };
     }
     return readEngineSnapshot(world, sceneRef.activeMap, sceneRef.presentation, feedbackBuffer);

@@ -21,6 +21,7 @@ function makeSnapshot(tick: number): EngineSnapshot {
     build: { activeTool: 'select', activeDesignationType: null, activeZoneType: null, lastZoneType: 'stockpile', activeBuildDefId: null, activeModeLabel: 'Select' },
     feedback: { recentEvents: [] },
     debugInfo: '',
+    objects: {},
   };
 }
 

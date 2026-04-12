@@ -115,3 +115,29 @@ describe('readEngineSnapshot work decision projection', () => {
     expect(snapshot.colonists[pawn.id].workDecision).toBeNull();
   });
 });
+
+describe('readEngineSnapshot object nodes', () => {
+  it('includes pawn and building in unified objects dictionary', () => {
+    const defs = buildDefDatabase();
+    const world = createWorld({ defs, seed: 1 });
+    const map = createGameMap({ id: 'main', width: 20, height: 20 });
+    world.maps.set(map.id, map);
+    const presentation = createPresentationState();
+
+    const pawn = createPawn({
+      name: 'Alice',
+      cell: { x: 1, y: 1 },
+      mapId: map.id,
+      factionId: 'player',
+      rng: world.rng,
+    });
+    map.objects.add(pawn);
+
+    const snapshot = readEngineSnapshot(world, map, presentation, { recentEvents: [] });
+
+    // Pawn should appear in objects
+    expect(snapshot.objects[pawn.id]).toBeDefined();
+    expect(snapshot.objects[pawn.id].kind).toBe('pawn');
+    expect(snapshot.objects[pawn.id].label).toBe('Alice');
+  });
+});
