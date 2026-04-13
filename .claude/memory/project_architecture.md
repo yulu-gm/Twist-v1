@@ -12,7 +12,7 @@ originSessionId: 9128ff6f-832f-4cad-81ec-c77ba43490ff
 - `src/features` — 玩法模块（ai、pawn、item、building、construction、pathfinding、reservation、zone 等）
 - `src/adapter` — 输入、渲染、UI bridge
 - `src/presentation` — 展示态（activeTool、hoveredCell 等瞬时 UI 状态）
-- `src/ui` — Preact UI 层（kernel/ui-types、snapshot-reader、domains/colonist|build|feedback）
+- `src/ui` — Preact UI 层（kernel/ui-types、snapshot-reader、domains/colonist|build|feedback|inspector|building）
 - `docs/superpowers/specs` — 设计文档
 - `docs/superpowers/plans` — 实施计划文档
 

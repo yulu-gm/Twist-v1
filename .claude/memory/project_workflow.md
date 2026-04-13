@@ -11,10 +11,11 @@ originSessionId: 9128ff6f-832f-4cad-81ec-c77ba43490ff
 3. 在 feature 分支上按 plan 逐步实现，每步提交
 4. 全量测试通过后合并
 
-## 分支状态（2026-04-12）
+## 分支状态（2026-04-13）
 
-- `main` — 主分支
-- `blank-start` — 当前活跃开发分支，含最新的 Structured Pawn Work Evaluation 功能（8 commits ahead of main，待合并）
+- `main` — 主分支，当前活跃开发分支
+- `blank-start` — 已合并到 main，不再活跃
+- `code-read` — 本地分支
 - Remote: `https://github.com/yulu-gm/Twist-v1`
 
 ## 代码风格
@@ -23,11 +24,10 @@ originSessionId: 9128ff6f-832f-4cad-81ec-c77ba43490ff
 - 文件头使用 `@file` / `@description` / `@dependencies` / `@part-of` JSDoc 格式
 - 提交信息使用英文（conventional commits）
 
-## 已知的预存问题（2026-04-12）
+## 已知的预存问题（2026-04-13）
 
 - `src/features/ai/toil-handlers/deliver.handler.ts` — 引用不存在的 `getBlueprintFootprintCells`，TypeScript 编译错误
-- `src/testing/scenarios/bed-blueprint-sleep.scenario.ts` — `.id` 属性 TypeScript 错误
-- 这两个是 pre-existing 问题，不影响测试运行（Vitest 不检查非测试文件的类型）
+- 这是 pre-existing 问题，不影响测试运行（Vitest 不检查非测试文件的类型）
 
 **Why:** spec-driven 流程确保设计先行，减少返工。中文注释因为团队是中文母语。
 
