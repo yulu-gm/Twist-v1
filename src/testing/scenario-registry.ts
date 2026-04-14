@@ -17,6 +17,7 @@ import { bedBlueprintSleepScenario } from './scenarios/bed-blueprint-sleep.scena
 import { blueprintSelfOccupancyPromoteScenario } from './scenarios/blueprint-self-occupancy-promote.scenario';
 import { blueprintOversupplyHaulScenario } from './scenarios/blueprint-oversupply-haul.scenario';
 import { blueprintMultiPawnOversupplyScenario } from './scenarios/blueprint-multipawn-oversupply.scenario';
+import { todSleepRhythmScenario } from './scenarios/tod-sleep-rhythm.scenario';
 import type { ScenarioDefinition } from './scenario-dsl/scenario.types';
 
 /** 所有已注册的业务场景 */
@@ -33,5 +34,6 @@ export const scenarioRegistry: readonly ScenarioDefinition[] = [
   blueprintSelfOccupancyPromoteScenario,
   blueprintOversupplyHaulScenario,
   blueprintMultiPawnOversupplyScenario,
+  todSleepRhythmScenario,
 ] as const;
 

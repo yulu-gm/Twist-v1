@@ -15,6 +15,7 @@ import type { Pawn } from '../../pawn/pawn.types';
 import type { Item } from '../../item/item.types';
 import type { GameMap } from '../../../world/game-map';
 import type { World } from '../../../world/world';
+import { getTimeOfDayState, isHourWithinWindow } from '../../../core/clock';
 import { estimateDistance, isReachable } from '../../pathfinding/path.service';
 import { createEatJob } from '../jobs/eat-job';
 import { createSleepJob } from '../jobs/sleep-job';
@@ -126,7 +127,31 @@ export const sleepWorkEvaluator: WorkEvaluator = {
   priority: 95,
   evaluate(pawn: Pawn, map: GameMap, world: World): WorkEvaluation {
     // 检查是否触发疲劳阈值
-    if (pawn.needs.rest >= pawn.needsProfile.sleepSeekThreshold) {
+    const tod = getTimeOfDayState(world.clock);
+    const sleepSeekThreshold = Math.max(1, pawn.needsProfile.sleepSeekThreshold);
+    const restPressure = (sleepSeekThreshold - pawn.needs.rest) / sleepSeekThreshold;
+    const inSleepWindow = isHourWithinWindow(
+      tod.hourFloat,
+      pawn.chronotype.sleepStartHour,
+      pawn.chronotype.sleepEndHour,
+    );
+    const hoursUntilSleepStart = (
+      ((pawn.chronotype.sleepStartHour % 24) - tod.hourFloat + 24) % 24
+    );
+    const schedulePressure = inSleepWindow
+      ? 0.75
+      : hoursUntilSleepStart <= 1
+        ? 0.35
+        : hoursUntilSleepStart <= 2
+          ? 0.15
+          : 0;
+    const nightPressure = tod.isNight ? 0.7 : tod.timeSegment === 'dusk' ? 0.25 : 0;
+    const sleepUrgency = Math.max(
+      0,
+      restPressure + schedulePressure + nightPressure + pawn.chronotype.nightOwlBias,
+    );
+
+    if (sleepUrgency <= 0) {
       return {
         kind: 'sleep',
         label: '睡觉',
@@ -141,9 +166,6 @@ export const sleepWorkEvaluator: WorkEvaluator = {
       };
     }
 
-    const sleepUrgency = (
-      pawn.needsProfile.sleepSeekThreshold - pawn.needs.rest
-    ) / Math.max(1, pawn.needsProfile.sleepSeekThreshold);
 
     // 尝试找到 pawn 自己拥有的床位
     const ownedBed = getBedByOwner(map, pawn.name);

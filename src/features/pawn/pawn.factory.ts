@@ -21,7 +21,12 @@ import type {
 import type { SeededRandom } from '../../core/seeded-random';
 import type { Pawn } from './pawn.types';
 import { PHYSICAL_OCCUPANT_TAG } from '../../world/occupancy';
-import { applyTraitModifiers, createDefaultNeedsProfile } from './pawn.systems';
+import {
+  applyTraitModifiers,
+  createDefaultChronotype,
+  createDefaultNeedsProfile,
+  createScheduleEntriesForChronotype,
+} from './pawn.systems';
 
 /**
  * 生成默认的24小时日程安排
@@ -76,8 +81,9 @@ export function createPawn(params: {
   traitIds?: string[];
 }): Pawn {
   const { name, cell, mapId, factionId } = params;
-  const { needsProfile, traits } = applyTraitModifiers(
+  const { needsProfile, chronotype, traits } = applyTraitModifiers(
     createDefaultNeedsProfile(),
+    createDefaultChronotype(params.rng),
     params.traitIds ?? [],
   );
 
@@ -109,6 +115,7 @@ export function createPawn(params: {
     },
     needsProfile,
     traits,
+    chronotype,
     thoughts: [],
     needsState: {
       starvationTicks: 0,
@@ -136,7 +143,7 @@ export function createPawn(params: {
     },
 
     schedule: {
-      entries: defaultSchedule(),
+      entries: createScheduleEntriesForChronotype(chronotype),
     },
   };
 }

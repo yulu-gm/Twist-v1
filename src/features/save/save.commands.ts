@@ -18,9 +18,18 @@ import { Grid } from '../../core/grid';
 import { SaveData, MapSaveData } from './save.types';
 import type { Zone } from '../zone/zone.types';
 import { normalizeZoneConfig } from '../zone/zone.types';
+import type { PawnChronotype } from '../pawn/pawn.types';
+import { createScheduleEntriesForChronotype } from '../pawn/pawn.systems';
 
 /** localStorage 中存档数据的键名 */
 const SAVE_KEY = 'opus_world_save';
+const LEGACY_DEFAULT_CHRONOTYPE: PawnChronotype = {
+  scheduleShiftHours: 0,
+  sleepStartHour: 22,
+  sleepDurationHours: 8,
+  sleepEndHour: 30,
+  nightOwlBias: 0,
+};
 
 // ── 序列化辅助函数 ──
 
@@ -302,6 +311,14 @@ export const loadGameHandler: CommandHandler = {
       // 清除棋子运行时状态 — 反序列化后 AI 任务/移动路径可能无效
       const pawns = map.objects.allOfKind(ObjectKind.Pawn);
       for (const pawn of pawns) {
+        if (!pawn.chronotype) {
+          pawn.chronotype = { ...LEGACY_DEFAULT_CHRONOTYPE };
+        }
+        if (!pawn.schedule?.entries?.length) {
+          pawn.schedule = {
+            entries: createScheduleEntriesForChronotype(pawn.chronotype),
+          };
+        }
         if (pawn.ai) {
           pawn.ai.currentJob = null;
           pawn.ai.currentToilIndex = 0;

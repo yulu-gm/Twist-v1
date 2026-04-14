@@ -5,10 +5,12 @@
  * @part-of features/pawn 棋子功能模块
  */
 
-import { TickPhase, ObjectKind } from '../../core/types';
+import { TickPhase, ObjectKind, ScheduleActivity } from '../../core/types';
+import type { ScheduleEntry } from '../../core/types';
 import type { SystemRegistration } from '../../core/tick-runner';
+import type { SeededRandom } from '../../core/seeded-random';
 import type { World } from '../../world/world';
-import type { Pawn, PawnNeedsProfile, PawnThought, PawnTrait } from './pawn.types';
+import type { Pawn, PawnChronotype, PawnNeedsProfile, PawnThought, PawnTrait } from './pawn.types';
 
 /** 需求系统每隔多少 tick 执行一次 */
 const NEED_SYSTEM_INTERVAL_TICKS = 10;
@@ -16,12 +18,17 @@ const NEED_SYSTEM_INTERVAL_TICKS = 10;
 const DYNAMIC_THOUGHT_DURATION = NEED_SYSTEM_INTERVAL_TICKS;
 
 /** 内置特质定义表：特质ID -> 特质元数据及需求档案修改函数 */
-const TRAIT_DEFS: Record<string, PawnTrait & { apply: (profile: PawnNeedsProfile) => void }> = {
+interface PawnTraitDef extends PawnTrait {
+  applyProfile?: (profile: PawnNeedsProfile) => void;
+  applyChronotype?: (chronotype: PawnChronotype) => void;
+}
+
+const TRAIT_DEFS: Record<string, PawnTraitDef> = {
   glutton: {
     traitId: 'glutton',
     label: 'Glutton',
     description: 'Gets hungry sooner and eats more often.',
-    apply(profile) {
+    applyProfile(profile) {
       profile.foodDecayPerTick += 0.01;
       profile.hungerSeekThreshold += 10;
     },
@@ -30,7 +37,7 @@ const TRAIT_DEFS: Record<string, PawnTrait & { apply: (profile: PawnNeedsProfile
     traitId: 'light_sleeper',
     label: 'Light Sleeper',
     description: 'Gets tired sooner and dislikes sleeping rough.',
-    apply(profile) {
+    applyProfile(profile) {
       profile.restDecayPerTick += 0.01;
       profile.sleepSeekThreshold += 10;
       profile.floorSleepMoodPenalty += 6;
@@ -40,11 +47,32 @@ const TRAIT_DEFS: Record<string, PawnTrait & { apply: (profile: PawnNeedsProfile
     traitId: 'hardy',
     label: 'Hardy',
     description: 'Handles hunger and poor sleeping conditions better.',
-    apply(profile) {
+    applyProfile(profile) {
       profile.hungerCriticalThreshold = Math.max(1, profile.hungerCriticalThreshold - 5);
       profile.starvationDamageInterval += 50;
       profile.starvationDamageAmount = Math.max(1, profile.starvationDamageAmount - 1);
       profile.floorSleepMoodPenalty = Math.max(0, profile.floorSleepMoodPenalty - 4);
+    },
+  },
+  night_owl: {
+    traitId: 'night_owl',
+    label: 'Night Owl',
+    description: 'Naturally stays up later and feels less sleep pressure at night.',
+    applyChronotype(chronotype) {
+      chronotype.scheduleShiftHours += 2;
+      chronotype.nightOwlBias -= 0.35;
+    },
+  },
+  high_energy: {
+    traitId: 'high_energy',
+    label: 'High Energy',
+    description: 'Burns through rest more slowly and can stay active later.',
+    applyProfile(profile) {
+      profile.restDecayPerTick = Math.max(0.01, profile.restDecayPerTick - 0.012);
+    },
+    applyChronotype(chronotype) {
+      chronotype.scheduleShiftHours += 1;
+      chronotype.nightOwlBias -= 0.18;
     },
   },
 };
@@ -57,6 +85,59 @@ function clamp100(v: number): number {
 /** 将数值限制在不低于 min */
 function clampMin(v: number, min: number): number {
   return v < min ? min : v;
+}
+
+function normalizeHour(hour: number): number {
+  const normalized = hour % 24;
+  return normalized < 0 ? normalized + 24 : normalized;
+}
+
+function finalizeChronotype(baseChronotype: PawnChronotype): PawnChronotype {
+  const sleepStartHour = baseChronotype.sleepStartHour + baseChronotype.scheduleShiftHours;
+  const sleepDurationHours = clampMin(baseChronotype.sleepDurationHours, 1);
+  const sleepEndHour = sleepStartHour + sleepDurationHours;
+  return {
+    scheduleShiftHours: baseChronotype.scheduleShiftHours,
+    sleepStartHour,
+    sleepDurationHours,
+    sleepEndHour,
+    nightOwlBias: baseChronotype.nightOwlBias,
+  };
+}
+
+export function createDefaultChronotype(rng: SeededRandom): PawnChronotype {
+  return {
+    scheduleShiftHours: rng.nextInt(-1, 2),
+    sleepStartHour: 22,
+    sleepDurationHours: 8,
+    sleepEndHour: 30,
+    nightOwlBias: 0,
+  };
+}
+
+export function createScheduleEntriesForChronotype(chronotype: PawnChronotype): ScheduleEntry[] {
+  const entries: ScheduleEntry[] = [];
+  const sleepStart = normalizeHour(chronotype.sleepStartHour);
+  const sleepEnd = normalizeHour(chronotype.sleepEndHour);
+
+  for (let hour = 0; hour < 24; hour++) {
+    let activity = ScheduleActivity.Anything;
+    const inSleepWindow = sleepStart === sleepEnd
+      ? true
+      : sleepStart < sleepEnd
+        ? hour >= sleepStart && hour < sleepEnd
+        : hour >= sleepStart || hour < sleepEnd;
+
+    if (inSleepWindow) {
+      activity = ScheduleActivity.Sleep;
+    } else if (hour >= 18 && hour < sleepStart) {
+      activity = ScheduleActivity.Joy;
+    }
+
+    entries.push({ hour, activity });
+  }
+
+  return entries;
 }
 
 /** 从棋子想法列表中移除指定类型（可选指定来源ID）的想法 */
@@ -179,15 +260,18 @@ export function createDefaultNeedsProfile(): PawnNeedsProfile {
 /** 将特质修改应用到基础需求档案，返回修改后的档案和特质元数据列表 */
 export function applyTraitModifiers(
   baseProfile: PawnNeedsProfile,
+  baseChronotype: PawnChronotype,
   traitIds: string[],
-): { needsProfile: PawnNeedsProfile; traits: PawnTrait[] } {
+): { needsProfile: PawnNeedsProfile; chronotype: PawnChronotype; traits: PawnTrait[] } {
   const needsProfile: PawnNeedsProfile = { ...baseProfile };
+  const chronotype: PawnChronotype = { ...baseChronotype };
   const traits: PawnTrait[] = [];
 
   for (const traitId of traitIds) {
     const trait = TRAIT_DEFS[traitId];
     if (!trait) continue;
-    trait.apply(needsProfile);
+    trait.applyProfile?.(needsProfile);
+    trait.applyChronotype?.(chronotype);
     traits.push({
       traitId: trait.traitId,
       label: trait.label,
@@ -195,7 +279,7 @@ export function applyTraitModifiers(
     });
   }
 
-  return { needsProfile, traits };
+  return { needsProfile, chronotype: finalizeChronotype(chronotype), traits };
 }
 
 export function needDecaySystem(world: World): void {

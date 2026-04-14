@@ -30,6 +30,7 @@ export function spawnPawnFixture(cell: { x: number; y: number }, name = 'Tester'
       mapId: harness.map.id,
       factionId: 'player',
       rng: harness.world.rng,
+      traitIds: [],
     });
     harness.map.objects.add(pawn);
   });

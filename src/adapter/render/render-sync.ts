@@ -12,6 +12,7 @@ import { World } from '../../world/world';
 import type { GameMap } from '../../world/game-map';
 import { ObjectKind, ObjectId, MapObjectBase } from '../../core/types';
 import { TILE_SIZE, LAYER_DEPTH, LayerName, kindToLayer, getSpriteColor, getObjectPixelCenter } from './render-utils';
+import { getDaylightOverlayState } from './daylight-overlay';
 import { SpriteRegistry } from './sprite-registry';
 import { TerrainRenderer } from './terrain-renderer';
 import { ZoneRenderer } from './zone-renderer';
@@ -35,6 +36,7 @@ export class RenderSync {
   private world: World;
   private map: GameMap;
   private spriteRegistry: SpriteRegistry;
+  private daylightOverlay: Phaser.GameObjects.Graphics;
 
   // ── 分层 Container ──
   private layers = new Map<LayerName, Phaser.GameObjects.Container>();
@@ -51,6 +53,9 @@ export class RenderSync {
     this.world = world;
     this.map = map;
     this.spriteRegistry = new SpriteRegistry();
+    this.daylightOverlay = this.scene.add.graphics()
+      .setDepth(LAYER_DEPTH.pawn + 0.75)
+      .setScrollFactor(0);
 
     this.createLayers();
 
@@ -88,6 +93,7 @@ export class RenderSync {
    * @param tickProgress - 距下一次逻辑 tick 的时间比例 [0,1)；Pawn 上与 moveProgress、speed 同刻度推算边上位置
    */
   sync(tickProgress = 0): void {
+    this.updateDaylightOverlay(tickProgress);
     this.terrainRenderer.syncIfDirty(this.layers);
     this.zoneRenderer.update();
     this.pawnRenderer.setTickProgress(tickProgress);
@@ -150,6 +156,20 @@ export class RenderSync {
 
   private getRenderer(kind: ObjectKind): ObjectRenderer {
     return this.rendererMap.get(kind) ?? this.defaultRenderer;
+  }
+
+  private updateDaylightOverlay(tickProgress: number): void {
+    const state = getDaylightOverlayState(this.world.clock, tickProgress);
+    this.daylightOverlay.clear();
+
+    if (state.overlayAlpha <= 0) {
+      this.daylightOverlay.setVisible(false);
+      return;
+    }
+
+    this.daylightOverlay.setVisible(true);
+    this.daylightOverlay.fillStyle(state.overlayColor, state.overlayAlpha);
+    this.daylightOverlay.fillRect(0, 0, this.scene.scale.width, this.scene.scale.height);
   }
 }
 

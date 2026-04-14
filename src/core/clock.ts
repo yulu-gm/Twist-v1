@@ -26,6 +26,13 @@ export interface SimulationClock {
   year: number;
 }
 
+export interface TimeOfDayState {
+  timeSegment: 'dawn' | 'day' | 'dusk' | 'night';
+  daylightLevel: number;
+  isNight: boolean;
+  hourFloat: number;
+}
+
 // ── 游戏时间常量 ──
 const TICKS_PER_HOUR = 100;                               // 每小时的 tick 数（1x 速度下约 10 秒真实时间）
 const HOURS_PER_DAY = 24;                                  // 每天的小时数
@@ -65,6 +72,62 @@ export function advanceClock(clock: SimulationClock): void {
   clock.day = (Math.floor(totalWithOffset / TICKS_PER_DAY) % DAYS_PER_SEASON) + 1;
   clock.season = Math.floor(totalWithOffset / TICKS_PER_SEASON) % SEASONS_PER_YEAR;
   clock.year = Math.floor(totalWithOffset / TICKS_PER_YEAR) + 1;
+}
+
+function clamp01(value: number): number {
+  if (value <= 0) return 0;
+  if (value >= 1) return 1;
+  return value;
+}
+
+function normalizeHour(hour: number): number {
+  const normalized = hour % HOURS_PER_DAY;
+  return normalized < 0 ? normalized + HOURS_PER_DAY : normalized;
+}
+
+export function getHourFloat(clock: SimulationClock): number {
+  const totalWithOffset = clock.totalTicks + 6 * TICKS_PER_HOUR;
+  const hourFloat = (totalWithOffset / TICKS_PER_HOUR) % HOURS_PER_DAY;
+  return normalizeHour(hourFloat);
+}
+
+export function isHourWithinWindow(hourFloat: number, startHour: number, endHour: number): boolean {
+  const hour = normalizeHour(hourFloat);
+  const start = normalizeHour(startHour);
+  const end = normalizeHour(endHour);
+
+  if (start === end) return true;
+  if (start < end) {
+    return hour >= start && hour < end;
+  }
+  return hour >= start || hour < end;
+}
+
+export function getTimeOfDayState(clock: SimulationClock): TimeOfDayState {
+  const hourFloat = getHourFloat(clock);
+  let timeSegment: TimeOfDayState['timeSegment'];
+  let daylightLevel: number;
+
+  if (hourFloat >= 6 && hourFloat < 8) {
+    timeSegment = 'dawn';
+    daylightLevel = clamp01((hourFloat - 6) / 2);
+  } else if (hourFloat >= 8 && hourFloat < 18) {
+    timeSegment = 'day';
+    daylightLevel = 1;
+  } else if (hourFloat >= 18 && hourFloat < 20) {
+    timeSegment = 'dusk';
+    daylightLevel = clamp01(1 - ((hourFloat - 18) / 2));
+  } else {
+    timeSegment = 'night';
+    daylightLevel = 0.08;
+  }
+
+  return {
+    timeSegment,
+    daylightLevel,
+    isNight: timeSegment === 'night',
+    hourFloat,
+  };
 }
 
 /**

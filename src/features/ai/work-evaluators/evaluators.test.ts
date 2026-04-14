@@ -25,6 +25,13 @@ function createTestEnv() {
   return { defs, world, map };
 }
 
+function setClockHour(env: ReturnType<typeof createTestEnv>, hourFloat: number) {
+  let deltaHours = hourFloat - 6;
+  if (deltaHours < 0) deltaHours += 24;
+  env.world.clock.totalTicks = Math.round(deltaHours * 100);
+  env.world.clock.hour = Math.floor(hourFloat) % 24;
+}
+
 /** 创建标准测试 pawn */
 function createTestPawn(
   env: ReturnType<typeof createTestEnv>,
@@ -131,6 +138,69 @@ describe('sleepWorkEvaluator', () => {
     const result = sleepWorkEvaluator.evaluate(pawn, env.map, env.world);
     expect(result.failureReasonCode).toBe('need_not_triggered');
     expect(result.createJob).toBeNull();
+  });
+
+  it('allows a normal pawn to seek sleep during its sleep window even if rest is above the old threshold', () => {
+    const env = createTestEnv();
+    const pawn = createTestPawn(env, { name: 'Normal' });
+    setClockHour(env, 23);
+    pawn.needs.rest = 60;
+    pawn.needsProfile.sleepSeekThreshold = 35;
+
+    const result = sleepWorkEvaluator.evaluate(pawn, env.map, env.world);
+    expect(result.failureReasonCode).toBe('none');
+    expect(result.createJob).not.toBeNull();
+    expect(result.score).toBeGreaterThan(0);
+  });
+
+  it('gives a normal pawn higher sleep score than a night_owl at the same late hour', () => {
+    const env = createTestEnv();
+    setClockHour(env, 23);
+    const normal = createTestPawn(env, { name: 'Normal' });
+    const owl = createPawn({
+      name: 'Owl',
+      cell: { x: 7, y: 5 },
+      mapId: env.map.id,
+      factionId: 'player',
+      rng: env.world.rng,
+      traitIds: ['night_owl'],
+    });
+    env.map.objects.add(owl);
+
+    normal.needs.rest = 45;
+    owl.needs.rest = 45;
+
+    const normalResult = sleepWorkEvaluator.evaluate(normal, env.map, env.world);
+    const owlResult = sleepWorkEvaluator.evaluate(owl, env.map, env.world);
+
+    expect(normalResult.failureReasonCode).toBe('none');
+    expect(owlResult.failureReasonCode).toBe('none');
+    expect(normalResult.score).toBeGreaterThan(owlResult.score);
+  });
+
+  it('gives a high_energy pawn lower sleep score than a normal pawn at the same night hour', () => {
+    const env = createTestEnv();
+    setClockHour(env, 23);
+    const normal = createTestPawn(env, { name: 'Normal' });
+    const energetic = createPawn({
+      name: 'Energetic',
+      cell: { x: 8, y: 5 },
+      mapId: env.map.id,
+      factionId: 'player',
+      rng: env.world.rng,
+      traitIds: ['high_energy'],
+    });
+    env.map.objects.add(energetic);
+
+    normal.needs.rest = 45;
+    energetic.needs.rest = 45;
+
+    const normalResult = sleepWorkEvaluator.evaluate(normal, env.map, env.world);
+    const energeticResult = sleepWorkEvaluator.evaluate(energetic, env.map, env.world);
+
+    expect(normalResult.failureReasonCode).toBe('none');
+    expect(energeticResult.failureReasonCode).toBe('none');
+    expect(normalResult.score).toBeGreaterThan(energeticResult.score);
   });
 });
 

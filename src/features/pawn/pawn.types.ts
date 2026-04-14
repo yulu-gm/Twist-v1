@@ -121,6 +121,14 @@ export interface PawnThought {
   sourceId?: ObjectId;
 }
 
+export interface PawnChronotype {
+  scheduleShiftHours: number;
+  sleepStartHour: number;
+  sleepDurationHours: number;
+  sleepEndHour: number;
+  nightOwlBias: number;
+}
+
 // ── Pawn（棋子：游戏中可操控的角色实体） ──
 export interface Pawn extends MapObjectBase {
   /** 对象类型标识，固定为 Pawn */
@@ -159,6 +167,7 @@ export interface Pawn extends MapObjectBase {
   needsProfile: PawnNeedsProfile;
   /** 棋子特质列表 */
   traits: PawnTrait[];
+  chronotype: PawnChronotype;
   /** 当前活跃的想法列表（影响心情） */
   thoughts: PawnThought[];
   /** 需求系统的持久状态数据 */
