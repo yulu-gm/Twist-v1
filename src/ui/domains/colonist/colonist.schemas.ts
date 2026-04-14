@@ -19,7 +19,6 @@ export const rosterColumns = [
 /** 需求条的配置（标识、标签、颜色），与 ColonistNode.needs 的键一一对应 */
 export const needDefs = [
   { key: 'food', label: 'Food', color: '#cc8844' },
-  { key: 'rest', label: 'Rest', color: '#4488cc' },
   { key: 'joy',  label: 'Joy',  color: '#44cc88' },
   { key: 'mood', label: 'Mood', color: '#cc44cc' },
 ] as const;

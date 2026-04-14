@@ -43,7 +43,7 @@ describe('ColonistInspector', () => {
   it('renders need bar labels', () => {
     render(<ColonistInspector viewModel={makeViewModel()} />);
     expect(screen.getByText('Food')).toBeInTheDocument();
-    expect(screen.getByText('Rest')).toBeInTheDocument();
+    expect(screen.queryByText('Rest')).not.toBeInTheDocument();
   });
 
   it('renders health info', () => {

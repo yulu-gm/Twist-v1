@@ -21,6 +21,7 @@ import { createScenarioQueryApi } from '../scenario-probes/query-api';
 import { diffCheckpointSnapshots, DivergenceRecord } from './shadow-runner';
 import type { StepSummary } from './scenario-hud';
 import { SimSpeed } from '../../core/types';
+import { getClockDisplay } from '../../core/clock';
 import type { World } from '../../world/world';
 
 /** 会话状态 — 工作台 session 的生命周期阶段 */
@@ -40,6 +41,8 @@ export interface ControllerState {
   currentSpeedLabel: string;
   /** 当前 tick */
   currentTick: number;
+  /** 当前场景时间显示 */
+  currentClockDisplay: string;
   /** 当前步骤标题 */
   currentStepTitle: string;
   /** Visual Runner 步骤摘要 */
@@ -172,6 +175,7 @@ export function createVisualScenarioController(
     currentSpeed: SimSpeed.Paused,
     currentSpeedLabel: formatSpeedLabel(SimSpeed.Paused),
     currentTick: 0,
+    currentClockDisplay: '',
     currentStepTitle: '',
     visualSteps,
     shadowSteps,
@@ -184,6 +188,7 @@ export function createVisualScenarioController(
   function emit() {
     if (disposed) return;
     state.currentTick = visualHarness?.world.tick ?? 0;
+    state.currentClockDisplay = visualHarness ? getClockDisplay(visualHarness.world.clock) : '';
     state.divergence = divergence;
     onStateChange({ ...state });
   }
@@ -499,6 +504,7 @@ export function createVisualScenarioController(
     if (state.sessionStatus !== 'paused' || count <= 0 || !visualHarness) return;
     visualHarness.stepTicks(count);
     state.currentTick = visualHarness.world.tick;
+    state.currentClockDisplay = getClockDisplay(visualHarness.world.clock);
     emit();
   }
 
@@ -553,6 +559,7 @@ export function createVisualScenarioController(
     state.currentSpeed = SimSpeed.Paused;
     state.currentSpeedLabel = formatSpeedLabel(SimSpeed.Paused);
     state.currentTick = 0;
+    state.currentClockDisplay = '';
     state.currentStepTitle = '';
     state.visualSteps = visualSteps;
     state.shadowSteps = shadowSteps;

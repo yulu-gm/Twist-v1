@@ -26,6 +26,8 @@ interface ColonistInspectorProps {
  * - 工作队列：按优先级排列的工作决策状态（active/blocked/deferred）
  */
 export function ColonistInspector({ viewModel }: ColonistInspectorProps) {
+  const visibleNeeds = viewModel.needs.filter(need => need.key !== 'rest');
+
   return (
     <div class="inspector-panel">
       <div class="inspector-panel__header">{viewModel.name}</div>
@@ -38,7 +40,7 @@ export function ColonistInspector({ viewModel }: ColonistInspectorProps) {
         </Section>
 
         <Section title="Needs">
-          {viewModel.needs.map(need => (
+          {visibleNeeds.map(need => (
             <ProgressBar
               key={need.key}
               label={need.label}

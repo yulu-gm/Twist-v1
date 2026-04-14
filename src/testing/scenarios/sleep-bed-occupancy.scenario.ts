@@ -115,7 +115,7 @@ export const sleepBedOccupancyScenario = createScenario({
       restoredSleepers = Array.from(restored);
       return restoredSleepers.length === PAWN_NAMES.length;
     }, {
-      timeoutTicks: 240,
+      timeoutTicks: 360,
       timeoutMessage: '并非所有小人都通过睡眠恢复到了有效休息度',
     }),
     createWaitForStep('等待床位在醒来后释放 occupant', ({ query }) => {
@@ -123,7 +123,7 @@ export const sleepBedOccupancyScenario = createScenario({
       const bedB = query.findBuildingAt('bed_wood', BED_CELLS[1]) as any;
       return !bedA?.bed?.occupantPawnId && !bedB?.bed?.occupantPawnId;
     }, {
-      timeoutTicks: 80,
+      timeoutTicks: 360,
       timeoutMessage: '小人醒来后床位 occupant 没有释放',
     }),
   ],

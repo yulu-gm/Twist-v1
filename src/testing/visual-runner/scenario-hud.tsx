@@ -34,6 +34,8 @@ export interface ScenarioHudProps {
   sessionStatus: ControllerSessionStatus;
   /** 当前 tick */
   currentTick?: number;
+  /** 当前场景时间显示 */
+  currentClockDisplay?: string;
   /** 当前速度 */
   currentSpeed: SimSpeed;
   /** 当前速度的用户可读 label */
@@ -165,6 +167,7 @@ export function ScenarioHud(props: ScenarioHudProps) {
     title,
     sessionStatus,
     currentTick,
+    currentClockDisplay,
     currentSpeed,
     currentSpeedLabel,
     currentStepTitle,
@@ -203,6 +206,9 @@ export function ScenarioHud(props: ScenarioHudProps) {
         {scenarioId && <p style={{ margin: '4px 0 0', color: '#93c5fd' }}>ID: {scenarioId}</p>}
         <p style={{ margin: '4px 0 0', color: '#aaa' }}>Status: {sessionStatus}</p>
         <p style={{ margin: '4px 0 0', color: '#aaa' }}>Tick: {currentTick ?? 0}</p>
+        {currentClockDisplay && (
+          <p style={{ margin: '4px 0 0', color: '#aaa' }}>Time: {currentClockDisplay}</p>
+        )}
         <p style={{ margin: '4px 0 0', color: '#aaa' }}>Speed: {currentSpeedLabel}</p>
         {currentStepTitle && (
           <p style={{ margin: '4px 0 0', color: '#3b82f6' }}>当前步骤: {currentStepTitle}</p>

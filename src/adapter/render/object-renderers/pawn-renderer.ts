@@ -180,6 +180,15 @@ export class PawnRenderer implements ObjectRenderer {
       case 'work':
         return { current: (toil.localData.workDone as number) ?? 0, total: (toil.localData.totalWork as number) ?? 100 };
       case 'wait':
+        if (toil.localData.sleeping) {
+          const total = (toil.localData.sleepSessionTargetTicks as number)
+            ?? (toil.localData.sleepTicksTarget as number)
+            ?? null;
+          if (typeof total !== 'number' || total <= 0) {
+            return null;
+          }
+          return { current: (toil.localData.waited as number) ?? 0, total };
+        }
         return { current: (toil.localData.waited as number) ?? 0, total: (toil.localData.waitTicks as number) ?? 60 };
       case 'interact':
         return { current: (toil.localData.interacted as number) ?? 0, total: (toil.localData.interactTicks as number) ?? 30 };

@@ -170,7 +170,7 @@ export const todSleepRhythmScenario = createScenario({
       }
       return false;
     }, {
-      timeoutTicks: 420,
+      timeoutTicks: 700,
       timeoutMessage: 'High Energy 迟迟没有进入睡眠，夜间偏置可能过强。',
     }),
     createWaitForStep('三名 pawn 都恢复到安全 rest', ({ query }) => {
@@ -192,7 +192,7 @@ export const todSleepRhythmScenario = createScenario({
         return !bed?.bed?.occupantPawnId;
       });
     }, {
-      timeoutTicks: 160,
+      timeoutTicks: 1400,
       timeoutMessage: '至少有一张床在场景结束时仍然被 occupant 占用。',
     }),
   ],

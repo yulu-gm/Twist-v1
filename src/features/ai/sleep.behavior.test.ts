@@ -8,6 +8,20 @@ import { jobSelectionSystem } from './job-selector';
 import { toilExecutorSystem } from './toil-executor';
 import { movementSystem } from '../movement/movement.system';
 
+function setClockHour(world: ReturnType<typeof createWorld>, hourFloat: number): void {
+  let deltaHours = hourFloat - 6;
+  if (deltaHours < 0) deltaHours += 24;
+  world.tick = Math.round(deltaHours * 100);
+  world.clock.totalTicks = Math.round(deltaHours * 100);
+  world.clock.hour = Math.floor(hourFloat) % 24;
+}
+
+function getActiveToil(pawn: ReturnType<typeof createPawn>) {
+  const job = pawn.ai.currentJob;
+  expect(job).not.toBeNull();
+  return job!.toils[job!.currentToilIndex];
+}
+
 describe('sleep behavior', () => {
   it('assigns a sleep job that targets an available bed when rest is low', () => {
     const defs = buildDefDatabase();
@@ -195,15 +209,120 @@ describe('sleep behavior', () => {
     expect(pawn.ai.currentJob?.targetId).toBeUndefined();
   });
 
-  it('restores rest while sleeping on the floor', () => {
+  it('restores some rest during a full scheduled floor sleep session', () => {
     const defs = buildDefDatabase();
     const world = createWorld({ defs, seed: 3 });
     const map = createGameMap({ id: 'main', width: 20, height: 20 });
     world.maps.set(map.id, map);
+    setClockHour(world, 22);
 
     const pawn = createPawn({
       name: 'Nap',
       cell: { x: 8, y: 8 },
+      mapId: map.id,
+      factionId: 'player',
+      rng: world.rng,
+    });
+    pawn.needs.food = 80;
+    pawn.needs.rest = 10;
+    pawn.chronotype = {
+      scheduleShiftHours: 0,
+      sleepStartHour: 22,
+      sleepDurationHours: 8,
+      sleepEndHour: 30,
+      nightOwlBias: 0,
+    };
+    map.objects.add(pawn);
+
+    jobSelectionSystem.execute(world);
+    expect(pawn.ai.currentJob?.defId).toBe('job_sleep');
+
+    for (let i = 0; i < 850 && pawn.ai.currentJob; i++) {
+      toilExecutorSystem.execute(world);
+    }
+
+    expect(pawn.ai.currentJob).toBeNull();
+    expect(pawn.needs.rest).toBeGreaterThan(70);
+    expect(pawn.needs.rest).toBeLessThan(pawn.needsProfile.wakeTargetRest);
+  });
+
+  it('initializes a scheduled sleep session target for night sleep progress', () => {
+    const defs = buildDefDatabase();
+    const world = createWorld({ defs, seed: 40 });
+    const map = createGameMap({ id: 'main', width: 20, height: 20 });
+    world.maps.set(map.id, map);
+    setClockHour(world, 22);
+
+    const pawn = createPawn({
+      name: 'NightShift',
+      cell: { x: 8, y: 8 },
+      mapId: map.id,
+      factionId: 'player',
+      rng: world.rng,
+    });
+    pawn.needs.food = 80;
+    pawn.needs.rest = 55;
+    pawn.chronotype = {
+      scheduleShiftHours: 0,
+      sleepStartHour: 22,
+      sleepDurationHours: 8,
+      sleepEndHour: 30,
+      nightOwlBias: 0,
+    };
+
+    map.objects.add(pawn);
+
+    jobSelectionSystem.execute(world);
+    toilExecutorSystem.execute(world);
+
+    const toil = getActiveToil(pawn);
+    expect(toil.type).toBe('wait');
+    expect(toil.localData.sleepSessionKind).toBe('scheduled');
+    expect(toil.localData.sleepSessionTargetTicks).toBe(800);
+  });
+
+  it('initializes a recovery sleep session target outside the scheduled sleep window', () => {
+    const defs = buildDefDatabase();
+    const world = createWorld({ defs, seed: 41 });
+    const map = createGameMap({ id: 'main', width: 20, height: 20 });
+    world.maps.set(map.id, map);
+    setClockHour(world, 12);
+
+    const pawn = createPawn({
+      name: 'Napper',
+      cell: { x: 9, y: 9 },
+      mapId: map.id,
+      factionId: 'player',
+      rng: world.rng,
+    });
+    pawn.needs.food = 80;
+    pawn.needs.rest = 10;
+    map.objects.add(pawn);
+
+    jobSelectionSystem.execute(world);
+    toilExecutorSystem.execute(world);
+
+    const toil = getActiveToil(pawn);
+    const expectedTicks = Math.ceil(
+      (pawn.needsProfile.wakeTargetRest - 10)
+      / (pawn.needsProfile.floorRestGainPerTick - pawn.needsProfile.restDecayPerTick),
+    );
+
+    expect(toil.type).toBe('wait');
+    expect(toil.localData.sleepSessionKind).toBe('recovery');
+    expect(toil.localData.sleepSessionTargetTicks).toBe(expectedTicks);
+  });
+
+  it('uses a fixed per-tick rest gain during recovery sleep and preserves partial recovery on interruption', () => {
+    const defs = buildDefDatabase();
+    const world = createWorld({ defs, seed: 42 });
+    const map = createGameMap({ id: 'main', width: 20, height: 20 });
+    world.maps.set(map.id, map);
+    setClockHour(world, 12);
+
+    const pawn = createPawn({
+      name: 'InterruptedNap',
+      cell: { x: 10, y: 10 },
       mapId: map.id,
       factionId: 'player',
       rng: world.rng,
@@ -215,8 +334,150 @@ describe('sleep behavior', () => {
     jobSelectionSystem.execute(world);
     expect(pawn.ai.currentJob?.defId).toBe('job_sleep');
 
-    for (let i = 0; i < 200 && pawn.ai.currentJob; i++) {
+    for (let i = 0; i < 20 && pawn.ai.currentJob; i++) {
       toilExecutorSystem.execute(world);
+    }
+
+    pawn.needs.food = 0;
+    toilExecutorSystem.execute(world);
+
+    expect(pawn.ai.currentJob).toBeNull();
+    expect(pawn.needs.rest).toBeCloseTo(10 + pawn.needsProfile.floorRestGainPerTick * 20, 5);
+    expect(pawn.needs.rest).toBeLessThan(pawn.needsProfile.wakeTargetRest);
+  });
+
+  it('does not finish a night sleep after only a few dozen ticks', () => {
+    const defs = buildDefDatabase();
+    const world = createWorld({ defs, seed: 30 });
+    const map = createGameMap({ id: 'main', width: 20, height: 20 });
+    world.maps.set(map.id, map);
+    setClockHour(world, 22);
+
+    const pawn = createPawn({
+      name: 'LongSleeper',
+      cell: { x: 10, y: 10 },
+      mapId: map.id,
+      factionId: 'player',
+      rng: world.rng,
+    });
+    pawn.needs.food = 80;
+    pawn.needs.rest = 55;
+    pawn.chronotype = {
+      scheduleShiftHours: 0,
+      sleepStartHour: 22,
+      sleepDurationHours: 8,
+      sleepEndHour: 30,
+      nightOwlBias: 0,
+    };
+
+    const bed = createBuilding({
+      defId: 'bed_wood',
+      cell: { x: 12, y: 10 },
+      mapId: map.id,
+      defs,
+    });
+    bed.bed!.ownerPawnId = pawn.name;
+
+    map.objects.add(pawn);
+    map.objects.add(bed);
+
+    jobSelectionSystem.execute(world);
+
+    for (let i = 0; i < 120 && pawn.ai.currentJob; i++) {
+      toilExecutorSystem.execute(world);
+      movementSystem.execute(world);
+    }
+
+    expect(pawn.ai.currentJob?.defId).toBe('job_sleep');
+    expect(pawn.needs.rest).toBeLessThan(pawn.needsProfile.wakeTargetRest);
+  });
+
+  it('does not nearly fill the rest bar at the start of a scheduled night sleep', () => {
+    const defs = buildDefDatabase();
+    const world = createWorld({ defs, seed: 32 });
+    const map = createGameMap({ id: 'main', width: 20, height: 20 });
+    world.maps.set(map.id, map);
+    setClockHour(world, 22);
+
+    const pawn = createPawn({
+      name: 'BarAlignmentSleeper',
+      cell: { x: 10, y: 10 },
+      mapId: map.id,
+      factionId: 'player',
+      rng: world.rng,
+    });
+    pawn.needs.food = 80;
+    pawn.needs.rest = 55;
+    pawn.chronotype = {
+      scheduleShiftHours: 0,
+      sleepStartHour: 22,
+      sleepDurationHours: 8,
+      sleepEndHour: 30,
+      nightOwlBias: 0,
+    };
+
+    const bed = createBuilding({
+      defId: 'bed_wood',
+      cell: { x: 12, y: 10 },
+      mapId: map.id,
+      defs,
+    });
+    bed.bed!.ownerPawnId = pawn.name;
+
+    map.objects.add(pawn);
+    map.objects.add(bed);
+
+    jobSelectionSystem.execute(world);
+
+    for (let i = 0; i < 120 && pawn.ai.currentJob; i++) {
+      toilExecutorSystem.execute(world);
+      movementSystem.execute(world);
+    }
+
+    expect(pawn.ai.currentJob?.defId).toBe('job_sleep');
+    expect(pawn.needs.rest).toBeLessThan(75);
+  });
+
+  it('wakes after completing the scheduled night sleep window', () => {
+    const defs = buildDefDatabase();
+    const world = createWorld({ defs, seed: 31 });
+    const map = createGameMap({ id: 'main', width: 20, height: 20 });
+    world.maps.set(map.id, map);
+    setClockHour(world, 22);
+
+    const pawn = createPawn({
+      name: 'ScheduledSleeper',
+      cell: { x: 10, y: 10 },
+      mapId: map.id,
+      factionId: 'player',
+      rng: world.rng,
+    });
+    pawn.needs.food = 80;
+    pawn.needs.rest = 55;
+    pawn.chronotype = {
+      scheduleShiftHours: 0,
+      sleepStartHour: 22,
+      sleepDurationHours: 8,
+      sleepEndHour: 30,
+      nightOwlBias: 0,
+    };
+
+    const bed = createBuilding({
+      defId: 'bed_wood',
+      cell: { x: 12, y: 10 },
+      mapId: map.id,
+      defs,
+    });
+    bed.bed!.ownerPawnId = pawn.name;
+
+    map.objects.add(pawn);
+    map.objects.add(bed);
+
+    jobSelectionSystem.execute(world);
+
+    for (let i = 0; i < 850 && pawn.ai.currentJob; i++) {
+      toilExecutorSystem.execute(world);
+      movementSystem.execute(world);
     }
 
     expect(pawn.ai.currentJob).toBeNull();

@@ -114,9 +114,10 @@ describe('selectColonistInspector', () => {
     expect(vm).not.toBeNull();
     expect(vm!.name).toBe('Alice');
     expect(vm!.jobLabel).toBe('Construct');
-    expect(vm!.needs).toHaveLength(4);
+    expect(vm!.needs).toHaveLength(3);
     expect(vm!.needs[0].key).toBe('food');
     expect(vm!.needs[0].value).toBe(62);
+    expect(vm!.needs.some(need => need.key === 'rest')).toBe(false);
     expect(vm!.workQueue).toEqual([]);
   });
 

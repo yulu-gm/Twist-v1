@@ -217,6 +217,7 @@ export function bootstrapScenarioWorkbench(options: WorkbenchBootstrapOptions = 
         title: state.title,
         sessionStatus: state.sessionStatus,
         currentTick: state.currentTick,
+        currentClockDisplay: state.currentClockDisplay,
         currentSpeed: state.currentSpeed,
         currentSpeedLabel: state.currentSpeedLabel,
         currentStepTitle: state.currentStepTitle,
