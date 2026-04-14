@@ -20,6 +20,7 @@ import type { ObjectRenderer } from './object-renderers/types';
 import { PawnRenderer } from './object-renderers/pawn-renderer';
 import { PlantRenderer } from './object-renderers/plant-renderer';
 import { ItemRenderer } from './object-renderers/item-renderer';
+import { ConstructionRenderer } from './object-renderers/construction-renderer';
 import { DefaultRenderer } from './object-renderers/default-renderer';
 
 /**
@@ -65,6 +66,7 @@ export class RenderSync {
     this.pawnRenderer = new PawnRenderer(scene, this.layers);
     const plantRenderer = new PlantRenderer(scene, this.layers.get('plant')!);
     const itemRenderer = new ItemRenderer(scene, this.layers.get('item')!);
+    const constructionRenderer = new ConstructionRenderer(scene, this.layers.get('building')!, map);
     this.defaultRenderer = new DefaultRenderer(scene, this.layers);
 
     // 注册渲染器
@@ -72,6 +74,7 @@ export class RenderSync {
       this.pawnRenderer,
       plantRenderer,
       itemRenderer,
+      constructionRenderer,
       this.defaultRenderer,
     ];
     for (const renderer of renderers) {

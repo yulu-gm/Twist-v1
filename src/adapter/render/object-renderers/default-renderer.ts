@@ -17,8 +17,6 @@ import type { ObjectRenderer } from './types';
 export class DefaultRenderer implements ObjectRenderer {
   readonly kinds = new Set([
     ObjectKind.Building,
-    ObjectKind.Blueprint,
-    ObjectKind.ConstructionSite,
     ObjectKind.Fire,
     ObjectKind.Designation,
   ]);
