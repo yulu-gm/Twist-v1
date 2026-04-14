@@ -80,4 +80,43 @@ describe('executeDeliver construction integration', () => {
     expect(pawn.inventory.carrying).toEqual({ defId: 'wood', count: 2 });
     expect(map.objects.allOfKind('item' as never)).toHaveLength(0);
   });
+
+  it('allows final delivery from a footprint-adjacent cell for multi-tile beds', () => {
+    const { world, map, pawn } = createConstructionTestWorld();
+    const blueprint = createBlueprint(map, {
+      cell: { x: 6, y: 6 },
+      targetDefId: 'bed_wood',
+      footprint: { width: 1, height: 2 },
+      materialsRequired: [{ defId: 'wood', count: 8 }],
+      materialsDelivered: [{ defId: 'wood', count: 7 }],
+    });
+
+    pawn.cell = { x: 5, y: 6 };
+    pawn.inventory.carrying = { defId: 'wood', count: 1 };
+
+    const toil = {
+      type: ToilType.Deliver,
+      targetId: blueprint.id,
+      targetCell: { x: 5, y: 6 },
+      state: ToilState.InProgress,
+      localData: { count: 1 },
+    };
+    const job = {
+      id: 'job_deliver_bed_adjacent',
+      defId: 'job_deliver_materials',
+      pawnId: pawn.id,
+      targetId: blueprint.id,
+      targetCell: blueprint.cell,
+      toils: [toil],
+      currentToilIndex: 0,
+      reservations: [],
+      state: JobState.Active,
+    };
+
+    executeDeliver({ pawn, toil, job, map, world });
+
+    expect(toil.state).toBe(ToilState.Completed);
+    expect(map.objects.get(blueprint.id)).toBeUndefined();
+    expect(map.objects.allOfKind('construction_site' as never)).toHaveLength(1);
+  });
 });

@@ -8,14 +8,15 @@
  */
 
 import {
-  ObjectId, CellCoord, ToilType, ToilState, JobState,
+  ObjectId, CellCoord, ToilType, ToilState, JobState, Footprint,
 } from '../../../core/types';
 import { Job } from '../ai.types';
 import type { GameMap } from '../../../world/game-map';
-import { findAdjacentPassable } from './adjacent-util';
+import { findAdjacentPassable, findAdjacentPassableToFootprint } from './adjacent-util';
 
 interface ConstructJobOptions {
   requiresPrepare?: boolean;
+  targetFootprint?: Footprint;
 }
 
 /** 建造工作计数器，用于生成唯一 Job ID */
@@ -44,7 +45,9 @@ export function createConstructJob(
   // 尝试邻格站位
   let gotoCell = siteCell;
   if (map) {
-    const adj = findAdjacentPassable(siteCell, map);
+    const adj = options.targetFootprint
+      ? findAdjacentPassableToFootprint(siteCell, options.targetFootprint, map)
+      : findAdjacentPassable(siteCell, map);
     if (adj) gotoCell = adj;
   }
 

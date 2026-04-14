@@ -5,25 +5,31 @@ import { Job } from '../ai.types';
 
 let carryJobCounter = 0;
 
+interface CarryJobOptions {
+  approachCell?: CellCoord;
+}
+
 export function createCarryJob(
   pawnId: ObjectId,
   destCell: CellCoord,
   count: number,
   blueprintId?: ObjectId,
+  options: CarryJobOptions = {},
 ): Job {
   carryJobCounter++;
+  const approachCell = options.approachCell ?? destCell;
 
   const finalToil = blueprintId
     ? {
         type: ToilType.Deliver,
         targetId: blueprintId,
-        targetCell: destCell,
+        targetCell: approachCell,
         state: ToilState.NotStarted,
         localData: { defId: 'unknown', count },
       }
     : {
         type: ToilType.Drop,
-        targetCell: destCell,
+        targetCell: approachCell,
         state: ToilState.NotStarted,
         localData: { defId: 'unknown', count },
       };
@@ -37,7 +43,7 @@ export function createCarryJob(
     toils: [
       {
         type: ToilType.GoTo,
-        targetCell: destCell,
+        targetCell: approachCell,
         state: ToilState.NotStarted,
         localData: {},
       },

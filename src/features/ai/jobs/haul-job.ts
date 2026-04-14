@@ -14,6 +14,10 @@ import { Job } from '../ai.types';
 /** 搬运工作计数器，用于生成唯一 Job ID */
 let haulJobCounter = 0;
 
+interface HaulJobOptions {
+  approachCell?: CellCoord;
+}
+
 /**
  * 创建一个搬运工作（Job）。
  *
@@ -36,21 +40,23 @@ export function createHaulJob(
   destCell: CellCoord,
   count: number,
   blueprintId?: ObjectId,
+  options: HaulJobOptions = {},
 ): Job {
   haulJobCounter++;
+  const approachCell = options.approachCell ?? destCell;
 
   // 最终步骤：根据是否有蓝图 ID 决定使用 Deliver（交付）还是 Drop（放置）
   const finalToil = blueprintId
     ? {
         type: ToilType.Deliver,
         targetId: blueprintId,
-        targetCell: destCell,
+        targetCell: approachCell,
         state: ToilState.NotStarted,
         localData: { defId: 'unknown', count },
       }
     : {
         type: ToilType.Drop,
-        targetCell: destCell,
+        targetCell: approachCell,
         state: ToilState.NotStarted,
         localData: { defId: 'unknown', count },
       };
@@ -80,7 +86,7 @@ export function createHaulJob(
       // 步骤3：移动到目的地
       {
         type: ToilType.GoTo,
-        targetCell: destCell,
+        targetCell: approachCell,
         state: ToilState.NotStarted,
         localData: {},
       },

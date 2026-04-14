@@ -14,7 +14,7 @@ export function buildLaunchChecks(mode, env) {
   }
 
   if (mode === 'visual' && !env.hasScenarioSelectPage) {
-    issues.push('Missing scenario-select.html required by visual-test.bat.');
+    issues.push('Missing scenario-select.html required by visual launchers.');
   }
 
   return issues;
@@ -39,10 +39,19 @@ function resolveDevPort(defaultPort = 5173) {
 export function buildViteCommand(mode, viteBin) {
   const port = resolveDevPort();
   const target = getLaunchTarget(mode);
-  const command = `${viteBin} --port ${port} --open${mode === 'visual' ? ` ${target}` : ''}`;
+  const isWindows = process.platform === 'win32';
+
+  if (isWindows) {
+    const command = `${viteBin} --port ${port} --open${mode === 'visual' ? ` ${target}` : ''}`;
+
+    return {
+      file: process.env.ComSpec || 'cmd.exe',
+      args: ['/d', '/c', command],
+    };
+  }
 
   return {
-    file: process.env.ComSpec || 'cmd.exe',
-    args: ['/d', '/c', command],
+    file: viteBin,
+    args: ['--port', String(port), '--open', ...(mode === 'visual' ? [target] : [])],
   };
 }

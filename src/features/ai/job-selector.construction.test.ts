@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import '../construction/occupancy.test.mock';
-import { ObjectKind } from '../../core/types';
+import { ObjectKind, ToilType } from '../../core/types';
 import { cleanupProtocol } from './cleanup';
 import { createConstructJob } from './jobs/construct-job';
 import { jobSelectionSystem } from './job-selector';
@@ -97,5 +97,26 @@ describe('construction job selection', () => {
     );
 
     expect(job.toils.map(toil => toil.type)).toContain('prepare_construction');
+  });
+
+  it('uses a footprint-adjacent goto cell for multi-tile beds instead of the covered footprint', () => {
+    const { world, map, pawn } = createConstructionTestWorld();
+    const blueprint = createBlueprint(map, {
+      targetDefId: 'bed_wood',
+      cell: { x: 6, y: 6 },
+      footprint: { width: 1, height: 2 },
+      materialsDelivered: [{ defId: 'wood', count: 8 }],
+      materialsRequired: [{ defId: 'wood', count: 8 }],
+    });
+
+    jobSelectionSystem.execute(world);
+
+    const assignedJob = pawn.ai.currentJob;
+    expect(assignedJob?.defId).toBe('job_construct');
+
+    const gotoToil = assignedJob?.toils.find(toil => toil.type === ToilType.GoTo);
+    expect(gotoToil?.targetCell).toBeDefined();
+    expect(gotoToil?.targetCell?.x === blueprint.cell.x
+      && (gotoToil.targetCell.y === blueprint.cell.y || gotoToil.targetCell.y === blueprint.cell.y + 1)).toBe(false);
   });
 });

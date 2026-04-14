@@ -44,9 +44,9 @@ if (issues.length > 0) {
   exitWithIssues(issues);
 }
 
-const viteBin = path.join(rootDir, 'node_modules', '.bin', 'vite.cmd');
+const viteBin = path.join(rootDir, 'node_modules', '.bin', process.platform === 'win32' ? 'vite.cmd' : 'vite');
 if (!fs.existsSync(viteBin)) {
-  exitWithIssues(['Missing local Vite binary at node_modules/.bin/vite.cmd. Run "npm install" first.']);
+  exitWithIssues([`Missing local Vite binary at ${path.relative(rootDir, viteBin)}. Run "npm install" first.`]);
 }
 
 console.log(`[launcher] Starting ${mode === 'visual' ? 'scenario selector' : 'Opus World'}...`);

@@ -21,6 +21,7 @@ import { findNearestAcceptingCell } from '../../item/item.queries';
 import { createCarryJob } from '../jobs/carry-job';
 import { areBlueprintMaterialsDelivered } from '../../construction/construction.helpers';
 import { getBlueprintMaterialInFlightCount } from './blueprint-inflight';
+import { findAdjacentPassableToFootprint } from '../jobs/adjacent-util';
 
 /**
  * 携带物处理评估器 — 当 pawn 手持物品时寻找放置目标
@@ -62,6 +63,7 @@ export const resolveCarryingWorkEvaluator: WorkEvaluator = {
       const count = Math.min(carrying.count, blueprintCandidate.needed);
       const bpCell = { ...blueprintCandidate.blueprint.cell };
       const bpId = blueprintCandidate.blueprint.id;
+      const approachCell = { ...blueprintCandidate.approachCell };
       return {
         kind: 'resolve_carrying',
         label: '处理携带物',
@@ -72,7 +74,7 @@ export const resolveCarryingWorkEvaluator: WorkEvaluator = {
         detail: bpId,
         jobDefId: 'job_deliver_carried_materials',
         evaluatedAtTick: world.tick,
-        createJob: () => createCarryJob(pawn.id, bpCell, count, bpId),
+        createJob: () => createCarryJob(pawn.id, bpCell, count, bpId, { approachCell }),
       };
     }
 
@@ -103,13 +105,25 @@ function findCarryResolutionBlueprintCandidate(
   pawn: Pawn,
   map: GameMap,
   materialDefId: string,
-): { blueprint: { id: string; cell: { x: number; y: number } }; needed: number; distance: number } | null {
+): {
+  blueprint: { id: string; cell: { x: number; y: number } };
+  needed: number;
+  distance: number;
+  approachCell: { x: number; y: number };
+} | null {
   const blueprints = map.objects.allOfKind(ObjectKind.Blueprint);
-  let bestCandidate: { blueprint: { id: string; cell: { x: number; y: number } }; needed: number; distance: number } | null = null;
+  let bestCandidate: {
+    blueprint: { id: string; cell: { x: number; y: number } };
+    needed: number;
+    distance: number;
+    approachCell: { x: number; y: number };
+  } | null = null;
 
   for (const blueprint of blueprints) {
     if (blueprint.destroyed || areBlueprintMaterialsDelivered(blueprint)) continue;
-    if (!isReachable(map, pawn.cell, blueprint.cell)) continue;
+    const approachCell = findAdjacentPassableToFootprint(blueprint.cell, blueprint.footprint, map);
+    if (!approachCell) continue;
+    if (!isReachable(map, pawn.cell, approachCell)) continue;
 
     for (let i = 0; i < blueprint.materialsRequired.length; i++) {
       const required = blueprint.materialsRequired[i];
@@ -120,12 +134,13 @@ function findCarryResolutionBlueprintCandidate(
       const needed = required.count - (delivered?.count ?? 0) - inFlight;
       if (needed <= 0) continue;
 
-      const distance = estimateDistance(pawn.cell, blueprint.cell);
+      const distance = estimateDistance(pawn.cell, approachCell);
       if (!bestCandidate || distance < bestCandidate.distance) {
         bestCandidate = {
           blueprint: { id: blueprint.id, cell: blueprint.cell },
           needed,
           distance,
+          approachCell,
         };
       }
 
