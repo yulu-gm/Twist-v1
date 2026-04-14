@@ -109,6 +109,7 @@ function processMap(world: World, map: GameMap): void {
         job.reservations.push(resId);
       }
 
+      evaluation.onAssigned?.(job);
       assignJob(pawn, job, map, world);
       selectedKind = evaluation.kind;
       assigned = true;

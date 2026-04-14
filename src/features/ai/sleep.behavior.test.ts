@@ -23,7 +23,7 @@ function getActiveToil(pawn: ReturnType<typeof createPawn>) {
 }
 
 describe('sleep behavior', () => {
-  it('assigns a sleep job that targets an available bed when rest is low', () => {
+  it('auto-claims an available unowned bed when rest is low', () => {
     const defs = buildDefDatabase();
     const world = createWorld({ defs, seed: 1 });
     const map = createGameMap({ id: 'main', width: 20, height: 20 });
@@ -45,8 +45,6 @@ describe('sleep behavior', () => {
       mapId: map.id,
       defs,
     });
-    // 预先分配床位所有权（不再依赖自动认领）
-    bed.bed!.ownerPawnId = pawn.name;
 
     map.objects.add(pawn);
     map.objects.add(bed);
@@ -105,7 +103,7 @@ describe('sleep behavior', () => {
     expect(pawn.cell).not.toEqual(bed.interaction?.interactionCell);
   });
 
-  it('uses the pawn owned bed and never auto-claims an unowned bed', () => {
+  it('uses the pawn owned bed before considering other unowned beds', () => {
     const defs = buildDefDatabase();
     const world = createWorld({ defs, seed: 10 });
     const map = createGameMap({ id: 'main', width: 20, height: 20 });
@@ -144,10 +142,8 @@ describe('sleep behavior', () => {
 
     jobSelectionSystem.execute(world);
 
-    // 应选中自己拥有的床位
     expect(pawn.ai.currentJob?.defId).toBe('job_sleep');
     expect(pawn.ai.currentJob?.targetId).toBe(ownedBed.id);
-    // 无主床不应被自动认领
     expect(strayBed.bed?.ownerPawnId).toBeUndefined();
   });
 

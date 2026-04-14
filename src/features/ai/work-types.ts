@@ -87,6 +87,8 @@ export interface WorkEvaluation {
   evaluatedAtTick: number;
   /** 创建真实 Job 的工厂函数（null 表示该类别当前不可用） */
   createJob: (() => Job | null) | null;
+  /** Job 成功选中并完成预留后触发的回调，用于提交轻量副作用 */
+  onAssigned?: ((job: Job) => void) | null;
 }
 
 // ── 决策快照 ──

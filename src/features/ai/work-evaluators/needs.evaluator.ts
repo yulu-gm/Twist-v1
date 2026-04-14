@@ -19,7 +19,7 @@ import { getTimeOfDayState, isHourWithinWindow } from '../../../core/clock';
 import { estimateDistance, isReachable } from '../../pathfinding/path.service';
 import { createEatJob } from '../jobs/eat-job';
 import { createSleepJob } from '../jobs/sleep-job';
-import { getBedByOwner, isBedAvailable } from '../../building/building.queries';
+import { getAllBeds, getBedByOwner, isBedAvailable } from '../../building/building.queries';
 
 /**
  * 进食工作评估器 — 评估 pawn 是否需要并可以进食
@@ -43,6 +43,7 @@ export const eatWorkEvaluator: WorkEvaluator = {
       jobDefId: null,
       evaluatedAtTick: world.tick,
       createJob: null,
+      onAssigned: null,
     });
 
     // 检查是否触发饥饿阈值
@@ -110,6 +111,7 @@ export const eatWorkEvaluator: WorkEvaluator = {
       jobDefId: 'job_eat',
       evaluatedAtTick: world.tick,
       createJob: () => createEatJob(pawn.id, foodId, foodCell, requestedCount, totalNutrition),
+      onAssigned: null,
     };
   },
 };
@@ -163,6 +165,7 @@ export const sleepWorkEvaluator: WorkEvaluator = {
         jobDefId: null,
         evaluatedAtTick: world.tick,
         createJob: null,
+        onAssigned: null,
       };
     }
 
@@ -191,11 +194,62 @@ export const sleepWorkEvaluator: WorkEvaluator = {
             { bedId: ownedBed.id, interactionCell },
             pawn.cell,
           ),
+          onAssigned: null,
         };
       }
     }
 
-    // 无自有床位时就地休息
+    // 无可用自有床位时，尝试认领一张无主空床
+    let claimableBedId: string | null = null;
+    let claimableInteractionCell = pawn.cell;
+    let claimableDistance = Infinity;
+
+    for (const bed of getAllBeds(map)) {
+      if (!bed.bed || bed.destroyed) continue;
+      if (!bed.bed.autoAssignable || bed.bed.ownerPawnId) continue;
+      if (!isBedAvailable(bed) || map.reservations.isReserved(bed.id)) continue;
+
+      const interactionCell = bed.interaction?.interactionCell ?? bed.cell;
+      if (!isReachable(map, pawn.cell, interactionCell)) continue;
+
+      const dist = estimateDistance(pawn.cell, interactionCell);
+      if (dist < claimableDistance) {
+        claimableBedId = bed.id;
+        claimableInteractionCell = interactionCell;
+        claimableDistance = dist;
+      }
+    }
+
+    if (claimableBedId) {
+      const bedId = claimableBedId;
+      const interactionCell = { ...claimableInteractionCell };
+      const score = 90 + sleepUrgency * 140 - claimableDistance * 0.5;
+
+      return {
+        kind: 'sleep',
+        label: '睡觉',
+        priority: 95,
+        score,
+        failureReasonCode: 'none',
+        failureReasonText: null,
+        detail: bedId,
+        jobDefId: 'job_sleep',
+        evaluatedAtTick: world.tick,
+        createJob: () => createSleepJob(
+          pawn.id,
+          { bedId, interactionCell },
+          pawn.cell,
+        ),
+        onAssigned: () => {
+          const claimedBed = getAllBeds(map).find(bed => bed.id === bedId);
+          if (claimedBed?.bed && !claimedBed.bed.ownerPawnId) {
+            claimedBed.bed.ownerPawnId = pawn.name;
+          }
+        },
+      };
+    }
+
+    // 没有空床时就地休息
     const score = 55 + sleepUrgency * 120;
     return {
       kind: 'sleep',
@@ -208,6 +262,7 @@ export const sleepWorkEvaluator: WorkEvaluator = {
       jobDefId: 'job_sleep',
       evaluatedAtTick: world.tick,
       createJob: () => createSleepJob(pawn.id, null, pawn.cell),
+      onAssigned: null,
     };
   },
 };

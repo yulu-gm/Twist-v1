@@ -11,7 +11,14 @@ import Phaser from 'phaser';
 import { World } from '../../world/world';
 import type { GameMap } from '../../world/game-map';
 import { ObjectKind, ObjectId, MapObjectBase } from '../../core/types';
-import { TILE_SIZE, LAYER_DEPTH, LayerName, kindToLayer, getSpriteColor, getObjectPixelCenter } from './render-utils';
+import {
+  TILE_SIZE,
+  LAYER_DEPTH,
+  LayerName,
+  kindToLayer,
+  getSpriteColor,
+  getObjectPixelCenter,
+} from './render-utils';
 import { getDaylightOverlayState } from './daylight-overlay';
 import { SpriteRegistry } from './sprite-registry';
 import { TerrainRenderer } from './terrain-renderer';
@@ -55,8 +62,7 @@ export class RenderSync {
     this.map = map;
     this.spriteRegistry = new SpriteRegistry();
     this.daylightOverlay = this.scene.add.graphics()
-      .setDepth(LAYER_DEPTH.pawn + 0.75)
-      .setScrollFactor(0);
+      .setDepth(LAYER_DEPTH.pawn + 0.75);
 
     this.createLayers();
 
@@ -172,7 +178,15 @@ export class RenderSync {
 
     this.daylightOverlay.setVisible(true);
     this.daylightOverlay.fillStyle(state.overlayColor, state.overlayAlpha);
-    this.daylightOverlay.fillRect(0, 0, this.scene.scale.width, this.scene.scale.height);
+    const camera = this.scene.cameras.main;
+    const bleed = 4 / Math.max(camera.zoom, 0.0001);
+    const view = camera.worldView;
+    this.daylightOverlay.fillRect(
+      view.x - bleed,
+      view.y - bleed,
+      view.width + bleed * 2,
+      view.height + bleed * 2,
+    );
   }
 }
 
