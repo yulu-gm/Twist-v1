@@ -34,8 +34,6 @@ export function getZoneColor(zoneType: ZoneType): number {
       return 0x4dd0e1;
     case ZoneType.Growing:
       return 0x66bb6a;
-    case ZoneType.Animal:
-      return 0xffb74d;
     default:
       return 0x90a4ae;
   }
@@ -48,8 +46,6 @@ export function getZoneDisplayName(zoneType: ZoneType): string {
       return '存储区';
     case ZoneType.Growing:
       return '种植区';
-    case ZoneType.Animal:
-      return '动物区';
     default:
       return '存储区';
   }
@@ -64,8 +60,6 @@ export function kindToLayer(kind: ObjectKind): LayerName {
     case ObjectKind.Building: return 'building';
     case ObjectKind.Blueprint: return 'building';
     case ObjectKind.ConstructionSite: return 'building';
-    case ObjectKind.Fire: return 'building';
-    case ObjectKind.Corpse: return 'item';
     case ObjectKind.Pawn: return 'pawn';
     default: return 'building';
   }
@@ -114,10 +108,6 @@ export function getSpriteColor(obj: MapObjectBase, defs: DefDatabase): number {
       const pDef = defs.plants.get(obj.defId);
       return pDef?.color ?? 0x22aa22;
     }
-    case ObjectKind.Fire:
-      return 0xff4500;
-    case ObjectKind.Corpse:
-      return 0x555555;
     case ObjectKind.Blueprint:
       return 0x66aaff;
     case ObjectKind.ConstructionSite:

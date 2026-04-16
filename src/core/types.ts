@@ -126,8 +126,6 @@ export enum ObjectKind {
   Building = "building",
   Item = "item",
   Plant = "plant",
-  Fire = "fire",
-  Corpse = "corpse",
   Blueprint = "blueprint",
   ConstructionSite = "construction_site",
   Designation = "designation",
@@ -194,7 +192,6 @@ export enum JobState {
 export enum ZoneType {
   Stockpile = "stockpile",
   Growing = "growing",
-  Animal = "animal",
 }
 
 // ── 地图对象基础接口 ──

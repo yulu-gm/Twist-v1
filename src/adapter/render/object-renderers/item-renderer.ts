@@ -11,10 +11,10 @@ import type { ObjectRenderer } from './types';
 import type { Item } from '../../../features/item/item.types';
 
 /**
- * 物品渲染器 — 处理 Item 和 Corpse 的精灵创建和更新
+ * 物品渲染器 — 处理 Item 的精灵创建和更新
  */
 export class ItemRenderer implements ObjectRenderer {
-  readonly kinds = new Set([ObjectKind.Item, ObjectKind.Corpse]);
+  readonly kinds = new Set([ObjectKind.Item]);
 
   private scene: Phaser.Scene;
   private layer: Phaser.GameObjects.Container;

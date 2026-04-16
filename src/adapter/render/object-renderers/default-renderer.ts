@@ -1,6 +1,6 @@
 /**
  * @file default-renderer.ts
- * @description 默认对象渲染器 — Building/Blueprint/ConstructionSite/Fire/Designation 等
+ * @description 默认对象渲染器 — Building/Blueprint/ConstructionSite/Designation 等
  * @part-of adapter/render/object-renderers
  */
 
@@ -18,7 +18,6 @@ import type { Building } from '../../../features/building/building.types';
 export class DefaultRenderer implements ObjectRenderer {
   readonly kinds = new Set([
     ObjectKind.Building,
-    ObjectKind.Fire,
     ObjectKind.Designation,
   ]);
 

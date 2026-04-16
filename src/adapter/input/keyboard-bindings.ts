@@ -6,7 +6,7 @@
 
 import Phaser from 'phaser';
 import { World } from '../../world/world';
-import { SimSpeed, DesignationType, ZoneType } from '../../core/types';
+import { SimSpeed, DesignationType } from '../../core/types';
 import { PresentationState, ToolType, OverlayType, applyToolSelection } from '../../presentation/presentation-state';
 
 /**

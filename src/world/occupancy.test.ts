@@ -6,7 +6,6 @@ import { createGameMap } from './game-map';
 import { createPawn } from '../features/pawn/pawn.factory';
 import { createItem } from '../features/item/item.factory';
 import { createBuilding } from '../features/building/building.factory';
-import { createCorpse } from '../features/corpse/corpse.factory';
 import { createPlant } from '../features/plant/plant.factory';
 import {
   PHYSICAL_OCCUPANT_TAG,
@@ -47,12 +46,6 @@ describe('occupancy', () => {
       mapId: map.id,
       defs,
     });
-    const corpse = createCorpse({
-      originalPawnId: pawn.id,
-      defId: 'corpse_human',
-      cell: { x: 3, y: 3 },
-      mapId: map.id,
-    });
     const blueprint = {
       id: 'bp_1',
       kind: ObjectKind.Blueprint,
@@ -67,11 +60,10 @@ describe('occupancy', () => {
     map.objects.add(pawn);
     map.objects.add(item);
     map.objects.add(plant);
-    map.objects.add(corpse);
     map.objects.add(blueprint as never);
 
     const occupants = getPhysicalOccupantsInFootprint(map, { x: 2, y: 2 }, { width: 2, height: 2 });
-    expect(occupants.map(obj => obj.id).sort()).toEqual([corpse.id, item.id, pawn.id, plant.id].sort());
+    expect(occupants.map(obj => obj.id).sort()).toEqual([item.id, pawn.id, plant.id].sort());
     expect(hasPhysicalOccupantsInFootprint(map, { x: 2, y: 2 }, { width: 2, height: 2 })).toBe(true);
     expect(hasPhysicalOccupantsInFootprint(map, { x: 4, y: 4 }, { width: 1, height: 1 })).toBe(false);
     expect(getObjectsInFootprint(map, { x: 4, y: 4 }, { width: 1, height: 1 }).map(obj => obj.id)).toEqual([blueprint.id]);
@@ -114,7 +106,7 @@ describe('occupancy', () => {
   });
 
   it('treats multi-cell footprints as occupied on every covered cell', () => {
-    const { defs, world, map } = createTestMap();
+    const { defs, map } = createTestMap();
 
     const table = createBuilding({
       defId: 'table',

@@ -6,7 +6,7 @@
  * @part-of testing/visual-runner — 可视运行层
  */
 
-import type { CheckpointSnapshot, PawnSnapshot, ItemSnapshot } from '../scenario-harness/checkpoint-snapshot';
+import type { CheckpointSnapshot, PawnSnapshot } from '../scenario-harness/checkpoint-snapshot';
 
 /** 分歧级别 */
 export type DivergenceLevel = 'warning' | 'error';

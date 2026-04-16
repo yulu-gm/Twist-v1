@@ -8,13 +8,11 @@
 import {
   ObjectKind,
   nextObjectId,
-  ScheduleActivity,
 } from '../../core/types';
 import type {
   CellCoord,
   MapId,
   FactionId,
-  ScheduleEntry,
   SkillId,
   SkillLevel,
 } from '../../core/types';
@@ -27,27 +25,6 @@ import {
   createDefaultNeedsProfile,
   createScheduleEntriesForChronotype,
 } from './pawn.systems';
-
-/**
- * 生成默认的24小时日程安排
- * 0-5点睡觉，6-21点自由活动，22-23点娱乐
- * @returns 24个小时的日程条目数组
- */
-function defaultSchedule(): ScheduleEntry[] {
-  const entries: ScheduleEntry[] = [];
-  for (let h = 0; h < 24; h++) {
-    let activity: ScheduleActivity;
-    if (h < 6) {
-      activity = ScheduleActivity.Sleep;
-    } else if (h >= 22) {
-      activity = ScheduleActivity.Joy;
-    } else {
-      activity = ScheduleActivity.Anything;
-    }
-    entries.push({ hour: h, activity });
-  }
-  return entries;
-}
 
 /**
  * 生成每个棋子的基础技能表
@@ -98,7 +75,6 @@ export function createPawn(params: {
 
     name,
     factionId,
-    drafted: false,
 
     movement: {
       path: [],

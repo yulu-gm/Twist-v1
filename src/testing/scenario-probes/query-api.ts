@@ -7,7 +7,6 @@
  */
 
 import { ObjectKind, cellKey } from '@core/types';
-import type { CellCoord, ZoneType } from '@core/types';
 import type { ScenarioQueryApi } from '../scenario-dsl/scenario.types';
 import type { ScenarioHarness } from '../scenario-harness/scenario-harness';
 

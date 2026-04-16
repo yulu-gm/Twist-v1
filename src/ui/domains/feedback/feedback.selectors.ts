@@ -8,7 +8,7 @@
 
 import type { EngineSnapshot } from '../../kernel/ui-types';
 import type { FeedbackViewModel, ToastItem, NotificationItem } from './feedback.types';
-import { getEventSeverity, formatEventTitle } from './feedback.schemas';
+import { formatEventTitle } from './feedback.schemas';
 
 /**
  * 选择命令反馈视图模型 — 从近期事件中提取 Toast 和通知列表

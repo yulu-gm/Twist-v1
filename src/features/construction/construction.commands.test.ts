@@ -30,7 +30,7 @@ function createTestWorld() {
 
 describe('cancelConstructionHandler', () => {
   it('cleans up pawns targeting a cancelled construction object through cleanup', () => {
-    const { defs, world, map, pawn } = createTestWorld();
+    const { world, map, pawn } = createTestWorld();
     const blueprint = {
       id: 'bp_1',
       kind: ObjectKind.Blueprint,

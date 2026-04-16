@@ -7,7 +7,6 @@
  * @part-of testing/visual-runner — 可视运行层
  */
 
-import { h } from 'preact';
 import type { ScenarioStepStatus } from '../scenario-dsl/scenario.types';
 import type { DivergenceRecord } from './shadow-runner';
 import type { ControllerSessionStatus } from './visual-scenario-controller';
@@ -168,7 +167,6 @@ export function ScenarioHud(props: ScenarioHudProps) {
     sessionStatus,
     currentTick,
     currentClockDisplay,
-    currentSpeed,
     currentSpeedLabel,
     currentStepTitle,
     visualSteps,

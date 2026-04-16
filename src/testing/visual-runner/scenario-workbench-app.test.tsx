@@ -17,6 +17,7 @@ function mockControllerState(overrides: Partial<ControllerState> = {}): Controll
     title: '砍树',
     sessionStatus: 'ready',
     currentTick: 0,
+    currentClockDisplay: '',
     currentSpeed: SimSpeed.Paused,
     currentSpeedLabel: 'Paused',
     currentStepTitle: '',

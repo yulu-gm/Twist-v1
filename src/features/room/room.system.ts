@@ -9,7 +9,7 @@
 import { TickPhase, ObjectKind, cellKey, CellCoordKey } from '../../core/types';
 import { SystemRegistration } from '../../core/tick-runner';
 import type { World } from '../../world/world';
-import type { GameMap, Room } from '../../world/game-map';
+import type { Room } from '../../world/game-map';
 
 /**
  * 重建所有地图的房间数据

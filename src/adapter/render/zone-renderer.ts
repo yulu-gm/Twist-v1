@@ -151,8 +151,6 @@ export class ZoneRenderer {
         return getZoneColor(ZoneType.Stockpile);
       case ZoneType.Growing:
         return getZoneColor(ZoneType.Growing);
-      case ZoneType.Animal:
-        return getZoneColor(ZoneType.Animal);
       default:
         return getZoneColor(ZoneType.Stockpile);
     }

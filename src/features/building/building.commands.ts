@@ -8,7 +8,6 @@
 import { ObjectKind } from '../../core/types';
 import type { Command, CommandHandler, ValidationResult, ExecutionResult } from '../../core/command-bus';
 import type { World } from '../../world/world';
-import type { GameMap } from '../../world/game-map';
 import type { Building } from './building.types';
 import type { Pawn } from '../pawn/pawn.types';
 

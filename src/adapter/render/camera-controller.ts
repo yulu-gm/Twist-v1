@@ -18,8 +18,6 @@ const ZOOM_MIN = 0.25;
 const ZOOM_MAX = 3;
 /** 每次滚轮缩放的步长 */
 const ZOOM_STEP = 0.1;
-/** 边缘滚动触发区域的像素宽度（暂未使用） */
-const EDGE_SCROLL_MARGIN = 30;
 
 /**
  * 摄像机控制器类 — 管理主摄像机的所有交互操作
@@ -30,13 +28,8 @@ const EDGE_SCROLL_MARGIN = 30;
  * - 鼠标中键拖拽：平移摄像机
  */
 export class CameraController {
-  // ── 引用 ──
-  /** Phaser 场景引用 */
-  private scene: Phaser.Scene;
   /** 主摄像机 */
   private camera: Phaser.Cameras.Scene2D.Camera;
-  /** 地图数据（用于设置摄像机边界） */
-  private map: GameMap;
 
   // ── 拖拽状态 ──
   /** 是否正在中键拖拽 */
@@ -54,8 +47,6 @@ export class CameraController {
   };
 
   constructor(scene: Phaser.Scene, map: GameMap) {
-    this.scene = scene;
-    this.map = map;
     this.camera = scene.cameras.main;
 
     // 设置摄像机边界（地图范围 + 2 格余量）

@@ -8,7 +8,7 @@
 
 import type { CellCoord } from '../../core/types';
 import type { GameMap } from '../../world/game-map';
-import type { PresentationState, PlacementPreview } from '../../presentation/presentation-state';
+import type { PresentationState } from '../../presentation/presentation-state';
 
 /**
  * 建筑放置工具类

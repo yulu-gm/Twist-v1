@@ -18,10 +18,8 @@ import { movementSystem } from '../features/movement/movement.system';
 import { toilExecutorSystem } from '../features/ai/toil-executor';
 import { jobSelectionSystem } from '../features/ai/job-selector';
 import { growPlantsSystem } from '../features/plant/plant.system';
-import { fireSystem } from '../features/fire/fire.system';
 import { constructionProgressSystem } from '../features/construction/construction.system';
 import { workGenerationSystem } from '../features/designation/designation.system';
-import { corpseDecaySystem } from '../features/corpse/corpse.system';
 import { roomRebuildSystem } from '../features/room/room.system';
 import { buildingTickSystem } from '../features/building/building.systems';
 import { releaseMissingTargetReservations } from '../features/reservation/reservation.cleanup';
@@ -46,7 +44,7 @@ import { createItem } from '../features/item/item.factory';
  * 2. AI 决策 — 棋子选择任务
  * 3. 预约管理 — 释放已销毁对象的预约
  * 4. 执行 — 移动、工序执行、建造进度
- * 5. 世界更新 — 需求衰减、植物生长、火焰、尸体腐烂、房间重建、建筑 tick
+ * 5. 世界更新 — 需求衰减、植物生长、房间重建、建筑 tick
  * 6. 清理 — 移除已销毁对象、清理过期预约
  * 7. 事件分发 — 占位（实际在 main-scene 中分发）
  */
@@ -89,8 +87,6 @@ export function buildDefaultSystems(): SystemRegistration[] {
   // 阶段 5：世界更新
   systems.push(needDecayRegistration);
   systems.push(growPlantsSystem);
-  systems.push(fireSystem);
-  systems.push(corpseDecaySystem);
   systems.push(roomRebuildSystem);
   systems.push(buildingTickSystem);
 

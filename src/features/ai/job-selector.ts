@@ -49,8 +49,6 @@ function processMap(world: World, map: GameMap): void {
   const pawns = map.objects.allOfKind(ObjectKind.Pawn);
 
   for (const pawn of pawns) {
-    if (pawn.drafted) continue;
-
     // 仅为空闲的 Pawn 分配工作
     if (pawn.ai.currentJob !== null) continue;
 
@@ -69,7 +67,6 @@ function processMap(world: World, map: GameMap): void {
     });
 
     // ── 3. 从高到低尝试分配，记录 blocked/deferred ──
-    let assigned = false;
     let selectedKind: string | null = null;
     const overrides = new Map<string, { code: WorkFailureReasonCode; text: string }>();
 
@@ -110,9 +107,8 @@ function processMap(world: World, map: GameMap): void {
       }
 
       evaluation.onAssigned?.(job);
-      assignJob(pawn, job, map, world);
+      assignJob(pawn, job, world);
       selectedKind = evaluation.kind;
-      assigned = true;
       break;
     }
 
@@ -203,7 +199,6 @@ function isJobBlockedByCarriedItems(pawn: Pawn, job: Job): boolean {
 function assignJob(
   pawn: Pawn,
   job: Job,
-  map: GameMap,
   world: World,
 ): void {
   pawn.ai.currentJob = job;

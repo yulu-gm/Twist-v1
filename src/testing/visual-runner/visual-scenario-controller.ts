@@ -165,9 +165,6 @@ export function createVisualScenarioController(
   let visualResults: StepResult[] = [];
   let nextStepIndex = 0;
 
-  // pause/resume 的 resolve 回调 — 用于暂停时阻塞 runScenarioLoop
-  let pauseResolve: (() => void) | null = null;
-
   const state: ControllerState = {
     scenarioId: scenario.id,
     title: scenario.title,

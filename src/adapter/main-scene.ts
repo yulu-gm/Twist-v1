@@ -47,8 +47,6 @@ export class MainScene extends Phaser.Scene {
   // ── 子系统 ──
   /** 渲染同步器：将世界对象同步为 Phaser 精灵 */
   private renderSync!: RenderSync;
-  /** 摄像机控制器：处理缩放、平移、键盘/鼠标移动 */
-  private cameraController!: CameraController;
   /** 输入处理器：处理鼠标点击和键盘快捷键 */
   private inputHandler!: InputHandler;
   /** 世界空间预览：建筑放置和指派预览矩形 */
@@ -89,7 +87,7 @@ export class MainScene extends Phaser.Scene {
 
     this.presentation = createPresentationState();
     this.renderSync = new RenderSync(this, this.world, this.activeMap);
-    this.cameraController = new CameraController(this, this.activeMap);
+    new CameraController(this, this.activeMap);
     this.inputHandler = new InputHandler(this, this.world, this.activeMap, this.presentation);
     this.worldPreview = new WorldPreview(this);
     this.selectionHighlight = new SelectionHighlight(this, this.activeMap);

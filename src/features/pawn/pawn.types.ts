@@ -137,8 +137,6 @@ export interface Pawn extends MapObjectBase {
   name: string;
   /** 所属阵营ID */
   factionId: FactionId;
-  /** 是否处于征召状态（征召后由玩家直接控制） */
-  drafted: boolean;
 
   // ── 移动相关 ──
   movement: {

@@ -6,7 +6,6 @@
  * @part-of ui/domains/colonist — 殖民者 UI 领域
  */
 
-import { Panel } from '../../../components/panel';
 import type { ColonistRosterRow } from '../colonist.types';
 import { getJobBadgeTone } from '../colonist.schemas';
 import { Badge } from '../../../components/badge';

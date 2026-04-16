@@ -159,7 +159,7 @@ export function findPath(
 
     if (currentKey === goalKey) {
       // 到达目标，回溯重建路径
-      const path = reconstructPath(cameFrom, currentKey, from);
+      const path = reconstructPath(cameFrom, currentKey);
       return { found: true, path, cost: gScore.get(currentKey)! };
     }
 
@@ -216,7 +216,6 @@ export function findPath(
 function reconstructPath(
   cameFrom: Map<string, string>,
   goalKey: string,
-  start: CellCoord,
 ): CellCoord[] {
   const path: CellCoord[] = [];
   let current = goalKey;

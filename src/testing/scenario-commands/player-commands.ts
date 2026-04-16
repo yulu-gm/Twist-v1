@@ -25,21 +25,6 @@ export function placeBlueprintCommand(defId: string, cell: CellCoord): CommandSt
 }
 
 /**
- * 征召 pawn（通过 draft_pawn 命令，中断当前工作并触发 cleanup）
- *
- * @param pawnName - 棋子名字
- */
-export function draftPawnCommand(pawnName: string): CommandStep {
-  return createCommandStep(`征召 ${pawnName}`, ({ issueCommand, query, stepTicks }) => {
-    const pawn = query.findPawnByName(pawnName);
-    if (!pawn) throw new Error(`Pawn "${pawnName}" not found`);
-    issueCommand({ type: 'draft_pawn', payload: { pawnId: pawn.id } });
-    // 推进 1 tick 让命令被处理
-    stepTicks(1);
-  });
-}
-
-/**
  * 下达砍树指令（通过 designate_cut 命令）
  *
  * @param cell - 树的位置
@@ -54,17 +39,3 @@ export function designateCutCommand(cell: CellCoord): CommandStep {
   });
 }
 
-/**
- * 强制 pawn 前往指定位置（通过 force_job 命令）
- *
- * @param pawnName - 棋子名字
- * @param targetCell - 目标格子
- */
-export function forceGotoCommand(pawnName: string, targetCell: CellCoord): CommandStep {
-  return createCommandStep(`强制 ${pawnName} 前往 (${targetCell.x}, ${targetCell.y})`, ({ issueCommand, query, stepTicks }) => {
-    const pawn = query.findPawnByName(pawnName);
-    if (!pawn) throw new Error(`Pawn "${pawnName}" not found`);
-    issueCommand({ type: 'force_job', payload: { pawnId: pawn.id, targetCell } });
-    stepTicks(1);
-  });
-}

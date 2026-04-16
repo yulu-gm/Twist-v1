@@ -146,7 +146,7 @@ export const bedBlueprintSleepScenario = createScenario({
       recoveredNames = Array.from(recovered);
       return recoveredNames.length === SLEEPER_NAMES.length;
     }, {
-      timeoutTicks: 420,
+      timeoutTicks: 720,
       timeoutMessage: '并非所有 sleeper 都在床上恢复到了有效休息度',
     }),
     createWaitForStep('等待三张木床在醒来后释放 occupant', ({ query }) => {

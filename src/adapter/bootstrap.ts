@@ -29,7 +29,7 @@ import type { UiPorts } from '../ui/kernel/ui-ports';
 export function bootstrapPhaser(
   world: World,
   uiBridge?: EngineSnapshotBridge,
-  uiPorts?: UiPorts,
+  _uiPorts?: UiPorts,
   parent = 'game-container',
 ): Phaser.Game {
   const config: Phaser.Types.Core.GameConfig = {

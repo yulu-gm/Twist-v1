@@ -76,7 +76,6 @@ export const executeDeliver: ToilHandler = ({ pawn, toil, map, world }) => {
       defId,
       count: remainingCarried,
       preferredCell: pawn.cell,
-      excludedCells: blueprint ? getBlueprintFootprintCells(blueprint) : undefined,
       searchScope: 'nearest-compatible',
       noCapacityPolicy: 'force-overflow',
     });

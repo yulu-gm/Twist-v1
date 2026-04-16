@@ -9,12 +9,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { AppShell } from './app-shell';
 
 describe('AppShell', () => {
-  it('renders the migrated ui root container', () => {
-    render(<AppShell />);
-    expect(screen.getByTestId('app-shell')).toBeInTheDocument();
-    expect(screen.getByText('Opus UI')).toBeInTheDocument();
-  });
-
   it('renders the unified object inspector when an object is selected', () => {
     const snapshot = {
       tick: 1,

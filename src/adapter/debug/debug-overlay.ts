@@ -9,7 +9,7 @@
 import Phaser from 'phaser';
 import type { World } from '../../world/world';
 import type { GameMap } from '../../world/game-map';
-import { ObjectKind, cellKey } from '../../core/types';
+import { ObjectKind } from '../../core/types';
 import { OverlayType, PresentationState } from '../../presentation/presentation-state';
 import type { Pawn } from '../../features/pawn/pawn.types';
 
@@ -27,11 +27,6 @@ const TILE_SIZE = 32;
  * - Pathfinding: 红色标记不可通行格子，绿色线条显示棋子当前路径
  */
 export class DebugOverlay {
-  // ── 引用 ──
-  /** Phaser 场景引用 */
-  private scene: Phaser.Scene;
-  /** 游戏世界状态 */
-  private world: World;
   /** 当前地图 */
   private map: GameMap;
   /** 展示层状态（读取 activeOverlay） */
@@ -45,12 +40,10 @@ export class DebugOverlay {
 
   constructor(
     scene: Phaser.Scene,
-    world: World,
+    _world: World,
     map: GameMap,
     presentation: PresentationState,
   ) {
-    this.scene = scene;
-    this.world = world;
     this.map = map;
     this.presentation = presentation;
     this.graphics = scene.add.graphics().setDepth(50);

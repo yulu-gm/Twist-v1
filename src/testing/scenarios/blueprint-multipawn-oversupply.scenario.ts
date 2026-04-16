@@ -1,7 +1,6 @@
 import {
   createAssertStep,
   createScenario,
-  createWaitForStep,
 } from '../scenario-dsl/scenario.builders';
 import { spawnItemFixture, spawnPawnFixture } from '../scenario-fixtures/world-fixtures';
 import { placeBlueprintCommand } from '../scenario-commands/player-commands';

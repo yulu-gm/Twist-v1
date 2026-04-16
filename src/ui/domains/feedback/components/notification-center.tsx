@@ -5,7 +5,6 @@
  * @part-of ui/domains/feedback — 反馈 UI 领域
  */
 
-import { Panel } from '../../../components/panel';
 import type { NotificationItem } from '../feedback.types';
 
 /** NotificationCenter 组件属性 */

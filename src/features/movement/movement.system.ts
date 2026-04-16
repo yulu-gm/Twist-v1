@@ -13,7 +13,6 @@ import { SystemRegistration } from '../../core/tick-runner';
 import { log } from '../../core/logger';
 import { World } from '../../world/world';
 import { GameMap } from '../../world/game-map';
-import type { Pawn } from '../pawn/pawn.types';
 import { MOVE_PROGRESS_PER_CELL } from './movement.types';
 
 /** 移动系统注册：在 EXECUTION 阶段每 tick 执行 */

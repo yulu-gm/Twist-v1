@@ -11,14 +11,11 @@ import { eatingScenario } from './scenarios/eating.scenario';
 import { blueprintConstructionScenario } from './scenarios/blueprint-construction.scenario';
 import { zoneStockpileLifecycleScenario } from './scenarios/zone-stockpile-lifecycle.scenario';
 import { quantityHaulStackChainScenario } from './scenarios/quantity-haul-stack-chain.scenario';
-import { interruptedHaulReservationRecoveryScenario } from './scenarios/interrupted-haul-reservation-recovery.scenario';
 import { sleepBedOccupancyScenario } from './scenarios/sleep-bed-occupancy.scenario';
 import { bedBlueprintSleepScenario } from './scenarios/bed-blueprint-sleep.scenario';
-import { blueprintSelfOccupancyPromoteScenario } from './scenarios/blueprint-self-occupancy-promote.scenario';
 import { blueprintOversupplyHaulScenario } from './scenarios/blueprint-oversupply-haul.scenario';
 import { blueprintMultiPawnOversupplyScenario } from './scenarios/blueprint-multipawn-oversupply.scenario';
 import { todSleepRhythmScenario } from './scenarios/tod-sleep-rhythm.scenario';
-import { bedBlueprintRoomOccupancyStallScenario } from './scenarios/bed-blueprint-room-occupancy-stall.scenario';
 import type { ScenarioDefinition } from './scenario-dsl/scenario.types';
 
 /** 所有已注册的业务场景 */
@@ -29,12 +26,9 @@ export const scenarioRegistry: readonly ScenarioDefinition[] = [
   blueprintConstructionScenario,
   zoneStockpileLifecycleScenario,
   quantityHaulStackChainScenario,
-  interruptedHaulReservationRecoveryScenario,
   sleepBedOccupancyScenario,
   bedBlueprintSleepScenario,
-  blueprintSelfOccupancyPromoteScenario,
   blueprintOversupplyHaulScenario,
   blueprintMultiPawnOversupplyScenario,
   todSleepRhythmScenario,
-  bedBlueprintRoomOccupancyStallScenario,
 ] as const;

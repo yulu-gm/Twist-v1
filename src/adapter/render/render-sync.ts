@@ -10,12 +10,11 @@
 import Phaser from 'phaser';
 import { World } from '../../world/world';
 import type { GameMap } from '../../world/game-map';
-import { ObjectKind, ObjectId, MapObjectBase } from '../../core/types';
+import { ObjectKind, ObjectId } from '../../core/types';
 import {
   TILE_SIZE,
   LAYER_DEPTH,
   LayerName,
-  kindToLayer,
   getSpriteColor,
   getObjectPixelCenter,
 } from './render-utils';

@@ -23,6 +23,8 @@ import { areBlueprintMaterialsDelivered } from '../../construction/construction.
 import { getBlueprintMaterialInFlightCount } from './blueprint-inflight';
 import { findAdjacentPassableToFootprint } from '../jobs/adjacent-util';
 
+const DEFAULT_FOOTPRINT = { width: 1, height: 1 } as const;
+
 /**
  * 携带物处理评估器 — 当 pawn 手持物品时寻找放置目标
  *
@@ -121,7 +123,8 @@ function findCarryResolutionBlueprintCandidate(
 
   for (const blueprint of blueprints) {
     if (blueprint.destroyed || areBlueprintMaterialsDelivered(blueprint)) continue;
-    const approachCell = findAdjacentPassableToFootprint(blueprint.cell, blueprint.footprint, map);
+    const footprint = blueprint.footprint ?? DEFAULT_FOOTPRINT;
+    const approachCell = findAdjacentPassableToFootprint(blueprint.cell, footprint, map);
     if (!approachCell) continue;
     if (!isReachable(map, pawn.cell, approachCell)) continue;
 

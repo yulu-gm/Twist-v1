@@ -26,6 +26,8 @@ import {
 import { getBlueprintMaterialInFlightCount } from './blueprint-inflight';
 import { findAdjacentPassableToFootprint } from '../jobs/adjacent-util';
 
+const DEFAULT_FOOTPRINT = { width: 1, height: 1 } as const;
+
 /**
  * 材料搬运评估器 — 为未送齐材料的蓝图寻找材料搬运目标
  *
@@ -66,7 +68,8 @@ export const deliverMaterialsWorkEvaluator: WorkEvaluator = {
         const inFlightCount = getBlueprintMaterialInFlightCount(map, bp.id, matDefId);
         const needed = requiredCount - deliveredCount - inFlightCount;
         if (needed <= 0) continue;
-        const approachCell = findAdjacentPassableToFootprint(bp.cell, bp.footprint, map);
+        const footprint = bp.footprint ?? DEFAULT_FOOTPRINT;
+        const approachCell = findAdjacentPassableToFootprint(bp.cell, footprint, map);
         if (!approachCell) continue;
 
         // 寻找距离最近的同类型物品
@@ -180,7 +183,8 @@ export const constructWorkEvaluator: WorkEvaluator = {
 
       if (map.reservations.isReserved(bp.id)) continue;
       if (hasConstructionOccupants(map, bp)) continue;
-      const approachCell = findAdjacentPassableToFootprint(bp.cell, bp.footprint, map);
+      const footprint = bp.footprint ?? DEFAULT_FOOTPRINT;
+      const approachCell = findAdjacentPassableToFootprint(bp.cell, footprint, map);
       if (!approachCell) continue;
 
       const dist = estimateDistance(pawn.cell, approachCell);
@@ -190,7 +194,7 @@ export const constructWorkEvaluator: WorkEvaluator = {
         bestDetail = bp.id;
         const bpId = bp.id;
         const bpCell = { ...bp.cell };
-        const bpFootprint = { ...bp.footprint };
+        const bpFootprint = bp.footprint ?? DEFAULT_FOOTPRINT;
         bestCreateJob = () => createConstructJob(
           pawn.id,
           bpId,
@@ -208,7 +212,8 @@ export const constructWorkEvaluator: WorkEvaluator = {
       if (site.buildProgress >= 1.0) continue;
       if (map.reservations.isReserved(site.id)) continue;
       if (hasConstructionOccupants(map, site)) continue;
-      const approachCell = findAdjacentPassableToFootprint(site.cell, site.footprint, map);
+      const footprint = site.footprint ?? DEFAULT_FOOTPRINT;
+      const approachCell = findAdjacentPassableToFootprint(site.cell, footprint, map);
       if (!approachCell) continue;
 
       const dist = estimateDistance(pawn.cell, approachCell);
@@ -218,7 +223,7 @@ export const constructWorkEvaluator: WorkEvaluator = {
         bestDetail = site.id;
         const siteId = site.id;
         const siteCell = { ...site.cell };
-        const siteFootprint = { ...site.footprint };
+        const siteFootprint = site.footprint ?? DEFAULT_FOOTPRINT;
         const totalWork = site.totalWorkAmount - site.workDone;
         bestCreateJob = () => {
           const job = createConstructJob(
