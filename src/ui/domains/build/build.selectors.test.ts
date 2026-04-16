@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { selectBuildModeSummary, selectActiveToolId, selectTopStatusBar } from './build.selectors';
+import { selectActiveToolId, selectTopStatusBar } from './build.selectors';
 import type { EngineSnapshot } from '../../kernel/ui-types';
 
 /** 构造测试用引擎快照，可覆盖任意字段 */
@@ -33,16 +33,6 @@ describe('selectTopStatusBar', () => {
     expect(vm.tick).toBe(100);
     expect(vm.speed).toBe(1);
     expect(vm.colonistCount).toBe(3);
-  });
-});
-
-describe('selectBuildModeSummary', () => {
-  it('returns tool mode label from snapshot', () => {
-    const summary = selectBuildModeSummary(makeSnapshot({
-      build: { activeTool: 'designate', activeDesignationType: 'mine', activeZoneType: null, lastZoneType: 'stockpile', activeBuildDefId: null, activeModeLabel: 'Mine' },
-    }));
-    expect(summary.title).toBe('Mine');
-    expect(summary.activeTool).toBe('designate');
   });
 });
 

@@ -15,7 +15,7 @@ import type { Zone } from '@world/zone-manager';
 // ── 步骤类型 ──
 
 /** 步骤种类：setup / command / waitFor / assert */
-export type ScenarioStepKind = 'setup' | 'command' | 'waitFor' | 'assert';
+type ScenarioStepKind = 'setup' | 'command' | 'waitFor' | 'assert';
 
 /** 步骤执行状态 */
 export type ScenarioStepStatus = 'pending' | 'running' | 'passed' | 'failed';
@@ -60,7 +60,7 @@ export interface ProbeContext {
 // ── 步骤定义 ──
 
 /** 步骤基础接口 */
-export interface ScenarioStepBase {
+interface ScenarioStepBase {
   /** 步骤种类 */
   kind: ScenarioStepKind;
   /** 步骤标题 — 业务可读，适合直接展示在 HUD 中 */

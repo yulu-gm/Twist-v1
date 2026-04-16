@@ -5,7 +5,7 @@
  */
 
 /** 建筑检视面板中的单条属性行 */
-export interface BuildingInspectorStat {
+interface BuildingInspectorStat {
   /** 属性名称（如 'Type'、'Position'） */
   label: string;
   /** 属性显示值 */

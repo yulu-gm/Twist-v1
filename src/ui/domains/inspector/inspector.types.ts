@@ -20,7 +20,7 @@ export interface ObjectStackEntryViewModel {
 }
 
 /** 通用属性行 */
-export interface InspectorStatRow {
+interface InspectorStatRow {
   /** 属性名称 */
   label: string;
   /** 属性显示值 */

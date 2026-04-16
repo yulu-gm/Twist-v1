@@ -32,7 +32,7 @@ export interface Faction {
 }
 
 // ── 故事状态（AI叙事驱动） ──
-export interface StoryState {
+interface StoryState {
   /** 当前威胁等级（影响事件生成的难度） */
   threatLevel: number;
   /** 距离上次袭击的天数 */

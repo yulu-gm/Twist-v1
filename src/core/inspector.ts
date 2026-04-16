@@ -14,7 +14,7 @@ import { log } from './logger';
  * Inspector — debug query interface for examining world state.
  */
 /** 调试检查器 - 用于在运行时查询和审视游戏世界的各种状态 */
-export class Inspector {
+class Inspector {
   /** 当前关联的游戏世界实例 */
   private world: any;
 

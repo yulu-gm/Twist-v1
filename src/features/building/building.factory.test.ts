@@ -7,7 +7,6 @@ import {
   getAllBeds,
   getBedByOwner,
   isBedAvailable,
-  isBedOwnedBy,
 } from './building.queries';
 
 describe('building furniture support', () => {
@@ -65,7 +64,7 @@ describe('building furniture support', () => {
 
     expect(getAllBeds(map)).toHaveLength(3);
     expect(getBedByOwner(map, 'Alice')?.id).toBe(ownedBed.id);
-    expect(isBedOwnedBy(ownedBed, 'Alice')).toBe(true);
+    expect(ownedBed.bed?.ownerPawnId === 'Alice').toBe(true);
     expect(isBedAvailable(occupiedBed)).toBe(false);
     expect(isBedAvailable(freeBed)).toBe(true);
   });

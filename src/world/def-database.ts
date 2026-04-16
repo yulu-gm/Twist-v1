@@ -11,9 +11,6 @@ import {
   DefId, Footprint, MaterialReq, Tag, CellCoord, StoragePriority
 } from '../core/types';
 
-// ── 定义类别枚举（字符串联合类型） ──
-export type DefCategory = 'buildings' | 'items' | 'plants' | 'terrains' | 'jobs' | 'recipes';
-
 // ── 建筑定义 ──
 export interface BuildingDef {
   /** 建筑的唯一标识符 */
@@ -128,25 +125,6 @@ export interface JobDef {
   workType: string;
 }
 
-// ── 配方定义 ──
-export interface RecipeDef {
-  /** 配方的唯一标识符 */
-  defId: DefId;
-  /** 显示名称 */
-  label: string;
-  /** 制作所需工作量 */
-  workAmount: number;
-  /** 所需原料列表 */
-  ingredients: MaterialReq[];
-  /** 产出成品列表 */
-  products: MaterialReq[];
-  /** 需要使用的工作台建筑ID */
-  workstationDefId: DefId;
-}
-
-// ── 统一定义类型（所有定义的联合类型） ──
-export type AnyDef = BuildingDef | ItemDef | PlantDef | TerrainDef | JobDef | RecipeDef;
-
 // ── 定义数据库 ──
 /**
  * DefDatabase 是游戏所有定义（Def）的中心注册表。
@@ -164,8 +142,6 @@ export class DefDatabase {
   readonly terrains: Map<DefId, TerrainDef> = new Map();
   /** 工作定义映射表 */
   readonly jobs: Map<DefId, JobDef> = new Map();
-  /** 配方定义映射表 */
-  readonly recipes: Map<DefId, RecipeDef> = new Map();
 
   /** 注册一个建筑定义 */
   registerBuilding(def: BuildingDef): void { this.buildings.set(def.defId, def); }
@@ -177,17 +153,4 @@ export class DefDatabase {
   registerTerrain(def: TerrainDef): void { this.terrains.set(def.defId, def); }
   /** 注册一个工作定义 */
   registerJob(def: JobDef): void { this.jobs.set(def.defId, def); }
-  /** 注册一个配方定义 */
-  registerRecipe(def: RecipeDef): void { this.recipes.set(def.defId, def); }
-
-  /**
-   * 通用查询方法——按类别和ID获取任意定义
-   * @param category - 定义类别（buildings/items/plants/terrains/jobs/recipes）
-   * @param id - 定义的唯一标识符
-   * @returns 找到的定义对象，未找到则返回 undefined
-   */
-  get<T extends AnyDef>(category: DefCategory, id: DefId): T | undefined {
-    const map = this[category] as Map<DefId, AnyDef>;
-    return map.get(id) as T | undefined;
-  }
 }

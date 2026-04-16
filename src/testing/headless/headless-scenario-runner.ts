@@ -11,7 +11,7 @@ import type { CheckpointSnapshot } from '@testing/scenario-harness/checkpoint-sn
 import type { ScenarioDefinition, ScenarioResult } from '@testing/scenario-dsl/scenario.types';
 
 /** 无头场景运行结果 — 在 ScenarioResult 基础上附带最终快照 */
-export interface HeadlessScenarioResult extends ScenarioResult {
+interface HeadlessScenarioResult extends ScenarioResult {
   /** 场景执行结束后的 checkpoint 快照 */
   finalSnapshot: CheckpointSnapshot;
 }

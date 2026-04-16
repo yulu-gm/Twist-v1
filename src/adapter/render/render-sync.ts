@@ -146,12 +146,6 @@ export class RenderSync {
 
   setShowGrid(show: boolean): void { this.terrainRenderer.setShowGrid(show); }
 
-  getWorldUILayer(): Phaser.GameObjects.Container { return this.layers.get('worldUI')!; }
-
-  getRegistry(): SpriteRegistry { return this.spriteRegistry; }
-
-  getTileSize(): number { return TILE_SIZE; }
-
   // ── 内部实现 ──
 
   private createLayers(): void {
@@ -188,5 +182,3 @@ export class RenderSync {
     );
   }
 }
-
-export { TILE_SIZE };

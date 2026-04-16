@@ -7,7 +7,7 @@
  */
 
 import type { EngineSnapshot } from '../../kernel/ui-types';
-import type { BuildModeSummary, TopStatusBarViewModel } from './build.types';
+import type { TopStatusBarViewModel } from './build.types';
 import { toolActions } from './build.schemas';
 
 /**
@@ -22,19 +22,6 @@ export function selectTopStatusBar(snapshot: EngineSnapshot): TopStatusBarViewMo
     tick: snapshot.tick,
     speed: snapshot.speed,
     colonistCount: snapshot.colonistCount,
-  };
-}
-
-/**
- * 选择建造模式摘要 — 当前工具模式的标题和类型
- *
- * @param snapshot - 引擎快照
- * @returns 建造模式摘要
- */
-export function selectBuildModeSummary(snapshot: EngineSnapshot): BuildModeSummary {
-  return {
-    title: snapshot.build.activeModeLabel,
-    activeTool: snapshot.build.activeTool,
   };
 }
 

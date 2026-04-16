@@ -26,7 +26,7 @@ export interface PawnSnapshot {
 }
 
 /** 物品快照 */
-export interface ItemSnapshot {
+interface ItemSnapshot {
   id: string;
   defId: string;
   cell: { x: number; y: number };
@@ -34,21 +34,21 @@ export interface ItemSnapshot {
 }
 
 /** 指派快照 */
-export interface DesignationSnapshot {
+interface DesignationSnapshot {
   id: string;
   designationType: string;
   cell: { x: number; y: number };
 }
 
 /** 蓝图快照 */
-export interface BlueprintSnapshot {
+interface BlueprintSnapshot {
   id: string;
   defId: string;
   delivered: Array<{ defId: string; count: number }>;
 }
 
 /** 建筑快照 */
-export interface BuildingSnapshot {
+interface BuildingSnapshot {
   id: string;
   defId: string;
   cell: { x: number; y: number };

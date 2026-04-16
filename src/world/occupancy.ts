@@ -5,7 +5,7 @@ import type { GameMap } from './game-map';
 
 export const PHYSICAL_OCCUPANT_TAG = 'physical_occupant' as const;
 
-export interface OccupancyQueryOptions {
+interface OccupancyQueryOptions {
   ignoreIds?: Iterable<ObjectId>;
 }
 

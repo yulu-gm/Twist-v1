@@ -9,8 +9,6 @@ export type {
   Zone,
   ZoneConfig,
   StockpileZoneConfig,
-  ZoneCellAddResult,
-  ZoneCellRemoveResult,
 } from '../../world/zone-manager';
 export {
   createDefaultZoneConfig,

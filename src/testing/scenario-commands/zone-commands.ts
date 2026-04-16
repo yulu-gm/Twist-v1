@@ -36,16 +36,3 @@ export function removeZoneCellsCommand(cells: CellCoord[]): CommandStep {
     stepTicks(1);
   });
 }
-
-/**
- * 删除整个 zone（通过 zone_delete 命令）
- *
- * @param zoneId - zone ID
- */
-export function deleteZoneCommand(zoneId: string): CommandStep {
-  return createCommandStep(`删除 zone：${zoneId}`, ({ issueCommand, stepTicks }) => {
-    issueCommand({ type: 'zone_delete', payload: { mapId: 'scenario', zoneId } });
-    // 推进 1 tick 让命令被处理
-    stepTicks(1);
-  });
-}

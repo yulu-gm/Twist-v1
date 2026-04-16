@@ -13,8 +13,7 @@ export type FactionId = string;      // 派系标识
 export type SkillId = string;        // 技能标识
 export type Tag = string;            // 对象标签，如 "haulable", "reservable", "selectable"
 export type ZoneId = string;         // 区域标识
-export type RoomId = string;         // 房间标识
-export type ReservationId = string;  // 预约标识
+// RoomId, ReservationId — 已删除（无引用）
 export type JobId = string;          // 工作标识
 export type TerrainDefId = DefId;    // 地形定义标识（DefId 的别名）
 export type CellCoordKey = string;   // 格子坐标序列化键，格式为 "x,y"

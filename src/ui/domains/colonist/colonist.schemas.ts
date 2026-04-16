@@ -1,18 +1,9 @@
 /**
  * @file colonist.schemas.ts
- * @description 殖民者领域的静态配置 — 列表列定义、需求定义、标签页定义、徽章色调映射
+ * @description 殖民者领域的静态配置 — 需求定义、徽章色调映射
  * @dependencies 无外部依赖
  * @part-of ui/domains/colonist — 殖民者 UI 领域
  */
-
-// ── 列表列定义 ──
-
-/** 殖民者列表的列配置 */
-export const rosterColumns = [
-  { key: 'name', label: 'Name' },
-  { key: 'job', label: 'Job' },
-  { key: 'mood', label: 'Mood' },
-] as const;
 
 // ── 需求定义 ──
 
@@ -22,11 +13,6 @@ export const needDefs = [
   { key: 'joy',  label: 'Joy',  color: '#44cc88' },
   { key: 'mood', label: 'Mood', color: '#cc44cc' },
 ] as const;
-
-// ── 检查器标签页 ──
-
-/** 检查器面板的标签页列表 */
-export const inspectorTabs = ['Overview', 'Needs', 'Job'] as const;
 
 /**
  * 根据任务 ID 返回徽章色调

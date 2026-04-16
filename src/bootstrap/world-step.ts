@@ -11,7 +11,7 @@ import type { World } from '../world/world';
 import type { GameEvent } from '../core/event-bus';
 
 /** advanceWorldTick 的可选配置 */
-export interface AdvanceWorldTickOptions {
+interface AdvanceWorldTickOptions {
   /** 自定义事件分发回调 - 在 eventBus.dispatch 之前调用，允许外部收集事件 */
   dispatchEvents?: (events: GameEvent[]) => void;
 }

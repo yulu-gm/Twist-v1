@@ -109,15 +109,3 @@ export function assertAnyItemStackAtLeast(
     });
   }, { failureMessage: `${defId} 没有堆叠达到 ${minimum}` });
 }
-
-/**
- * 断言某类物品的全局总量等于期望值（资源守恒检查）
- *
- * @param defId - 物品定义 ID
- * @param expected - 期望总数
- */
-export function assertItemCountConserved(defId: string, expected: number): AssertStep {
-  return createAssertStep(`${defId} 全局总量守恒 = ${expected}`, ({ query }) => {
-    return query.totalMaterialCountInWorld(defId) === expected;
-  }, { failureMessage: `${defId} 总量不等于 ${expected}` });
-}

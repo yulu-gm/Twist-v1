@@ -59,7 +59,7 @@ export interface PlacementPreview {
  *
  * 当玩家使用指派工具时，显示指派操作的目标位置和合法性
  */
-export interface DesignationPreview {
+interface DesignationPreview {
   /** 目标格子 */
   cell: CellCoord;
   /** 指派类型（采矿/收获/砍伐） */
@@ -94,7 +94,7 @@ export interface ZonePreview {
  * 每次工具切换或有效选中时，将当前稳定状态压入栈，
  * 右键弹出时恢复到该快照。
  */
-export interface PresentationBackEntry {
+interface PresentationBackEntry {
   /** 工具类型 */
   activeTool: ToolType;
   /** 指派子类型 */
@@ -110,7 +110,7 @@ export interface PresentationBackEntry {
 /**
  * 工具选择参数 — 传入 applyToolSelection 的选项对象
  */
-export interface ToolSelectionOptions {
+interface ToolSelectionOptions {
   /** 目标工具 */
   tool: ToolType;
   /** 指派子类型（仅 Designate 工具时使用） */
@@ -238,7 +238,7 @@ export function createPresentationState(): PresentationState {
 /**
  * 从当前展示状态生成一个稳定状态快照，用于压入返回栈
  */
-export function captureBackEntry(presentation: PresentationState): PresentationBackEntry {
+function captureBackEntry(presentation: PresentationState): PresentationBackEntry {
   return {
     activeTool: presentation.activeTool,
     activeDesignationType: presentation.activeDesignationType,
@@ -252,7 +252,7 @@ export function captureBackEntry(presentation: PresentationState): PresentationB
 /**
  * 比较两个返回栈条目是否代表相同的稳定状态（用于去重）
  */
-export function isSameBackEntry(a: PresentationBackEntry, b: PresentationBackEntry): boolean {
+function isSameBackEntry(a: PresentationBackEntry, b: PresentationBackEntry): boolean {
   if (a.activeTool !== b.activeTool) return false;
   if (a.activeDesignationType !== b.activeDesignationType) return false;
   if (a.activeZoneType !== b.activeZoneType) return false;
@@ -279,7 +279,7 @@ export function clearTransientInteractionState(presentation: PresentationState):
 /**
  * 若当前状态与栈顶不同，则将当前状态压入返回栈（去重压栈）
  */
-export function pushBackEntryIfNeeded(presentation: PresentationState): void {
+function pushBackEntryIfNeeded(presentation: PresentationState): void {
   const current = captureBackEntry(presentation);
   const top = presentation.backStack[presentation.backStack.length - 1];
   if (!top || !isSameBackEntry(top, current)) {

@@ -13,7 +13,7 @@ const DUSK_TINT = 0x6d7bff;
 const DAY_TINT = 0xf9fbff;
 const MAX_OVERLAY_ALPHA = 0.32;
 
-export interface DaylightOverlayState {
+interface DaylightOverlayState {
   timeSegment: TimeOfDayState['timeSegment'];
   daylightLevel: number;
   hourFloat: number;

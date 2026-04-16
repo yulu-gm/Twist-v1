@@ -24,7 +24,7 @@ import type {
 import type { PawnWorkDecisionSnapshot } from '../ai/work-types';
 
 // ── 手持物品（地图外的临时堆） ──
-export interface CarriedItemStack {
+interface CarriedItemStack {
   /** 物品定义 ID */
   defId: DefId;
   /** 当前手持数量 */

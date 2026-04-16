@@ -1,11 +1,9 @@
 /**
  * @file clock.ts
  * @description 模拟时钟系统，管理游戏内时间（小时/天/季节/年）的推进与显示
- * @dependencies types.ts (SimSpeed)
+ * @dependencies types.ts
  * @part-of core 核心模块 — 驱动游戏世界的时间流逝
  */
-
-import { SimSpeed } from './types';
 
 /** 模拟时钟状态接口 — 记录当前游戏时间 */
 export interface SimulationClock {
@@ -43,7 +41,7 @@ const TICKS_PER_SEASON = TICKS_PER_DAY * DAYS_PER_SEASON;  // 每季的 tick 数
 const TICKS_PER_YEAR = TICKS_PER_SEASON * SEASONS_PER_YEAR; // 每年的 tick 数
 
 /** 季节名称（英文） */
-export const SEASON_NAMES = ['Spring', 'Summer', 'Fall', 'Winter'] as const;
+const SEASON_NAMES = ['Spring', 'Summer', 'Fall', 'Winter'] as const;
 
 /**
  * 创建初始时钟状态
@@ -137,19 +135,4 @@ export function getTimeOfDayState(clock: SimulationClock): TimeOfDayState {
  */
 export function getClockDisplay(clock: SimulationClock): string {
   return `Year ${clock.year}, ${SEASON_NAMES[clock.season]}, Day ${clock.day}, ${clock.hour}:00`;
-}
-
-/** 基准 tick 间隔（毫秒），1x 速度下每 100ms 一个 tick */
-export const BASE_TICK_MS = 100;
-
-/**
- * 根据模拟速度和帧间隔计算本帧应执行的 tick 数
- * @param speed - 当前模拟速度档位
- * @param dtMs - 距上一帧的毫秒数
- * @returns 本帧应执行的 tick 数（暂停时为 0）
- */
-export function getTicksPerFrame(speed: SimSpeed, dtMs: number): number {
-  if (speed === SimSpeed.Paused) return 0;
-  const multiplier = speed === SimSpeed.Normal ? 1 : speed === SimSpeed.Fast ? 2 : 3;
-  return Math.floor((dtMs * multiplier) / BASE_TICK_MS) || (speed > SimSpeed.Paused ? 1 : 0);
 }

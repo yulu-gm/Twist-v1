@@ -10,7 +10,7 @@
 import { LogChannel, ObjectId } from './types';
 
 /** 单条日志记录 */
-export interface LogEntry {
+interface LogEntry {
   /** 日志产生时的 Tick 编号 */
   tick: number;
   /** 日志所属频道（ai、job、command 等） */

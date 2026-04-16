@@ -17,13 +17,3 @@ import type { ToolActionDef } from './build.types';
 export function activateToolAction(ports: UiPorts, action: ToolActionDef): void {
   ports.setTool(action.tool, action.designationType ?? null, action.buildDefId ?? null, action.zoneType ?? null);
 }
-
-/**
- * 设置游戏速度
- *
- * @param ports - UI 端口
- * @param speed - 目标速度值（0-3）
- */
-export function setSpeed(ports: UiPorts, speed: number): void {
-  ports.setSpeed(speed);
-}

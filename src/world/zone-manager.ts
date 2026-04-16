@@ -33,14 +33,14 @@ export interface Zone {
 }
 
 /** 批量添加格子的结果摘要 */
-export interface ZoneCellAddResult {
+interface ZoneCellAddResult {
   addedCells: CellCoordKey[];
   replacedZoneIds: ZoneId[];
   deletedZoneIds: ZoneId[];
 }
 
 /** 批量移除格子的结果摘要 */
-export interface ZoneCellRemoveResult {
+interface ZoneCellRemoveResult {
   removedCells: CellCoordKey[];
   affectedZoneIds: ZoneId[];
   deletedZoneIds: ZoneId[];

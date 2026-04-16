@@ -14,41 +14,10 @@ import type { Item } from './item.types';
 import type {
   ItemPlacementSearchScope,
   ItemPlacementSelectionPreference,
-  ItemPlacementCapacitySummary,
 } from './item.types';
 
 const FALLBACK_ITEM_TAGS = new Set(['haulable', 'resource']);
 const FALLBACK_MAX_STACK = 100;
-
-/**
- * 获取地图上的所有物品
- * @param map - 游戏地图对象
- * @returns 该地图上所有物品的数组
- */
-export function getAllItems(map: GameMap): Item[] {
-  return map.objects.allOfKind(ObjectKind.Item);
-}
-
-/**
- * 按ID查找物品
- * @param map - 游戏地图对象
- * @param id - 物品的对象ID
- * @returns 找到的物品对象，未找到则返回 undefined
- */
-export function getItemById(map: GameMap, id: string): Item | undefined {
-  return map.objects.getAs(id, ObjectKind.Item);
-}
-
-/**
- * 获取指定坐标上的所有物品
- * @param map - 游戏地图对象
- * @param x - 格子X坐标
- * @param y - 格子Y坐标
- * @returns 该坐标上的物品数组
- */
-export function getItemsAt(map: GameMap, x: number, y: number): Item[] {
-  return getItemsAtCell(map, { x, y });
-}
 
 /**
  * 获取指定格子上的所有物品
@@ -181,43 +150,6 @@ export function findNearestAcceptingCell(
   }
 
   return bestCell;
-}
-
-export function getItemPlacementCapacitySummary(
-  map: GameMap,
-  defs: DefDatabase,
-  origin: CellCoord,
-  defId: DefId,
-  searchScope: ItemPlacementSearchScope,
-  options?: FindNearestAcceptingCellOptions,
-): ItemPlacementCapacitySummary {
-  let totalCapacity = 0;
-
-  const considerCell = (cell: CellCoord): void => {
-    totalCapacity += getCellAvailableCapacity(map, defs, cell, defId, searchScope);
-  };
-
-  if (searchScope === 'stockpile-only') {
-    for (const zone of map.zones.getAll()) {
-      if (zone.zoneType !== ZoneType.Stockpile) continue;
-      for (const key of zone.cells) {
-        considerCell(parseKey(key));
-      }
-    }
-  } else {
-    for (let y = 0; y < map.height; y++) {
-      for (let x = 0; x < map.width; x++) {
-        considerCell({ x, y });
-      }
-    }
-  }
-
-  return {
-    totalCapacity,
-    bestCell: totalCapacity > 0
-      ? findNearestAcceptingCell(map, defs, origin, defId, searchScope, options)
-      : null,
-  };
 }
 
 function isItemAcceptedByStockpile(zone: { config: { stockpile?: { allowAllHaulable: boolean; allowedDefIds: Set<DefId> } } }, defId: DefId, itemTags: Set<string>): boolean {

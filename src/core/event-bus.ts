@@ -14,7 +14,7 @@ export interface GameEvent {
 }
 
 /** 事件处理回调函数类型 */
-export type EventHandler = (event: GameEvent) => void;
+type EventHandler = (event: GameEvent) => void;
 
 /**
  * 事件总线 — 管理事件监听器的注册、移除与事件分发

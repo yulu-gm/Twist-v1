@@ -68,7 +68,7 @@ export function kindToLayer(kind: ObjectKind): LayerName {
 // ── 颜色工具函数 ──
 
 /** 将 0xRRGGBB 整数拆分为 {r, g, b} (0-255) */
-export function hexToRgb(hex: number): { r: number; g: number; b: number } {
+function hexToRgb(hex: number): { r: number; g: number; b: number } {
   return {
     r: (hex >> 16) & 0xff,
     g: (hex >> 8) & 0xff,
@@ -77,7 +77,7 @@ export function hexToRgb(hex: number): { r: number; g: number; b: number } {
 }
 
 /** 将 {r, g, b} 合并为 0xRRGGBB 整数 */
-export function rgbToHex(r: number, g: number, b: number): number {
+function rgbToHex(r: number, g: number, b: number): number {
   return ((r & 0xff) << 16) | ((g & 0xff) << 8) | (b & 0xff);
 }
 

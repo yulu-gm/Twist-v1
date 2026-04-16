@@ -48,29 +48,6 @@ export function waitForPawnJobDef(
 }
 
 /**
- * 等待 pawn 身上携带指定物品
- *
- * @param title - 步骤标题
- * @param pawnName - 棋子名字
- * @param defId - 物品定义 ID
- * @param minCount - 最小携带数量
- * @param timeoutTicks - 最大等待 tick 数
- */
-export function waitForPawnCarrying(
-  title: string,
-  pawnName: string,
-  defId: string,
-  minCount = 1,
-  timeoutTicks = 100,
-): WaitForStep {
-  return createWaitForStep(title, ({ query }) => {
-    const pawn = query.findPawnByName(pawnName);
-    return pawn?.inventory.carrying?.defId === defId &&
-      (pawn.inventory.carrying?.count ?? 0) >= minCount;
-  }, { timeoutTicks, timeoutMessage: `超时：${pawnName} 未携带 ${defId}` });
-}
-
-/**
  * 等待 pawn 饱食度达到最小值
  *
  * @param title - 步骤标题

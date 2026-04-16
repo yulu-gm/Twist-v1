@@ -48,26 +48,5 @@ export interface Job {
   state: JobState;
 }
 
-// ── Utility scoring（效用评分） ──
-// 用于任务选择系统，将候选任务按分数排序以挑选最优任务
-export interface JobCandidate {
-  /** 候选的工作任务 */
-  job: Job;
-  /** 效用分数（越高越优先被选中） */
-  score: number;
-}
-
-/** 工作条目：描述一项可用工作的类型、目标和优先级 */
-export interface WorkEntry {
-  /** 工作类型标识（如 "mine", "harvest"） */
-  type: string;
-  /** 目标对象 ID（可选） */
-  targetId?: ObjectId;
-  /** 目标格子坐标（可选） */
-  targetCell?: CellCoord;
-  /** 优先级数值（越高越优先） */
-  priority: number;
-}
-
 // 为方便使用，重新导出枚举
 export { JobState, ToilState, ToilType } from '../../core/types';

@@ -18,18 +18,6 @@ export function getAllBuildings(map: GameMap): Building[] {
   return map.objects.allOfKind(ObjectKind.Building);
 }
 
-/**
- * 根据ID获取指定建筑对象
- * @param map - 目标地图实例
- * @param id - 建筑对象的唯一标识符
- * @returns 匹配的 Building 对象，若不存在或类型不匹配则返回 undefined
- */
-export function getBuildingById(map: GameMap, id: string): Building | undefined {
-  const obj = map.objects.get(id);
-  if (obj && obj.kind === ObjectKind.Building) return obj as Building;
-  return undefined;
-}
-
 /** 获取地图上所有带 bed 组件的建筑 */
 export function getAllBeds(map: GameMap): Building[] {
   return getAllBuildings(map).filter(building => building.bed !== undefined);
@@ -43,9 +31,4 @@ export function getBedByOwner(map: GameMap, ownerName: string): Building | undef
 /** 判断床位是否当前无人占用且未被摧毁 */
 export function isBedAvailable(building: Building): boolean {
   return building.bed !== undefined && building.bed.occupantPawnId === undefined && !building.destroyed;
-}
-
-/** 判断床位是否归指定棋子所有 */
-export function isBedOwnedBy(building: Building, ownerName: string): boolean {
-  return building.bed?.ownerPawnId === ownerName;
 }
