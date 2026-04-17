@@ -56,3 +56,65 @@ export function designateCutCommand(cell: CellCoord): CommandStep {
   });
 }
 
+/**
+ * 创建多目标砍树订单 — 一次操作生成一张 cut 订单，目标为多棵树。
+ * 每个目标格上必须存在植物，否则抛错；命令一次性提交，不会拆成多张订单。
+ *
+ * @param title - 订单标题（同时作为后续 byTitle 索引断言的稳定 key）
+ * @param cells - 树的格子坐标列表
+ * @param priorityIndex - 可选优先级（数值越小优先级越高），透传到 create_map_work_order payload
+ */
+export function createCutOrderCommand(
+  title: string,
+  cells: CellCoord[],
+  priorityIndex?: number,
+): CommandStep {
+  return createCommandStep(`创建砍树订单：${title}`, ({ issueCommand, query, stepTicks }) => {
+    // 先把所有树解析出来；任意一格没树就直接报错（不允许部分失败）
+    const items = cells.map(cell => {
+      const tree = query.findPlantAt(cell);
+      if (!tree) {
+        throw new Error(`创建砍树订单失败：在 (${cell.x}, ${cell.y}) 没有找到树`);
+      }
+      return { targetRef: { kind: 'object' as const, objectId: (tree as any).id } };
+    });
+
+    // 整张订单一次提交：保留"一次操作 = 一张订单"的语义
+    const payload: Record<string, unknown> = {
+      mapId: 'scenario',
+      orderKind: 'cut',
+      title,
+      items,
+    };
+    if (priorityIndex !== undefined) {
+      payload.priorityIndex = priorityIndex;
+    }
+    issueCommand({ type: 'create_map_work_order', payload });
+    // 推进 1 tick 让命令被处理
+    stepTicks(1);
+  });
+}
+
+/**
+ * 创建结果订单（如工坊配方）— 通过 create_result_work_order 命令开订单。
+ * 用于场景中模拟非地图来源的产出请求；目前只创建单一 result_batch item。
+ *
+ * @param orderKind - 订单子类（如 'craft_meal'），由调用方语义决定
+ * @param title - 订单标题（同时作为后续 byTitle 索引断言的稳定 key）
+ */
+export function createResultWorkOrderCommand(orderKind: string, title: string): CommandStep {
+  return createCommandStep(`创建结果订单：${title}`, ({ issueCommand, stepTicks }) => {
+    issueCommand({
+      type: 'create_result_work_order',
+      payload: {
+        mapId: 'scenario',
+        orderKind,
+        title,
+        items: [{ targetRef: { kind: 'result_batch', batchId: `${orderKind}_batch_1` } }],
+      },
+    });
+    // 推进 1 tick 让命令被处理
+    stepTicks(1);
+  });
+}
+

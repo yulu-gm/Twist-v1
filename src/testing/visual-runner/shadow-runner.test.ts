@@ -15,6 +15,7 @@ function makeSnapshot(overrides?: Partial<CheckpointSnapshot>): CheckpointSnapsh
     designations: [],
     blueprints: [],
     buildings: [],
+    workOrders: { list: [], byTitle: {} },
     ...overrides,
   };
 }
