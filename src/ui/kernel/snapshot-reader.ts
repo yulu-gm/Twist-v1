@@ -3,7 +3,9 @@
  * @description 引擎快照读取器 — 从游戏世界状态构建完整的 EngineSnapshot
  * @dependencies world/world — 世界状态；world/game-map — 地图数据；
  *               presentation — 展示层状态；core/types — ObjectKind；
- *               core/clock — 时钟显示格式化；ui-types — 快照类型定义；
+ *               core/clock — 时钟显示格式化；ui-types — 快照类型定义
+ *               （含 EngineSnapshot/ColonistNode/BuildingNode/ObjectNode/
+ *                WorkOrderNode/WorkOrderItemNode/WorkOrdersSnapshot/FeedbackSnapshot）；
  *               features/pawn — Pawn 类型（殖民者数据提取）；
  *               features/building — Building 类型（建筑数据提取）；
  *               features/construction — Blueprint/ConstructionSite 类型；
@@ -30,6 +32,9 @@ import type {
   BuildingNode,
   ObjectNode,
   FeedbackSnapshot,
+  WorkOrderNode,
+  WorkOrderItemNode,
+  WorkOrdersSnapshot,
 } from './ui-types';
 
 /**
@@ -227,6 +232,9 @@ export function readEngineSnapshot(
     presentation.activeZoneType,
   );
 
+  // 投影工作订单 — 看板/详情面板的数据源；list 与 byId 中的节点必须是同一引用
+  const workOrders = buildWorkOrdersSnapshot(map);
+
   // 构建调试面板的信息文本
   const debugInfo = buildDebugInfo(map, presentation);
 
@@ -261,6 +269,7 @@ export function readEngineSnapshot(
       activeModeLabel,
     },
     feedback: feedbackBuffer,
+    workOrders,
     debugInfo,
   };
 }
@@ -331,4 +340,68 @@ function buildDebugInfo(map: GameMap, presentation: PresentationState): string {
   const reservations = map.reservations.getAll();
   dbg += `Reservations: ${reservations.length}\n`;
   return dbg;
+}
+
+/**
+ * 投影 WorkOrderStore 为只读 WorkOrdersSnapshot
+ *
+ * 字段语义：
+ * - totalItemCount = items.length
+ * - doneItemCount = items 中 status='done' 的个数
+ * - activeWorkerCount = items 中 truthy claimedByPawnId 的去重数量
+ * - blocked = 没有任何 item 处于 open/claimed/working
+ *   （即所有 item 都在 blocked/invalid/done 之中 — 订单失去推进能力）
+ *
+ * `byId[id]` 与 `list` 中对应元素必须是同一对象引用，便于 Preact memo 等值比较。
+ *
+ * @param map - 当前地图（其 workOrders 为订单源）
+ * @returns 工作订单快照
+ */
+function buildWorkOrdersSnapshot(map: GameMap): WorkOrdersSnapshot {
+  const orders = map.workOrders.list();
+  const list: WorkOrderNode[] = [];
+  const byId: Record<string, WorkOrderNode> = {};
+
+  for (const order of orders) {
+    let doneItemCount = 0;
+    // 用 Set 去重活跃工人 ID
+    const activeWorkers = new Set<string>();
+    // 推进能力探测 — 一旦有 item 仍处可推进态（open/claimed/working），订单不算 blocked
+    let hasProgressable = false;
+
+    const items: WorkOrderItemNode[] = order.items.map(it => {
+      if (it.status === 'done') doneItemCount += 1;
+      if (it.claimedByPawnId) activeWorkers.add(it.claimedByPawnId);
+      if (it.status === 'open' || it.status === 'claimed' || it.status === 'working') {
+        hasProgressable = true;
+      }
+      return {
+        id: it.id,
+        status: it.status,
+        currentStage: it.currentStage ?? null,
+        claimedByPawnId: it.claimedByPawnId ?? null,
+        blockedReason: it.blockedReason ?? null,
+      };
+    });
+
+    const node: WorkOrderNode = {
+      id: order.id,
+      title: order.title,
+      orderKind: order.orderKind,
+      sourceKind: order.sourceKind,
+      status: order.status,
+      priorityIndex: order.priorityIndex,
+      totalItemCount: order.items.length,
+      doneItemCount,
+      activeWorkerCount: activeWorkers.size,
+      // 订单整体阻塞 — 没有可推进 item 时为 true（包括空 item 列表的极端情形）
+      blocked: !hasProgressable,
+      items,
+    };
+
+    list.push(node);
+    byId[order.id] = node;
+  }
+
+  return { list, byId };
 }

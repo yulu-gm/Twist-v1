@@ -131,6 +131,30 @@ describe('reconcileWorkOrders', () => {
     expect(order.items[0].blockedReason).toBe('target_missing');
     expect(order.status).toBe('done');
   });
+
+  it('marks fully open result orders as blocked with no_executor and keeps order pending', () => {
+    const { world, map } = createTestWorld();
+
+    // 结果订单：无人认领时（全部 open），reconcile 应将 item 标为 blocked
+    const order = map.workOrders.createResultOrder({
+      orderKind: 'craft',
+      title: '无执行者订单',
+      items: [{ targetRef: { kind: 'result_batch', batchId: 'batch_a' } }],
+      createdAtTick: world.tick,
+    });
+
+    expect(order.items[0].status).toBe('open');
+
+    reconcileWorkOrders(world);
+
+    // item 被标为 blocked + no_executor
+    expect(order.items[0].status).toBe('blocked');
+    expect(order.items[0].blockedReason).toBe('no_executor');
+    // blocked 非终态 → 订单不是 done
+    expect(order.status).not.toBe('done');
+    // hasInProgress 仅看 claimed/working，blocked item 留下订单为 pending
+    expect(order.status).toBe('pending');
+  });
 });
 
 describe('reorder_work_orders', () => {

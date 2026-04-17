@@ -20,6 +20,7 @@ function makeSnapshot(overrides: Partial<EngineSnapshot> = {}): EngineSnapshot {
     colonists: {},
     build: { activeTool: 'select', activeDesignationType: null, activeZoneType: null, lastZoneType: 'stockpile', activeBuildDefId: null, activeModeLabel: 'Select' },
     feedback: { recentEvents: [] },
+    workOrders: { list: [], byId: {} },
     debugInfo: '',
     objects: {},
     ...overrides,

@@ -63,6 +63,7 @@ describe('AppShell', () => {
         activeModeLabel: 'Select',
       },
       feedback: { recentEvents: [] },
+      workOrders: { list: [], byId: {} },
       debugInfo: '',
     } as any;
 

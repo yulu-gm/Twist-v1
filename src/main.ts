@@ -286,6 +286,8 @@ async function boot(): Promise<void> {
         selection: { primaryId: null, selectedIds: [] },
         colonists: {}, build: { activeTool: 'select', activeDesignationType: null, activeZoneType: null, lastZoneType: 'stockpile', activeBuildDefId: null, activeModeLabel: 'Select' },
         feedback: feedbackBuffer, debugInfo: '', objects: {},
+        // 工作订单空快照 — 场景未就绪时无地图可投影
+        workOrders: { list: [], byId: {} },
       };
     }
     return readEngineSnapshot(world, sceneRef.activeMap, sceneRef.presentation, feedbackBuffer);

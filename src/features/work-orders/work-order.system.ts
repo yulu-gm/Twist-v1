@@ -2,7 +2,10 @@
  * @file work-order.system.ts
  * @description 工作订单维护系统 — 每 tick 在 WORK_GENERATION 阶段对所有订单做一次 reconcile：
  *              1) 检查 item 目标是否仍存在（kind='object' 时若对象缺失/被销毁则置为 invalid）；
- *              2) 根据 item 状态分布推进订单整体状态（pending / active / done）。
+ *              2) 结果订单（sourceKind='result'）若全部 item 仍为 open（无执行者认领），
+ *                 将这些 open item 标记为 blocked + blockedReason='no_executor'，
+ *                 让看板能直观呈现"无人执行"的产出请求；
+ *              3) 根据 item 状态分布推进订单整体状态（pending / active / done）。
  *              终态（done / cancelled）订单跳过；paused 订单跳过 item 检查但仍参与 done 推进。
  * @dependencies TickPhase — 核心枚举；SystemRegistration — 系统注册接口；World — 世界状态；
  *               WorkOrderItem, WorkOrderItemStatus — 订单领域类型
@@ -52,6 +55,23 @@ export function reconcileWorkOrders(world: World): void {
       if (order.status !== 'paused') {
         for (const it of order.items) {
           reconcileItemTarget(it, map);
+        }
+      }
+
+      // 结果订单"无执行者"标记 — 若订单为 result 来源、未暂停、且全部 item 仍为 open，
+      // 视为没有任何 pawn 接活，将这些 open item 置为 blocked + no_executor。
+      // 必须在"全部终态 → done"判断之前执行，blocked 不属于终态，订单仍保持 pending，
+      // 看板得以呈现"无执行者"的产出请求。
+      // 注意：map 来源订单的同类失败由 Task 4 在 evaluator 中细化（不同类目原因不同）。
+      if (
+        order.sourceKind === 'result' &&
+        order.status !== 'paused' &&
+        order.items.length > 0 &&
+        order.items.every(it => it.status === 'open')
+      ) {
+        for (const it of order.items) {
+          it.status = 'blocked';
+          it.blockedReason = 'no_executor';
         }
       }
 
