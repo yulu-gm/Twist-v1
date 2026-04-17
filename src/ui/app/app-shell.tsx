@@ -26,6 +26,8 @@ import { activateToolAction } from '../domains/build/build.intents';
 import { selectCommandFeedback, selectDebugInfo, selectShowDebugPanel } from '../domains/feedback/feedback.selectors';
 import { ToastStack } from '../domains/feedback/components/toast-stack';
 import { DebugPanel } from '../domains/feedback/components/debug-panel';
+import { selectWorkOrderBoard } from '../domains/work-orders/work-order.selectors';
+import { WorkOrderBoard } from '../domains/work-orders/components/work-order-board';
 
 /** AppShell 组件属性 — 所有数据和回调从 AppRoot 注入 */
 interface AppShellProps {
@@ -93,6 +95,7 @@ export function AppShell({ snapshot, uiState, dispatch, ports }: AppShellProps) 
   const feedback = selectCommandFeedback(snapshot);
   const debugInfo = selectDebugInfo(snapshot);
   const showDebug = selectShowDebugPanel(snapshot);
+  const workOrderBoard = selectWorkOrderBoard(snapshot, uiState);
 
   return (
     <div class="app-shell" data-testid="app-shell">
@@ -104,6 +107,15 @@ export function AppShell({ snapshot, uiState, dispatch, ports }: AppShellProps) 
         rows={rosterRows}
         activeId={snapshot.selection.primaryId}
         onSelect={(id) => ports.selectColonist(id)}
+      />
+      <WorkOrderBoard
+        rows={workOrderBoard.rows}
+        selectedOrderId={workOrderBoard.selectedOrderId}
+        detail={workOrderBoard.detail}
+        onSelect={(orderId) => dispatch({ type: 'set_inspector_target', targetId: orderId })}
+        onPause={(orderId) => ports.pauseWorkOrder(orderId)}
+        onResume={(orderId) => ports.resumeWorkOrder(orderId)}
+        onCancel={(orderId) => ports.cancelWorkOrder(orderId)}
       />
       {objectInspector && (
         <ObjectInspector

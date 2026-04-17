@@ -220,6 +220,21 @@ function createLazyPorts(world: World, getPresentation: () => PresentationState 
     clearBedOwner(bedId: string) {
       world.commandQueue.push({ type: 'clear_bed_owner', payload: { bedId } });
     },
+    pauseWorkOrder(orderId: string) {
+      world.commandQueue.push({ type: 'pause_work_order', payload: { mapId: 'main', orderId } });
+    },
+    resumeWorkOrder(orderId: string) {
+      world.commandQueue.push({ type: 'resume_work_order', payload: { mapId: 'main', orderId } });
+    },
+    cancelWorkOrder(orderId: string) {
+      world.commandQueue.push({ type: 'cancel_work_order', payload: { mapId: 'main', orderId } });
+    },
+    reorderWorkOrders(orderIds: string[]) {
+      world.commandQueue.push({ type: 'reorder_work_orders', payload: { mapId: 'main', orderIds } });
+    },
+    createResultWorkOrder(payload: { orderKind: string; title: string; items: Array<Record<string, unknown>> }) {
+      world.commandQueue.push({ type: 'create_result_work_order', payload: { mapId: 'main', ...payload } });
+    },
   };
 }
 
