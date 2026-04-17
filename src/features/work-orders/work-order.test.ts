@@ -27,6 +27,9 @@ function createTestWorld() {
 describe('create_map_work_order', () => {
   it('creates one map order with two open items and preserves list order', () => {
     const { world, map } = createTestWorld();
+    // 两个目标格子设为可挖地形（rock），确保物化为 Mine 指派而非 invalid
+    map.terrain.set(1, 1, 'rock');
+    map.terrain.set(2, 2, 'rock');
 
     world.commandQueue.push({
       type: 'create_map_work_order',

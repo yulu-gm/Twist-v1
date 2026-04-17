@@ -65,6 +65,8 @@ export interface WorkOrderItem {
   blockedReason?: string;
   /** 推进进度（0~1，可选；非长期动作可缺省） */
   progress?: number;
+  /** 由命令处理器在创建时回填，指向材料化的 Designation/Blueprint id */
+  artifactId?: string;
 }
 
 /** 工作订单：玩家下达的一组 item 的集合 */
@@ -100,6 +102,8 @@ export interface CreateWorkOrderItemInput {
   claimedByPawnId?: string;
   blockedReason?: string;
   progress?: number;
+  /** 由命令处理器在创建时回填，指向材料化的 Designation/Blueprint id */
+  artifactId?: string;
 }
 
 /** 创建订单的输入参数 */
@@ -235,6 +239,7 @@ export class WorkOrderStore {
       claimedByPawnId: it.claimedByPawnId,
       blockedReason: it.blockedReason,
       progress: it.progress,
+      artifactId: it.artifactId,
     }));
 
     const order: WorkOrder = {

@@ -189,11 +189,11 @@ function isJobBlockedByCarriedItems(pawn: Pawn, job: Job): boolean {
 }
 
 /**
- * 将工作分配给 Pawn：设置 AI 状态、重置空闲计数、推送 job_assigned 事件。
+ * 将工作分配给 Pawn：设置 AI 状态、重置空闲计数、若 Job 来自工作订单则回写 item.claimed，
+ * 推送 job_assigned 事件。
  *
  * @param pawn   - 接受工作的 Pawn
  * @param job    - 要分配的工作
- * @param map    - 当前地图
  * @param world  - 游戏世界实例
  */
 function assignJob(
@@ -205,6 +205,22 @@ function assignJob(
   pawn.ai.currentToilIndex = 0;
   pawn.ai.toilState = {};
   pawn.ai.idleTicks = 0;
+
+  // 若该 Job 由工作订单派生，把对应 item 标记为 claimed —
+  // 后续 work.handler / construction.system 在工作完成时再写回 done。
+  if (job.workOrderId && job.workOrderItemId) {
+    for (const [, m] of world.maps) {
+      const order = m.workOrders.get(job.workOrderId);
+      if (!order) continue;
+      const item = order.items.find(entry => entry.id === job.workOrderItemId);
+      if (item) {
+        item.status = 'claimed';
+        item.claimedByPawnId = pawn.id;
+        item.currentStage = 'claimed';
+        break;
+      }
+    }
+  }
 
   log.info('ai', `Pawn ${pawn.id} assigned job ${job.id} (${job.defId})`, undefined, pawn.id);
 

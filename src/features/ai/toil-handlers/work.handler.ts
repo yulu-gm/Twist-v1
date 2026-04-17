@@ -104,6 +104,16 @@ export const executeWork: ToilHandler = ({ pawn, toil, map, world }) => {
 
           target.destroyed = true;
           map.objects.remove(toil.targetId);
+          // 若该指派由工作订单派生，回写 item.status = 'done'
+          if (desig.workOrderId && desig.workOrderItemId) {
+            const order = map.workOrders.get(desig.workOrderId);
+            const item = order?.items.find(it => it.id === desig.workOrderItemId);
+            if (item) {
+              item.status = 'done';
+              item.claimedByPawnId = undefined;
+              item.currentStage = 'done';
+            }
+          }
           world.eventBuffer.push({
             type: 'designation_completed',
             tick: world.tick,

@@ -2,9 +2,15 @@
  * @file work-order.commands.ts
  * @description 工作订单命令处理器集合 — 包括订单创建（地图来源 / 结果来源）、暂停、恢复、取消、
  *              重排序、偏好 pawn 指派等命令。所有命令必须显式携带 mapId（不做地图自动解析）。
+ *              create_map_work_order 还会按 orderKind 把每个 item 物化为对应的 map artifact
+ *              （cut/harvest → Designation；mine → Designation；build → Blueprint），并把
+ *              artifact id 回填到 item.artifactId，供 AI evaluator 通过订单溯源。
  * @dependencies CommandHandler, Command, ValidationResult, ExecutionResult — 命令总线接口；
  *               World — 世界状态；GameMap — 游戏地图；
- *               WorkOrderItem, CreateWorkOrderItemInput — 订单领域类型
+ *               WorkOrderItem, CreateWorkOrderItemInput — 订单领域类型；
+ *               createDesignationFromOrderItem — 由 item 物化 Designation；
+ *               analyzeBuildingPlacement — 建造位置占用检查；
+ *               nextObjectId, ObjectKind, DesignationType, WorkPriority, Rotation, MaterialReq — 核心类型
  * @part-of features/work-orders — 工作订单功能
  */
 
@@ -14,13 +20,20 @@ import {
   ValidationResult,
   ExecutionResult,
 } from '../../core/command-bus';
+import {
+  ObjectKind, DesignationType, WorkPriority, nextObjectId, Rotation, MaterialReq,
+} from '../../core/types';
 import { World } from '../../world/world';
 import { GameMap } from '../../world/game-map';
 import {
   CreateWorkOrderItemInput,
+  WorkOrder,
   WorkOrderItem,
   WorkOrderItemStatus,
 } from './work-order.types';
+import { createDesignationFromOrderItem } from '../designation/designation.commands';
+import { analyzeBuildingPlacement } from '../construction/construction.placement';
+import type { Blueprint } from '../construction/blueprint.types';
 
 // ── 辅助函数 ──
 
@@ -38,6 +51,135 @@ function getMap(world: World, cmd: Command): GameMap | undefined {
 
 /** Item 终态集合（done/invalid 不再被维护流程修改） */
 const TERMINAL_ITEM_STATUSES: ReadonlySet<WorkOrderItemStatus> = new Set(['done', 'invalid']);
+
+/**
+ * 物化订单 item 为对应的 map artifact —
+ * - cut/harvest：由 item.targetRef.objectId 指向的植物生成 Designation
+ * - mine：由 item.targetRef.cell 生成 Mine 类型 Designation（同时校验地形可挖）
+ * - build：由 item.targetRef.cell + defId 生成 Blueprint（含占地校验、材料清单装配）
+ * 其他 orderKind（zone_x/cancel_x/craft 等）暂不物化（首版范围之外）。
+ *
+ * 物化结果：合法的 item 写入 item.artifactId；非法的 item 翻 invalid 并记录 blockedReason。
+ *
+ * @param world - 世界状态（用于读取 defs/tick）
+ * @param map - 订单所在地图
+ * @param order - 新创建的订单
+ */
+function materializeMapWorkOrderItems(world: World, map: GameMap, order: WorkOrder): void {
+  const orderKind = order.orderKind;
+  // 仅处理 cut/harvest/mine/build 这四类玩家驱动订单
+  if (orderKind !== 'cut' && orderKind !== 'harvest' && orderKind !== 'mine' && orderKind !== 'build') {
+    return;
+  }
+
+  for (const item of order.items) {
+    if (TERMINAL_ITEM_STATUSES.has(item.status)) continue;
+
+    if (orderKind === 'cut' || orderKind === 'harvest') {
+      const targetObjectId = item.targetRef.objectId;
+      if (!targetObjectId) {
+        item.status = 'invalid';
+        item.blockedReason = 'target_missing';
+        continue;
+      }
+      const target = map.objects.get(targetObjectId);
+      if (!target || target.destroyed || target.kind !== ObjectKind.Plant) {
+        item.status = 'invalid';
+        item.blockedReason = 'target_missing';
+        continue;
+      }
+      const desigType = orderKind === 'cut' ? DesignationType.Cut : DesignationType.Harvest;
+      const designation = createDesignationFromOrderItem(
+        map.id,
+        desigType,
+        WorkPriority.Normal,
+        order.id,
+        item.id,
+        targetObjectId,
+        target.cell,
+      );
+      map.objects.add(designation);
+      item.artifactId = designation.id;
+      continue;
+    }
+
+    if (orderKind === 'mine') {
+      const cell = item.targetRef.cell;
+      if (!cell) {
+        item.status = 'invalid';
+        item.blockedReason = 'target_missing';
+        continue;
+      }
+      // 校验地形可挖
+      const terrainDefId = map.terrain.get(cell.x, cell.y);
+      const terrainDef = world.defs.terrains.get(terrainDefId);
+      if (!terrainDef?.mineable) {
+        item.status = 'invalid';
+        item.blockedReason = 'target_missing';
+        continue;
+      }
+      const designation = createDesignationFromOrderItem(
+        map.id,
+        DesignationType.Mine,
+        WorkPriority.Normal,
+        order.id,
+        item.id,
+        undefined,
+        cell,
+      );
+      // createDesignationFromOrderItem 已经设置 cell，但保险起见再写一次
+      designation.cell = { x: cell.x, y: cell.y };
+      map.objects.add(designation);
+      item.artifactId = designation.id;
+      continue;
+    }
+
+    if (orderKind === 'build') {
+      const cell = item.targetRef.cell;
+      const defId = item.targetRef.defId;
+      if (!cell || !defId) {
+        item.status = 'invalid';
+        item.blockedReason = 'target_missing';
+        continue;
+      }
+      const buildingDef = world.defs.buildings.get(defId);
+      if (!buildingDef) {
+        item.status = 'invalid';
+        item.blockedReason = 'target_missing';
+        continue;
+      }
+      // 占地冲突校验（与 placeBlueprintHandler 一致）
+      const placement = analyzeBuildingPlacement(map, cell, buildingDef.size);
+      if (placement.blocked) {
+        item.status = 'invalid';
+        item.blockedReason = 'target_missing';
+        continue;
+      }
+      const materialsRequired: MaterialReq[] = buildingDef.costList.map(c => ({ defId: c.defId, count: c.count }));
+      const materialsDelivered: MaterialReq[] = buildingDef.costList.map(c => ({ defId: c.defId, count: 0 }));
+      const blueprint: Blueprint = {
+        id: nextObjectId(),
+        kind: ObjectKind.Blueprint,
+        defId: `blueprint_${defId}`,
+        mapId: map.id,
+        cell: { x: cell.x, y: cell.y },
+        footprint: buildingDef.size,
+        tags: new Set(['blueprint', 'construction']),
+        destroyed: false,
+        targetDefId: defId,
+        rotation: Rotation.North,
+        materialsRequired,
+        materialsDelivered,
+        // 订单溯源：Job 完成时通过这两个字段把 item.status 写回 done
+        workOrderId: order.id,
+        workOrderItemId: item.id,
+      };
+      map.objects.add(blueprint);
+      item.artifactId = blueprint.id;
+      continue;
+    }
+  }
+}
 
 // ── create_map_work_order（创建地图来源订单） ──
 
@@ -70,6 +212,10 @@ export const createMapWorkOrderHandler: CommandHandler = {
       preferredPawnIds: cmd.payload.preferredPawnIds as string[] | undefined,
       createdAtTick: w.tick,
     });
+
+    // 按 orderKind 把每个 item 物化为对应的 map artifact，
+    // 并把生成的 artifact id 回填到 item.artifactId（供 AI evaluator 溯源）。
+    materializeMapWorkOrderItems(w, map, order);
 
     return {
       events: [{

@@ -65,6 +65,10 @@ export interface Job {
   reservations: string[];
   /** 工作的整体执行状态 */
   state: JobState;
+  /** 若该 Job 由工作订单派生，记录订单 ID，便于完成时回写 item 状态 */
+  workOrderId?: string;
+  /** 若该 Job 由工作订单派生，记录订单项 ID，便于完成时回写 item 状态 */
+  workOrderItemId?: string;
 }
 
 /** 棋子需求数值档案 — 描述需求衰减速率、阈值和恢复参数 */

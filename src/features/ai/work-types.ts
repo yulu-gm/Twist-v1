@@ -26,7 +26,10 @@ export type WorkFailureReasonCode =
   | 'materials_not_delivered'
   | 'carrying_conflict'
   | 'no_available_bed'
-  | 'no_reachable_material_source';
+  | 'no_reachable_material_source'
+  | 'order_paused'
+  | 'order_cancelled'
+  | 'no_order_executor';
 
 // ── 工作选项（冻结后的展示单元） ──
 
