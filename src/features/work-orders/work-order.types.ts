@@ -41,6 +41,10 @@ export interface WorkOrderItemTargetRef {
   cells?: CellCoord[];
   /** 当 kind='result_batch' 时的批次 ID */
   batchId?: string;
+  /** 建造订单专用：目标建筑的定义 ID（kind='cell' 时使用，由 Task 4 消费） */
+  defId?: string;
+  /** 区域订单专用：要划设/取消的 ZoneType（kind='area' 时使用） */
+  zoneType?: string;
 }
 
 // ── 订单条目与订单 ──

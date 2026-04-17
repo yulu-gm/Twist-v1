@@ -312,3 +312,35 @@ export const designationCommandHandlers: CommandHandler[] = [
   designateCutHandler,
   cancelDesignationHandler,
 ];
+
+// ── 工作订单 → 指派 适配器 ──
+
+/**
+ * 由工作订单 item 派生指派对象的辅助函数（Task 4 将使用）
+ *
+ * 当前仅作为导出工具函数存在 — 输入层只下发 create_map_work_order，
+ * AI evaluator/订单维护系统在 Task 4 接管后才会调用本函数把 item 物化为 Designation。
+ *
+ * @param mapId - 所在地图 ID
+ * @param designationType - 指派类型
+ * @param priority - 工作优先级
+ * @param workOrderId - 派生该指派的工作订单 ID
+ * @param workOrderItemId - 派生该指派的订单 item ID
+ * @param targetObjectId - 目标对象 ID（可选）
+ * @param targetCell - 目标格子（可选）
+ * @returns 携带 workOrderId/workOrderItemId 溯源字段的 Designation
+ */
+export function createDesignationFromOrderItem(
+  mapId: MapId,
+  designationType: DesignationType,
+  priority: WorkPriority,
+  workOrderId: string,
+  workOrderItemId: string,
+  targetObjectId?: ObjectId,
+  targetCell?: CellCoord,
+): Designation {
+  const designation = createDesignation(mapId, designationType, priority, targetObjectId, targetCell);
+  designation.workOrderId = workOrderId;
+  designation.workOrderItemId = workOrderItemId;
+  return designation;
+}

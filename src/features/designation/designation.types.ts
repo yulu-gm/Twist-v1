@@ -16,7 +16,8 @@ import {
 
 /**
  * 指派对象接口
- * 继承自 MapObjectBase，代表一条待执行的工作指令（如采集、挖矿、砍伐）
+ * 继承自 MapObjectBase，代表一条待执行的工作指令（如采集、挖矿、砍伐）。
+ * 由工作订单（WorkOrder）派生时会回填 workOrderId / workOrderItemId 以便溯源。
  */
 export interface Designation extends MapObjectBase {
   /** 对象类型标识，固定为 Designation */
@@ -29,6 +30,10 @@ export interface Designation extends MapObjectBase {
   targetCell?: CellCoord;
   /** 工作优先级，用于排序任务执行顺序 */
   priority: WorkPriority;
+  /** 派生该指派的工作订单 ID（可选；由订单流程回填，便于溯源/级联取消） */
+  workOrderId?: string;
+  /** 派生该指派的订单 item ID（可选；由订单流程回填） */
+  workOrderItemId?: string;
 }
 
 // ── KindMap 类型注册 ──

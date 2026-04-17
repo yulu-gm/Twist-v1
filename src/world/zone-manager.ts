@@ -30,6 +30,10 @@ export interface Zone {
   cells: Set<CellCoordKey>;
   /** 区域的额外配置 */
   config: ZoneConfig;
+  /** 派生该区域的工作订单 ID（可选；由订单流程回填，便于溯源/级联取消） */
+  workOrderId?: string;
+  /** 派生该区域的订单 item ID（可选；由订单流程回填） */
+  workOrderItemId?: string;
 }
 
 /** 批量添加格子的结果摘要 */
