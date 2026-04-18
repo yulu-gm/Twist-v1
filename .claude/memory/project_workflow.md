@@ -1,6 +1,6 @@
 ---
 name: project-workflow
-description: 项目开发工作流 — spec/plan 驱动、分支策略、中文注释
+description: 项目开发工作流 — spec/plan 驱动、中文注释、提交前回归
 type: project
 ---
 
@@ -11,11 +11,7 @@ type: project
 3. 在 feature 分支上按 plan 逐步实现，每步提交
 4. 全量测试通过后合并
 
-## 分支状态（2026-04-17）
-
-- `main` — 当前活跃主分支，最新提交包含 dead code 清理与游戏方向/内容总设三份设计文档
-- 本地另有 `code-read` 分支
-- Remote: `https://github.com/yulu-gm/Twist-v1`（含 `archived`、`if线`、`codex/blueprint-haul-carry-overflow` 等历史分支）
+Remote: `git@github.com:yulu-gm/Twist-v1.git`（默认 `origin`）
 
 ## 代码风格
 

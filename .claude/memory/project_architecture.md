@@ -21,10 +21,10 @@ originSessionId: 9128ff6f-832f-4cad-81ec-c77ba43490ff
 - `job-selector.ts` — 工作选择编排器，调用 evaluator 管线
 - `work-types.ts` — WorkOption、WorkEvaluation、PawnWorkDecisionSnapshot 类型
 - `work-evaluator.types.ts` — WorkEvaluator 接口
-- `work-evaluators/` — 9 个独立评估器（eat、sleep、mine、harvest、deliver_materials、construct、haul_to_stockpile、resolve_carrying、wander）
-- `ai.types.ts` — Job 类型
-- `jobs/` — 各类 job 工厂函数
-- `toil-handlers/` — Toil 执行处理器
+- `work-evaluators/` — 各类工作评估器（按目录扫描，会随新功能增长）
+- `ai.types.ts` — Job 类型；`jobs/` — 各类 job 工厂；`toil-handlers/` — Toil 执行处理器
+
+**重要**：自 v0.0.1 起，evaluator **只从 `map.workOrders` 取活**，不再扫描裸 designation/blueprint。详见 `work_orders.md`。
 
 ## 测试体系
 
