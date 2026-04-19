@@ -82,7 +82,7 @@ function makePresentationState(selectedIds: ObjectId[] = []): PresentationState 
     activeTool: 'select' as PresentationState['activeTool'],
     activeDesignationType: null,
     activeZoneType: null,
-    lastZoneType: 'stockpile' as PresentationState['lastZoneType'],
+    lastZoneType: 'growing' as PresentationState['lastZoneType'],
     activeBuildDefId: null,
     showDebugPanel: false,
     showGrid: false,

@@ -93,21 +93,6 @@ export const BUILDING_DEFS: BuildingDef[] = [
     passable: false,
     color: 0xA0522D,
   },
-  /** 仓储区标记——区域标记类建筑，不需要建造，用于标识物品存储区域 */
-  {
-    defId: 'stockpile_zone_marker',
-    label: 'Stockpile',
-    description: 'A zone for storing items.',
-    size: { width: 1, height: 1 },
-    maxHp: 999,
-    workToBuild: 0,
-    costList: [],
-    tags: ['zone_marker'],
-    blocksMovement: false,
-    blocksLight: false,
-    passable: true,
-    color: 0xFFFF00,
-  },
   /** 仓库——可建造的家具型仓储设施，挂载抽象库存容器，是正式存储的唯一来源 */
   {
     defId: 'warehouse_shed',

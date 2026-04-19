@@ -40,7 +40,7 @@ export type WorkFailureReasonCode =
  * 每一行对应最近一次选工排序中真实参与过的一个工作类别
  */
 export interface WorkOption {
-  /** 工作类别标识（如 'eat'、'sleep'、'haul_to_stockpile'） */
+  /** 工作类别标识（如 'eat'、'sleep'、'haul_to_storage'） */
   kind: string;
   /** 面向用户的类别显示名 */
   label: string;

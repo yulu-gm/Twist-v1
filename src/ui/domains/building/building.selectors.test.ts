@@ -11,7 +11,7 @@ function makeSnapshot(overrides: Partial<EngineSnapshot> = {}): EngineSnapshot {
     presentation: { activeTool: 'select', activeDesignationType: null, activeZoneType: null, activeBuildDefId: null, commandMenuPath: [], hoveredCell: null, selectedIds: [], showDebugPanel: false, showGrid: false },
     selection: { primaryId: null, selectedIds: [] },
     colonists: {},
-    build: { activeTool: 'select', activeDesignationType: null, activeZoneType: null, lastZoneType: 'stockpile', activeBuildDefId: null, activeModeLabel: 'Select' },
+    build: { activeTool: 'select', activeDesignationType: null, activeZoneType: null, lastZoneType: 'growing', activeBuildDefId: null, activeModeLabel: 'Select' },
     feedback: { recentEvents: [] },
     workOrders: { list: [], byId: {} },
     debugInfo: '',

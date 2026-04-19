@@ -48,7 +48,7 @@ function makeSnapshot(overrides: Partial<EngineSnapshot> = {}): EngineSnapshot {
       activeTool: 'select',
       activeDesignationType: null,
       activeZoneType: null,
-      lastZoneType: 'stockpile',
+      lastZoneType: 'growing',
       activeBuildDefId: null,
       activeModeLabel: 'Select',
     },

@@ -1,30 +1,21 @@
 /**
  * @file zone-manager.ts
- * @description 区域（Zone）接口与区域管理器（ZoneManager），管理地图上玩家划定的功能区域
+ * @description 区域（Zone）接口与区域管理器（ZoneManager），管理地图上玩家划定的功能区域。
+ *              本初始版本仅保留 Growing 类型；正式存储已迁移到仓库 building.storage 抽象库存。
  * @dependencies core/types — CellCoordKey, ZoneId, ZoneType, DefId
  * @part-of world 模块——游戏世界数据层
  */
 
-import { CellCoordKey, DefId, ZoneId, ZoneType } from '../core/types';
-
-/** 存储区配置：默认允许所有 haulable 物品，后续可扩展白名单筛选 */
-export interface StockpileZoneConfig {
-  /** 是否允许所有 haulable 物品进入 */
-  allowAllHaulable: boolean;
-  /** 显式允许的物品定义 ID 集合；allowAllHaulable 为 false 时生效 */
-  allowedDefIds: Set<DefId>;
-}
+import { CellCoordKey, ZoneId, ZoneType } from '../core/types';
 
 /** 区域配置集合，按区域类型挂载对应的配置块 */
-export type ZoneConfig = Record<string, unknown> & {
-  stockpile?: StockpileZoneConfig;
-};
+export type ZoneConfig = Record<string, unknown>;
 
-/** 区域：地图上由玩家划定的功能区域（如存储区、种植区等） */
+/** 区域：地图上由玩家划定的功能区域（如种植区等） */
 export interface Zone {
   /** 区域唯一标识符 */
   id: ZoneId;
-  /** 区域类型（如 stockpile, growing 等） */
+  /** 区域类型（如 growing 等） */
   zoneType: ZoneType;
   /** 区域包含的所有格子坐标（使用 CellCoordKey 便于快速查找） */
   cells: Set<CellCoordKey>;
@@ -50,59 +41,18 @@ interface ZoneCellRemoveResult {
   deletedZoneIds: ZoneId[];
 }
 
-/** 创建 stockpile 区域的默认配置 */
-export function createDefaultStockpileZoneConfig(): StockpileZoneConfig {
-  return {
-    allowAllHaulable: true,
-    allowedDefIds: new Set<DefId>(),
-  };
-}
-
-/** 创建指定区域类型的默认配置 */
-export function createDefaultZoneConfig(zoneType: ZoneType): ZoneConfig {
-  switch (zoneType) {
-    case ZoneType.Stockpile:
-      return { stockpile: createDefaultStockpileZoneConfig() };
-    default:
-      return {};
-  }
+/** 创建指定区域类型的默认配置（当前所有区域类型默认无附加配置） */
+export function createDefaultZoneConfig(_zoneType: ZoneType): ZoneConfig {
+  return {};
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function normalizeStockpileConfig(value: unknown): StockpileZoneConfig {
-  if (!isRecord(value)) {
-    return createDefaultStockpileZoneConfig();
-  }
-
-  const allowedDefIds = value.allowedDefIds;
-  const allowedSet = allowedDefIds instanceof Set
-    ? new Set<DefId>(Array.from(allowedDefIds).filter((defId): defId is DefId => typeof defId === 'string'))
-    : Array.isArray(allowedDefIds)
-      ? new Set<DefId>(allowedDefIds.filter((defId): defId is DefId => typeof defId === 'string'))
-      : new Set<DefId>();
-
-  return {
-    allowAllHaulable: value.allowAllHaulable !== false,
-    allowedDefIds: allowedSet,
-  };
-}
-
 /** 归一化区域配置，补齐缺省值并恢复序列化后的 Set */
-export function normalizeZoneConfig(zoneType: ZoneType, config?: unknown): ZoneConfig {
-  const normalized: ZoneConfig = isRecord(config) ? { ...config } : {};
-
-  switch (zoneType) {
-    case ZoneType.Stockpile:
-      normalized.stockpile = normalizeStockpileConfig(normalized.stockpile);
-      break;
-    default:
-      break;
-  }
-
-  return normalized;
+export function normalizeZoneConfig(_zoneType: ZoneType, config?: unknown): ZoneConfig {
+  return isRecord(config) ? { ...config } : {};
 }
 
 /**

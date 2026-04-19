@@ -54,7 +54,7 @@ describe('command-menu', () => {
 
   it('returns leaf entries at the deepest level marked active when current leaf matches', () => {
     const entries = getVisibleCommandMenuEntries(['build', 'furniture'], 'build_bed');
-    expect(entries.map((entry) => entry.label)).toEqual(['返回', '床']);
+    expect(entries.map((entry) => entry.label)).toEqual(['返回', '床', '仓库']);
     expect(entries[1].active).toBe(true);
   });
 

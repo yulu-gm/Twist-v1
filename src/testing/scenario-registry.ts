@@ -6,11 +6,9 @@
  */
 
 import { woodcuttingScenario } from './scenarios/woodcutting.scenario';
-import { stockpileHaulScenario } from './scenarios/stockpile-haul.scenario';
+import { warehouseStorageHaulScenario } from './scenarios/warehouse-storage-haul.scenario';
 import { eatingScenario } from './scenarios/eating.scenario';
 import { blueprintConstructionScenario } from './scenarios/blueprint-construction.scenario';
-import { zoneStockpileLifecycleScenario } from './scenarios/zone-stockpile-lifecycle.scenario';
-import { quantityHaulStackChainScenario } from './scenarios/quantity-haul-stack-chain.scenario';
 import { sleepBedOccupancyScenario } from './scenarios/sleep-bed-occupancy.scenario';
 import { bedBlueprintSleepScenario } from './scenarios/bed-blueprint-sleep.scenario';
 import { blueprintOversupplyHaulScenario } from './scenarios/blueprint-oversupply-haul.scenario';
@@ -22,11 +20,9 @@ import type { ScenarioDefinition } from './scenario-dsl/scenario.types';
 /** 所有已注册的业务场景 */
 export const scenarioRegistry: readonly ScenarioDefinition[] = [
   woodcuttingScenario,
-  stockpileHaulScenario,
+  warehouseStorageHaulScenario,
   eatingScenario,
   blueprintConstructionScenario,
-  zoneStockpileLifecycleScenario,
-  quantityHaulStackChainScenario,
   sleepBedOccupancyScenario,
   bedBlueprintSleepScenario,
   blueprintOversupplyHaulScenario,

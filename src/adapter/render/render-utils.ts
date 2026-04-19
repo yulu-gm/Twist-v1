@@ -30,8 +30,6 @@ export type LayerName = keyof typeof LAYER_DEPTH;
 /** 区域类型 → 基础渲染颜色 */
 export function getZoneColor(zoneType: ZoneType): number {
   switch (zoneType) {
-    case ZoneType.Stockpile:
-      return 0x4dd0e1;
     case ZoneType.Growing:
       return 0x66bb6a;
     default:
@@ -42,12 +40,10 @@ export function getZoneColor(zoneType: ZoneType): number {
 /** 区域类型 → 中文显示名 */
 export function getZoneDisplayName(zoneType: ZoneType): string {
   switch (zoneType) {
-    case ZoneType.Stockpile:
-      return '存储区';
     case ZoneType.Growing:
       return '种植区';
     default:
-      return '存储区';
+      return '区域';
   }
 }
 

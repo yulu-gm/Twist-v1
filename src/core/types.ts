@@ -191,7 +191,6 @@ export enum JobState {
 // ── 区域类型枚举 ──
 /** 玩家可创建的区域类型 */
 export enum ZoneType {
-  Stockpile = "stockpile",
   Growing = "growing",
 }
 

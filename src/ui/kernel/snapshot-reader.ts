@@ -224,7 +224,7 @@ export function readEngineSnapshot(
     };
   }
 
-  // 格式化工具模式标签（如 "Select"、"Build: wall_wood"、"Zone: stockpile"）
+  // 格式化工具模式标签（如 "Select"、"Build: wall_wood"、"Zone: growing"）
   const activeModeLabel = formatToolModeLabel(
     presentation.activeTool,
     presentation.activeDesignationType,
@@ -297,7 +297,7 @@ function formatJobLabel(defId: string): string {
  * @param desType - 指派类型（可选）
  * @param buildDefId - 建筑定义 ID（可选）
  * @param zoneType - 区域类型（可选）
- * @returns 模式标签（如 'Select'、'Build: wall_wood'、'Zone: stockpile'）
+ * @returns 模式标签（如 'Select'、'Build: wall_wood'、'Zone: growing'）
  */
 function formatToolModeLabel(
   tool: string,

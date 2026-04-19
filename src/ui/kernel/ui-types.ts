@@ -49,7 +49,7 @@ export interface PresentationSnapshot {
   activeTool: string;
   /** 当前指派类型（mine/harvest/cut 等），仅 designate 工具有值 */
   activeDesignationType: string | null;
-  /** 当前区域类型（stockpile 等），仅 zone 工具有值 */
+  /** 当前区域类型（growing 等），仅 zone 工具有值 */
   activeZoneType: string | null;
   /** 当前建筑定义 ID，仅 build 工具有值 */
   activeBuildDefId: string | null;

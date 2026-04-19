@@ -18,7 +18,7 @@ function makeSnapshot(overrides: Partial<EngineSnapshot> = {}): EngineSnapshot {
     presentation: { activeTool: 'select', activeDesignationType: null, activeZoneType: null, activeBuildDefId: null, commandMenuPath: [], hoveredCell: null, selectedIds: [], showDebugPanel: false, showGrid: false },
     selection: { primaryId: null, selectedIds: [] },
     colonists: {},
-    build: { activeTool: 'select', activeDesignationType: null, activeZoneType: null, lastZoneType: 'stockpile', activeBuildDefId: null, activeModeLabel: 'Select' },
+    build: { activeTool: 'select', activeDesignationType: null, activeZoneType: null, lastZoneType: 'growing', activeBuildDefId: null, activeModeLabel: 'Select' },
     feedback: { recentEvents: [] },
     workOrders: { list: [], byId: {} },
     debugInfo: '',
@@ -144,7 +144,7 @@ describe('selectColonistInspector', () => {
               options: [
                 { kind: 'eat', label: '吃饭', status: 'active', detail: 'meal_simple', failureReasonText: null },
                 { kind: 'construct', label: '施工', status: 'blocked', detail: null, failureReasonText: '材料尚未送达' },
-                { kind: 'haul_to_stockpile', label: '搬运到储存区', status: 'deferred', detail: null, failureReasonText: null },
+                { kind: 'haul_to_storage', label: '搬运到仓库', status: 'deferred', detail: null, failureReasonText: null },
               ],
             },
           },
@@ -157,7 +157,7 @@ describe('selectColonistInspector', () => {
     expect(vm?.workQueue).toEqual([
       { label: '吃饭', tone: 'active', detail: '拾取（未开始）' },
       { label: '施工', tone: 'blocked', detail: '材料尚未送达' },
-      { label: '搬运到储存区', tone: 'deferred', detail: null },
+      { label: '搬运到仓库', tone: 'deferred', detail: null },
     ]);
   });
 });

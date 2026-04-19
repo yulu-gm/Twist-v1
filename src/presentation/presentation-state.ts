@@ -229,7 +229,7 @@ export function createPresentationState(): PresentationState {
     activeTool: ToolType.Select,
     activeDesignationType: null,
     activeZoneType: null,
-    lastZoneType: ZoneType.Stockpile,
+    lastZoneType: ZoneType.Growing,
     activeBuildDefId: null,
     showDebugPanel: false,
     showGrid: false,

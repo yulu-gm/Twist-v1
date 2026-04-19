@@ -147,12 +147,10 @@ export class ZoneRenderer {
 
   private resolveZoneColor(zoneType: string): number {
     switch (zoneType as ZoneType) {
-      case ZoneType.Stockpile:
-        return getZoneColor(ZoneType.Stockpile);
       case ZoneType.Growing:
         return getZoneColor(ZoneType.Growing);
       default:
-        return getZoneColor(ZoneType.Stockpile);
+        return getZoneColor(ZoneType.Growing);
     }
   }
 }

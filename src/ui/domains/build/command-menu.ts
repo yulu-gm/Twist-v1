@@ -69,6 +69,12 @@ const ROOT_COMMAND_MENU: CommandMenuNode[] = [
             kind: 'leaf',
             action: { id: 'build_bed', tool: 'build', label: '床', hotkey: '', buildDefId: 'bed_wood', group: 1 },
           },
+          {
+            id: 'build_warehouse',
+            label: '仓库',
+            kind: 'leaf',
+            action: { id: 'build_warehouse', tool: 'build', label: '仓库', hotkey: '', buildDefId: 'warehouse_shed', group: 1 },
+          },
         ],
       },
     ],
@@ -103,12 +109,6 @@ const ROOT_COMMAND_MENU: CommandMenuNode[] = [
     label: '区域',
     kind: 'branch',
     children: [
-      {
-        id: 'zone_stockpile',
-        label: '存储区',
-        kind: 'leaf',
-        action: { id: 'zone_stockpile', tool: 'zone', label: '存储区', hotkey: '', zoneType: 'stockpile', group: 3 },
-      },
       {
         id: 'zone_growing',
         label: '种植区',
@@ -173,7 +173,7 @@ export function resolveActiveCommandLeafId(state: ActiveToolState): string {
     return state.activeDesignationType ?? 'mine';
   }
   if (state.activeTool === 'zone') {
-    return state.activeZoneType === 'growing' ? 'zone_growing' : 'zone_stockpile';
+    return 'zone_growing';
   }
   return state.activeTool;
 }

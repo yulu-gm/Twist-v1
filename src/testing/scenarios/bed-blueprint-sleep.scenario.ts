@@ -7,6 +7,7 @@ import {
 import { ObjectKind } from '@core/types';
 import {
   setPawnRestFixture,
+  spawnBuildingFixture,
   spawnItemFixture,
   spawnPawnFixture,
 } from '../scenario-fixtures/world-fixtures';
@@ -25,6 +26,8 @@ const MATERIAL_CELLS = [
   { x: 10, y: 11 },
   { x: 10, y: 14 },
 ] as const;
+// stockpile 已下线 — 提供仓库收纳建造原料，pawn 完成入库后再去蓝图取材建造
+const WAREHOUSE_CELL = { x: 12, y: 11 } as const;
 const REST_TRIGGER_VALUE = 10;
 const REST_RECOVERY_VALUE = 60;
 
@@ -50,6 +53,7 @@ export const bedBlueprintSleepScenario = createScenario({
     spawnPawnFixture({ x: 9, y: 8 }, BUILDER_NAMES[0]),
     spawnPawnFixture({ x: 9, y: 14 }, BUILDER_NAMES[1]),
     ...BUILDER_NAMES.map((name) => setPawnRestFixture(name, 100)),
+    spawnBuildingFixture('warehouse_shed', WAREHOUSE_CELL),
     ...MATERIAL_CELLS.map((cell) => spawnItemFixture('wood', cell, 8)),
   ],
   script: [
