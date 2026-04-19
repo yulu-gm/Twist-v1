@@ -53,6 +53,13 @@ export interface PresentationSnapshot {
   activeZoneType: string | null;
   /** 当前建筑定义 ID，仅 build 工具有值 */
   activeBuildDefId: string | null;
+  /**
+   * 当前底部命令栏菜单路径
+   *
+   * `[]` 表示根层；其余按层级顺序保存分支节点 id。
+   * UI 渲染层和键盘输入层共享这份路径，避免状态漂移。
+   */
+  commandMenuPath: string[];
   /** 鼠标悬停的格子坐标 */
   hoveredCell: { x: number; y: number } | null;
   /** 当前选中的对象 ID 列表 */

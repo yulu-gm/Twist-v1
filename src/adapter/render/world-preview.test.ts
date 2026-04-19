@@ -96,6 +96,7 @@ function makePresentationState(): PresentationState {
     dragRect: null,
     zonePreview: null,
     backStack: [],
+    commandMenuPath: [],
   };
 }
 

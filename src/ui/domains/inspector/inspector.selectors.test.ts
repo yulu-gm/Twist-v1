@@ -34,6 +34,7 @@ function makeSnapshot(overrides: Partial<EngineSnapshot> = {}): EngineSnapshot {
       activeDesignationType: null,
       activeZoneType: null,
       activeBuildDefId: null,
+      commandMenuPath: [],
       hoveredCell: null,
       selectedIds: [],
       showDebugPanel: false,

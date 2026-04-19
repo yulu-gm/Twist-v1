@@ -89,6 +89,7 @@ function makePresentationState(selectedIds: ObjectId[] = []): PresentationState 
     dragRect: null,
     zonePreview: null,
     backStack: [],
+    commandMenuPath: [],
   };
 }
 

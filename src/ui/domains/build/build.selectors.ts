@@ -1,14 +1,15 @@
 /**
  * @file build.selectors.ts
- * @description 建造领域的选择器 — 从 EngineSnapshot 派生顶栏、建造摘要和当前工具 ID
- * @dependencies ui/kernel/ui-types — EngineSnapshot；build.types — BuildModeSummary,
- *               TopStatusBarViewModel；build.schemas — toolActions
+ * @description 建造领域的选择器 — 从 EngineSnapshot 派生顶栏数据和分层命令菜单视图模型
+ * @dependencies ui/kernel/ui-types — EngineSnapshot；build.types — TopStatusBarViewModel,
+ *               CommandMenuViewModel；command-menu — getVisibleCommandMenuEntries,
+ *               resolveActiveCommandLeafId
  * @part-of ui/domains/build — 建造 UI 领域
  */
 
 import type { EngineSnapshot } from '../../kernel/ui-types';
-import type { TopStatusBarViewModel } from './build.types';
-import { toolActions } from './build.schemas';
+import type { CommandMenuViewModel, TopStatusBarViewModel } from './build.types';
+import { getVisibleCommandMenuEntries, resolveActiveCommandLeafId } from './command-menu';
 
 /**
  * 选择顶部状态栏视图模型
@@ -26,35 +27,23 @@ export function selectTopStatusBar(snapshot: EngineSnapshot): TopStatusBarViewMo
 }
 
 /**
- * 选择当前激活的工具动作 ID — 用于高亮工具栏按钮
+ * 选择当前层级的命令菜单视图模型 — 由 ToolModeBar 和键盘绑定共同消费
  *
- * @param snapshot - 引擎快照
- * @returns 匹配的工具动作 ID（如 'select'、'mine'、'stockpile'），无匹配时默认 'select'
- *
- * 匹配逻辑：遍历 toolActions，比较 tool、designationType 和 zoneType，
- * designate/zone 类工具需同时匹配子类型才算命中
+ * 工作原理：
+ * 1. 用 PresentationState 中的工具切片推断激活叶子 id；
+ * 2. 用快照里的 commandMenuPath 解析当前可见层级；
+ * 3. 把激活叶子和它的祖先分支标记 active，渲染时自动高亮。
  */
-export function selectActiveToolId(snapshot: EngineSnapshot): string {
-  const tool = snapshot.presentation.activeTool;
-  const desType = snapshot.presentation.activeDesignationType;
-  const buildDefId = snapshot.presentation.activeBuildDefId;
-  const zoneType = snapshot.presentation.activeZoneType;
+export function selectCommandMenuViewModel(snapshot: EngineSnapshot): CommandMenuViewModel {
+  const activeLeafId = resolveActiveCommandLeafId({
+    activeTool: snapshot.presentation.activeTool,
+    activeDesignationType: snapshot.presentation.activeDesignationType,
+    activeBuildDefId: snapshot.presentation.activeBuildDefId,
+    activeZoneType: snapshot.presentation.activeZoneType,
+  });
 
-  // 遍历工具动作定义，找到与当前状态匹配的动作
-  for (const action of toolActions) {
-    if (action.tool === tool) {
-      // 菜单切换按钮不参与具体子项匹配
-      if (action.isZoneToggle || action.isBuildToggle) continue;
-      if (action.designationType) {
-        if (action.designationType === desType) return action.id;
-      } else if (action.buildDefId) {
-        if (action.buildDefId === buildDefId) return action.id;
-      } else if (action.zoneType) {
-        if (action.zoneType === zoneType) return action.id;
-      } else {
-        return action.id;
-      }
-    }
-  }
-  return 'select';
+  return {
+    path: snapshot.presentation.commandMenuPath,
+    entries: getVisibleCommandMenuEntries(snapshot.presentation.commandMenuPath, activeLeafId),
+  };
 }

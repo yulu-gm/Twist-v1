@@ -1,19 +1,69 @@
 /**
  * @file keyboard-bindings.ts
- * @description 键盘快捷键绑定 — 速度控制、工具切换、覆盖层切换、存档/读档、网格线
+ * @description 键盘快捷键绑定 — 速度控制、命令栏分层导航与动态字母快捷键、覆盖层切换、存档/读档、网格线
  * @part-of adapter/input
  */
 
 import Phaser from 'phaser';
 import { World } from '../../world/world';
-import { SimSpeed, DesignationType } from '../../core/types';
-import { PresentationState, ToolType, OverlayType, applyToolSelection } from '../../presentation/presentation-state';
+import { SimSpeed, DesignationType, ZoneType, DefId } from '../../core/types';
+import {
+  PresentationState,
+  ToolType,
+  OverlayType,
+  applyToolSelection,
+  popCommandMenuLevel,
+  resetCommandMenuPath,
+} from '../../presentation/presentation-state';
+import {
+  COMMAND_SHORTCUT_KEYS,
+  getVisibleCommandMenuEntries,
+  resolveActiveCommandLeafId,
+} from '../../ui/domains/build/command-menu';
+
+/**
+ * 在当前可见菜单层级中按快捷键触发对应条目
+ *
+ * - 分支条目：把 branchId 压入 commandMenuPath，进入下一层；
+ * - 叶子条目：通过 applyToolSelection 切换工具与子模式，菜单路径保持不变；
+ * - 返回条目（仅 Esc）：在 ESC 处理路径中已单独处理，这里跳过。
+ */
+function triggerVisibleEntryShortcut(
+  presentation: PresentationState,
+  shortcut: string,
+): void {
+  const activeLeafId = resolveActiveCommandLeafId({
+    activeTool: presentation.activeTool,
+    activeDesignationType: presentation.activeDesignationType,
+    activeBuildDefId: presentation.activeBuildDefId,
+    activeZoneType: presentation.activeZoneType,
+  });
+
+  const entries = getVisibleCommandMenuEntries(presentation.commandMenuPath, activeLeafId);
+  const entry = entries.find((candidate) => candidate.shortcut === shortcut);
+  if (!entry) return;
+
+  if (entry.kind === 'branch' && entry.branchId) {
+    presentation.commandMenuPath = [...presentation.commandMenuPath, entry.branchId];
+    return;
+  }
+
+  if (entry.kind === 'leaf' && entry.action) {
+    const action = entry.action;
+    applyToolSelection(presentation, {
+      tool: action.tool as ToolType,
+      designationType: (action.designationType ?? null) as DesignationType | null,
+      buildDefId: (action.buildDefId ?? null) as DefId | null,
+      zoneType: (action.zoneType ?? null) as ZoneType | null,
+    });
+  }
+}
 
 /**
  * 注册所有键盘快捷键
  *
  * - 速度控制: SPACE 暂停/恢复, 1/2/3 速度档
- * - 工具切换: ESC/Q 选择, B 建造, M 采矿, H 采集, X 砍伐, Z 区域, C 取消
+ * - 命令栏: ESC 优先退一级菜单（根层时切回选择工具），Z/X/C/V/B/N/M 按当前可见层级动态分配
  * - 覆盖层: F1 调试, F2 区域, F3 房间, F4 温度, F5 寻路
  * - 系统: F6 保存, F7 加载, F8 网格线
  */
@@ -42,41 +92,24 @@ export function setupKeyboardBindings(
     world.commandQueue.push({ type: 'set_speed', payload: { speed: SimSpeed.UltraFast } });
   });
 
-  // ── 工具快捷键 ──
-  // ESC: 回到选择工具并清空选中与预览
+  // ── 命令栏导航 ──
+  // ESC: 优先退一级菜单；如果已经在根层，则切回选择工具并清空选中与预览
   kb.on('keydown-ESC', () => {
+    if (popCommandMenuLevel(presentation)) {
+      return;
+    }
     applyToolSelection(presentation, { tool: ToolType.Select });
+    resetCommandMenuPath(presentation);
     presentation.placementPreview = null;
     presentation.selectedObjectIds.clear();
   });
-  // Q: 切换到选择工具，记录回退栈
-  kb.on('keydown-Q', () => {
-    applyToolSelection(presentation, { tool: ToolType.Select });
-  });
-  // B: 切换到建造工具，默认 wall_wood
-  kb.on('keydown-B', () => {
-    applyToolSelection(presentation, { tool: ToolType.Build, buildDefId: 'wall_wood' });
-  });
-  // M: 切换到指定工具（采矿）
-  kb.on('keydown-M', () => {
-    applyToolSelection(presentation, { tool: ToolType.Designate, designationType: DesignationType.Mine });
-  });
-  // H: 切换到指定工具（采集）
-  kb.on('keydown-H', () => {
-    applyToolSelection(presentation, { tool: ToolType.Designate, designationType: DesignationType.Harvest });
-  });
-  // X: 切换到指定工具（砍伐）
-  kb.on('keydown-X', () => {
-    applyToolSelection(presentation, { tool: ToolType.Designate, designationType: DesignationType.Cut });
-  });
-  // Z: 切换到区域工具，使用上次激活的区域类型
-  kb.on('keydown-Z', () => {
-    applyToolSelection(presentation, { tool: ToolType.Zone, zoneType: presentation.lastZoneType });
-  });
-  // C: 切换到取消工具
-  kb.on('keydown-C', () => {
-    applyToolSelection(presentation, { tool: ToolType.Cancel });
-  });
+
+  // Z/X/C/V/B/N/M: 按当前可见菜单层级动态触发条目
+  for (const key of COMMAND_SHORTCUT_KEYS) {
+    kb.on(`keydown-${key}`, () => {
+      triggerVisibleEntryShortcut(presentation, key);
+    });
+  }
 
   // ── 调试面板切换: F1 ──
   kb.on('keydown-F1', () => {

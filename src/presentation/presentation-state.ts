@@ -162,6 +162,17 @@ export interface PresentationState {
   zonePreview: ZonePreview | null;
   /** 右键返回导航栈 — 存储稳定交互状态快照，供 popBackNavigation 恢复 */
   backStack: PresentationBackEntry[];
+  /**
+   * 底部命令栏当前菜单路径
+   *
+   * - `[]` 表示根层
+   * - `['build']` 表示当前正在查看 `建造` 的下一层
+   * - `['build', 'furniture']` 表示当前正在查看 `建造 -> 家具` 的下一层
+   *
+   * 字符串为命令菜单 schema 中的节点 id，UI 渲染层和 Phaser 键盘输入层
+   * 共享同一份导航状态，避免组件本地 dropdown 状态导致的漂移。
+   */
+  commandMenuPath: string[];
 }
 
 /**
@@ -226,6 +237,8 @@ export function createPresentationState(): PresentationState {
     zonePreview: null,
     /** 初始返回栈为空 */
     backStack: [],
+    /** 初始命令菜单停留在根层 */
+    commandMenuPath: [],
   };
 }
 
@@ -382,4 +395,43 @@ export function popBackNavigation(presentation: PresentationState): boolean {
   presentation.selectedObjectIds = new Set(entry.selectedObjectIds);
 
   return true;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 命令菜单路径辅助函数
+// 这些函数是 PresentationState.commandMenuPath 的唯一写入入口，
+// UI 层（Preact）和输入层（Phaser 键盘绑定）都通过它们操作菜单导航，
+// 保证两侧不会出现状态漂移。
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * 进入指定分支节点的下一层菜单
+ *
+ * 仅追加层级，不重置工具激活状态。
+ */
+export function enterCommandMenuBranch(
+  presentation: PresentationState,
+  branchId: string,
+): void {
+  presentation.commandMenuPath = [...presentation.commandMenuPath, branchId];
+}
+
+/**
+ * 弹出命令菜单的最后一层
+ *
+ * @returns true 表示成功退一级；false 表示已经在根层、未发生变化
+ */
+export function popCommandMenuLevel(presentation: PresentationState): boolean {
+  if (presentation.commandMenuPath.length === 0) return false;
+  presentation.commandMenuPath = presentation.commandMenuPath.slice(0, -1);
+  return true;
+}
+
+/**
+ * 重置命令菜单路径到根层
+ *
+ * 不影响当前激活工具及其子模式。
+ */
+export function resetCommandMenuPath(presentation: PresentationState): void {
+  presentation.commandMenuPath = [];
 }

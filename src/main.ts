@@ -29,7 +29,14 @@ import type { World } from './world/world';
 // 导入共享的启动基础设施
 import { buildDefaultSystems, registerDefaultCommands } from './bootstrap/default-registrations';
 import type { PresentationState } from './presentation/presentation-state';
-import { ToolType, applyObjectSelection, applyToolSelection } from './presentation/presentation-state';
+import {
+  ToolType,
+  applyObjectSelection,
+  applyToolSelection,
+  enterCommandMenuBranch,
+  popCommandMenuLevel,
+  resetCommandMenuPath,
+} from './presentation/presentation-state';
 import type { UiPorts } from './ui/kernel/ui-ports';
 import type { DesignationType, ObjectId, ZoneType } from './core/types';
 
@@ -211,6 +218,15 @@ function createLazyPorts(world: World, getPresentation: () => PresentationState 
         zoneType: (zoneType ?? null) as ZoneType | null,
       });
     },
+    enterCommandMenu(branchId: string) {
+      enterCommandMenuBranch(pres(), branchId);
+    },
+    backCommandMenu() {
+      return popCommandMenuLevel(pres());
+    },
+    resetCommandMenu() {
+      resetCommandMenuPath(pres());
+    },
     jumpCameraTo(_cell: { x: number; y: number }) {
       // Will be wired to Phaser camera later
     },
@@ -282,7 +298,7 @@ async function boot(): Promise<void> {
       // 场景尚未创建，返回空快照
       return {
         tick: 0, speed: 0, clockDisplay: '', colonistCount: 0,
-        presentation: { activeTool: 'select', activeDesignationType: null, activeZoneType: null, activeBuildDefId: null, hoveredCell: null, selectedIds: [], showDebugPanel: false, showGrid: false },
+        presentation: { activeTool: 'select', activeDesignationType: null, activeZoneType: null, activeBuildDefId: null, commandMenuPath: [], hoveredCell: null, selectedIds: [], showDebugPanel: false, showGrid: false },
         selection: { primaryId: null, selectedIds: [] },
         colonists: {}, build: { activeTool: 'select', activeDesignationType: null, activeZoneType: null, lastZoneType: 'stockpile', activeBuildDefId: null, activeModeLabel: 'Select' },
         feedback: feedbackBuffer, debugInfo: '', objects: {},
