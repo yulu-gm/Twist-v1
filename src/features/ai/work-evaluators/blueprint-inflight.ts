@@ -38,8 +38,9 @@ export function getBlueprintMaterialInFlightCount(
 /**
  * 获取单个 pawn 当前搬运工作的计划数量
  *
- * 检查 pawn 是否正在执行 job_deliver_materials，且目标为指定蓝图。
- * 如果 pawn 已携带匹配材料则返回携带量；否则从 PickUp toil 推断计划拾取量。
+ * 检查 pawn 是否正在执行 job_deliver_materials / job_take_from_storage / job_deliver_carried_materials，
+ * 且目标为指定蓝图。如果 pawn 已携带匹配材料则返回携带量；
+ * 否则从 PickUp / TakeFromStorage toil 推断计划拾取量。
  *
  * @param pawn          - 要检查的 Pawn 对象
  * @param map           - 当前地图
@@ -54,7 +55,15 @@ function getDeliverJobPlannedCount(
   materialDefId: string,
 ): number {
   const job = pawn.ai.currentJob;
-  if (!job || job.defId !== 'job_deliver_materials') return 0;
+  if (!job) return 0;
+  // 三种会把材料送进同一蓝图的 job：传统 deliver_materials（仅历史路径）、
+  // 仓库取材 take_from_storage、以及把已携带材料就近送往蓝图的 deliver_carried_materials
+  const acceptableDefIds = new Set([
+    'job_deliver_materials',
+    'job_take_from_storage',
+    'job_deliver_carried_materials',
+  ]);
+  if (!acceptableDefIds.has(job.defId)) return 0;
   if (job.state === JobState.Done || job.state === JobState.Failed) return 0;
 
   const deliverToil = job.toils.find(toil => toil.type === ToilType.Deliver);
@@ -74,7 +83,25 @@ function getDeliverJobPlannedCount(
     return 0;
   }
 
-  // 从 PickUp toil 推断计划拾取量
+  // 从仓库取材（TakeFromStorage）toil 推断计划取量——优先于 PickUp
+  const takeToil = job.toils.find(toil => toil.type === ToilType.TakeFromStorage);
+  if (takeToil) {
+    if (takeToil.state === ToilState.Completed || takeToil.state === ToilState.Failed) {
+      // 取材结束但还没装到 carrying（极短窗口） → 此处按 0 处理避免双重计数
+      return 0;
+    }
+    const takeDefId = typeof takeToil.localData.defId === 'string'
+      ? takeToil.localData.defId
+      : null;
+    if (takeDefId && takeDefId !== materialDefId) return 0;
+    const requestedCount = Math.max(
+      0,
+      Math.floor((takeToil.localData.count as number) ?? (deliverToil.localData.count as number) ?? 0),
+    );
+    return requestedCount;
+  }
+
+  // 从 PickUp toil 推断计划拾取量（旧路径，仅在 carry/historical 用例中触发）
   const pickupToil = job.toils.find(toil => toil.type === ToilType.PickUp);
   if (!pickupToil || !pickupToil.targetId) return 0;
 

@@ -166,3 +166,47 @@ export function findReachableWarehouseForDeposit(
 
   return best;
 }
+
+/** 仓库取材候选 — 表示可被某个 pawn 选作取材目标的具体仓库及其交互点 */
+export interface WarehouseWithdrawalCandidate {
+  warehouse: Building;
+  approachCell: CellCoord;
+  availableCount: number;
+  distance: number;
+}
+
+/**
+ * 为材料型工作选择最近可达且确实库存了所需 defId 的仓库
+ * - 只看 building.storage.inventory[defId] > 0 的仓库
+ * - approachCell 取自 building.interaction.interactionCell；缺失则跳过
+ * - availableCount 截断为不超过 requestedCount，避免上层多算
+ */
+export function findReachableWarehouseForWithdrawal(
+  pawn: Pawn,
+  map: GameMap,
+  _world: World,
+  defId: DefId,
+  requestedCount: number,
+): WarehouseWithdrawalCandidate | null {
+  let best: WarehouseWithdrawalCandidate | null = null;
+
+  for (const building of map.objects.allOfKind(ObjectKind.Building)) {
+    const availableCount = building.storage?.inventory[defId] ?? 0;
+    if (availableCount <= 0) continue;
+    const approachCell = building.interaction?.interactionCell;
+    if (!approachCell) continue;
+    if (!isReachable(map, pawn.cell, approachCell)) continue;
+
+    const distance = estimateDistance(pawn.cell, approachCell);
+    if (!best || distance < best.distance) {
+      best = {
+        warehouse: building,
+        approachCell,
+        availableCount: Math.min(availableCount, requestedCount),
+        distance,
+      };
+    }
+  }
+
+  return best;
+}

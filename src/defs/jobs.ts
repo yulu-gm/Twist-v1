@@ -32,4 +32,8 @@ export const JOB_DEFS: JobDef[] = [
   { defId: 'job_goto', label: 'Go To', reportString: 'going to {target}', workType: 'personal' },
   /** 运送材料——将建筑所需材料运送到工地 */
   { defId: 'job_deliver_materials', label: 'Deliver Materials', reportString: 'delivering materials', workType: 'hauling' },
+  /** 入库——将地面物资搬入仓库抽象库存 */
+  { defId: 'job_store_in_storage', label: 'Store In Warehouse', reportString: 'storing {target}', workType: 'hauling' },
+  /** 取材——从仓库抽象库存取材后送往蓝图 */
+  { defId: 'job_take_from_storage', label: 'Take From Warehouse', reportString: 'taking material from warehouse', workType: 'hauling' },
 ];

@@ -4,9 +4,11 @@
  *              本评估器只接受由工作订单（orderKind='build'）派生的 Blueprint / ConstructionSite，
  *              其他渠道（programmatic place_blueprint）创建的 artifact 不在此被选中。
  *              严格优先级：高优先订单的 artifact 优先于低优先订单的 artifact，跨订单不再用距离比较。
+ *              材料来源已统一为仓库抽象库存——deliver_materials 不再读取地面 item，而是从最近可达的仓库取材。
  * @dependencies ai/work-evaluator.types — WorkEvaluator 接口；
  *               pathfinding — 距离估算和可达性检查；
  *               construction — 蓝图材料检查和占用检测；
+ *               storage/storage.service — 仓库取材目标查找；
  *               ai/jobs — 工作工厂函数；
  *               blueprint-inflight — 在途材料计算
  * @part-of AI 子系统（features/ai）
@@ -15,12 +17,12 @@
 import type { WorkEvaluator } from '../work-evaluator.types';
 import type { WorkEvaluation } from '../work-types';
 import type { Pawn } from '../../pawn/pawn.types';
-import type { Item } from '../../item/item.types';
 import type { GameMap } from '../../../world/game-map';
 import type { World } from '../../../world/world';
 import { ObjectKind, ToilType } from '../../../core/types';
-import { estimateDistance, isReachable } from '../../pathfinding/path.service';
-import { createHaulJob } from '../jobs/haul-job';
+import { estimateDistance } from '../../pathfinding/path.service';
+import { findReachableWarehouseForWithdrawal } from '../../storage/storage.service';
+import { createTakeFromStorageToBlueprintJob } from '../jobs/storage-job';
 import { createConstructJob } from '../jobs/construct-job';
 import {
   areBlueprintMaterialsDelivered,
@@ -94,16 +96,22 @@ function collectConstructionCandidates(map: GameMap, order: WorkOrder): Array<Bl
 }
 
 /**
- * 材料搬运评估器 — 只为订单内、尚未送齐材料的 Blueprint 寻找最近的材料源。
+ * 材料搬运评估器 — 只为订单内、尚未送齐材料的 Blueprint 寻找最近的仓库材料源。
  *
  * 评分公式：45 - distance * 0.5（仅在同一订单内的多个 blueprint 之间比较）
+ * 失败语义：
+ *   - 该订单内有缺料蓝图但没有任何仓库提供该材料 → no_storage_source
+ *   - 没有任何 build 订单或全部蓝图都已送齐 → no_target
  */
 export const deliverMaterialsWorkEvaluator: WorkEvaluator = {
   kind: 'deliver_materials',
   label: '运送材料',
   priority: 45,
   evaluate(pawn: Pawn, map: GameMap, world: World): WorkEvaluation {
-    const blocked = (code: 'no_target' | 'no_reachable_material_source', text: string): WorkEvaluation => ({
+    const blocked = (
+      code: 'no_target' | 'no_storage_source' | 'no_reachable_material_source',
+      text: string,
+    ): WorkEvaluation => ({
       kind: 'deliver_materials',
       label: '运送材料',
       priority: 45,
@@ -124,10 +132,11 @@ export const deliverMaterialsWorkEvaluator: WorkEvaluator = {
       if (candidates.length === 0) continue;
 
       let bestScore = -Infinity;
-      let bestCreateJob: (() => ReturnType<typeof createHaulJob>) | null = null;
+      let bestCreateJob: (() => ReturnType<typeof createTakeFromStorageToBlueprintJob>) | null = null;
       let bestDetail: string | null = null;
       let bestOrderId: string | null = null;
       let bestItemId: string | null = null;
+      let sawUndelivered = false;
 
       for (const cand of candidates) {
         const bp = cand.bp;
@@ -141,68 +150,61 @@ export const deliverMaterialsWorkEvaluator: WorkEvaluator = {
           const inFlightCount = getBlueprintMaterialInFlightCount(map, bp.id, matDefId);
           const needed = requiredCount - deliveredCount - inFlightCount;
           if (needed <= 0) continue;
+          sawUndelivered = true;
+
           const footprint = bp.footprint ?? DEFAULT_FOOTPRINT;
           const approachCell = findAdjacentPassableToFootprint(bp.cell, footprint, map);
           if (!approachCell) continue;
 
-          // 寻找距离最近的同类型物品
-          const items = map.objects.allOfKind(ObjectKind.Item);
-          let bestItem: Item | null = null;
-          let bestItemDist = Infinity;
+          // 在仓库库存中寻找最近可达的材料源
+          const candidateWarehouse = findReachableWarehouseForWithdrawal(
+            pawn,
+            map,
+            world,
+            matDefId,
+            needed,
+          );
+          if (!candidateWarehouse) continue;
 
-          for (const item of items) {
-            if (item.destroyed) continue;
-            if (item.defId !== matDefId) continue;
-            if (map.reservations.isReserved(item.id)) continue;
-            if (!isReachable(map, pawn.cell, item.cell) || !isReachable(map, item.cell, approachCell)) continue;
+          const haulCount = Math.min(
+            needed,
+            candidateWarehouse.availableCount,
+            pawn.inventory.carryCapacity,
+          );
+          if (haulCount <= 0) continue;
 
-            const haulCount = Math.min(item.stackCount, needed, pawn.inventory.carryCapacity);
-            if (haulCount <= 0) continue;
-
-            const d = estimateDistance(pawn.cell, item.cell);
-            if (d < bestItemDist) {
-              bestItemDist = d;
-              bestItem = item;
-            }
+          // 评分以仓库到 pawn 的距离为基准
+          const score = 45 - candidateWarehouse.distance * 0.5;
+          if (score > bestScore) {
+            bestScore = score;
+            bestDetail = bp.id;
+            bestOrderId = cand.orderId;
+            bestItemId = cand.itemId;
+            const warehouseId = candidateWarehouse.warehouse.id;
+            const warehouseApproach = { ...candidateWarehouse.approachCell };
+            const targetApproachCell = { ...approachCell };
+            const bpId = bp.id;
+            const defIdLocal = matDefId;
+            const countLocal = haulCount;
+            bestCreateJob = () => {
+              const job = createTakeFromStorageToBlueprintJob(
+                pawn.id,
+                warehouseId,
+                warehouseApproach,
+                defIdLocal,
+                countLocal,
+                bpId,
+                targetApproachCell,
+              );
+              // deliver_materials 仍然不直接 claim 订单 item，但写回引用便于追踪
+              if (bestOrderId && bestItemId) {
+                job.workOrderId = bestOrderId;
+                job.workOrderItemId = bestItemId;
+              }
+              return job;
+            };
           }
-
-          if (bestItem) {
-            const haulCount = Math.min(bestItem.stackCount, needed, pawn.inventory.carryCapacity);
-            if (haulCount <= 0) continue;
-
-            const score = 45 - bestItemDist * 0.5;
-            if (score > bestScore) {
-              bestScore = score;
-              bestDetail = bp.id;
-              bestOrderId = cand.orderId;
-              bestItemId = cand.itemId;
-              const itemId = bestItem.id;
-              const itemCell = { ...bestItem.cell };
-              const bpCell = { ...bp.cell };
-              const bpId = bp.id;
-              const count = haulCount;
-              const targetApproachCell = { ...approachCell };
-              bestCreateJob = () => {
-                const job = createHaulJob(
-                  pawn.id,
-                  itemId,
-                  itemCell,
-                  bpCell,
-                  count,
-                  bpId,
-                  { approachCell: targetApproachCell },
-                );
-                // deliver_materials job 不直接归属订单 item 的 claim（搬运是中间动作），
-                // 但仍写回 workOrderId/workOrderItemId 便于追踪与日后扩展
-                if (bestOrderId && bestItemId) {
-                  job.workOrderId = bestOrderId;
-                  job.workOrderItemId = bestItemId;
-                }
-                return job;
-              };
-            }
-            break; // 每个蓝图只检查一种缺少的材料
-          }
+          break; // 每个蓝图只挑一种缺少的材料
         }
       }
 
@@ -221,8 +223,12 @@ export const deliverMaterialsWorkEvaluator: WorkEvaluator = {
           createJob: createJobFn,
         };
       }
-      // 当前订单无可达材料源，按严格优先级仍不允许跨到下一订单 —— 直接报错
-      return blocked('no_reachable_material_source', '没有可达的材料来源');
+
+      // 该订单内确实有缺料蓝图，但仓库里没有可达的材料源 → 报告 no_storage_source
+      if (sawUndelivered) {
+        return blocked('no_storage_source', '没有可达的仓库提供所需材料');
+      }
+      // 否则订单内全部蓝图都已送齐——继续看下一个订单（这里属于"该订单已无活"）
     }
 
     return blocked('no_target', '没有可送材料的蓝图订单');
