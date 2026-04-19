@@ -10,7 +10,10 @@ import { buildDefDatabase } from '../../defs';
 import { createGameMap } from '../../world/game-map';
 import { createWorld } from '../../world/world';
 import { createPawn } from '../../features/pawn/pawn.factory';
-import { createPresentationState } from '../../presentation/presentation-state';
+import {
+  createPresentationState,
+  enterCommandMenuBranch,
+} from '../../presentation/presentation-state';
 import { readEngineSnapshot } from './snapshot-reader';
 
 describe('readEngineSnapshot work decision projection', () => {
@@ -139,5 +142,32 @@ describe('readEngineSnapshot object nodes', () => {
     expect(snapshot.objects[pawn.id]).toBeDefined();
     expect(snapshot.objects[pawn.id].kind).toBe('pawn');
     expect(snapshot.objects[pawn.id].label).toBe('Alice');
+  });
+});
+
+describe('readEngineSnapshot command menu projection', () => {
+  it('projects commandMenuPath into the presentation snapshot', () => {
+    const defs = buildDefDatabase();
+    const world = createWorld({ defs, seed: 7 });
+    const map = createGameMap({ id: 'main', width: 8, height: 8 });
+    const presentation = createPresentationState();
+    world.maps.set(map.id, map);
+
+    enterCommandMenuBranch(presentation, 'build');
+    enterCommandMenuBranch(presentation, 'structure');
+
+    const snapshot = readEngineSnapshot(world, map, presentation, { recentEvents: [] });
+    expect(snapshot.presentation.commandMenuPath).toEqual(['build', 'structure']);
+  });
+
+  it('projects empty commandMenuPath when at root level', () => {
+    const defs = buildDefDatabase();
+    const world = createWorld({ defs, seed: 7 });
+    const map = createGameMap({ id: 'main', width: 8, height: 8 });
+    const presentation = createPresentationState();
+    world.maps.set(map.id, map);
+
+    const snapshot = readEngineSnapshot(world, map, presentation, { recentEvents: [] });
+    expect(snapshot.presentation.commandMenuPath).toEqual([]);
   });
 });

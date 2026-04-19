@@ -240,6 +240,8 @@ export function readEngineSnapshot(
       activeDesignationType: presentation.activeDesignationType,
       activeZoneType: presentation.activeZoneType,
       activeBuildDefId: presentation.activeBuildDefId,
+      // 命令栏菜单路径以独立拷贝下发，确保快照不可变
+      commandMenuPath: [...presentation.commandMenuPath],
       hoveredCell: presentation.hoveredCell ? { x: presentation.hoveredCell.x, y: presentation.hoveredCell.y } : null,
       selectedIds,
       showDebugPanel: presentation.showDebugPanel,

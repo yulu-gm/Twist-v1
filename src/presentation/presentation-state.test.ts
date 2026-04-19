@@ -5,6 +5,9 @@ import {
   applyToolSelection,
   applyObjectSelection,
   popBackNavigation,
+  enterCommandMenuBranch,
+  popCommandMenuLevel,
+  resetCommandMenuPath,
 } from './presentation-state';
 
 describe('presentation-state back navigation', () => {
@@ -75,5 +78,40 @@ describe('presentation-state back navigation', () => {
     const result = popBackNavigation(p);
     expect(result).toBe(false);
     expect(p.hoveredCell).toBeNull();
+  });
+});
+
+describe('presentation-state command menu path', () => {
+  it('initializes commandMenuPath as empty array', () => {
+    const p = createPresentationState();
+    expect(p.commandMenuPath).toEqual([]);
+  });
+
+  it('pushes and pops command menu path levels independently from tool backStack', () => {
+    const p = createPresentationState();
+
+    enterCommandMenuBranch(p, 'build');
+    enterCommandMenuBranch(p, 'furniture');
+    expect(p.commandMenuPath).toEqual(['build', 'furniture']);
+
+    expect(popCommandMenuLevel(p)).toBe(true);
+    expect(p.commandMenuPath).toEqual(['build']);
+    expect(popCommandMenuLevel(p)).toBe(true);
+    expect(p.commandMenuPath).toEqual([]);
+    expect(popCommandMenuLevel(p)).toBe(false);
+  });
+
+  it('resets command menu path without touching active tool fields', () => {
+    const p = createPresentationState();
+    p.activeTool = ToolType.Build;
+    p.activeBuildDefId = 'wall_wood';
+    enterCommandMenuBranch(p, 'build');
+    enterCommandMenuBranch(p, 'structure');
+
+    resetCommandMenuPath(p);
+
+    expect(p.commandMenuPath).toEqual([]);
+    expect(p.activeTool).toBe(ToolType.Build);
+    expect(p.activeBuildDefId).toBe('wall_wood');
   });
 });

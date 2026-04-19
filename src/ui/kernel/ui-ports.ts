@@ -30,6 +30,24 @@ export interface UiPorts {
   selectColonist(id: string): void;
   /** 切换工具，可选附带指派类型、建筑定义 ID 和区域类型 */
   setTool(tool: string, designationType?: string | null, buildDefId?: string | null, zoneType?: string | null): void;
+  /**
+   * 进入指定分支节点的下一层菜单
+   *
+   * 仅追加 commandMenuPath，不会激活工具；UI 层与键盘输入层共享。
+   */
+  enterCommandMenu(branchId: string): void;
+  /**
+   * 弹出命令菜单的最后一层
+   *
+   * @returns true 表示成功退一级；false 表示已经在根层
+   */
+  backCommandMenu(): boolean;
+  /**
+   * 重置命令菜单路径到根层
+   *
+   * 不影响当前激活工具及其子模式。
+   */
+  resetCommandMenu(): void;
   /** 跳转摄像机到指定格子（待接入 Phaser 摄像机） */
   jumpCameraTo(cell: { x: number; y: number }): void;
   /** 指派床位所有者 */
