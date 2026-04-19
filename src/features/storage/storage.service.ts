@@ -8,9 +8,14 @@
  * @part-of features/storage 仓库存储功能模块
  */
 
-import type { DefId } from '../../core/types';
+import type { CellCoord, DefId } from '../../core/types';
+import { ObjectKind } from '../../core/types';
 import type { Building } from '../building/building.types';
+import type { Pawn } from '../pawn/pawn.types';
+import type { GameMap } from '../../world/game-map';
+import type { World } from '../../world/world';
 import type { DefDatabase } from '../../world/def-database';
+import { estimateDistance, isReachable } from '../pathfinding/path.service';
 
 /**
  * 判断仓库是否能接收指定物品
@@ -113,4 +118,51 @@ export function summarizeWarehouseInventory(
     typeCount: entries.length,
     entries,
   };
+}
+
+// ── 仓库目标查找（AI 选址用） ──
+
+/** 仓库入库候选 — 表示可被某个 pawn 选作入库目标的具体仓库及其交互点 */
+export interface WarehouseDepositCandidate {
+  warehouse: Building;
+  approachCell: CellCoord;
+  freeCapacity: number;
+  distance: number;
+}
+
+/**
+ * 为入库工作选择最近可达且仍有容量的仓库
+ * - 仅考虑挂载 'all-haulable' 存储组件且能接收该 defId 的仓库
+ * - approachCell 取自 building.interaction.interactionCell；缺失则跳过
+ * - freeCapacity 截断为不超过 requestedCount，避免上层多算
+ */
+export function findReachableWarehouseForDeposit(
+  pawn: Pawn,
+  map: GameMap,
+  world: World,
+  defId: DefId,
+  requestedCount: number,
+): WarehouseDepositCandidate | null {
+  let best: WarehouseDepositCandidate | null = null;
+
+  for (const building of map.objects.allOfKind(ObjectKind.Building)) {
+    if (!canWarehouseAcceptItem(building, world.defs, defId)) continue;
+    const freeCapacity = getWarehouseFreeCapacity(building);
+    if (freeCapacity <= 0) continue;
+    const approachCell = building.interaction?.interactionCell;
+    if (!approachCell) continue;
+    if (!isReachable(map, pawn.cell, approachCell)) continue;
+
+    const distance = estimateDistance(pawn.cell, approachCell);
+    if (!best || distance < best.distance) {
+      best = {
+        warehouse: building,
+        approachCell,
+        freeCapacity: Math.min(freeCapacity, requestedCount),
+        distance,
+      };
+    }
+  }
+
+  return best;
 }

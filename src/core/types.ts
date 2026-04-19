@@ -166,6 +166,8 @@ export enum ToilType {
   Deliver = "deliver",
   Interact = "interact",
   PrepareConstruction = "prepare_construction",
+  StoreInStorage = "store_in_storage",
+  TakeFromStorage = "take_from_storage",
 }
 
 /** 劳动步骤的执行状态 */

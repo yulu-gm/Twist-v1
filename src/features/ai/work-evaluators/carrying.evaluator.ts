@@ -42,7 +42,7 @@ export const resolveCarryingWorkEvaluator: WorkEvaluator = {
       label: '处理携带物',
       priority: 20,
       score: -1,
-      failureReasonCode: 'no_stockpile_destination',
+      failureReasonCode: 'no_storage_destination',
       failureReasonText: '当前携带物没有合法放置目标',
       detail: null,
       jobDefId: null,

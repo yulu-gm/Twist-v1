@@ -5,15 +5,15 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { ZoneType, cellKey } from '../../../core/types';
 import { buildDefDatabase } from '../../../defs';
 import { createGameMap } from '../../../world/game-map';
 import { createWorld } from '../../../world/world';
 import { createItem } from '../../item/item.factory';
 import { createPawn } from '../../pawn/pawn.factory';
+import { createBuilding } from '../../building/building.factory';
 import { eatWorkEvaluator, sleepWorkEvaluator } from './needs.evaluator';
 import { wanderWorkEvaluator } from './wander.evaluator';
-import { haulToStockpileWorkEvaluator } from './hauling.evaluator';
+import { haulToStorageWorkEvaluator } from './hauling.evaluator';
 import { constructWorkEvaluator } from './construction.evaluator';
 
 /** 创建标准测试环境 */
@@ -48,14 +48,19 @@ function createTestPawn(
   return pawn;
 }
 
-/** 在指定格子上添加单格存储区 */
-function addStockpile(map: ReturnType<typeof createGameMap>, cell: { x: number; y: number }) {
-  map.zones.add({
-    id: `zone_stockpile_${cellKey(cell)}`,
-    zoneType: ZoneType.Stockpile,
-    cells: new Set([cellKey(cell)]),
-    config: { stockpile: { allowAllHaulable: true, allowedDefIds: new Set() } },
+/** 在指定格子上添加仓库建筑 */
+function addWarehouse(
+  env: ReturnType<typeof createTestEnv>,
+  cell: { x: number; y: number },
+) {
+  const warehouse = createBuilding({
+    defId: 'warehouse_shed',
+    cell,
+    mapId: env.map.id,
+    defs: env.defs,
   });
+  env.map.objects.add(warehouse);
+  return warehouse;
 }
 
 // ── Eat Evaluator ──
@@ -231,40 +236,54 @@ describe('wanderWorkEvaluator', () => {
   });
 });
 
-// ── Haul To Stockpile Evaluator ──
+// ── Haul To Storage Evaluator ──
 
-describe('haulToStockpileWorkEvaluator', () => {
-  it('returns available when haulable item and stockpile exist', () => {
+describe('haulToStorageWorkEvaluator', () => {
+  it('returns haul_to_storage when haulable item and warehouse both exist', () => {
     const env = createTestEnv();
     const pawn = createTestPawn(env);
     env.map.objects.add(createItem({ defId: 'wood', cell: { x: 3, y: 5 }, mapId: env.map.id, stackCount: 5, defs: env.defs }));
-    addStockpile(env.map, { x: 10, y: 5 });
+    addWarehouse(env, { x: 10, y: 5 });
 
-    const result = haulToStockpileWorkEvaluator.evaluate(pawn, env.map, env.world);
+    const result = haulToStorageWorkEvaluator.evaluate(pawn, env.map, env.world);
+
+    expect(result.kind).toBe('haul_to_storage');
     expect(result.failureReasonCode).toBe('none');
+    expect(result.jobDefId).toBe('job_store_in_storage');
     expect(result.createJob).not.toBeNull();
-    expect(result.kind).toBe('haul_to_stockpile');
-    expect(result.label).toBe('搬运到储存区');
+    expect(result.label).toBe('搬运入库');
   });
 
-  it('returns blocked no_target when no haulable items', () => {
+  it('returns no_target when no haulable items', () => {
     const env = createTestEnv();
     const pawn = createTestPawn(env);
-    addStockpile(env.map, { x: 10, y: 5 });
+    addWarehouse(env, { x: 10, y: 5 });
 
-    const result = haulToStockpileWorkEvaluator.evaluate(pawn, env.map, env.world);
+    const result = haulToStorageWorkEvaluator.evaluate(pawn, env.map, env.world);
     expect(result.failureReasonCode).toBe('no_target');
     expect(result.createJob).toBeNull();
   });
 
-  it('returns blocked no_target when items exist but no stockpile', () => {
+  it('returns no_target when items exist but no warehouse', () => {
     const env = createTestEnv();
     const pawn = createTestPawn(env);
     env.map.objects.add(createItem({ defId: 'wood', cell: { x: 3, y: 5 }, mapId: env.map.id, stackCount: 5, defs: env.defs }));
 
-    const result = haulToStockpileWorkEvaluator.evaluate(pawn, env.map, env.world);
-    // 无存储区时搬运路径不成立，评估器将其视为 no_target
+    const result = haulToStorageWorkEvaluator.evaluate(pawn, env.map, env.world);
     expect(result.failureReasonCode).toBe('no_target');
+    expect(result.createJob).toBeNull();
+  });
+
+  it('returns no_storage_destination when warehouse is full', () => {
+    const env = createTestEnv();
+    const pawn = createTestPawn(env);
+    env.map.objects.add(createItem({ defId: 'wood', cell: { x: 3, y: 5 }, mapId: env.map.id, stackCount: 5, defs: env.defs }));
+    const warehouse = addWarehouse(env, { x: 10, y: 5 });
+    warehouse.storage!.storedCount = warehouse.storage!.capacityMax;
+    warehouse.storage!.inventory = { wood: warehouse.storage!.capacityMax };
+
+    const result = haulToStorageWorkEvaluator.evaluate(pawn, env.map, env.world);
+    expect(result.failureReasonCode).toBe('no_storage_destination');
     expect(result.createJob).toBeNull();
   });
 });
