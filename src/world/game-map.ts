@@ -15,6 +15,7 @@ import { ZoneManager } from './zone-manager';
 import { RoomGraph } from './room-graph';
 import { ReservationTable } from './reservation-table';
 import { PathGrid } from './path-grid';
+import { WorkOrderStore } from '../features/work-orders/work-order.types';
 
 // ── Re-exports（保持现有 import 路径兼容） ──
 export type { Zone } from './zone-manager';
@@ -24,6 +25,7 @@ export { RoomGraph } from './room-graph';
 export type { Reservation } from './reservation-table';
 export { ReservationTable } from './reservation-table';
 export { PathGrid } from './path-grid';
+export { WorkOrderStore } from '../features/work-orders/work-order.types';
 
 // ── 游戏地图 ──
 /** GameMap 是单个地图的完整数据结构，包含地形、对象、区域、房间等所有子系统 */
@@ -52,6 +54,8 @@ export interface GameMap {
   temperature: Grid<number>;
   /** 美观度网格（每格的美观度值） */
   beauty: Grid<number>;
+  /** 工作订单存储（玩家下达的长效工作意图，按优先级排序） */
+  workOrders: WorkOrderStore;
 }
 
 /**
@@ -87,5 +91,6 @@ export function createGameMap(config: { id: MapId; width: number; height: number
     pathGrid: new PathGrid(width, height),
     temperature: new Grid<number>(width, height, 20),
     beauty: new Grid<number>(width, height, 0),
+    workOrders: new WorkOrderStore(),
   };
 }

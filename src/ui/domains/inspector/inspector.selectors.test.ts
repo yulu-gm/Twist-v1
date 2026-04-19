@@ -53,6 +53,7 @@ function makeSnapshot(overrides: Partial<EngineSnapshot> = {}): EngineSnapshot {
       activeModeLabel: 'Select',
     },
     feedback: { recentEvents: [] },
+    workOrders: { list: [], byId: {} },
     debugInfo: '',
     ...overrides,
   };

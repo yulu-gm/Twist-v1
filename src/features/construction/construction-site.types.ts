@@ -12,6 +12,7 @@ import {
 /**
  * 施工工地接口 —— 蓝图材料齐全后转换而来
  * 棋子（Pawn）对其执行建造工作，进度达到 1.0 后转换为最终建筑
+ * 由工作订单派生时会回填 workOrderId / workOrderItemId 以便溯源/完成时回写。
  */
 export interface ConstructionSite extends MapObjectBase {
   /** 对象类型标识：施工工地 */
@@ -26,6 +27,10 @@ export interface ConstructionSite extends MapObjectBase {
   totalWorkAmount: number;
   /** 已完成的工作量 */
   workDone: number;
+  /** 派生该工地的工作订单 ID（可选；从蓝图升级时拷贝） */
+  workOrderId?: string;
+  /** 派生该工地的订单 item ID（可选；从蓝图升级时拷贝） */
+  workOrderItemId?: string;
 }
 
 // ── KindMap 类型注册 ──

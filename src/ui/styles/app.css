@@ -555,3 +555,435 @@
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+/* ── Work Order Board ── */
+
+.work-order-board {
+  position: absolute;
+  left: 10px;
+  top: 250px;
+  width: 320px;
+  max-height: calc(100vh - 320px);
+  overflow-y: auto;
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 标题条按钮 — 始终可见，整条可点击触发折叠 */
+.work-order-board__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: none;
+  border: none;
+  text-align: left;
+  width: 100%;
+  font-family: var(--font-family);
+  font-size: var(--font-size);
+  font-weight: bold;
+  color: var(--text-color);
+  cursor: pointer;
+  border-bottom: 1px solid var(--panel-border);
+  transition: background 120ms ease;
+}
+
+.work-order-board__header:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* 雪佛龙 — 收起态指向右侧（▸），展开态向下（▾） */
+.work-order-board__chevron {
+  display: inline-block;
+  width: 10px;
+  font-size: 10px;
+  color: var(--text-muted);
+  transform: rotate(-90deg);
+  transition: transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.work-order-board__header.is-expanded .work-order-board__chevron {
+  transform: rotate(0deg);
+}
+
+/* 计数徽章 — 仅当 rows.length > 0 时由组件渲染 */
+.work-order-board__count {
+  margin-left: auto;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 列表 + detail 容器 — 受 expanded 控制的折叠区 */
+.work-order-board__body {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition:
+    max-height 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.work-order-board__body.is-expanded {
+  max-height: 60vh;
+  opacity: 1;
+}
+
+.work-order-board__empty {
+  padding: 18px 4px;
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  font-style: italic;
+  text-align: center;
+}
+
+.work-order-board__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* 单行容器：相对定位以承载 selected 左侧强调条 */
+.work-order-row {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  border-radius: 4px;
+  max-height: 80px; /* 用于退出动画收 0 */
+  opacity: 1;
+  transition:
+    background 120ms ease,
+    transform 120ms ease,
+    opacity 240ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    max-height 240ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    color 200ms ease;
+  /* 进入动画：通过 animation 单独触发 */
+  animation: wo-row-enter 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes wo-row-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.work-order-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+  transform: translateX(1px);
+}
+
+/* 选中行：左侧 3px accent 条 + 浅色 accent 背景 */
+.work-order-row.is-selected {
+  background: rgba(74, 144, 217, 0.12);
+}
+
+.work-order-row.is-selected::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+/* 完成态：标题划线 + 整行灰化，优先级位置由组件渲染为 ✓ */
+.work-order-row--completing {
+  color: var(--text-muted);
+}
+
+.work-order-row--completing .work-order-row__title {
+  position: relative;
+  color: var(--text-muted);
+}
+
+.work-order-row--completing .work-order-row__title::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  height: 1px;
+  width: 100%;
+  background: currentColor;
+  transform-origin: left center;
+  animation: wo-row-strike 200ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+@keyframes wo-row-strike {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+.work-order-row--completing .work-order-row__priority {
+  color: #2e7d32;
+  background: rgba(46, 125, 50, 0.12);
+}
+
+/* 退出态：淡出 + 高度收 0，pointer-events 关闭防止误点 */
+.work-order-row--exiting {
+  opacity: 0;
+  max-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.work-order-row__main {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  background: none;
+  border: none;
+  text-align: left;
+  font-family: var(--font-family);
+  color: inherit;
+  cursor: pointer;
+  min-width: 0; /* 允许内部 title 截断 */
+}
+
+.work-order-row__handle {
+  align-self: center;
+  width: 10px;
+  color: var(--text-muted);
+  font-size: 10px;
+  letter-spacing: -1px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+  user-select: none;
+}
+
+.work-order-row:hover .work-order-row__handle,
+.work-order-row.is-selected .work-order-row__handle {
+  opacity: 0.5;
+}
+
+.work-order-row__priority {
+  align-self: center;
+  min-width: 18px;
+  padding: 2px 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  transition: background 200ms ease, color 200ms ease;
+}
+
+/* prefers-reduced-motion: 关闭所有过渡与动画 */
+@media (prefers-reduced-motion: reduce) {
+  .work-order-board__chevron,
+  .work-order-board__body,
+  .work-order-row,
+  .work-order-row__priority {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+  }
+  .work-order-row--completing .work-order-row__title::after {
+    animation: none !important;
+    transform: scaleX(1);
+  }
+}
+
+.work-order-row__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.work-order-row__title {
+  font-size: var(--font-size);
+  font-weight: 600;
+  color: var(--text-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.work-order-row__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.work-order-row__progress,
+.work-order-row__workers {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 行操作区：默认隐藏，行 hover 或选中时浮现 */
+.work-order-row__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.work-order-row:hover .work-order-row__actions,
+.work-order-row.is-selected .work-order-row__actions {
+  opacity: 1;
+}
+
+.work-order-row__btn {
+  padding: 3px 8px;
+  border-radius: 3px;
+  font-family: var(--font-family);
+  font-size: 10px;
+  color: var(--text-color);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--panel-border);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.work-order-row__btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.work-order-row__btn--danger:hover:not(:disabled) {
+  background: rgba(217, 74, 74, 0.18);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.work-order-row__btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ── Work Order Status / Source Pills ── */
+
+.work-order-pill {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  line-height: 1.4;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-muted);
+}
+
+.work-order-pill--source-map {
+  background: rgba(74, 144, 217, 0.14);
+  color: var(--accent-hover);
+}
+
+.work-order-pill--source-result {
+  background: rgba(180, 130, 60, 0.18);
+  color: #d8a466;
+}
+
+.work-order-pill--status-active {
+  background: rgba(74, 144, 217, 0.18);
+  color: var(--accent-hover);
+}
+
+.work-order-pill--status-pending {
+  background: rgba(160, 160, 160, 0.16);
+  color: var(--text-muted);
+}
+
+.work-order-pill--status-paused {
+  background: rgba(217, 165, 64, 0.16);
+  color: #d8b066;
+}
+
+.work-order-pill--status-blocked {
+  background: rgba(217, 74, 74, 0.18);
+  color: var(--danger);
+}
+
+.work-order-pill--status-done {
+  background: rgba(68, 204, 68, 0.16);
+  color: var(--success);
+}
+
+.work-order-pill--status-cancelled {
+  background: rgba(140, 140, 140, 0.18);
+  color: var(--text-muted);
+}
+
+/* ── Work Order Detail (inline panel) ── */
+
+.work-order-detail {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--panel-border);
+}
+
+.work-order-detail__title {
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.work-order-detail__empty {
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  font-style: italic;
+  padding: 4px 0;
+}
+
+.work-order-detail__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.work-order-detail__item {
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.work-order-detail__item-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.work-order-detail__stage {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.work-order-detail__claim {
+  margin-top: 4px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* item 状态 pill — 复用 status pill 的色调风格 */
+.work-order-pill--item-open { background: rgba(160, 160, 160, 0.16); color: var(--text-muted); }
+.work-order-pill--item-claimed { background: rgba(160, 160, 160, 0.20); color: var(--text-color); }
+.work-order-pill--item-working { background: rgba(74, 144, 217, 0.18); color: var(--accent-hover); }
+.work-order-pill--item-blocked { background: rgba(217, 74, 74, 0.18); color: var(--danger); }
+.work-order-pill--item-done { background: rgba(68, 204, 68, 0.16); color: var(--success); }
+.work-order-pill--item-invalid { background: rgba(140, 140, 140, 0.18); color: var(--text-muted); }

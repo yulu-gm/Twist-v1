@@ -46,6 +46,10 @@ export interface Job {
   reservations: string[];
   /** 工作整体状态：Starting / Active / Done / Failed */
   state: JobState;
+  /** 若该 Job 由工作订单派生，记录订单 ID，便于完成时回写 */
+  workOrderId?: string;
+  /** 若该 Job 由工作订单派生，记录订单项 ID，便于完成时回写 */
+  workOrderItemId?: string;
 }
 
 // 为方便使用，重新导出枚举

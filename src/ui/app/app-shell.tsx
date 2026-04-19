@@ -26,6 +26,10 @@ import { activateToolAction } from '../domains/build/build.intents';
 import { selectCommandFeedback, selectDebugInfo, selectShowDebugPanel } from '../domains/feedback/feedback.selectors';
 import { ToastStack } from '../domains/feedback/components/toast-stack';
 import { DebugPanel } from '../domains/feedback/components/debug-panel';
+import { selectWorkOrderBoard } from '../domains/work-orders/work-order.selectors';
+import { WorkOrderBoard } from '../domains/work-orders/components/work-order-board';
+import { useCompletionTracker } from '../domains/work-orders/use-completion-tracker';
+import { useCollapseState } from '../domains/work-orders/use-collapse-state';
 
 /** AppShell 组件属性 — 所有数据和回调从 AppRoot 注入 */
 interface AppShellProps {
@@ -93,6 +97,10 @@ export function AppShell({ snapshot, uiState, dispatch, ports }: AppShellProps) 
   const feedback = selectCommandFeedback(snapshot);
   const debugInfo = selectDebugInfo(snapshot);
   const showDebug = selectShowDebugPanel(snapshot);
+  // 工单看板 — 先跟踪完成淡出窗口，再投影视图模型，再决定折叠状态
+  const completion = useCompletionTracker(snapshot.workOrders.list);
+  const workOrderBoard = selectWorkOrderBoard(snapshot, uiState, completion);
+  const collapse = useCollapseState(workOrderBoard.suggestedExpanded);
 
   return (
     <div class="app-shell" data-testid="app-shell">
@@ -104,6 +112,17 @@ export function AppShell({ snapshot, uiState, dispatch, ports }: AppShellProps) 
         rows={rosterRows}
         activeId={snapshot.selection.primaryId}
         onSelect={(id) => ports.selectColonist(id)}
+      />
+      <WorkOrderBoard
+        rows={workOrderBoard.rows}
+        selectedOrderId={workOrderBoard.selectedOrderId}
+        detail={workOrderBoard.detail}
+        expanded={collapse.expanded}
+        onToggle={collapse.toggle}
+        onSelect={(orderId) => dispatch({ type: 'set_inspector_target', targetId: orderId })}
+        onPause={(orderId) => ports.pauseWorkOrder(orderId)}
+        onResume={(orderId) => ports.resumeWorkOrder(orderId)}
+        onCancel={(orderId) => ports.cancelWorkOrder(orderId)}
       />
       {objectInspector && (
         <ObjectInspector

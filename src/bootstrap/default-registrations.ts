@@ -20,6 +20,7 @@ import { jobSelectionSystem } from '../features/ai/job-selector';
 import { growPlantsSystem } from '../features/plant/plant.system';
 import { constructionProgressSystem } from '../features/construction/construction.system';
 import { workGenerationSystem } from '../features/designation/designation.system';
+import { workOrderSystem } from '../features/work-orders/work-order.system';
 import { roomRebuildSystem } from '../features/room/room.system';
 import { buildingTickSystem } from '../features/building/building.systems';
 import { releaseMissingTargetReservations } from '../features/reservation/reservation.cleanup';
@@ -31,6 +32,7 @@ import { pawnCommandHandlers } from '../features/pawn/pawn.commands';
 import { zoneCommandHandlers } from '../features/zone/zone.commands';
 import { saveCommandHandlers } from '../features/save/save.commands';
 import { buildingCommandHandlers } from '../features/building/building.commands';
+import { workOrderCommandHandlers } from '../features/work-orders/work-order.commands';
 import { createItem } from '../features/item/item.factory';
 
 /**
@@ -63,6 +65,8 @@ export function buildDefaultSystems(): SystemRegistration[] {
 
   // 阶段 1：工作生成
   systems.push(workGenerationSystem);
+  // 工作订单维护：每 tick 推进订单状态、检测目标失效
+  systems.push(workOrderSystem);
 
   // 阶段 2：AI 决策
   systems.push(jobSelectionSystem);
@@ -200,4 +204,5 @@ export function registerDefaultCommands(world: World): void {
   world.commandBus.registerAll(zoneCommandHandlers);
   world.commandBus.registerAll(saveCommandHandlers);
   world.commandBus.registerAll(buildingCommandHandlers);
+  world.commandBus.registerAll(workOrderCommandHandlers);
 }

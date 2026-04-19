@@ -11,7 +11,7 @@ import { createGameMap } from '../../world/game-map';
 import { createWorld } from '../../world/world';
 import { createItem } from '../item/item.factory';
 import { createPawn } from '../pawn/pawn.factory';
-import { placeBlueprintHandler } from '../construction/construction.commands';
+import { createMapWorkOrderHandler } from '../work-orders/work-order.commands';
 import { jobSelectionSystem } from './job-selector';
 
 describe('job selector work reasons', () => {
@@ -30,9 +30,15 @@ describe('job selector work reasons', () => {
     });
     map.objects.add(pawn);
 
-    placeBlueprintHandler.execute(world, {
-      type: 'place_blueprint',
-      payload: { defId: 'wall_wood', cell: { x: 8, y: 2 }, mapId: map.id },
+    // 通过 build 工作订单创建蓝图（evaluator 现在只接受订单派生的 artifact）
+    createMapWorkOrderHandler.execute(world, {
+      type: 'create_map_work_order',
+      payload: {
+        mapId: map.id,
+        orderKind: 'build',
+        title: '建墙',
+        items: [{ targetRef: { kind: 'cell', cell: { x: 8, y: 2 }, defId: 'wall_wood' } }],
+      },
     } as any);
 
     map.objects.add(createItem({

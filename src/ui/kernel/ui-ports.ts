@@ -54,4 +54,14 @@ export interface UiPorts {
   assignBedOwner(bedId: string, pawnId: string): void;
   /** 清除床位所有者 */
   clearBedOwner(bedId: string): void;
+  /** 暂停指定工作订单 */
+  pauseWorkOrder(orderId: string): void;
+  /** 恢复指定工作订单 */
+  resumeWorkOrder(orderId: string): void;
+  /** 取消指定工作订单 */
+  cancelWorkOrder(orderId: string): void;
+  /** 重排订单优先级 — orderIds 顺序即新的 priorityIndex 顺序 */
+  reorderWorkOrders(orderIds: string[]): void;
+  /** 创建结果来源订单（工作台/原型 UI 触发） */
+  createResultWorkOrder(payload: { orderKind: string; title: string; items: Array<Record<string, unknown>> }): void;
 }

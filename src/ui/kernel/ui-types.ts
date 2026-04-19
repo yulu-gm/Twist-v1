@@ -293,6 +293,65 @@ export interface FeedbackSnapshot {
   recentEvents: Array<{ type: string; tick: number; summary: string }>;
 }
 
+// ── 工作订单快照 ──
+
+/**
+ * 工作订单 item 节点 — UI 看板/详情面板使用的只读 item 数据
+ */
+export interface WorkOrderItemNode {
+  /** Item 唯一标识 */
+  id: string;
+  /** Item 当前状态 */
+  status: 'open' | 'claimed' | 'working' | 'blocked' | 'done' | 'invalid';
+  /** 当前推进到的工序阶段（无则 null） */
+  currentStage: string | null;
+  /** 已领取该 item 的 pawn ID（无则 null） */
+  claimedByPawnId: string | null;
+  /** blocked / invalid 原因（无则 null） */
+  blockedReason: string | null;
+}
+
+/**
+ * 工作订单节点 — UI 看板使用的单个订单只读投影
+ */
+export interface WorkOrderNode {
+  /** 订单唯一标识 */
+  id: string;
+  /** 显示标题 */
+  title: string;
+  /** 订单子类（mine/haul/craft 等） */
+  orderKind: string;
+  /** 订单来源（map/result） */
+  sourceKind: 'map' | 'result';
+  /** 订单整体状态 */
+  status: 'pending' | 'active' | 'paused' | 'done' | 'cancelled';
+  /** 优先级序号（值越小越靠前） */
+  priorityIndex: number;
+  /** item 总数 */
+  totalItemCount: number;
+  /** 已完成 item 数（status='done'） */
+  doneItemCount: number;
+  /** 当前活跃工人数（去重的 claimedByPawnId） */
+  activeWorkerCount: number;
+  /** 是否整体阻塞 — 所有 item 都处于 blocked/invalid/done（无可推进 item） */
+  blocked: boolean;
+  /** 该订单包含的 item 列表（按原顺序） */
+  items: WorkOrderItemNode[];
+}
+
+/**
+ * 工作订单快照 — 当前地图全部订单的只读集合
+ *
+ * `byId[order.id]` 与 `list` 中对应元素是同一对象引用，
+ * 以便 Preact 在 memo 等值比对中复用节点。
+ */
+export interface WorkOrdersSnapshot {
+  /** 按 priorityIndex 升序排列的订单节点 */
+  list: WorkOrderNode[];
+  /** 以订单 ID 为键的索引（值与 list 中元素引用相同） */
+  byId: Record<string, WorkOrderNode>;
+}
+
 // ── 引擎快照根结构 ──
 
 /**
@@ -324,6 +383,8 @@ export interface EngineSnapshot {
   build: BuildSnapshot;
   /** 反馈事件快照 */
   feedback: FeedbackSnapshot;
+  /** 工作订单快照 — 看板与详情面板数据源 */
+  workOrders: WorkOrdersSnapshot;
   /** 调试信息文本（预格式化的多行字符串） */
   debugInfo: string;
 }

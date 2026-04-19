@@ -104,6 +104,9 @@ export function tryPromoteBlueprintToConstructionSite(
     buildProgress: 0,
     totalWorkAmount: buildingDef.workToBuild ?? 100,
     workDone: 0,
+    // 把订单溯源信息从蓝图拷贝到工地，让施工评估器在 site 阶段也能识别订单
+    workOrderId: blueprint.workOrderId,
+    workOrderItemId: blueprint.workOrderItemId,
   };
 
   map.objects.remove(blueprint.id);

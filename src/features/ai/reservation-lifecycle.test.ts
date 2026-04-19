@@ -44,6 +44,15 @@ function makeBlueprint(map: ReturnType<typeof createGameMap>, itemDefId: string)
   };
 
   map.objects.add(blueprint as never);
+  // 把蓝图挂到一个 build 工作订单上，evaluator 才会把它当作有效的运送材料目标
+  const order = map.workOrders.createMapOrder({
+    orderKind: 'build',
+    title: '测试蓝图订单',
+    items: [{ targetRef: { kind: 'cell', cell: blueprint.cell, defId: blueprint.targetDefId }, artifactId: blueprint.id }],
+    createdAtTick: 0,
+  });
+  (blueprint as any).workOrderId = order.id;
+  (blueprint as any).workOrderItemId = order.items[0].id;
   return blueprint;
 }
 

@@ -11,7 +11,8 @@ import {
 
 /**
  * 蓝图接口 —— 玩家下达建造指令后在地图上生成的占位对象
- * 当所有材料运送完毕后，蓝图会转换为施工工地（ConstructionSite）
+ * 当所有材料运送完毕后，蓝图会转换为施工工地（ConstructionSite）。
+ * 由工作订单派生时会回填 workOrderId / workOrderItemId 以便溯源。
  */
 export interface Blueprint extends MapObjectBase {
   /** 对象类型标识：蓝图 */
@@ -24,6 +25,10 @@ export interface Blueprint extends MapObjectBase {
   materialsRequired: MaterialReq[];
   /** 已运送到蓝图位置的材料清单（defId + 已到数量） */
   materialsDelivered: MaterialReq[];
+  /** 派生该蓝图的工作订单 ID（可选；由订单流程回填，便于溯源/级联取消） */
+  workOrderId?: string;
+  /** 派生该蓝图的订单 item ID（可选；由订单流程回填） */
+  workOrderItemId?: string;
 }
 
 // ── KindMap 类型注册 ──

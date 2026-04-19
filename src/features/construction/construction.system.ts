@@ -86,6 +86,17 @@ function processConstructionSites(world: World, map: GameMap): void {
     map.objects.remove(site.id);
     map.objects.add(building);
 
+    // 若该工地由工作订单派生，回写订单 item.status = 'done'
+    if (site.workOrderId && site.workOrderItemId) {
+      const order = map.workOrders.get(site.workOrderId);
+      const item = order?.items.find(it => it.id === site.workOrderItemId);
+      if (item) {
+        item.status = 'done';
+        item.claimedByPawnId = undefined;
+        item.currentStage = 'done';
+      }
+    }
+
     // 若建筑阻挡移动，更新寻路网格将其占用的格子标记为不可通行
     // Update pathGrid if building blocks movement
     if (buildingDef.blocksMovement) {
