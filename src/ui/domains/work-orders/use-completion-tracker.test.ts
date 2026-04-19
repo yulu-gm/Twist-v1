@@ -86,5 +86,9 @@ describe('useCompletionTracker', () => {
     rerender({ orders: [makeNode('a', 'done'), makeNode('b', 'done')] });
     expect(result.current.exitingIds.has('a')).toBe(true);
     expect(result.current.exitingIds.has('b')).toBe(false);
+
+    act(() => { vi.advanceTimersByTime(1000); });
+    rerender({ orders: [makeNode('a', 'done'), makeNode('b', 'done')] });
+    expect(result.current.exitingIds.has('b')).toBe(true);
   });
 });

@@ -55,27 +55,25 @@ export function useCompletionTracker(orders: readonly WorkOrderNode[]): Completi
     exitingStartAt: new Map(),
     hiddenIds: new Set(),
   });
+  const timerRef = useRef<number | null>(null);
   const [, forceUpdate] = useReducer((n: number) => n + 1, 0);
 
   // 同步阶段 — 每次 render 立刻处理新出现的终态订单与已过期的窗口
   // 这样首次渲染时 done 订单立刻就在 completingDoneAt 中（满足测试：done 出现立即可见）
   const state = stateRef.current;
   const now = Date.now();
-  let mutated = false;
 
   // 新出现的终态订单：done 进 completing；cancelled 直接进 exiting
   for (const order of orders) {
     if (order.status === 'done') {
       if (!state.completingDoneAt.has(order.id) && !state.exitingIds.has(order.id) && !state.hiddenIds.has(order.id)) {
         state.completingDoneAt.set(order.id, now);
-        mutated = true;
       }
     } else if (order.status === 'cancelled') {
       if (!state.exitingIds.has(order.id) && !state.hiddenIds.has(order.id)) {
         state.exitingIds.add(order.id);
         // cancelled 直接进入 exiting 相位 — 仅写 exitingStartAt，不污染 completingDoneAt
         state.exitingStartAt.set(order.id, now);
-        mutated = true;
       }
     }
   }
@@ -87,7 +85,6 @@ export function useCompletionTracker(orders: readonly WorkOrderNode[]): Completi
       state.exitingIds.add(id);
       // 记录 exiting 起点 — 与 completingDoneAt 分离，避免覆盖 done 进入 completing 的时刻
       state.exitingStartAt.set(id, now);
-      mutated = true;
     }
   }
 
@@ -97,14 +94,17 @@ export function useCompletionTracker(orders: readonly WorkOrderNode[]): Completi
     if (enteredAt == null) continue;
     if (now - enteredAt >= EXITING_DURATION_MS && !state.hiddenIds.has(id)) {
       state.hiddenIds.add(id);
-      mutated = true;
     }
   }
 
   // 安排下一次推进：取所有未到期窗口的最近 deadline
   // exiting 中的 ID 读 exitingStartAt + EXITING_DURATION_MS；仍在 completing 的 ID 读 completingDoneAt + COMPLETING_DURATION_MS
-  const timerRef = useRef<number | null>(null);
+  // 故意不传 deps — Map/Set 原地变更不会被引用相等检测到，每次 render 重排定时器最稳妥
   useEffect(() => {
+    if (timerRef.current != null) {
+      window.clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
     let nextDelay = Infinity;
     // 仍在 completing 相位（在 completingDoneAt 中且未进入 exiting/hidden）
     for (const [id, doneAt] of state.completingDoneAt) {
@@ -127,9 +127,6 @@ export function useCompletionTracker(orders: readonly WorkOrderNode[]): Completi
     }
     return undefined;
   });
-
-  // 静默：参数未实际使用 — 仅写下 mutated 以避免误删上面的判定逻辑
-  void mutated;
 
   return state;
 }
