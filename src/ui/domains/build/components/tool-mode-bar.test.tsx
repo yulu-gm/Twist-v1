@@ -1,69 +1,94 @@
 /**
  * @file tool-mode-bar.test.tsx
- * @description 宸ュ叿鏍忕粍浠舵祴璇?鈥?楠岃瘉鎸夐挳娓叉煋銆侀珮浜姸鎬併€佺偣鍑诲洖璋冨拰鍖哄煙涓嬫媺鑿滃崟
- * @part-of ui/domains/build 鈥?寤洪€?UI 棰嗗煙
+ * @description ToolModeBar 组件测试 — 验证统一方块列表渲染、返回项、分支进入、叶子激活
+ * @part-of ui/domains/build — 建造 UI 领域
  */
 
 import { fireEvent, render, screen, cleanup } from '@testing-library/preact';
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import { ToolModeBar } from './tool-mode-bar';
+import type { CommandMenuViewModel } from '../build.types';
 
 afterEach(cleanup);
 
+function renderBar(menu: CommandMenuViewModel, overrides: Partial<Parameters<typeof ToolModeBar>[0]> = {}) {
+  return render(
+    <ToolModeBar
+      menu={menu}
+      onActivate={vi.fn()}
+      onEnterBranch={vi.fn()}
+      onBack={vi.fn()}
+      {...overrides}
+    />,
+  );
+}
+
 describe('ToolModeBar', () => {
-  it('renders the primary toolbar buttons', () => {
-    render(<ToolModeBar activeToolId="select" activeTool="select" onActivate={vi.fn()} />);
-    expect(screen.getByRole('button', { name: 'Select' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Build' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Mine' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Harvest' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Cut' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '区域' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+  it('renders root entries as square command tiles with shortcut hints', () => {
+    renderBar({
+      path: [],
+      entries: [
+        { id: 'select', label: '选择', shortcut: 'Z', kind: 'leaf', active: true, action: { id: 'select', tool: 'select', label: '选择', hotkey: '', group: 0 } },
+        { id: 'build', label: '建造', shortcut: 'X', kind: 'branch', active: false, branchId: 'build' },
+      ],
+    });
+
+    expect(screen.getByRole('button', { name: '选择' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '建造' })).toBeInTheDocument();
+    expect(screen.getByText('Z')).toBeInTheDocument();
+    expect(screen.getByText('X')).toBeInTheDocument();
   });
 
-  it('highlights the active tool', () => {
-    render(<ToolModeBar activeToolId="mine" activeTool="designate" onActivate={vi.fn()} />);
-    const mineBtn = screen.getByRole('button', { name: 'Mine' });
-    expect(mineBtn.className).toContain('is-active');
+  it('marks active entries with is-active class', () => {
+    renderBar({
+      path: [],
+      entries: [
+        { id: 'select', label: '选择', shortcut: 'Z', kind: 'leaf', active: true, action: { id: 'select', tool: 'select', label: '选择', hotkey: '', group: 0 } },
+      ],
+    });
+
+    expect(screen.getByRole('button', { name: '选择' }).className).toContain('is-active');
   });
 
-  it('opens the build menu with structure and furniture categories', () => {
-    render(<ToolModeBar activeToolId="select" activeTool="select" onActivate={vi.fn()} />);
-    const buildBtn = screen.getByRole('button', { name: 'Build' });
-    fireEvent.click(buildBtn);
+  it('calls onEnterBranch for branch tiles', () => {
+    const onEnterBranch = vi.fn();
+    renderBar(
+      {
+        path: [],
+        entries: [{ id: 'build', label: '建造', shortcut: 'X', kind: 'branch', active: false, branchId: 'build' }],
+      },
+      { onEnterBranch },
+    );
 
-    expect(buildBtn.getAttribute('aria-expanded')).toBe('true');
-    expect(screen.getByRole('button', { name: 'Structure' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Furniture' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Wall' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '建造' }));
+    expect(onEnterBranch).toHaveBeenCalledWith('build');
   });
 
-  it('calls onActivate when a build submenu item is clicked', () => {
+  it('calls onBack for 返回 tiles', () => {
+    const onBack = vi.fn();
+    renderBar(
+      {
+        path: ['build'],
+        entries: [{ id: '__back__', label: '返回', shortcut: 'Esc', kind: 'back', active: false }],
+      },
+      { onBack },
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '返回' }));
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls onActivate for leaf tiles without requiring local menu state', () => {
     const onActivate = vi.fn();
-    render(<ToolModeBar activeToolId="select" activeTool="select" onActivate={onActivate} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Build' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Furniture' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Bed' }));
+    renderBar(
+      {
+        path: ['build', 'structure'],
+        entries: [{ id: 'build_wall', label: '墙', shortcut: 'Z', kind: 'leaf', active: true, action: { id: 'build_wall', tool: 'build', label: '墙', hotkey: '', buildDefId: 'wall_wood', group: 1 } }],
+      },
+      { onActivate },
+    );
 
-    expect(onActivate).toHaveBeenCalledTimes(1);
-    expect(onActivate.mock.calls[0][0].id).toBe('build_bed');
-  });
-
-  it('toggles zone menu on zone button click', () => {
-    render(<ToolModeBar activeToolId="select" activeTool="select" onActivate={vi.fn()} />);
-    const zoneBtn = screen.getByRole('button', { name: '区域' });
-    fireEvent.click(zoneBtn);
-    expect(zoneBtn.getAttribute('aria-expanded')).toBe('true');
-  });
-
-  it('calls onActivate with zone sub-item and closes menu', () => {
-    const onActivate = vi.fn();
-    render(<ToolModeBar activeToolId="select" activeTool="select" onActivate={onActivate} />);
-    fireEvent.click(screen.getByRole('button', { name: '区域' }));
-    fireEvent.click(screen.getByRole('button', { name: '种植区' }));
-
-    expect(onActivate).toHaveBeenCalledTimes(1);
-    expect(onActivate.mock.calls[0][0].zoneType).toBe('growing');
+    fireEvent.click(screen.getByRole('button', { name: '墙' }));
+    expect(onActivate).toHaveBeenCalledWith(expect.objectContaining({ id: 'build_wall', buildDefId: 'wall_wood' }));
   });
 });

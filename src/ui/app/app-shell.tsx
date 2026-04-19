@@ -19,7 +19,7 @@ import { selectColonistRosterRows } from '../domains/colonist/colonist.selectors
 import { ColonistRoster } from '../domains/colonist/components/colonist-roster';
 import { selectObjectInspector } from '../domains/inspector/inspector.selectors';
 import { ObjectInspector } from '../domains/inspector/components/object-inspector';
-import { selectTopStatusBar, selectActiveToolId } from '../domains/build/build.selectors';
+import { selectTopStatusBar, selectCommandMenuViewModel } from '../domains/build/build.selectors';
 import { TopStatusBar } from '../domains/build/components/top-status-bar';
 import { ToolModeBar } from '../domains/build/components/tool-mode-bar';
 import { activateToolAction } from '../domains/build/build.intents';
@@ -87,7 +87,7 @@ export function AppShell({ snapshot, uiState, dispatch, ports }: AppShellProps) 
 
   // 从快照中派生各领域视图模型
   const topBar = selectTopStatusBar(snapshot);
-  const activeToolId = selectActiveToolId(snapshot);
+  const commandMenu = selectCommandMenuViewModel(snapshot);
   const rosterRows = selectColonistRosterRows(snapshot, uiState);
   const objectInspector = selectObjectInspector(snapshot, uiState);
   const feedback = selectCommandFeedback(snapshot);
@@ -117,9 +117,12 @@ export function AppShell({ snapshot, uiState, dispatch, ports }: AppShellProps) 
       <ToastStack toasts={feedback.toasts} />
       <DebugPanel visible={showDebug} debugInfo={debugInfo} />
       <ToolModeBar
-        activeToolId={activeToolId}
-        activeTool={snapshot.presentation.activeTool}
+        menu={commandMenu}
         onActivate={(action) => activateToolAction(ports, action)}
+        onEnterBranch={(branchId) => ports.enterCommandMenu(branchId)}
+        onBack={() => {
+          ports.backCommandMenu();
+        }}
       />
     </div>
   );
