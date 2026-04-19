@@ -114,4 +114,21 @@ describe('selectWorkOrderBoard', () => {
     expect(vm.rows).toHaveLength(0);
     expect(vm.suggestedExpanded).toBe(false);
   });
+
+  it('clears selected order and detail when inspectorTargetId points at a hidden id', () => {
+    const completion: CompletionTrackerState = {
+      completingDoneAt: new Map(),
+      exitingIds: new Set(),
+      exitingStartAt: new Map(),
+      hiddenIds: new Set(['a']),
+    };
+    const ui = { inspectorTargetId: 'a' } as unknown as UiState;
+    const vm = selectWorkOrderBoard(
+      makeSnapshot([makeOrder('a', 'done'), makeOrder('b', 'active')]),
+      ui,
+      completion,
+    );
+    expect(vm.selectedOrderId).toBeNull();
+    expect(vm.detail).toBeNull();
+  });
 });
