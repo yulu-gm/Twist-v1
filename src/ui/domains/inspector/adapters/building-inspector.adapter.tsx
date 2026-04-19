@@ -43,6 +43,19 @@ export const buildingInspectorAdapter: ObjectInspectorAdapter = {
     }
     sections.push({ id: 'info', title: 'Info', rows: infoRows });
 
+    // 仓库专属区块 — 容量/种类摘要
+    if (building.storage) {
+      sections.push({
+        id: 'storage',
+        title: 'Storage',
+        rows: [
+          { label: 'Capacity', value: `${building.storage.storedCount}/${building.storage.capacityMax}` },
+          { label: 'Item Types', value: String(building.storage.typeCount) },
+          { label: 'Total Count', value: String(building.storage.storedCount) },
+        ],
+      });
+    }
+
     // 床位专属区块
     if (building.bed) {
       const bed = building.bed;
@@ -85,39 +98,83 @@ export const buildingInspectorAdapter: ObjectInspectorAdapter = {
       stack: context.stack,
       sections,
       actions,
-      renderBody: (callbacks: InspectorBodyCallbacks) => (
-        <>
-          <Section title="Info">
-            {infoRows.map(row => (
-              <StatRow key={row.label} label={row.label} value={row.value} />
-            ))}
-          </Section>
-
-          {building.bed && (
-            <Section title="Bed">
-              <StatRow label="Role" value={toTitleCase(building.bed.role)} />
-              <StatRow label="Owner" value={building.bed.ownerPawnId ?? 'Unassigned'} />
-              <StatRow label="Occupant" value={building.bed.occupantPawnId ?? 'Empty'} />
-              <div class="bed-owner-controls">
-                <select
-                  onInput={(e) => {
-                    const value = (e.currentTarget as HTMLSelectElement).value;
-                    if (value) callbacks.onAssignBedOwner(context.targetId, value);
-                  }}
-                >
-                  <option value="" disabled selected>Assign owner</option>
-                  {availableOwners.map((owner) => (
-                    <option key={owner.id} value={owner.id}>{owner.label}</option>
+      renderBody: (callbacks: InspectorBodyCallbacks) => {
+        // 仓库 Inspector — 上半为信息/容量/控制区，底部固定为库存 Dock
+        if (building.storage) {
+          const storage = building.storage;
+          return (
+            <div class="warehouse-inspector" data-testid="warehouse-inspector">
+              <div class="warehouse-inspector__top">
+                <Section title="Info">
+                  {infoRows.map(row => (
+                    <StatRow key={row.label} label={row.label} value={row.value} />
                   ))}
-                </select>
-                <button type="button" onClick={() => callbacks.onClearBedOwner(context.targetId)}>
-                  Clear Owner
-                </button>
+                </Section>
+                <Section title="Storage">
+                  <StatRow label="Capacity" value={`${storage.storedCount}/${storage.capacityMax}`} />
+                  <StatRow label="Item Types" value={String(storage.typeCount)} />
+                  <StatRow label="Total Count" value={String(storage.storedCount)} />
+                </Section>
+                <Section title="Controls">
+                  <div class="warehouse-inspector__future-panel">Incoming / Outgoing / Priority</div>
+                </Section>
               </div>
+              <div class="warehouse-inventory">
+                <div class="warehouse-inventory__header">
+                  <span>Inventory</span>
+                  <span>{storage.typeCount} types / {storage.storedCount} total</span>
+                </div>
+                <div class="warehouse-inventory__grid" data-testid="warehouse-inventory-grid">
+                  {storage.entries.map(entry => (
+                    <div key={entry.defId} class="warehouse-item-card">
+                      <span
+                        class="warehouse-item-card__swatch"
+                        style={{ background: `#${entry.color.toString(16).padStart(6, '0')}` }}
+                      />
+                      <span class="warehouse-item-card__label">{entry.label}</span>
+                      <strong class="warehouse-item-card__count">{entry.count}</strong>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        return (
+          <>
+            <Section title="Info">
+              {infoRows.map(row => (
+                <StatRow key={row.label} label={row.label} value={row.value} />
+              ))}
             </Section>
-          )}
-        </>
-      ),
+
+            {building.bed && (
+              <Section title="Bed">
+                <StatRow label="Role" value={toTitleCase(building.bed.role)} />
+                <StatRow label="Owner" value={building.bed.ownerPawnId ?? 'Unassigned'} />
+                <StatRow label="Occupant" value={building.bed.occupantPawnId ?? 'Empty'} />
+                <div class="bed-owner-controls">
+                  <select
+                    onInput={(e) => {
+                      const value = (e.currentTarget as HTMLSelectElement).value;
+                      if (value) callbacks.onAssignBedOwner(context.targetId, value);
+                    }}
+                  >
+                    <option value="" disabled selected>Assign owner</option>
+                    {availableOwners.map((owner) => (
+                      <option key={owner.id} value={owner.id}>{owner.label}</option>
+                    ))}
+                  </select>
+                  <button type="button" onClick={() => callbacks.onClearBedOwner(context.targetId)}>
+                    Clear Owner
+                  </button>
+                </div>
+              </Section>
+            )}
+          </>
+        );
+      },
     };
   },
 };

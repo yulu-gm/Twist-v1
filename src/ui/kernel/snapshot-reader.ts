@@ -30,6 +30,7 @@ import type {
   EngineSnapshot,
   ColonistNode,
   BuildingNode,
+  BuildingStorageNode,
   ObjectNode,
   FeedbackSnapshot,
   WorkOrderNode,
@@ -123,6 +124,7 @@ export function readEngineSnapshot(
         occupantPawnId: building.bed.occupantPawnId ?? null,
         autoAssignable: building.bed.autoAssignable,
       } : undefined,
+      storage: building.storage ? summarizeBuildingStorage(building, world) : undefined,
     };
   }
 
@@ -159,6 +161,7 @@ export function readEngineSnapshot(
       category: b.category,
       usageType: b.usageType,
       bed: b.bed,
+      storage: b.storage,
     };
   }
 
@@ -406,4 +409,38 @@ function buildWorkOrdersSnapshot(map: GameMap): WorkOrdersSnapshot {
   }
 
   return { list, byId };
+}
+
+/**
+ * 把建筑的抽象库存聚合成 UI 卡片数据
+ *
+ * 实时根据 building.storage.inventory 求总和、统计种类数，并把每个 defId 翻译成
+ * 物品标签和颜色。条目按数量降序排列，方便底部库存 Dock 直接渲染。
+ *
+ * @param building - 拥有 storage 组件的建筑
+ * @param world - 游戏世界对象（提供物品定义查询）
+ * @returns 聚合后的库存摘要
+ */
+function summarizeBuildingStorage(building: Building, world: World): BuildingStorageNode {
+  const storage = building.storage!;
+  const entries: Array<{ defId: string; label: string; count: number; color: number }> = [];
+  let storedCount = 0;
+  for (const [defId, count] of Object.entries(storage.inventory)) {
+    if (!count || count <= 0) continue;
+    const itemDef = world.defs.items.get(defId);
+    entries.push({
+      defId,
+      label: itemDef?.label ?? defId,
+      count,
+      color: itemDef?.color ?? 0xaaaaaa,
+    });
+    storedCount += count;
+  }
+  entries.sort((a, b) => b.count - a.count);
+  return {
+    capacityMax: storage.capacityMax,
+    storedCount,
+    typeCount: entries.length,
+    entries,
+  };
 }

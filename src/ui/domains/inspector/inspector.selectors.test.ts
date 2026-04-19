@@ -414,4 +414,40 @@ describe('selectObjectInspector', () => {
       expect(vm!.actions.map(a => a.id)).toContain('designate_cut');
     }
   });
+
+  it('uses a specialized warehouse inspector with inventory summary', () => {
+    const snapshot = makeSnapshot({
+      selection: { primaryId: 'warehouse_1', selectedIds: ['warehouse_1'] },
+      objects: {
+        warehouse_1: {
+          id: 'warehouse_1',
+          kind: 'building',
+          label: 'Warehouse',
+          defId: 'warehouse_shed',
+          cell: { x: 8, y: 8 },
+          footprint: { width: 2, height: 2 },
+          category: 'furniture',
+          usageType: 'storage',
+          storage: {
+            capacityMax: 160,
+            storedCount: 36,
+            typeCount: 3,
+            entries: [
+              { defId: 'wood', label: 'Wood', count: 20, color: 0x8b6914 },
+              { defId: 'stone_block', label: 'Stone Block', count: 10, color: 0x777777 },
+              { defId: 'meal_simple', label: 'Simple Meal', count: 6, color: 0xe0c068 },
+            ],
+          },
+        } as any,
+      },
+    });
+
+    const vm = selectObjectInspector(snapshot, makeUiState());
+    expect(vm).not.toBeNull();
+    expect(vm!.mode).toBe('specialized');
+    expect(vm!.title).toBe('Warehouse');
+    if (vm!.mode === 'specialized') {
+      expect(vm!.sections.some(s => s.title === 'Storage')).toBe(true);
+    }
+  });
 });

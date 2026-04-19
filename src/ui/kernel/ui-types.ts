@@ -167,6 +167,20 @@ export interface BuildingNode {
     /** 是否允许自动分配 */
     autoAssignable: boolean;
   };
+  /** 仓储库存摘要（仅 storage 组件存在的建筑有此字段） */
+  storage?: BuildingStorageNode;
+}
+
+/** 建筑仓储节点 — 把抽象库存按物品定义聚合成 UI 可读的卡片数据 */
+export interface BuildingStorageNode {
+  /** 仓库最大可存储总数 */
+  capacityMax: number;
+  /** 当前已存储总数（从 inventory 实时聚合） */
+  storedCount: number;
+  /** 当前包含的物品种类数 */
+  typeCount: number;
+  /** 按物品定义聚合的库存条目（按数量降序） */
+  entries: Array<{ defId: string; label: string; count: number; color: number }>;
 }
 
 // ── 统一对象节点类型（Inspector 数据源） ──
@@ -218,6 +232,8 @@ export interface BuildingObjectNode extends ObjectNodeBase {
     occupantPawnId: string | null;
     autoAssignable: boolean;
   };
+  /** 仓储库存摘要 — 与 BuildingNode.storage 字段共享同一聚合 */
+  storage?: BuildingStorageNode;
 }
 
 /** Blueprint 对象节点 */

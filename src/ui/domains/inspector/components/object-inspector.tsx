@@ -55,7 +55,7 @@ export function ObjectInspector({ viewModel, onSelectTarget, onRunAction, onAssi
       </div>
 
       {/* 内容区 */}
-      <div class="inspector-panel__body">
+      <div class="inspector-panel__body inspector-panel__body--flex">
         {vm.mode === 'generic' ? (
           <>
             {/* 降级提示 */}
