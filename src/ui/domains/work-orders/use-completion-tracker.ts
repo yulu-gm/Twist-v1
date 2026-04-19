@@ -122,7 +122,7 @@ export function useCompletionTracker(orders: readonly WorkOrderNode[]): Completi
     }
     if (nextDelay !== Infinity) {
       const delay = Math.max(0, nextDelay);
-      timerRef.current = window.setTimeout(() => forceUpdate(), delay);
+      timerRef.current = window.setTimeout(() => forceUpdate(undefined), delay);
       return () => { if (timerRef.current != null) window.clearTimeout(timerRef.current); };
     }
     return undefined;
