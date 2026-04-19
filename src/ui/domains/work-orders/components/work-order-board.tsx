@@ -1,14 +1,17 @@
 /**
  * @file work-order-board.tsx
- * @description 工作订单看板 — 左侧面板列出全部订单，支持选中、暂停/继续/取消
+ * @description 工作订单看板 — 左侧面板，标题条始终可见，列表区可折叠
  * @dependencies work-order.types — WorkOrderRow, WorkOrderDetailViewModel；
  *               work-order-detail — 详情子面板
  * @part-of ui/domains/work-orders — 工作订单 UI 领域
  *
  * 设计要点：
+ * - 标题条 "工作订单" 始终可见，前置雪佛龙 ▸/▾，整条可点击触发 onToggle
+ * - 列表区根据 expanded 决定渲染（收起态完全不渲染列表与详情）
  * - 行内显示：优先级编号 + 标题 + 来源/进度/工人/状态徽章
- * - 选中行：左侧 3px accent 强调条 + 浅色背景；非选中行的操作按钮仅 hover 时浮现
- * - 详情面板内嵌于看板底部，仅当有选中订单时显示
+ * - 行根据 displayPhase 加 class：
+ *   - 'completing' → work-order-row--completing（显示 ✓ + 标题划线）
+ *   - 'exiting'    → work-order-row--exiting（淡出 + 高度收 0）
  */
 
 import type { WorkOrderRow, WorkOrderDetailViewModel } from '../work-order.types';
@@ -20,6 +23,10 @@ interface WorkOrderBoardProps {
   rows: WorkOrderRow[];
   /** 当前选中订单 ID（无选中则 null） */
   selectedOrderId: string | null;
+  /** 是否展开（标题条始终显示，列表区受此控制） */
+  expanded: boolean;
+  /** 切换展开/收起 — 标题条点击回调 */
+  onToggle: () => void;
   /** 选中订单详情视图模型（无选中则 null） */
   detail: WorkOrderDetailViewModel | null;
   /** 选中行回调 */
@@ -73,15 +80,27 @@ function WorkOrderRowItem({
   // 状态徽章颜色：blocked > status 派生
   const statusToken = row.blocked && !isTerminal ? 'blocked' : row.status;
 
+  // displayPhase 派生 class — completing 显示 ✓ + 划线；exiting 淡出 + 收高
+  const phaseClass = row.displayPhase === 'completing'
+    ? 'work-order-row--completing'
+    : row.displayPhase === 'exiting'
+      ? 'work-order-row--exiting'
+      : '';
+
   return (
-    <li class={`work-order-row ${isSelected ? 'is-selected' : ''}`} data-status={row.status}>
+    <li
+      class={`work-order-row ${isSelected ? 'is-selected' : ''} ${phaseClass}`}
+      data-status={row.status}
+    >
       <button
         type="button"
         class="work-order-row__main"
         onClick={() => onSelect(row.id)}
       >
         <span class="work-order-row__handle" aria-hidden="true">⋮⋮</span>
-        <span class="work-order-row__priority">{row.priorityIndex + 1}</span>
+        <span class="work-order-row__priority">
+          {row.displayPhase === 'completing' ? '✓' : row.priorityIndex + 1}
+        </span>
         <div class="work-order-row__body">
           <div class="work-order-row__title">{row.title}</div>
           <div class="work-order-row__meta">
@@ -130,15 +149,17 @@ function WorkOrderRowItem({
 }
 
 /**
- * 工作订单看板 — 作为左侧 ui-panel 渲染
+ * 工作订单看板 — 左侧 ui-panel
  *
  * 行列表渲染顺序由 selector 给出（按 priorityIndex 升序）。
- * 空列表显示 "当前没有订单" 占位。
- * 选中订单后在底部嵌入 WorkOrderDetail 子面板。
+ * 标题条始终可见，列表区根据 expanded 决定渲染。
+ * 选中订单后在底部嵌入 WorkOrderDetail 子面板（仅 expanded 时）。
  */
 export function WorkOrderBoard({
   rows,
   selectedOrderId,
+  expanded,
+  onToggle,
   detail,
   onSelect,
   onPause,
@@ -147,8 +168,19 @@ export function WorkOrderBoard({
 }: WorkOrderBoardProps) {
   return (
     <div class="work-order-board ui-panel" data-testid="work-order-board">
-      <div class="ui-panel__title">工作订单</div>
-      <div class="ui-panel__body">
+      <button
+        type="button"
+        class={`work-order-board__header ${expanded ? 'is-expanded' : ''}`}
+        onClick={onToggle}
+        aria-expanded={expanded}
+      >
+        <span class="work-order-board__chevron" aria-hidden="true">▾</span>
+        <span>工作订单</span>
+        {rows.length > 0 && (
+          <span class="work-order-board__count">{rows.length}</span>
+        )}
+      </button>
+      <div class={`work-order-board__body ${expanded ? 'is-expanded' : ''}`} aria-hidden={!expanded}>
         {rows.length === 0 ? (
           <div class="work-order-board__empty">当前没有订单</div>
         ) : (
