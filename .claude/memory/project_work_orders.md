@@ -19,3 +19,4 @@ type: project
 - 新写 AI evaluator 时，先 `for (const order of map.workOrders.list())` 严格按序扫描，命中即返；不要回退到全图扫描裸标记。
 - Job 完成时必须把 `item.status` 写回 `done`（见 `work.handler.ts`、`construction.system.ts`）。
 - 新场景测试断言订单进度时使用 `result.finalSnapshot.workOrders.byTitle[<title>]`（auto-id `wo_<n>` 不稳定）。
+- UI 层不会永久显示终态订单：done 在 2000ms 高亮后退出，cancelled 直接退出（淡出 240ms）。完成淡出窗口由 `src/ui/domains/work-orders/use-completion-tracker.ts` 维护，对数据层 `WorkOrderStore` 不产生任何写操作。新场景测试如需断言"订单完成时机"，应基于数据层 `status === 'done'`，而非 UI 行可见性。
