@@ -75,12 +75,14 @@ export function createBuilding(params: {
     };
   }
 
-  // 若定义了仓储配置，挂载仓储组件
-  // Attach optional storage component
+  // 若定义了仓储配置，挂载仓库抽象库存组件
+  // Attach optional warehouse storage component
   if (def?.storageConfig) {
     building.storage = {
-      allowedDefIds: new Set(def.storageConfig.allowedDefIds),
-      priority: def.storageConfig.priority,
+      mode: def.storageConfig.mode,
+      capacityMax: def.storageConfig.capacityMax,
+      storedCount: 0,
+      inventory: {},
     };
   }
 

@@ -108,4 +108,26 @@ export const BUILDING_DEFS: BuildingDef[] = [
     passable: true,
     color: 0xFFFF00,
   },
+  /** 仓库——可建造的家具型仓储设施，挂载抽象库存容器，是正式存储的唯一来源 */
+  {
+    defId: 'warehouse_shed',
+    label: 'Warehouse',
+    description: 'A dedicated warehouse for abstract item storage.',
+    size: { width: 2, height: 2 },
+    maxHp: 180,
+    workToBuild: 180,
+    costList: [{ defId: 'wood', count: 20 }],
+    tags: ['furniture', 'storage'],
+    category: 'furniture',
+    furnitureType: 'storage',
+    storageConfig: {
+      mode: 'all-haulable',
+      capacityMax: 160,
+    },
+    blocksMovement: false,
+    blocksLight: false,
+    passable: false,
+    interactionCellOffset: { x: 1, y: 2 },
+    color: 0x8a6a3a,
+  },
 ];

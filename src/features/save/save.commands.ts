@@ -59,7 +59,7 @@ function serializeObject(obj: any): any {
  * 将序列化后的对象还原为带 Set 类型的地图对象
  *
  * @param data - 纯 JSON 对象（tags 为字符串数组）
- * @returns 还原后的对象，tags 恢复为 Set<Tag>，storage.allowedDefIds 恢复为 Set
+ * @returns 还原后的对象，tags / cells 恢复为 Set
  */
 function deserializeObject(data: any): any {
   const obj: any = {};
@@ -70,11 +70,12 @@ function deserializeObject(data: any): any {
     } else if (key === 'cells' && Array.isArray(value)) {
       obj[key] = new Set(value);
     } else if (key === 'storage' && value && typeof value === 'object') {
+      // 仓库存储——抽象库存容器，inventory 为 plain object，不需要 Set 还原
       obj[key] = {
-        ...value,
-        allowedDefIds: Array.isArray(value.allowedDefIds)
-          ? new Set(value.allowedDefIds)
-          : value.allowedDefIds,
+        mode: value.mode,
+        capacityMax: value.capacityMax,
+        storedCount: value.storedCount,
+        inventory: { ...(value.inventory ?? {}) },
       };
     } else {
       obj[key] = value;
