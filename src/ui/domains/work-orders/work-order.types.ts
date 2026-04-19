@@ -27,6 +27,15 @@ export interface WorkOrderRow {
   blocked: boolean;
   /** 订单整体状态（用于状态徽章着色） */
   status: WorkOrderNode['status'];
+  /**
+   * UI 派生显示相位，由 selector 根据 completionState 计算
+   * - 'normal'：正常显示（pending/active/paused，或终态但尚未观测）
+   * - 'completing'：done 后 2000ms 内的高亮窗口（显示 ✓ + 划线）
+   * - 'exiting'：完成窗口结束或 cancelled，正在播放退出动画的 240ms 内
+   *
+   * 已加入 hiddenIds 的订单会被 selector 过滤掉，不出现在 rows 中。
+   */
+  displayPhase: 'normal' | 'completing' | 'exiting';
 }
 
 /**
@@ -67,4 +76,9 @@ export interface WorkOrderBoardViewModel {
   selectedOrderId: string | null;
   /** 选中订单的详情视图模型（无选中则 null） */
   detail: WorkOrderDetailViewModel | null;
+  /**
+   * 自动建议的展开状态 — `rows.length > 0` 时为 true。
+   * 由 selector 派生，hook 据此决定是否清空用户折叠覆盖。
+   */
+  suggestedExpanded: boolean;
 }
