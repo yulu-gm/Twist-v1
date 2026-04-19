@@ -54,8 +54,8 @@ describe('WorkOrderBoard', () => {
     expect(onCancel).toHaveBeenCalledWith('wo_1');
   });
 
-  it('hides list and detail when collapsed', () => {
-    render(
+  it('keeps body mounted but unexpanded when collapsed (so CSS can animate)', () => {
+    const { container } = render(
       <WorkOrderBoard
         rows={[row()]}
         selectedOrderId={null}
@@ -70,8 +70,11 @@ describe('WorkOrderBoard', () => {
     );
     // 标题条仍可见
     expect(screen.getByRole('button', { name: /工作订单/ })).toBeInTheDocument();
-    // 列表不渲染
-    expect(screen.queryByText('砍伐 5 棵树')).toBeNull();
+    // body 节点持续存在（用于 CSS 折叠过渡），但不带 is-expanded
+    const body = container.querySelector('.work-order-board__body');
+    expect(body).not.toBeNull();
+    expect(body?.className).not.toContain('is-expanded');
+    expect(body?.getAttribute('aria-hidden')).toBe('true');
   });
 
   it('header button toggles via onToggle', () => {

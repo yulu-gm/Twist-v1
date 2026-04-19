@@ -180,28 +180,26 @@ export function WorkOrderBoard({
           <span class="work-order-board__count">{rows.length}</span>
         )}
       </button>
-      {expanded && (
-        <div class="work-order-board__body is-expanded">
-          {rows.length === 0 ? (
-            <div class="work-order-board__empty">当前没有订单</div>
-          ) : (
-            <ul class="work-order-board__list">
-              {rows.map(row => (
-                <WorkOrderRowItem
-                  key={row.id}
-                  row={row}
-                  isSelected={row.id === selectedOrderId}
-                  onSelect={onSelect}
-                  onPause={onPause}
-                  onResume={onResume}
-                  onCancel={onCancel}
-                />
-              ))}
-            </ul>
-          )}
-          <WorkOrderDetail detail={detail} />
-        </div>
-      )}
+      <div class={`work-order-board__body ${expanded ? 'is-expanded' : ''}`} aria-hidden={!expanded}>
+        {rows.length === 0 ? (
+          <div class="work-order-board__empty">当前没有订单</div>
+        ) : (
+          <ul class="work-order-board__list">
+            {rows.map(row => (
+              <WorkOrderRowItem
+                key={row.id}
+                row={row}
+                isSelected={row.id === selectedOrderId}
+                onSelect={onSelect}
+                onPause={onPause}
+                onResume={onResume}
+                onCancel={onCancel}
+              />
+            ))}
+          </ul>
+        )}
+        <WorkOrderDetail detail={detail} />
+      </div>
     </div>
   );
 }
