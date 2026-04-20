@@ -86,6 +86,7 @@ function makePresentationState(): PresentationState {
     activeOverlay: 'none' as PresentationState['activeOverlay'],
     cameraPosition: { x: 0, y: 0 },
     cameraZoom: 1,
+    fps: 0,
     activeTool: 'select' as PresentationState['activeTool'],
     activeDesignationType: null,
     activeZoneType: null,

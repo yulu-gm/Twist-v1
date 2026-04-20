@@ -389,6 +389,8 @@ export interface EngineSnapshot {
   clockDisplay: string;
   /** 殖民者总数 */
   colonistCount: number;
+  /** 当前渲染 FPS（平滑值）；旧测试快照可不提供 */
+  fps?: number;
   /** 展示层快照 */
   presentation: PresentationSnapshot;
   /** 选择状态快照 */

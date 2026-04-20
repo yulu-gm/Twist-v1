@@ -23,6 +23,7 @@ export function selectTopStatusBar(snapshot: EngineSnapshot): TopStatusBarViewMo
     tick: snapshot.tick,
     speed: snapshot.speed,
     colonistCount: snapshot.colonistCount,
+    fps: snapshot.fps ?? 0,
   };
 }
 

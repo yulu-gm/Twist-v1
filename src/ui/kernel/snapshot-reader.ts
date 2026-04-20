@@ -261,6 +261,7 @@ export function readEngineSnapshot(
     speed: world.speed,
     clockDisplay: getClockDisplay(world.clock),
     colonistCount: pawns.length,
+    fps: presentation.fps,
     presentation: {
       activeTool: presentation.activeTool,
       activeDesignationType: presentation.activeDesignationType,

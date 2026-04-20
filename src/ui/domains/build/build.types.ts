@@ -72,4 +72,6 @@ export interface TopStatusBarViewModel {
   speed: number;
   /** 殖民者总数 */
   colonistCount: number;
+  /** 当前 FPS（四舍五入前的原始值） */
+  fps: number;
 }

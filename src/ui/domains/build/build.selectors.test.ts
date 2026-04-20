@@ -29,11 +29,12 @@ function makeSnapshot(overrides: Partial<EngineSnapshot> = {}): EngineSnapshot {
 
 describe('selectTopStatusBar', () => {
   it('extracts clock, tick, speed, and colonist count', () => {
-    const vm = selectTopStatusBar(makeSnapshot());
+    const vm = selectTopStatusBar(makeSnapshot({ fps: 58.6 }));
     expect(vm.clockDisplay).toBe('Year 1, Spring, Day 1, 6:00');
     expect(vm.tick).toBe(100);
     expect(vm.speed).toBe(1);
     expect(vm.colonistCount).toBe(3);
+    expect(vm.fps).toBe(58.6);
   });
 });
 

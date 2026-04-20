@@ -314,7 +314,7 @@ async function boot(): Promise<void> {
     if (!sceneRef?.presentation) {
       // 场景尚未创建，返回空快照
       return {
-        tick: 0, speed: 0, clockDisplay: '', colonistCount: 0,
+        tick: 0, speed: 0, clockDisplay: '', colonistCount: 0, fps: 0,
         presentation: { activeTool: 'select', activeDesignationType: null, activeZoneType: null, activeBuildDefId: null, commandMenuPath: [], hoveredCell: null, selectedIds: [], showDebugPanel: false, showGrid: false },
         selection: { primaryId: null, selectedIds: [] },
         colonists: {}, build: { activeTool: 'select', activeDesignationType: null, activeZoneType: null, lastZoneType: 'growing', activeBuildDefId: null, activeModeLabel: 'Select' },

@@ -142,6 +142,8 @@ export interface PresentationState {
   cameraPosition: { x: number; y: number };
   /** 摄像机缩放倍率 */
   cameraZoom: number;
+  /** 当前渲染帧率（平滑值），供 UI 顶栏展示 */
+  fps: number;
   /** 当前激活的工具类型 */
   activeTool: ToolType;
   /** 当前激活的指派子类型（用于 UI 高亮） */
@@ -226,6 +228,7 @@ export function createPresentationState(): PresentationState {
     activeOverlay: OverlayType.None,
     cameraPosition: { x: 0, y: 0 },
     cameraZoom: 1,
+    fps: 0,
     activeTool: ToolType.Select,
     activeDesignationType: null,
     activeZoneType: null,
