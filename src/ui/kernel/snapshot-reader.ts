@@ -76,7 +76,7 @@ export function readEngineSnapshot(
       cell: { x: pawn.cell.x, y: pawn.cell.y },
       factionId: pawn.factionId ?? '',
       currentJob: jobDefId,
-      currentJobLabel: formatJobLabel(jobDefId),
+      currentJobLabel: formatJobLabel(jobDefId, world),
       needs: {
         food: pawn.needs?.food ?? 0,
         rest: pawn.needs?.rest ?? 0,
@@ -168,30 +168,44 @@ export function readEngineSnapshot(
   // 映射 Blueprint 对象
   const blueprints = map.objects.allOfKind(ObjectKind.Blueprint) as Blueprint[];
   for (const bp of blueprints) {
+    const targetDef = world.defs.buildings.get(bp.targetDefId);
+    const targetLabel = targetDef?.label ?? bp.targetDefId;
     objects[bp.id] = {
       id: bp.id,
       kind: 'blueprint',
-      label: `Blueprint: ${bp.targetDefId}`,
+      label: `蓝图：${targetLabel}`,
       defId: bp.defId,
       cell: { x: bp.cell.x, y: bp.cell.y },
       footprint: bp.footprint ?? { width: 1, height: 1 },
       targetDefId: bp.targetDefId,
-      materialsRequired: bp.materialsRequired.map(m => ({ defId: m.defId, count: m.count })),
-      materialsDelivered: bp.materialsDelivered.map(m => ({ defId: m.defId, count: m.count })),
+      targetLabel,
+      materialsRequired: bp.materialsRequired.map(m => ({
+        defId: m.defId,
+        label: world.defs.items.get(m.defId)?.label ?? m.defId,
+        count: m.count,
+      })),
+      materialsDelivered: bp.materialsDelivered.map(m => ({
+        defId: m.defId,
+        label: world.defs.items.get(m.defId)?.label ?? m.defId,
+        count: m.count,
+      })),
     };
   }
 
   // 映射 ConstructionSite 对象
   const sites = map.objects.allOfKind(ObjectKind.ConstructionSite) as ConstructionSite[];
   for (const site of sites) {
+    const targetDef = world.defs.buildings.get(site.targetDefId);
+    const targetLabel = targetDef?.label ?? site.targetDefId;
     objects[site.id] = {
       id: site.id,
       kind: 'construction_site',
-      label: `Construction: ${site.targetDefId}`,
+      label: `施工：${targetLabel}`,
       defId: site.defId,
       cell: { x: site.cell.x, y: site.cell.y },
       footprint: site.footprint ?? { width: 1, height: 1 },
       targetDefId: site.targetDefId,
+      targetLabel,
       buildProgress: site.buildProgress,
     };
   }
@@ -227,8 +241,9 @@ export function readEngineSnapshot(
     };
   }
 
-  // 格式化工具模式标签（如 "Select"、"Build: wall_wood"、"Zone: growing"）
+  // 格式化工具模式标签（如 "选择"、"建造：木墙"、"区域：种植区"）
   const activeModeLabel = formatToolModeLabel(
+    world,
     presentation.activeTool,
     presentation.activeDesignationType,
     presentation.activeBuildDefId,
@@ -282,11 +297,16 @@ export function readEngineSnapshot(
 /**
  * 格式化任务定义 ID 为可读标签
  *
- * @param defId - 任务定义 ID（如 'idle'、'job_haul_item'）
- * @returns 格式化后的标签（如 'Idle'、'Haul Item'）
+ * 优先使用 def 数据库中的 label（已中文化），未命中时回退为 title-case。
+ *
+ * @param defId - 任务定义 ID（如 'idle'、'job_haul'）
+ * @param world - 游戏世界对象（提供任务定义查询）
+ * @returns 格式化后的标签（如 '空闲'、'搬运'）
  */
-function formatJobLabel(defId: string): string {
-  if (defId === 'idle') return 'Idle';
+function formatJobLabel(defId: string, world: World): string {
+  if (defId === 'idle') return '空闲';
+  const fromDef = world.defs.jobs.get(defId)?.label;
+  if (fromDef) return fromDef;
   return defId
     .replace(/^job_/, '')
     .replace(/_/g, ' ')
@@ -294,26 +314,53 @@ function formatJobLabel(defId: string): string {
 }
 
 /**
+ * 区域类型本地化映射 — 把 ZoneType defId 翻译为中文
+ */
+const ZONE_TYPE_LABELS: Record<string, string> = {
+  growing: '种植区',
+  storage: '仓储区',
+  stockpile: '仓储区',
+};
+
+/**
+ * 指派类型本地化映射 — 把 DesignationType 翻译为中文
+ */
+const DESIGNATION_TYPE_LABELS: Record<string, string> = {
+  mine: '开采',
+  harvest: '收获',
+  cut: '砍伐',
+  haul: '搬运',
+};
+
+/**
  * 格式化工具模式为显示标签
  *
+ * @param world - 游戏世界对象（提供建筑定义查询）
  * @param tool - 工具类型
  * @param desType - 指派类型（可选）
  * @param buildDefId - 建筑定义 ID（可选）
  * @param zoneType - 区域类型（可选）
- * @returns 模式标签（如 'Select'、'Build: wall_wood'、'Zone: growing'）
+ * @returns 模式标签（如 '选择'、'建造：木墙'、'区域：种植区'）
  */
 function formatToolModeLabel(
+  world: World,
   tool: string,
   desType: string | null,
   buildDefId: string | null,
   zoneType: string | null,
 ): string {
   switch (tool) {
-    case 'select': return 'Select';
-    case 'build': return buildDefId ? `Build: ${buildDefId}` : 'Build';
-    case 'designate': return desType ? `${desType.charAt(0).toUpperCase()}${desType.slice(1)}` : 'Designate';
-    case 'zone': return zoneType ? `Zone: ${zoneType}` : 'Zone';
-    case 'cancel': return 'Cancel';
+    case 'select': return '选择';
+    case 'build': {
+      if (!buildDefId) return '建造';
+      const buildLabel = world.defs.buildings.get(buildDefId)?.label ?? buildDefId;
+      return `建造：${buildLabel}`;
+    }
+    case 'designate':
+      return desType ? (DESIGNATION_TYPE_LABELS[desType] ?? desType) : '指派';
+    case 'zone':
+      return zoneType ? `区域：${ZONE_TYPE_LABELS[zoneType] ?? zoneType}` : '区域';
+    case 'cancel': return '取消';
     default: return tool;
   }
 }
@@ -326,24 +373,24 @@ function formatToolModeLabel(
  * @returns 预格式化的多行调试字符串
  */
 function buildDebugInfo(map: GameMap, presentation: PresentationState): string {
-  let dbg = `--- Debug ---\n`;
-  dbg += `Tool: ${presentation.activeTool}\n`;
+  let dbg = `--- 调试 ---\n`;
+  dbg += `工具：${presentation.activeTool}\n`;
   const hovered = presentation.hoveredCell;
   if (hovered) {
-    dbg += `Hover: (${hovered.x}, ${hovered.y})\n`;
+    dbg += `悬停：(${hovered.x}, ${hovered.y})\n`;
     const terrain = map.terrain.get(hovered.x, hovered.y);
-    dbg += `Terrain: ${terrain}\n`;
+    dbg += `地形：${terrain}\n`;
     const objs = map.spatial.getAt(hovered);
-    dbg += `Objects: ${objs.length}\n`;
+    dbg += `对象：${objs.length}\n`;
     for (const id of objs) {
       const object = map.objects.get(id);
       if (object) dbg += `  ${object.kind}: ${object.id}\n`;
     }
-    dbg += `Passable: ${map.spatial.isPassable(hovered)}\n`;
+    dbg += `可通行：${map.spatial.isPassable(hovered)}\n`;
   }
-  dbg += `Total objects: ${map.objects.size}\n`;
+  dbg += `对象总数：${map.objects.size}\n`;
   const reservations = map.reservations.getAll();
-  dbg += `Reservations: ${reservations.length}\n`;
+  dbg += `预约数：${reservations.length}\n`;
   return dbg;
 }
 

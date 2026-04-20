@@ -281,8 +281,8 @@ describe('selectObjectInspector', () => {
     expect(vm!.mode).toBe('specialized');
     expect(vm!.title).toBe('Alice');
     if (vm!.mode === 'specialized') {
-      expect(vm!.sections.some(s => s.title === 'Needs')).toBe(true);
-      expect(vm!.sections.some(s => s.title === 'Overview')).toBe(true);
+      expect(vm!.sections.some(s => s.title === '需求')).toBe(true);
+      expect(vm!.sections.some(s => s.title === '概览')).toBe(true);
     }
   });
 
@@ -310,7 +310,7 @@ describe('selectObjectInspector', () => {
     if (vm!.mode === 'specialized') {
       expect(vm!.actions.map(a => a.id)).toContain('assign_bed_owner');
       expect(vm!.actions.map(a => a.id)).toContain('clear_bed_owner');
-      expect(vm!.sections.some(s => s.title === 'Bed')).toBe(true);
+      expect(vm!.sections.some(s => s.title === '床位')).toBe(true);
     }
   });
 
@@ -326,8 +326,9 @@ describe('selectObjectInspector', () => {
           cell: { x: 4, y: 4 },
           footprint: { width: 1, height: 2 },
           targetDefId: 'bed_wood',
-          materialsRequired: [{ defId: 'wood', count: 10 }],
-          materialsDelivered: [{ defId: 'wood', count: 4 }],
+          targetLabel: '木床',
+          materialsRequired: [{ defId: 'wood', label: '木材', count: 10 }],
+          materialsDelivered: [{ defId: 'wood', label: '木材', count: 4 }],
         } as any,
       },
     });
@@ -336,7 +337,7 @@ describe('selectObjectInspector', () => {
     expect(vm!.mode).toBe('specialized');
     if (vm!.mode === 'specialized') {
       expect(vm!.actions.map(a => a.id)).toContain('cancel_construction');
-      expect(vm!.sections.some(s => s.title === 'Materials')).toBe(true);
+      expect(vm!.sections.some(s => s.title === '材料')).toBe(true);
     }
   });
 
@@ -352,6 +353,7 @@ describe('selectObjectInspector', () => {
           cell: { x: 5, y: 5 },
           footprint: { width: 1, height: 1 },
           targetDefId: 'wall_wood',
+          targetLabel: '木墙',
           buildProgress: 0.45,
         } as any,
       },
@@ -360,8 +362,8 @@ describe('selectObjectInspector', () => {
     const vm = selectObjectInspector(snapshot, makeUiState());
     expect(vm!.mode).toBe('specialized');
     if (vm!.mode === 'specialized') {
-      expect(vm!.subtitle).toBe('Construction Site');
-      expect(vm!.sections[0].rows.some(r => r.label === 'Progress' && r.value === '45%')).toBe(true);
+      expect(vm!.subtitle).toBe('施工工地');
+      expect(vm!.sections[0].rows.some(r => r.label === '进度' && r.value === '45%')).toBe(true);
     }
   });
 
@@ -384,8 +386,8 @@ describe('selectObjectInspector', () => {
     const vm = selectObjectInspector(snapshot, makeUiState());
     expect(vm!.mode).toBe('specialized');
     if (vm!.mode === 'specialized') {
-      expect(vm!.subtitle).toBe('Item');
-      expect(vm!.sections.some(s => s.title === 'Overview')).toBe(true);
+      expect(vm!.subtitle).toBe('物品');
+      expect(vm!.sections.some(s => s.title === '概览')).toBe(true);
     }
   });
 
@@ -409,7 +411,7 @@ describe('selectObjectInspector', () => {
     const vm = selectObjectInspector(snapshot, makeUiState());
     expect(vm!.mode).toBe('specialized');
     if (vm!.mode === 'specialized') {
-      expect(vm!.subtitle).toBe('Plant');
+      expect(vm!.subtitle).toBe('植物');
       expect(vm!.actions.map(a => a.id)).toContain('designate_harvest');
       expect(vm!.actions.map(a => a.id)).toContain('designate_cut');
     }
@@ -447,7 +449,7 @@ describe('selectObjectInspector', () => {
     expect(vm!.mode).toBe('specialized');
     expect(vm!.title).toBe('Warehouse');
     if (vm!.mode === 'specialized') {
-      expect(vm!.sections.some(s => s.title === 'Storage')).toBe(true);
+      expect(vm!.sections.some(s => s.title === '仓储')).toBe(true);
     }
   });
 });

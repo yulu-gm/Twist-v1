@@ -25,25 +25,25 @@ export const itemInspectorAdapter: ObjectInspectorAdapter = {
       mode: 'specialized',
       targetId: context.targetId,
       title: item.label,
-      subtitle: 'Item',
+      subtitle: '物品',
       stack: context.stack,
       sections: [
         {
           id: 'overview',
-          title: 'Overview',
+          title: '概览',
           rows: [
-            { label: 'Type', value: item.defId },
-            { label: 'Stack', value: String(item.stackCount) },
-            { label: 'Position', value: `(${item.cell.x}, ${item.cell.y})` },
+            { label: '类型', value: item.label },
+            { label: '堆叠', value: String(item.stackCount) },
+            { label: '坐标', value: `(${item.cell.x}, ${item.cell.y})` },
           ],
         },
       ],
       actions: [],
       renderBody: () => (
-        <Section title="Overview">
-          <StatRow label="Type" value={item.defId} />
-          <StatRow label="Stack" value={String(item.stackCount)} />
-          <StatRow label="Position" value={`(${item.cell.x}, ${item.cell.y})`} />
+        <Section title="概览">
+          <StatRow label="类型" value={item.label} />
+          <StatRow label="堆叠" value={String(item.stackCount)} />
+          <StatRow label="坐标" value={`(${item.cell.x}, ${item.cell.y})`} />
         </Section>
       ),
     };

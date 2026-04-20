@@ -38,8 +38,8 @@ describe('warehouse storage service', () => {
       totalCount: 14,
       typeCount: 2,
       entries: [
-        { defId: 'stone_block', label: 'Stone Block', count: 7, color: 0x999999 },
-        { defId: 'wood', label: 'Wood', count: 7, color: 0x8B4513 },
+        { defId: 'wood', label: '木材', count: 7, color: 0x8B4513 },
+        { defId: 'stone_block', label: '石砖', count: 7, color: 0x999999 },
       ],
     });
   });

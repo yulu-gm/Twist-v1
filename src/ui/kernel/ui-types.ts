@@ -241,10 +241,12 @@ export interface BlueprintObjectNode extends ObjectNodeBase {
   kind: 'blueprint';
   /** 目标建筑定义 ID */
   targetDefId: string;
-  /** 所需材料列表 */
-  materialsRequired: Array<{ defId: string; count: number }>;
-  /** 已运送材料列表 */
-  materialsDelivered: Array<{ defId: string; count: number }>;
+  /** 目标建筑显示名（已用 defs 解析为中文 label） */
+  targetLabel: string;
+  /** 所需材料列表（label 已用 defs 解析） */
+  materialsRequired: Array<{ defId: string; label: string; count: number }>;
+  /** 已运送材料列表（label 已用 defs 解析） */
+  materialsDelivered: Array<{ defId: string; label: string; count: number }>;
 }
 
 /** ConstructionSite 对象节点 */
@@ -252,6 +254,8 @@ export interface ConstructionSiteObjectNode extends ObjectNodeBase {
   kind: 'construction_site';
   /** 目标建筑定义 ID */
   targetDefId: string;
+  /** 目标建筑显示名（已用 defs 解析为中文 label） */
+  targetLabel: string;
   /** 建造进度（0-1） */
   buildProgress: number;
 }

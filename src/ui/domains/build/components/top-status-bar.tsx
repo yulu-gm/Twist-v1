@@ -43,8 +43,8 @@ export function TopStatusBar({ viewModel, onSetSpeed }: TopStatusBarProps) {
         </div>
       </div>
       <div class="top-status-bar__right">
-        <span>{viewModel.colonistCount} colonists</span>
-        <span class="top-status-bar__muted">T:{viewModel.tick}</span>
+        <span>{viewModel.colonistCount} 名殖民者</span>
+        <span class="top-status-bar__muted">刻:{viewModel.tick}</span>
       </div>
     </header>
   );

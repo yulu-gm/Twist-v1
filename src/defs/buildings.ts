@@ -13,8 +13,8 @@ export const BUILDING_DEFS: BuildingDef[] = [
   /** 木墙——基础结构，阻挡移动和光线，需要5个木材建造 */
   {
     defId: 'wall_wood',
-    label: 'Wood Wall',
-    description: 'A simple wooden wall.',
+    label: '木墙',
+    description: '简单的木质墙体。',
     size: { width: 1, height: 1 },
     maxHp: 150,
     workToBuild: 100,
@@ -28,8 +28,8 @@ export const BUILDING_DEFS: BuildingDef[] = [
   /** 石墙——高耐久结构，阻挡移动和光线，需要5个石砖建造 */
   {
     defId: 'wall_stone',
-    label: 'Stone Wall',
-    description: 'A sturdy stone wall.',
+    label: '石墙',
+    description: '坚固的石质墙体。',
     size: { width: 1, height: 1 },
     maxHp: 300,
     workToBuild: 200,
@@ -43,8 +43,8 @@ export const BUILDING_DEFS: BuildingDef[] = [
   /** 木门——可通行的结构，殖民者可以开关，阻挡光线但不阻挡移动 */
   {
     defId: 'door_wood',
-    label: 'Wood Door',
-    description: 'A wooden door. Colonists can open and close it.',
+    label: '木门',
+    description: '木质门，殖民者可以开关。',
     size: { width: 1, height: 1 },
     maxHp: 100,
     workToBuild: 80,
@@ -58,8 +58,8 @@ export const BUILDING_DEFS: BuildingDef[] = [
   /** 木床——家具，供殖民者睡觉，占1x2格，有交互偏移格 */
   {
     defId: 'bed_wood',
-    label: 'Wood Bed',
-    description: 'A simple bed for sleeping.',
+    label: '木床',
+    description: '供睡眠使用的简易床铺。',
     size: { width: 1, height: 2 },
     maxHp: 100,
     workToBuild: 120,
@@ -81,8 +81,8 @@ export const BUILDING_DEFS: BuildingDef[] = [
   /** 桌子——家具，用于进食，占2x1格 */
   {
     defId: 'table',
-    label: 'Table',
-    description: 'A table for eating.',
+    label: '桌子',
+    description: '用于进食的桌子。',
     size: { width: 2, height: 1 },
     maxHp: 100,
     workToBuild: 80,
@@ -96,8 +96,8 @@ export const BUILDING_DEFS: BuildingDef[] = [
   /** 仓库——可建造的家具型仓储设施，挂载抽象库存容器，是正式存储的唯一来源 */
   {
     defId: 'warehouse_shed',
-    label: 'Warehouse',
-    description: 'A dedicated warehouse for abstract item storage.',
+    label: '仓库',
+    description: '专用于抽象物品存储的仓库。',
     size: { width: 2, height: 2 },
     maxHp: 180,
     workToBuild: 180,

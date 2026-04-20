@@ -9,9 +9,9 @@
 
 /** 需求条的配置（标识、标签、颜色），与 ColonistNode.needs 的键一一对应 */
 export const needDefs = [
-  { key: 'food', label: 'Food', color: '#cc8844' },
-  { key: 'joy',  label: 'Joy',  color: '#44cc88' },
-  { key: 'mood', label: 'Mood', color: '#cc44cc' },
+  { key: 'food', label: '饱食', color: '#cc8844' },
+  { key: 'joy',  label: '愉悦',  color: '#44cc88' },
+  { key: 'mood', label: '心情', color: '#cc44cc' },
 ] as const;
 
 /**
@@ -21,6 +21,6 @@ export const needDefs = [
  * @returns 'idle' 表示空闲（灰色），'working' 表示工作中（蓝色）
  */
 export function getJobBadgeTone(job: string): 'idle' | 'working' | 'alert' {
-  if (job === 'idle' || job === 'Idle') return 'idle';
+  if (job === 'idle' || job === '空闲') return 'idle';
   return 'working';
 }
