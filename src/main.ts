@@ -22,8 +22,9 @@ import type { FeedbackSnapshot } from './ui/kernel/ui-types';
 
 // 导入功能模块
 import { createPawn } from './features/pawn/pawn.factory';
-import { createItem } from './features/item/item.factory';
 import { createPlant } from './features/plant/plant.factory';
+import { createBuilding } from './features/building/building.factory';
+import { storeInWarehouse } from './features/storage/storage.service';
 import type { World } from './world/world';
 
 // 导入共享的启动基础设施
@@ -106,7 +107,7 @@ function spawnInitialVegetation(map: GameMap, world: World): void {
 }
 
 /**
- * 生成初始棋子和资源 — 在地图中央创建 3 个棋子、5 堆木材和 3 堆食物
+ * 生成初始棋子和资源 — 在地图中央放置初始仓库，再在仓库内预存所有初始物资
  *
  * @param map - 目标地图
  * @param world - 世界对象（提供 RNG）
@@ -115,6 +116,17 @@ function spawnInitialPawns(map: GameMap, world: World): void {
   const rng = world.rng;
   const centerX = Math.floor(map.width / 2);
   const centerY = Math.floor(map.height / 2);
+
+  // 初始仓库 — 占地 2x2，放置在地图中央偏左上一格，使其覆盖中心点
+  // Initial warehouse — 2x2 footprint anchored so its area covers the map center
+  const warehouseCell = { x: centerX - 1, y: centerY - 1 };
+  const warehouse = createBuilding({
+    defId: 'warehouse_shed',
+    cell: warehouseCell,
+    mapId: map.id,
+    defs: world.defs,
+  });
+  map.objects.add(warehouse);
 
   const names = ['Alice', 'Bob', 'Charlie'];
   const traitIdsByName: Record<string, string[]> = {
@@ -145,28 +157,18 @@ function spawnInitialPawns(map: GameMap, world: World): void {
     map.objects.add(pawn);
   }
 
-  // 生成初始资源：5 堆木材
+  // 初始物资直接进入仓库 — 5 份木材累计入库
+  // Initial wood deposited straight into the warehouse
   for (let i = 0; i < 5; i++) {
-    const item = createItem({
-      defId: 'wood',
-      cell: { x: centerX + rng.nextInt(-2, 2), y: centerY + rng.nextInt(-2, 2) },
-      mapId: map.id,
-      stackCount: rng.nextInt(10, 25),
-      defs: world.defs,
-    });
-    map.objects.add(item);
+    const count = rng.nextInt(10, 25);
+    storeInWarehouse(warehouse, 'wood', count);
   }
 
-  // 生成初始食物：3 堆简单餐食
+  // 初始食物直接进入仓库 — 3 份简单餐食累计入库
+  // Initial meals deposited straight into the warehouse
   for (let i = 0; i < 3; i++) {
-    const item = createItem({
-      defId: 'meal_simple',
-      cell: { x: centerX + rng.nextInt(-2, 2), y: centerY + rng.nextInt(-2, 2) },
-      mapId: map.id,
-      stackCount: rng.nextInt(3, 8),
-      defs: world.defs,
-    });
-    map.objects.add(item);
+    const count = rng.nextInt(3, 8);
+    storeInWarehouse(warehouse, 'meal_simple', count);
   }
 }
 
