@@ -210,3 +210,59 @@ export function findReachableWarehouseForWithdrawal(
 
   return best;
 }
+
+/** 仓库标签型物品候选 — 表示一个 pawn 可在仓库里找到的、带特定标签的具体 defId 资源 */
+export interface WarehouseTaggedItemCandidate {
+  warehouse: Building;
+  approachCell: CellCoord;
+  defId: DefId;
+  availableCount: number;
+  distance: number;
+}
+
+/**
+ * 从所有可达仓库的库存中查找带指定标签的物品（如 'food'）
+ *
+ * - 跨仓库扫描每个 storage.inventory 条目，按 defs 上的 tags 过滤
+ * - 距离按 pawn → 仓库交互格估算；最优 = 距离最小者
+ * - availableCount 截断为不超过 requestedCount，避免上层多算
+ *
+ * 用于需求侧（吃饭等）需要"任意一种带 X 标签的物品"的查询，与
+ * findReachableWarehouseForWithdrawal（按 defId 精确查找）互补。
+ */
+export function findReachableWarehouseWithTaggedItem(
+  pawn: Pawn,
+  map: GameMap,
+  world: World,
+  tag: string,
+  requestedCount: number,
+): WarehouseTaggedItemCandidate | null {
+  let best: WarehouseTaggedItemCandidate | null = null;
+
+  for (const building of map.objects.allOfKind(ObjectKind.Building)) {
+    if (!building.storage) continue;
+    const approachCell = building.interaction?.interactionCell;
+    if (!approachCell) continue;
+    if (!isReachable(map, pawn.cell, approachCell)) continue;
+
+    const distance = estimateDistance(pawn.cell, approachCell);
+    if (best && distance >= best.distance) continue;
+
+    for (const [defId, count] of Object.entries(building.storage.inventory)) {
+      if (!count || count <= 0) continue;
+      const itemDef = world.defs.items.get(defId);
+      if (!itemDef?.tags.includes(tag)) continue;
+
+      best = {
+        warehouse: building,
+        approachCell,
+        defId,
+        availableCount: Math.min(count, requestedCount),
+        distance,
+      };
+      break;
+    }
+  }
+
+  return best;
+}
