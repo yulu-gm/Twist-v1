@@ -13,8 +13,8 @@ export const ITEM_DEFS: ItemDef[] = [
   /** 木材——基础建筑材料，可搬运，最大堆叠75 */
   {
     defId: 'wood',
-    label: 'Wood',
-    description: 'Raw wood logs.',
+    label: '木材',
+    description: '原木。',
     maxStack: 75,
     tags: ['haulable', 'resource', 'material'],
     color: 0x8B4513,
@@ -22,8 +22,8 @@ export const ITEM_DEFS: ItemDef[] = [
   /** 石块——开采岩石获得的粗加工石料，最大堆叠50 */
   {
     defId: 'stone_chunk',
-    label: 'Stone Chunk',
-    description: 'A rough chunk of stone.',
+    label: '石块',
+    description: '粗加工的石料。',
     maxStack: 50,
     tags: ['haulable', 'resource'],
     color: 0x808080,
@@ -31,8 +31,8 @@ export const ITEM_DEFS: ItemDef[] = [
   /** 石砖——由石块加工而成的建筑材料，最大堆叠50 */
   {
     defId: 'stone_block',
-    label: 'Stone Block',
-    description: 'Cut stone blocks for building.',
+    label: '石砖',
+    description: '可用于建筑的切割石砖。',
     maxStack: 50,
     tags: ['haulable', 'resource', 'material'],
     color: 0x999999,
@@ -40,8 +40,8 @@ export const ITEM_DEFS: ItemDef[] = [
   /** 钢铁——精炼金属材料，最大堆叠75 */
   {
     defId: 'steel',
-    label: 'Steel',
-    description: 'Refined steel.',
+    label: '钢铁',
+    description: '精炼后的钢铁。',
     maxStack: 75,
     tags: ['haulable', 'resource', 'material'],
     color: 0xB0C4DE,
@@ -49,8 +49,8 @@ export const ITEM_DEFS: ItemDef[] = [
   /** 简单餐食——烹饪制成的食物，营养值30，最大堆叠10 */
   {
     defId: 'meal_simple',
-    label: 'Simple Meal',
-    description: 'A simple but nutritious meal.',
+    label: '简易餐食',
+    description: '简单但富有营养的餐食。',
     maxStack: 10,
     tags: ['haulable', 'food'],
     color: 0xDAA520,
@@ -59,8 +59,8 @@ export const ITEM_DEFS: ItemDef[] = [
   /** 浆果——可直接生食的野果，营养值10，最大堆叠30 */
   {
     defId: 'berries',
-    label: 'Berries',
-    description: 'Wild berries, edible raw.',
+    label: '浆果',
+    description: '可生食的野生浆果。',
     maxStack: 30,
     tags: ['haulable', 'food', 'raw_food'],
     color: 0x8B0000,
@@ -69,8 +69,8 @@ export const ITEM_DEFS: ItemDef[] = [
   /** 稻米——收获的生稻，营养值5（需烹饪），最大堆叠50 */
   {
     defId: 'rice',
-    label: 'Rice',
-    description: 'Harvested rice.',
+    label: '稻米',
+    description: '收获的稻米。',
     maxStack: 50,
     tags: ['haulable', 'food', 'raw_food'],
     color: 0xFFFACD,

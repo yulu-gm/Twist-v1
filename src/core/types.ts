@@ -166,6 +166,8 @@ export enum ToilType {
   Deliver = "deliver",
   Interact = "interact",
   PrepareConstruction = "prepare_construction",
+  StoreInStorage = "store_in_storage",
+  TakeFromStorage = "take_from_storage",
 }
 
 /** 劳动步骤的执行状态 */
@@ -189,7 +191,6 @@ export enum JobState {
 // ── 区域类型枚举 ──
 /** 玩家可创建的区域类型 */
 export enum ZoneType {
-  Stockpile = "stockpile",
   Growing = "growing",
 }
 

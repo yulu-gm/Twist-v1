@@ -49,7 +49,7 @@ export interface PresentationSnapshot {
   activeTool: string;
   /** 当前指派类型（mine/harvest/cut 等），仅 designate 工具有值 */
   activeDesignationType: string | null;
-  /** 当前区域类型（stockpile 等），仅 zone 工具有值 */
+  /** 当前区域类型（growing 等），仅 zone 工具有值 */
   activeZoneType: string | null;
   /** 当前建筑定义 ID，仅 build 工具有值 */
   activeBuildDefId: string | null;
@@ -167,6 +167,20 @@ export interface BuildingNode {
     /** 是否允许自动分配 */
     autoAssignable: boolean;
   };
+  /** 仓储库存摘要（仅 storage 组件存在的建筑有此字段） */
+  storage?: BuildingStorageNode;
+}
+
+/** 建筑仓储节点 — 把抽象库存按物品定义聚合成 UI 可读的卡片数据 */
+export interface BuildingStorageNode {
+  /** 仓库最大可存储总数 */
+  capacityMax: number;
+  /** 当前已存储总数（从 inventory 实时聚合） */
+  storedCount: number;
+  /** 当前包含的物品种类数 */
+  typeCount: number;
+  /** 按物品定义聚合的库存条目（按数量降序） */
+  entries: Array<{ defId: string; label: string; count: number; color: number }>;
 }
 
 // ── 统一对象节点类型（Inspector 数据源） ──
@@ -218,6 +232,8 @@ export interface BuildingObjectNode extends ObjectNodeBase {
     occupantPawnId: string | null;
     autoAssignable: boolean;
   };
+  /** 仓储库存摘要 — 与 BuildingNode.storage 字段共享同一聚合 */
+  storage?: BuildingStorageNode;
 }
 
 /** Blueprint 对象节点 */
@@ -225,10 +241,12 @@ export interface BlueprintObjectNode extends ObjectNodeBase {
   kind: 'blueprint';
   /** 目标建筑定义 ID */
   targetDefId: string;
-  /** 所需材料列表 */
-  materialsRequired: Array<{ defId: string; count: number }>;
-  /** 已运送材料列表 */
-  materialsDelivered: Array<{ defId: string; count: number }>;
+  /** 目标建筑显示名（已用 defs 解析为中文 label） */
+  targetLabel: string;
+  /** 所需材料列表（label 已用 defs 解析） */
+  materialsRequired: Array<{ defId: string; label: string; count: number }>;
+  /** 已运送材料列表（label 已用 defs 解析） */
+  materialsDelivered: Array<{ defId: string; label: string; count: number }>;
 }
 
 /** ConstructionSite 对象节点 */
@@ -236,6 +254,8 @@ export interface ConstructionSiteObjectNode extends ObjectNodeBase {
   kind: 'construction_site';
   /** 目标建筑定义 ID */
   targetDefId: string;
+  /** 目标建筑显示名（已用 defs 解析为中文 label） */
+  targetLabel: string;
   /** 建造进度（0-1） */
   buildProgress: number;
 }
@@ -369,6 +389,8 @@ export interface EngineSnapshot {
   clockDisplay: string;
   /** 殖民者总数 */
   colonistCount: number;
+  /** 当前渲染 FPS（平滑值）；旧测试快照可不提供 */
+  fps?: number;
   /** 展示层快照 */
   presentation: PresentationSnapshot;
   /** 选择状态快照 */

@@ -5,22 +5,28 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { ZoneType, cellKey } from '../../core/types';
 import { buildDefDatabase } from '../../defs';
 import { createGameMap } from '../../world/game-map';
 import { createWorld } from '../../world/world';
+import { createBuilding } from '../building/building.factory';
 import { createItem } from '../item/item.factory';
 import { createPawn } from '../pawn/pawn.factory';
 import { jobSelectionSystem } from './job-selector';
 
-/** 在指定格子上添加单格存储区 */
-function addStockpile(map: ReturnType<typeof createGameMap>, cell: { x: number; y: number }) {
-  map.zones.add({
-    id: 'zone_stockpile',
-    zoneType: ZoneType.Stockpile,
-    cells: new Set([cellKey(cell)]),
-    config: { stockpile: { allowAllHaulable: true, allowedDefIds: new Set() } },
+/** 在指定格子上添加仓库建筑（用作入库目标） */
+function addWarehouse(
+  map: ReturnType<typeof createGameMap>,
+  defs: ReturnType<typeof buildDefDatabase>,
+  cell: { x: number; y: number },
+) {
+  const warehouse = createBuilding({
+    defId: 'warehouse_shed',
+    cell,
+    mapId: map.id,
+    defs,
   });
+  map.objects.add(warehouse);
+  return warehouse;
 }
 
 describe('job selector work decision snapshot', () => {
@@ -56,7 +62,7 @@ describe('job selector work decision snapshot', () => {
       stackCount: 10,
       defs,
     }));
-    addStockpile(map, { x: 8, y: 1 });
+    addWarehouse(map, defs, { x: 8, y: 1 });
 
     jobSelectionSystem.execute(world);
 
@@ -67,7 +73,7 @@ describe('job selector work decision snapshot', () => {
       status: 'active',
     });
     expect(pawn.ai.workDecision?.options.some(option => (
-      option.kind === 'haul_to_stockpile' && option.status === 'deferred'
+      option.kind === 'haul_to_storage' && option.status === 'deferred'
     ))).toBe(true);
   });
 
@@ -110,18 +116,18 @@ describe('job selector work decision snapshot', () => {
       stackCount: 10,
       defs,
     }));
-    addStockpile(map, { x: 8, y: 1 });
+    addWarehouse(map, defs, { x: 8, y: 1 });
 
     jobSelectionSystem.execute(world);
 
-    expect(pawn.ai.currentJob?.defId).toBe('job_haul');
+    expect(pawn.ai.currentJob?.defId).toBe('job_store_in_storage');
     expect(pawn.ai.workDecision?.options[0]).toMatchObject({
       kind: 'eat',
       status: 'blocked',
       failureReasonCode: 'target_reserved',
     });
     expect(pawn.ai.workDecision?.options.some(option => (
-      option.kind === 'haul_to_stockpile' && option.status === 'active'
+      option.kind === 'haul_to_storage' && option.status === 'active'
     ))).toBe(true);
   });
 });

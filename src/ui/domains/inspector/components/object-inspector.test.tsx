@@ -99,4 +99,27 @@ describe('ObjectInspector', () => {
     expect(screen.getByTestId('stack-tab-building_1')).toBeInTheDocument();
     expect(screen.getByTestId('stack-tab-item_1')).toBeInTheDocument();
   });
+
+  it('renders warehouse inventory dock inside specialized inspector body', () => {
+    const vm: SpecializedInspectorViewModel = {
+      mode: 'specialized',
+      targetId: 'warehouse_1',
+      title: 'Warehouse',
+      subtitle: 'Building',
+      stack: [{ id: 'warehouse_1', label: 'Warehouse', kind: 'building', isActive: true }],
+      sections: [],
+      actions: [],
+      renderBody: () => (
+        <div class="warehouse-inspector">
+          <div class="warehouse-inspector__top">top</div>
+          <div class="warehouse-inventory">
+            <div class="warehouse-inventory__grid" data-testid="warehouse-inventory-grid">grid</div>
+          </div>
+        </div>
+      ),
+    };
+
+    render(<ObjectInspector viewModel={vm} onSelectTarget={() => {}} onRunAction={() => {}} />);
+    expect(screen.getByTestId('warehouse-inventory-grid')).toBeInTheDocument();
+  });
 });

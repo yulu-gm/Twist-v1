@@ -390,7 +390,7 @@ export class InputHandler {
 
   /** 框选区域：收集合法格子打包成单 item 的 zone_create 订单 */
   private dragZoneCreate(minX: number, minY: number, maxX: number, maxY: number): void {
-    const zoneType = this.presentation.activeZoneType ?? ZoneType.Stockpile;
+    const zoneType = this.presentation.activeZoneType ?? ZoneType.Growing;
     const analysis = this.analyzeZonePlacement(this.getRectCells(minX, minY, maxX, maxY), zoneType);
     if (analysis.validCellCount === 0) return;
 
@@ -493,7 +493,7 @@ export class InputHandler {
 
     const dragRect = this.presentation.dragRect;
     const zoneType = this.presentation.activeTool === ToolType.Zone
-      ? (this.presentation.activeZoneType ?? ZoneType.Stockpile)
+      ? (this.presentation.activeZoneType ?? ZoneType.Growing)
       : null;
 
     let cells: CellCoord[] = [];

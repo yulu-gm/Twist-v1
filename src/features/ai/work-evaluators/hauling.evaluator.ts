@@ -1,10 +1,10 @@
 /**
  * @file hauling.evaluator.ts
- * @description 存储区搬运工作评估器 — 评估 pawn 是否可以搬运散落物品到存储区
+ * @description 仓库入库工作评估器 — 评估 pawn 是否可以把地面物资搬入仓库的抽象库存
  * @dependencies ai/work-evaluator.types — WorkEvaluator 接口；
  *               pathfinding — 距离估算和可达性检查；
- *               item/item.queries — 存储格查找和容量检查；
- *               ai/jobs — 搬运工作工厂函数
+ *               storage/storage.service — 仓库目标查找；
+ *               ai/jobs/storage-job — 入库 Job 工厂
  * @part-of AI 子系统（features/ai）
  */
 
@@ -12,32 +12,31 @@ import type { WorkEvaluator } from '../work-evaluator.types';
 import type { WorkEvaluation } from '../work-types';
 import type { Pawn } from '../../pawn/pawn.types';
 import type { Item } from '../../item/item.types';
+import type { Building } from '../../building/building.types';
 import type { GameMap } from '../../../world/game-map';
 import type { World } from '../../../world/world';
-import type { Zone } from '../../../world/zone-manager';
-import { ObjectKind, ZoneType, CellCoord, cellKey } from '../../../core/types';
+import { ObjectKind, CellCoord } from '../../../core/types';
 import { estimateDistance, isReachable } from '../../pathfinding/path.service';
-import {
-  findNearestAcceptingCell,
-  getCellAvailableCapacity,
-  isCellCompatibleForItemDef,
-} from '../../item/item.queries';
-import { createHaulJob } from '../jobs/haul-job';
+import { findReachableWarehouseForDeposit } from '../../storage/storage.service';
+import { createStoreInStorageJob } from '../jobs/storage-job';
 
 /**
- * 存储区搬运工作评估器 — 为散落物品寻找存储区目标
+ * 仓库入库工作评估器 — 为散落物品寻找最近可达的仓库目标
  *
- * 仅处理带 haulable 标签且不在兼容存储区内的物品
+ * 仅处理带 haulable 标签且未被预约的地面物品
  * 评分公式：15 - itemDist * 0.45 - destDist * 0.2
  */
-export const haulToStockpileWorkEvaluator: WorkEvaluator = {
-  kind: 'haul_to_stockpile',
-  label: '搬运到储存区',
+export const haulToStorageWorkEvaluator: WorkEvaluator = {
+  kind: 'haul_to_storage',
+  label: '搬运入库',
   priority: 15,
   evaluate(pawn: Pawn, map: GameMap, world: World): WorkEvaluation {
-    const blocked = (code: 'no_target' | 'no_stockpile_destination', text: string): WorkEvaluation => ({
-      kind: 'haul_to_stockpile',
-      label: '搬运到储存区',
+    const blocked = (
+      code: 'no_target' | 'no_storage_destination',
+      text: string,
+    ): WorkEvaluation => ({
+      kind: 'haul_to_storage',
+      label: '搬运入库',
       priority: 15,
       score: -1,
       failureReasonCode: code,
@@ -49,127 +48,89 @@ export const haulToStockpileWorkEvaluator: WorkEvaluator = {
     });
 
     const items = map.objects.allOfKind(ObjectKind.Item) as Item[];
-    let bestItem: Item | null = null;
-    let bestDest: CellCoord | null = null;
-    let bestScore = -Infinity;
+
+    let best: {
+      item: Item;
+      warehouse: Building;
+      approachCell: CellCoord;
+      score: number;
+      haulCount: number;
+    } | null = null;
+
+    let sawHaulable = false;
 
     for (const item of items) {
       if (item.destroyed) continue;
       if (!item.tags.has('haulable')) continue;
       if (map.reservations.isReserved(item.id)) continue;
-      if (isItemInCompatibleStockpile(map, item)) continue;
+      // 物品本身不可达——pawn 取不到，跳过（也不计入 sawHaulable，因为对该 pawn 等价于"没料"）
+      if (!isReachable(map, pawn.cell, item.cell)) continue;
+      sawHaulable = true;
 
-      const placement = findReachableStockpilePlacement(pawn, item, map, world);
-      if (!placement) continue;
+      const candidate = findReachableWarehouseForDeposit(
+        pawn,
+        map,
+        world,
+        item.defId,
+        item.stackCount,
+      );
+      if (!candidate) continue;
 
-      const haulCount = Math.min(item.stackCount, placement.totalCapacity, pawn.inventory.carryCapacity);
+      const haulCount = Math.min(
+        item.stackCount,
+        candidate.freeCapacity,
+        pawn.inventory.carryCapacity,
+      );
       if (haulCount <= 0) continue;
 
       const itemDist = estimateDistance(pawn.cell, item.cell);
-      const destDist = estimateDistance(item.cell, placement.bestCell);
+      const destDist = estimateDistance(item.cell, candidate.approachCell);
       const score = 15 - itemDist * 0.45 - destDist * 0.2;
 
-      if (score > bestScore) {
-        bestScore = score;
-        bestItem = item;
-        bestDest = placement.bestCell;
+      if (!best || score > best.score) {
+        best = {
+          item,
+          warehouse: candidate.warehouse,
+          approachCell: candidate.approachCell,
+          score,
+          haulCount,
+        };
       }
     }
 
-    if (!bestItem || !bestDest) {
-      return blocked('no_target', '没有可搬运且位于储存区外的物品');
+    if (!best) {
+      // 区分两种失败：没有任何地面可搬物 → no_target；
+      // 有地面可搬物但所有仓库都没有可用空间（已存在仓库但满了/不可达） → no_storage_destination
+      if (!sawHaulable) {
+        return blocked('no_target', '没有可入库的地面物资');
+      }
+      const hasAnyWarehouse = (
+        map.objects.allOfKind(ObjectKind.Building) as Building[]
+      ).some(b => !!b.storage);
+      if (hasAnyWarehouse) {
+        return blocked('no_storage_destination', '没有可达且仍有空间的仓库');
+      }
+      return blocked('no_target', '没有可入库的地面物资');
     }
 
-    // 重新计算最终的可搬运数量
-    const finalPlacement = findReachableStockpilePlacement(pawn, bestItem, map, world);
-    if (!finalPlacement) {
-      return blocked('no_stockpile_destination', '没有可达的储存区目标');
-    }
-
-    const haulCount = Math.min(bestItem.stackCount, finalPlacement.totalCapacity, pawn.inventory.carryCapacity);
-    if (haulCount <= 0) {
-      return blocked('no_stockpile_destination', '没有可达的储存区目标');
-    }
-
-    // 捕获闭包变量
-    const itemId = bestItem.id;
-    const itemCell = { ...bestItem.cell };
-    const destCell = { ...bestDest };
+    const itemId = best.item.id;
+    const itemCell = { ...best.item.cell };
+    const warehouseId = best.warehouse.id;
+    const approachCell = { ...best.approachCell };
+    const haulCount = best.haulCount;
 
     return {
-      kind: 'haul_to_stockpile',
-      label: '搬运到储存区',
+      kind: 'haul_to_storage',
+      label: '搬运入库',
       priority: 15,
-      score: bestScore,
+      score: best.score,
       failureReasonCode: 'none',
       failureReasonText: null,
-      detail: bestItem.defId,
-      jobDefId: 'job_haul',
+      detail: best.item.defId,
+      jobDefId: 'job_store_in_storage',
       evaluatedAtTick: world.tick,
-      createJob: () => createHaulJob(pawn.id, itemId, itemCell, destCell, haulCount),
+      createJob: () =>
+        createStoreInStorageJob(pawn.id, itemId, itemCell, warehouseId, approachCell, haulCount),
     };
   },
 };
-
-/** 判断物品是否已经位于兼容的 stockpile 存储区内 */
-function isItemInCompatibleStockpile(map: GameMap, item: Item): boolean {
-  const zone = map.zones.getZoneAt(cellKey(item.cell));
-  return !!zone
-    && zone.zoneType === ZoneType.Stockpile
-    && isItemAcceptedByStockpile(zone, item)
-    && isCellCompatibleForItemDef(map, item.cell, item.defId);
-}
-
-/** 检查存储区是否接受该物品 */
-function isItemAcceptedByStockpile(zone: Zone, item: Item): boolean {
-  const stockpile = zone.config.stockpile;
-  if (!stockpile) return true;
-  if (stockpile.allowAllHaulable) return item.tags.has('haulable');
-  return stockpile.allowedDefIds.has(item.defId);
-}
-
-/** 查找可达的存储区放置位置 */
-function findReachableStockpilePlacement(
-  pawn: Pawn,
-  item: Item,
-  map: GameMap,
-  world: World,
-): { bestCell: CellCoord; totalCapacity: number } | null {
-  if (!isReachable(map, pawn.cell, item.cell)) return null;
-
-  let totalReachableCapacity = 0;
-  for (const zone of map.zones.getAll()) {
-    if (zone.zoneType !== ZoneType.Stockpile) continue;
-    for (const key of zone.cells) {
-      const [x, y] = key.split(',').map(Number);
-      const cell = { x, y };
-      if (!isReachable(map, item.cell, cell)) continue;
-      totalReachableCapacity += getCellAvailableCapacity(map, world.defs, cell, item.defId, 'stockpile-only');
-    }
-  }
-
-  if (totalReachableCapacity <= 0) return null;
-
-  const excludedCells = new Set<string>();
-  while (true) {
-    const candidate = findNearestAcceptingCell(
-      map,
-      world.defs,
-      item.cell,
-      item.defId,
-      'stockpile-only',
-      {
-        excludedCells,
-        selectionPreference: 'prefer-existing-stacks',
-      },
-    );
-    if (!candidate) return null;
-    if (isReachable(map, item.cell, candidate)) {
-      return {
-        bestCell: candidate,
-        totalCapacity: totalReachableCapacity,
-      };
-    }
-    excludedCells.add(cellKey(candidate));
-  }
-}

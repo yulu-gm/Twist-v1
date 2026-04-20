@@ -26,30 +26,30 @@ export const constructionSiteInspectorAdapter: ObjectInspectorAdapter = {
       mode: 'specialized',
       targetId: context.targetId,
       title: site.label,
-      subtitle: 'Construction Site',
+      subtitle: '施工工地',
       stack: context.stack,
       sections: [
         {
           id: 'overview',
-          title: 'Overview',
+          title: '概览',
           rows: [
-            { label: 'Target', value: site.targetDefId },
-            { label: 'Progress', value: `${progressPercent}%` },
-            { label: 'Position', value: `(${site.cell.x}, ${site.cell.y})` },
-            { label: 'Size', value: `${site.footprint.width}x${site.footprint.height}` },
+            { label: '目标', value: site.targetLabel },
+            { label: '进度', value: `${progressPercent}%` },
+            { label: '坐标', value: `(${site.cell.x}, ${site.cell.y})` },
+            { label: '尺寸', value: `${site.footprint.width}x${site.footprint.height}` },
           ],
         },
       ],
       actions: [
-        { id: 'cancel_construction', label: 'Cancel Construction', enabled: true },
+        { id: 'cancel_construction', label: '取消建造', enabled: true },
       ],
       renderBody: (callbacks: InspectorBodyCallbacks) => (
         <>
-          <Section title="Overview">
-            <StatRow label="Target" value={site.targetDefId} />
-            <StatRow label="Progress" value={`${progressPercent}%`} />
-            <StatRow label="Position" value={`(${site.cell.x}, ${site.cell.y})`} />
-            <StatRow label="Size" value={`${site.footprint.width}x${site.footprint.height}`} />
+          <Section title="概览">
+            <StatRow label="目标" value={site.targetLabel} />
+            <StatRow label="进度" value={`${progressPercent}%`} />
+            <StatRow label="坐标" value={`(${site.cell.x}, ${site.cell.y})`} />
+            <StatRow label="尺寸" value={`${site.footprint.width}x${site.footprint.height}`} />
           </Section>
 
           <div class="inspector-actions" data-testid="inspector-actions">
@@ -57,7 +57,7 @@ export const constructionSiteInspectorAdapter: ObjectInspectorAdapter = {
               onClick={() => callbacks.onRunAction('cancel_construction', context.targetId)}
               data-testid="action-cancel_construction"
             >
-              Cancel Construction
+              取消建造
             </button>
           </div>
         </>

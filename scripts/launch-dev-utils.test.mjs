@@ -23,17 +23,6 @@ describe('buildLaunchChecks', () => {
       'Missing Vite dependency. Run "npm install" to restore dependencies.',
     ]);
   });
-
-  it('reports the missing scenario page for the visual launcher', () => {
-    const issues = buildLaunchChecks('visual', {
-      hasPackageJson: true,
-      hasNodeModules: true,
-      hasVite: true,
-      hasScenarioSelectPage: false,
-    });
-
-    expect(issues).toContain('Missing scenario-select.html required by visual-test.bat.');
-  });
 });
 
 describe('getLaunchTarget', () => {

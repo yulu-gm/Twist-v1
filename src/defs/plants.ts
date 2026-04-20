@@ -13,8 +13,8 @@ export const PLANT_DEFS: PlantDef[] = [
   /** 橡树——大型树木，30天成熟，砍伐可获得25个木材，4个生长阶段 */
   {
     defId: 'tree_oak',
-    label: 'Oak Tree',
-    description: 'A sturdy oak tree.',
+    label: '橡树',
+    description: '坚实的橡树。',
     growthDays: 30,
     harvestYield: { defId: 'wood', count: 25 },
     tags: ['plant', 'tree', 'cuttable'],
@@ -24,8 +24,8 @@ export const PLANT_DEFS: PlantDef[] = [
   /** 松树——高大针叶树，25天成熟，砍伐可获得20个木材，4个生长阶段 */
   {
     defId: 'tree_pine',
-    label: 'Pine Tree',
-    description: 'A tall pine tree.',
+    label: '松树',
+    description: '高耸的松树。',
     growthDays: 25,
     harvestYield: { defId: 'wood', count: 20 },
     tags: ['plant', 'tree', 'cuttable'],
@@ -35,8 +35,8 @@ export const PLANT_DEFS: PlantDef[] = [
   /** 浆果丛——野生灌木，8天成熟，收获可获得8个浆果，3个生长阶段 */
   {
     defId: 'bush_berry',
-    label: 'Berry Bush',
-    description: 'A bush bearing edible berries.',
+    label: '浆果丛',
+    description: '结有可食浆果的灌木。',
     growthDays: 8,
     harvestYield: { defId: 'berries', count: 8 },
     tags: ['plant', 'harvestable'],
@@ -46,8 +46,8 @@ export const PLANT_DEFS: PlantDef[] = [
   /** 水稻——人工种植作物，6天成熟，收获可获得6个稻米，3个生长阶段 */
   {
     defId: 'crop_rice',
-    label: 'Rice Plant',
-    description: 'A domesticated rice plant.',
+    label: '水稻',
+    description: '人工种植的水稻。',
     growthDays: 6,
     harvestYield: { defId: 'rice', count: 6 },
     tags: ['plant', 'crop', 'harvestable'],
@@ -57,8 +57,8 @@ export const PLANT_DEFS: PlantDef[] = [
   /** 高草——野生草本植物，5天成熟，无收获产出，2个生长阶段 */
   {
     defId: 'grass_tall',
-    label: 'Tall Grass',
-    description: 'Wild grass.',
+    label: '高草',
+    description: '野生草本。',
     growthDays: 5,
     tags: ['plant', 'grass'],
     color: 0x7CFC00,

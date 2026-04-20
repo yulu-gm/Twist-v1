@@ -13,7 +13,7 @@ import type { CellCoord } from '@core/types';
 /**
  * 创建 zone 区域（通过 zone_set_cells 命令）
  *
- * @param zoneType - zone 类型（如 'stockpile'）
+ * @param zoneType - zone 类型（如 'growing'）
  * @param cells - zone 覆盖的格子列表
  */
 export function createZoneCommand(zoneType: string, cells: CellCoord[]): CommandStep {

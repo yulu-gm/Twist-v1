@@ -10,8 +10,12 @@ import type { GameMap } from '../../world/game-map';
 
 /** 地图格子像素大小 */
 const TILE_SIZE = 32;
-/** WASD 键盘滚动速度（像素/帧） */
-const SCROLL_SPEED = 10;
+/** WASD 键盘目标速度（像素/秒） */
+const SCROLL_SPEED = 900;
+/** 键盘按下时的加速平滑系数（越大越跟手） */
+const MOVE_ACCEL = 14;
+/** 松开按键时的减速平滑系数（越大越快停下） */
+const MOVE_DECEL = 12;
 /** 最小缩放倍率 */
 const ZOOM_MIN = 0.25;
 /** 最大缩放倍率 */
@@ -30,6 +34,8 @@ const ZOOM_STEP = 0.1;
 export class CameraController {
   /** 主摄像机 */
   private camera: Phaser.Cameras.Scene2D.Camera;
+  /** WASD 移动速度向量（像素/秒） */
+  private velocity = { x: 0, y: 0 };
 
   // ── 拖拽状态 ──
   /** 是否正在中键拖拽 */
@@ -110,15 +116,39 @@ export class CameraController {
     });
   }
 
-  /** 每帧更新 — 处理 WASD 键盘平移（速度随缩放等比调整） */
-  update(): void {
-    const speed = SCROLL_SPEED / this.camera.zoom;
+  /** 每帧更新 — 处理 WASD 键盘平移（含缓动，delta 驱动） */
+  update(deltaMs: number): void {
+    if (!this.wasd) return;
 
-    if (this.wasd) {
-      if (this.wasd.W.isDown) this.camera.scrollY -= speed;
-      if (this.wasd.S.isDown) this.camera.scrollY += speed;
-      if (this.wasd.A.isDown) this.camera.scrollX -= speed;
-      if (this.wasd.D.isDown) this.camera.scrollX += speed;
+    const dt = Math.max(0, deltaMs) / 1000;
+    if (dt <= 0) return;
+
+    // 键盘方向输入
+    let inputX = 0;
+    let inputY = 0;
+    if (this.wasd.A.isDown) inputX -= 1;
+    if (this.wasd.D.isDown) inputX += 1;
+    if (this.wasd.W.isDown) inputY -= 1;
+    if (this.wasd.S.isDown) inputY += 1;
+
+    // 对角线方向归一化，避免斜向速度更快
+    const inputLength = Math.hypot(inputX, inputY);
+    if (inputLength > 0) {
+      inputX /= inputLength;
+      inputY /= inputLength;
     }
+
+    const targetVx = inputX * SCROLL_SPEED;
+    const targetVy = inputY * SCROLL_SPEED;
+    const smoothing = inputLength > 0 ? MOVE_ACCEL : MOVE_DECEL;
+    const lerpFactor = 1 - Math.exp(-smoothing * dt);
+
+    this.velocity.x += (targetVx - this.velocity.x) * lerpFactor;
+    this.velocity.y += (targetVy - this.velocity.y) * lerpFactor;
+
+    // 保持既有手感：缩放越大，世界坐标平移步长越小
+    const zoomFactor = 1 / Math.max(this.camera.zoom, 0.0001);
+    this.camera.scrollX += this.velocity.x * dt * zoomFactor;
+    this.camera.scrollY += this.velocity.y * dt * zoomFactor;
   }
 }

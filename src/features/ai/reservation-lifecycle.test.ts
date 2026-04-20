@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { ObjectKind, ToilState, JobState, ZoneType, cellKey } from '../../core/types';
+import { ObjectKind, ToilState, JobState } from '../../core/types';
 import { buildDefDatabase } from '../../defs';
 import { createGameMap } from '../../world/game-map';
 import { createWorld } from '../../world/world';
 import { createPawn } from '../pawn/pawn.factory';
 import { createItem } from '../item/item.factory';
+import { createBuilding } from '../building/building.factory';
 import { createHaulJob } from './jobs/haul-job';
 import { advanceToil } from './job-lifecycle';
 import { jobSelectionSystem } from './job-selector';
@@ -56,18 +57,20 @@ function makeBlueprint(map: ReturnType<typeof createGameMap>, itemDefId: string)
   return blueprint;
 }
 
-function addStockpileAt(map: ReturnType<typeof createGameMap>, coord: { x: number; y: number }) {
-  map.zones.add({
-    id: 'zone_stockpile',
-    zoneType: ZoneType.Stockpile,
-    cells: new Set([cellKey(coord)]),
-    config: {
-      stockpile: {
-        allowAllHaulable: true,
-        allowedDefIds: new Set(),
-      },
-    },
-  });
+function addWarehouseAt(
+  map: ReturnType<typeof createGameMap>,
+  defs: ReturnType<typeof buildDefDatabase>,
+  coord: { x: number; y: number },
+  itemDefId: string,
+  stock: number,
+) {
+  const warehouse = createBuilding({ defId: 'warehouse_shed', cell: coord, mapId: map.id, defs });
+  map.objects.add(warehouse);
+  if (warehouse.storage) {
+    warehouse.storage.inventory[itemDefId] = stock;
+    warehouse.storage.storedCount = stock;
+  }
+  return warehouse;
 }
 
 describe('reservation lifecycle', () => {
@@ -102,8 +105,9 @@ describe('reservation lifecycle', () => {
     const { defs, world, map, pawn } = createTestWorld();
     const item = createItem({ defId: 'wood', cell: { x: 4, y: 2 }, mapId: map.id, stackCount: 15, defs });
     map.objects.add(item);
-    makeBlueprint(map, item.defId);
-    addStockpileAt(map, item.cell);
+    const blueprint = makeBlueprint(map, item.defId);
+    // 仓库储备充足材料，使 deliver evaluator 能够选中蓝图并发起 take_from_storage Job
+    addWarehouseAt(map, defs, { x: 5, y: 5 }, item.defId, 10);
 
     const job = createHaulJob(pawn.id, item.id, item.cell, { x: 8, y: 8 }, 5, 'bp_1');
     const resId = map.reservations.tryReserve({
@@ -125,9 +129,10 @@ describe('reservation lifecycle', () => {
 
     jobSelectionSystem.execute(world);
 
+    // stockpile 已下线 — pawn 现在应被分配从仓库取材送往蓝图的 take_from_storage Job
     expect(pawn.ai.currentJob).not.toBeNull();
-    expect(pawn.ai.currentJob?.defId).toBe('job_deliver_materials');
-    expect(pawn.ai.currentJob?.targetId).toBe(item.id);
+    expect(pawn.ai.currentJob?.defId).toBe('job_take_from_storage');
+    void blueprint;
   });
 
 });

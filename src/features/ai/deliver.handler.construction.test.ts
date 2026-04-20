@@ -3,6 +3,9 @@ import '../construction/occupancy.test.mock';
 import { ToilState, ToilType, JobState } from '../../core/types';
 import { createConstructionTestWorld, createBlueprint } from '../construction/construction.test-utils';
 import { executeDeliver } from './toil-handlers/deliver.handler';
+import { executeTakeFromStorage } from './toil-handlers/take-from-storage.handler';
+import { createBuilding } from '../building/building.factory';
+import { createTakeFromStorageToBlueprintJob } from './jobs/storage-job';
 
 describe('executeDeliver construction integration', () => {
   it('promotes a blueprint to a construction site when the final delivery arrives', () => {
@@ -118,5 +121,65 @@ describe('executeDeliver construction integration', () => {
     expect(toil.state).toBe(ToilState.Completed);
     expect(map.objects.get(blueprint.id)).toBeUndefined();
     expect(map.objects.allOfKind('construction_site' as never)).toHaveLength(1);
+  });
+
+  it('delivers material after taking it from warehouse inventory', () => {
+    const { world, map, pawn, defs } = createConstructionTestWorld();
+
+    const warehouse = createBuilding({
+      defId: 'warehouse_shed',
+      cell: { x: 12, y: 8 },
+      mapId: map.id,
+      defs,
+    });
+    warehouse.storage!.inventory = { wood: 20 };
+    warehouse.storage!.storedCount = 20;
+    map.objects.add(warehouse);
+
+    const blueprint = createBlueprint(map, {
+      cell: { x: 14, y: 10 },
+      materialsRequired: [{ defId: 'wood', count: 5 }],
+      materialsDelivered: [{ defId: 'wood', count: 0 }],
+    });
+
+    const warehouseApproach = warehouse.interaction!.interactionCell;
+    const blueprintApproach = { x: blueprint.cell.x - 1, y: blueprint.cell.y };
+
+    const job = createTakeFromStorageToBlueprintJob(
+      pawn.id,
+      warehouse.id,
+      warehouseApproach,
+      'wood',
+      5,
+      blueprint.id,
+      blueprintApproach,
+    );
+
+    // 第一步：让 pawn 站在仓库交互格上，跑 TakeFromStorage
+    pawn.cell = { ...warehouseApproach };
+    job.currentToilIndex = 1;
+    const takeToil = job.toils[1];
+    takeToil.state = ToilState.InProgress;
+    executeTakeFromStorage({ pawn, toil: takeToil, job, map, world });
+
+    expect(takeToil.state).toBe(ToilState.Completed);
+    expect(warehouse.storage!.inventory.wood).toBe(15);
+    expect(warehouse.storage!.storedCount).toBe(15);
+    expect(pawn.inventory.carrying).toEqual({ defId: 'wood', count: 5 });
+
+    // 第二步：跳到 Deliver toil，让 pawn 站在蓝图相邻格交付材料
+    pawn.cell = { ...blueprintApproach };
+    job.currentToilIndex = 3;
+    const deliverToil = job.toils[3];
+    deliverToil.state = ToilState.InProgress;
+    executeDeliver({ pawn, toil: deliverToil, job, map, world });
+
+    expect(deliverToil.state).toBe(ToilState.Completed);
+    const delivered = map.objects.get(blueprint.id) as typeof blueprint | undefined;
+    // 材料完整交付后蓝图被升级为工地，所以原 blueprint 已被移除
+    if (delivered) {
+      expect(delivered.materialsDelivered.find(entry => entry.defId === 'wood')?.count).toBe(5);
+    }
+    expect(pawn.inventory.carrying).toBeNull();
   });
 });

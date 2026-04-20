@@ -392,7 +392,7 @@ describe('InputHandler emits create_map_work_order per drag/click', () => {
     const presentation = createPresentationState();
     applyToolSelection(presentation, {
       tool: ToolType.Zone,
-      zoneType: ZoneType.Stockpile,
+      zoneType: ZoneType.Growing,
     });
 
     const map = createFakeMap();
@@ -412,7 +412,7 @@ describe('InputHandler emits create_map_work_order per drag/click', () => {
     expect(item.targetRef.kind).toBe('area');
     expect(Array.isArray(item.targetRef.cells)).toBe(true);
     expect(item.targetRef.cells.length).toBeGreaterThan(0);
-    expect(item.targetRef.zoneType).toBe(ZoneType.Stockpile);
+    expect(item.targetRef.zoneType).toBe(ZoneType.Growing);
   });
 
   it('drag-cancel: splits into one order per cancel kind, no raw cancel/zone commands', () => {
@@ -427,7 +427,7 @@ describe('InputHandler emits create_map_work_order per drag/click', () => {
         [cellKey({ x: 2, y: 2 })]: [{ id: 'b1', kind: ObjectKind.Blueprint, tags: new Set() }],
       },
       zonesByCell: {
-        [cellKey({ x: 3, y: 3 })]: { id: 'z1', zoneType: ZoneType.Stockpile },
+        [cellKey({ x: 3, y: 3 })]: { id: 'z1', zoneType: ZoneType.Growing },
       },
     });
     const world = createFakeWorld();

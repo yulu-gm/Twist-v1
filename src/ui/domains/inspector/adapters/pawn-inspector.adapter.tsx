@@ -31,21 +31,21 @@ export const pawnInspectorAdapter: ObjectInspectorAdapter = {
     const sections: InspectorSection[] = [
       {
         id: 'overview',
-        title: 'Overview',
+        title: '概览',
         rows: [
-          { label: 'Job', value: pawn.currentJobLabel },
-          { label: 'HP', value: `${pawn.health.hp}/${pawn.health.maxHp}` },
-          { label: 'Position', value: `(${pawn.cell.x}, ${pawn.cell.y})` },
+          { label: '任务', value: pawn.currentJobLabel },
+          { label: '生命', value: `${pawn.health.hp}/${pawn.health.maxHp}` },
+          { label: '坐标', value: `(${pawn.cell.x}, ${pawn.cell.y})` },
         ],
       },
       {
         id: 'needs',
-        title: 'Needs',
+        title: '需求',
         rows: [
-          { label: 'Food', value: String(pawn.needs.food) },
-          { label: 'Rest', value: String(pawn.needs.rest) },
-          { label: 'Joy', value: String(pawn.needs.joy) },
-          { label: 'Mood', value: String(pawn.needs.mood) },
+          { label: '饱食', value: String(pawn.needs.food) },
+          { label: '精力', value: String(pawn.needs.rest) },
+          { label: '愉悦', value: String(pawn.needs.joy) },
+          { label: '心情', value: String(pawn.needs.mood) },
         ],
       },
     ];
@@ -57,19 +57,19 @@ export const pawnInspectorAdapter: ObjectInspectorAdapter = {
       mode: 'specialized',
       targetId: context.targetId,
       title: pawn.label,
-      subtitle: 'Pawn',
+      subtitle: '殖民者',
       stack: context.stack,
       sections,
       actions: [],
       renderBody: () => (
         <>
-          <Section title="Info">
-            <StatRow label="Position" value={`(${pawn.cell.x}, ${pawn.cell.y})`} />
-            <StatRow label="Job" value={pawn.currentJobLabel} />
-            <StatRow label="HP" value={`${pawn.health.hp}/${pawn.health.maxHp}`} />
+          <Section title="信息">
+            <StatRow label="坐标" value={`(${pawn.cell.x}, ${pawn.cell.y})`} />
+            <StatRow label="任务" value={pawn.currentJobLabel} />
+            <StatRow label="生命" value={`${pawn.health.hp}/${pawn.health.maxHp}`} />
           </Section>
 
-          <Section title="Needs">
+          <Section title="需求">
             {needDefs.map(def => (
               <ProgressBar
                 key={def.key}

@@ -1,5 +1,10 @@
+/**
+ * @file job-selector.reachability.test.ts
+ * @description 验证 selector 在仓库目标存在/被阻挡时的可达性筛选
+ * @part-of AI 子系统（features/ai）
+ */
+
 import { describe, expect, it } from 'vitest';
-import { ZoneType, cellKey } from '../../core/types';
 import { buildDefDatabase } from '../../defs';
 import { createGameMap } from '../../world/game-map';
 import { createWorld } from '../../world/world';
@@ -8,32 +13,20 @@ import { createItem } from '../item/item.factory';
 import { createPawn } from '../pawn/pawn.factory';
 import { jobSelectionSystem } from './job-selector';
 
-function addStockpileAt(map: ReturnType<typeof createGameMap>, coord: { x: number; y: number }) {
-  map.zones.add({
-    id: 'zone_stockpile',
-    zoneType: ZoneType.Stockpile,
-    cells: new Set([cellKey(coord)]),
-    config: {
-      stockpile: {
-        allowAllHaulable: true,
-        allowedDefIds: new Set(),
-      },
-    },
+/** 在指定格子上添加仓库建筑（占地 2x2） */
+function addWarehouse(
+  map: ReturnType<typeof createGameMap>,
+  defs: ReturnType<typeof buildDefDatabase>,
+  cell: { x: number; y: number },
+) {
+  const warehouse = createBuilding({
+    defId: 'warehouse_shed',
+    cell,
+    mapId: map.id,
+    defs,
   });
-}
-
-function addStockpileCells(map: ReturnType<typeof createGameMap>, coords: Array<{ x: number; y: number }>) {
-  map.zones.add({
-    id: 'zone_stockpile_multi',
-    zoneType: ZoneType.Stockpile,
-    cells: new Set(coords.map(cell => cellKey(cell))),
-    config: {
-      stockpile: {
-        allowAllHaulable: true,
-        allowedDefIds: new Set(),
-      },
-    },
-  });
+  map.objects.add(warehouse);
+  return warehouse;
 }
 
 describe('job selector reachability', () => {
@@ -107,15 +100,15 @@ describe('job selector reachability', () => {
       }));
     }
 
+    addWarehouse(map, defs, { x: 8, y: 1 });
     map.pathGrid.rebuildFrom(map, defs);
-    addStockpileAt(map, { x: 8, y: 1 });
 
     jobSelectionSystem.execute(world);
 
     expect(pawn.ai.currentJob).toBeNull();
   });
 
-  it('assigns haul jobs to a reachable stockpile cell when the nearest one is blocked', () => {
+  it('assigns store-in-storage jobs to a reachable warehouse when the nearest one is unreachable', () => {
     const defs = buildDefDatabase();
     const world = createWorld({ defs, seed: 12345 });
     const map = createGameMap({ id: 'main', width: 12, height: 12 });
@@ -139,17 +132,19 @@ describe('job selector reachability', () => {
     });
     map.objects.add(item);
 
-    addStockpileCells(map, [
-      { x: 4, y: 1 },
-      { x: 8, y: 1 },
-    ]);
+    // 近仓库被墙完全围住——其交互格不可达
+    const nearWarehouse = addWarehouse(map, defs, { x: 4, y: 3 });
+    // 远仓库无障碍可达
+    const farWarehouse = addWarehouse(map, defs, { x: 9, y: 1 });
 
+    const nearApproach = nearWarehouse.interaction!.interactionCell;
     for (const cell of [
-      { x: 3, y: 1 },
-      { x: 4, y: 0 },
-      { x: 4, y: 2 },
-      { x: 5, y: 1 },
+      { x: nearApproach.x - 1, y: nearApproach.y },
+      { x: nearApproach.x + 1, y: nearApproach.y },
+      { x: nearApproach.x, y: nearApproach.y - 1 },
+      { x: nearApproach.x, y: nearApproach.y + 1 },
     ]) {
+      if (cell.x < 0 || cell.y < 0 || cell.x >= map.width || cell.y >= map.height) continue;
       map.objects.add(createBuilding({
         defId: 'wall_wood',
         cell,
@@ -162,7 +157,9 @@ describe('job selector reachability', () => {
 
     jobSelectionSystem.execute(world);
 
-    expect(pawn.ai.currentJob?.defId).toBe('job_haul');
-    expect(pawn.ai.currentJob?.toils[2]?.targetCell).toEqual({ x: 8, y: 1 });
+    expect(pawn.ai.currentJob?.defId).toBe('job_store_in_storage');
+    // 入库 Job 的第 4 个 toil（StoreInStorage）目标即仓库交互格
+    const storeToil = pawn.ai.currentJob?.toils[3];
+    expect(storeToil?.targetCell).toEqual(farWarehouse.interaction!.interactionCell);
   });
 });

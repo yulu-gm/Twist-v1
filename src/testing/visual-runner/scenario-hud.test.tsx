@@ -86,15 +86,15 @@ describe('ScenarioHud', () => {
     const onResume = vi.fn();
     const { getByRole, getByText } = render(
       h(ScenarioHud, {
-        scenarioId: 'stockpile-haul',
-        title: '搬运进 Stockpile',
+        scenarioId: 'warehouse-storage-haul',
+        title: '搬运进仓库',
         sessionStatus: 'paused',
         currentTick: 42,
         currentSpeed: SimSpeed.Paused,
         currentSpeedLabel: 'Paused',
-        currentStepTitle: '等待木材进入 stockpile',
-        visualSteps: [{ title: '等待木材进入 stockpile', status: 'running' }],
-        shadowSteps: [{ title: '等待木材进入 stockpile', status: 'passed' }],
+        currentStepTitle: '等待木材进入仓库',
+        visualSteps: [{ title: '等待木材进入仓库', status: 'running' }],
+        shadowSteps: [{ title: '等待木材进入仓库', status: 'passed' }],
         divergence: null,
         onResume,
         onStepTicks,

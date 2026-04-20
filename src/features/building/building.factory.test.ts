@@ -10,6 +10,26 @@ import {
 } from './building.queries';
 
 describe('building furniture support', () => {
+  it('attaches warehouse storage inventory from the building def', () => {
+    const defs = buildDefDatabase();
+
+    const warehouse = createBuilding({
+      defId: 'warehouse_shed',
+      cell: { x: 4, y: 5 },
+      mapId: 'main',
+      defs,
+    });
+
+    expect(warehouse.category).toBe('furniture');
+    expect(warehouse.furniture?.usageType).toBe('storage');
+    expect(warehouse.storage).toEqual({
+      mode: 'all-haulable',
+      capacityMax: 160,
+      storedCount: 0,
+      inventory: {},
+    });
+  });
+
   it('attaches furniture and bed components from the building def', () => {
     const defs = buildDefDatabase();
     const bed = createBuilding({

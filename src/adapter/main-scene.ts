@@ -26,6 +26,8 @@ import { advanceWorldTick, processWorldCommands } from '../bootstrap/world-step'
 
 /** 基础 tick 间隔（毫秒），1x 速度下每 100ms 执行一次 tick */
 const TICK_MS = 100; // base tick interval at 1x
+/** FPS 平滑系数（越大越平滑） */
+const FPS_SMOOTHING = 0.9;
 
 /**
  * 主场景类 — Phaser 的核心场景
@@ -55,6 +57,8 @@ export class MainScene extends Phaser.Scene {
   private selectionHighlight!: SelectionHighlight;
   /** 调试覆盖层：渲染区域/房间/温度等可视化 */
   private debugOverlay!: DebugOverlay;
+  /** 摄像机控制器：处理摄像机的缩放、平移、WASD 键盘移动和鼠标中键拖拽 */
+  private cameraController!: CameraController;
 
   // ── tick 累积器 ──
   /** 累积的帧间隔时间（毫秒），达到 TICK_MS 时消耗并执行 tick */
@@ -87,7 +91,7 @@ export class MainScene extends Phaser.Scene {
 
     this.presentation = createPresentationState();
     this.renderSync = new RenderSync(this, this.world, this.activeMap);
-    new CameraController(this, this.activeMap);
+    this.cameraController = new CameraController(this, this.activeMap);
     this.inputHandler = new InputHandler(this, this.world, this.activeMap, this.presentation);
     this.worldPreview = new WorldPreview(this);
     this.selectionHighlight = new SelectionHighlight(this, this.activeMap);
@@ -121,11 +125,18 @@ export class MainScene extends Phaser.Scene {
    * 5. 同步渲染状态
    */
   update(_time: number, delta: number): void {
+    // 计算平滑 FPS（EMA），避免顶栏数字每帧大幅抖动
+    const instantFps = delta > 0 ? 1000 / delta : 0;
+    this.presentation.fps = this.presentation.fps <= 0
+      ? instantFps
+      : this.presentation.fps * FPS_SMOOTHING + instantFps * (1 - FPS_SMOOTHING);
+
     // 始终更新输入和 UI（即使暂停时也需响应操作）
     this.inputHandler.update();
     this.worldPreview.update(this.presentation);
     this.selectionHighlight.update(this.presentation);
     this.debugOverlay.update();
+    this.cameraController.update(delta);
 
     // 通知 Preact UI 桥接发射新快照
     if (this.uiBridge) this.uiBridge.emit();

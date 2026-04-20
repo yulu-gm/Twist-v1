@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { ObjectKind } from '../../core/types';
 import { buildDefDatabase } from '../../defs';
 import { createPawn } from '../pawn/pawn.factory';
+import { createBuilding } from '../building/building.factory';
 import { createGameMap } from '../../world/game-map';
 import { createWorld } from '../../world/world';
 import { loadGameHandler, saveGameHandler } from './save.commands';
@@ -53,5 +54,38 @@ describe('save/load chronotype compatibility', () => {
     expect(loadedPawn.chronotype.sleepEndHour).toBe(30);
     expect(loadedPawn.schedule.entries).toHaveLength(24);
     expect(loadedPawn.schedule.entries.filter(entry => entry.activity === 'sleep')).toHaveLength(8);
+  });
+
+  it('persists warehouse inventory across save and load', () => {
+    const defs = buildDefDatabase();
+    const world = createWorld({ defs, seed: 42 });
+    const map = createGameMap({ id: 'main', width: 12, height: 12 });
+    world.maps.set(map.id, map);
+
+    const warehouse = createBuilding({
+      defId: 'warehouse_shed',
+      cell: { x: 3, y: 3 },
+      mapId: map.id,
+      defs,
+    });
+
+    warehouse.storage!.inventory = { wood: 12, stone_block: 4 };
+    warehouse.storage!.storedCount = 16;
+    map.objects.add(warehouse);
+
+    saveGameHandler.execute(world, { type: 'save_game', payload: {} } as any);
+
+    const loadedWorld = createWorld({ defs, seed: 7 });
+    loadGameHandler.execute(loadedWorld, { type: 'load_game', payload: {} } as any);
+
+    const loadedMap = loadedWorld.maps.get('main')!;
+    const loadedWarehouse = loadedMap.objects.getAs(warehouse.id, ObjectKind.Building)!;
+
+    expect(loadedWarehouse.storage).toEqual({
+      mode: 'all-haulable',
+      capacityMax: 160,
+      storedCount: 16,
+      inventory: { wood: 12, stone_block: 4 },
+    });
   });
 });

@@ -16,7 +16,6 @@ import {
   setPawnChronotypeFixture,
   spawnPawnWithTraitsFixture,
 } from '../scenario-fixtures/tod-fixtures';
-import { createZoneCommand } from '../scenario-commands/zone-commands';
 
 const NORMAL_PAWN = 'Normal';
 const NIGHT_OWL_PAWN = 'Night Owl';
@@ -29,17 +28,7 @@ const BED_CELLS = [
   { x: 19, y: 14 },
 ] as const;
 
-const STOCKPILE_CELLS = [
-  { x: 26, y: 8 },
-  { x: 27, y: 8 },
-  { x: 28, y: 8 },
-  { x: 26, y: 9 },
-  { x: 27, y: 9 },
-  { x: 28, y: 9 },
-  { x: 26, y: 10 },
-  { x: 27, y: 10 },
-  { x: 28, y: 10 },
-] as const;
+const STORAGE_BUILDING_CELL = { x: 26, y: 8 } as const;
 
 const WOOD_SOURCE_CELLS = [
   { x: 6, y: 8 },
@@ -72,6 +61,7 @@ export const todSleepRhythmScenario = createScenario({
     spawnBuildingFixture('bed_wood', BED_CELLS[0]),
     spawnBuildingFixture('bed_wood', BED_CELLS[1]),
     spawnBuildingFixture('bed_wood', BED_CELLS[2]),
+    spawnBuildingFixture('warehouse_shed', STORAGE_BUILDING_CELL),
     spawnPawnFixture({ x: 10, y: 8 }, NORMAL_PAWN),
     spawnPawnWithTraitsFixture({ x: 10, y: 11 }, NIGHT_OWL_PAWN, ['night_owl']),
     spawnPawnWithTraitsFixture({ x: 10, y: 14 }, HIGH_ENERGY_PAWN, ['high_energy']),
@@ -112,7 +102,6 @@ export const todSleepRhythmScenario = createScenario({
     }),
   ],
   script: [
-    createZoneCommand('stockpile', STOCKPILE_CELLS as unknown as { x: number; y: number }[]),
     createWaitForStep('普通 pawn 先进入睡眠', ({ query }) => {
       const normal = query.findPawnByName(NORMAL_PAWN);
       const nightOwl = query.findPawnByName(NIGHT_OWL_PAWN);

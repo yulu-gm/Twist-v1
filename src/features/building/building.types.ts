@@ -10,7 +10,6 @@ import type {
   MapObjectBase,
   Rotation,
   DefId,
-  StoragePriority,
   CellCoord,
 } from '../../core/types';
 
@@ -49,12 +48,16 @@ export interface Building extends MapObjectBase {
     /** 是否已连接到电网 */
     connected: boolean;
   };
-  /** 仓储组件：将建筑作为物品容器使用 */
+  /** 仓储组件：将建筑作为抽象库存容器使用 */
   storage?: {
-    /** 允许存放的物品定义ID集合 */
-    allowedDefIds: Set<DefId>;
-    /** 存储优先级 */
-    priority: StoragePriority;
+    /** 收纳模式：'all-haulable' = 接受所有 haulable 物品 */
+    mode: 'all-haulable';
+    /** 仓库最大可存储总数 */
+    capacityMax: number;
+    /** 当前已存储总数 */
+    storedCount: number;
+    /** 按物品定义 ID 聚合的库存数量映射 */
+    inventory: Partial<Record<DefId, number>>;
   };
   /** 交互组件：棋子与建筑互动时使用的格子位置 */
   interaction?: {

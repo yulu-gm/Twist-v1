@@ -13,7 +13,7 @@ export const TERRAIN_DEFS: TerrainDef[] = [
   /** 草地——最常见的自然地形，可通行，肥沃度正常 */
   {
     defId: 'grass',
-    label: 'Grass',
+    label: '草地',
     passable: true,
     moveCost: 1,
     fertility: 1,
@@ -23,7 +23,7 @@ export const TERRAIN_DEFS: TerrainDef[] = [
   /** 泥土——自然地形，可通行，肥沃度略低 */
   {
     defId: 'dirt',
-    label: 'Dirt',
+    label: '泥土',
     passable: true,
     moveCost: 1,
     fertility: 0.7,
@@ -33,7 +33,7 @@ export const TERRAIN_DEFS: TerrainDef[] = [
   /** 沙地——自然地形，可通行但移动较慢，几乎无肥沃度 */
   {
     defId: 'sand',
-    label: 'Sand',
+    label: '沙地',
     passable: true,
     moveCost: 1.5,
     fertility: 0.1,
@@ -43,7 +43,7 @@ export const TERRAIN_DEFS: TerrainDef[] = [
   /** 岩石——不可通行的自然地形，可开采获得石块 */
   {
     defId: 'rock',
-    label: 'Rock',
+    label: '岩石',
     passable: false,
     moveCost: 999,
     fertility: 0,
@@ -54,7 +54,7 @@ export const TERRAIN_DEFS: TerrainDef[] = [
   /** 水——不可通行的自然地形，无法开采 */
   {
     defId: 'water',
-    label: 'Water',
+    label: '水',
     passable: false,
     moveCost: 999,
     fertility: 0,
@@ -64,7 +64,7 @@ export const TERRAIN_DEFS: TerrainDef[] = [
   /** 木地板——人造地形，移动速度快，无肥沃度 */
   {
     defId: 'floor_wood',
-    label: 'Wood Floor',
+    label: '木地板',
     passable: true,
     moveCost: 0.8,
     fertility: 0,
@@ -74,7 +74,7 @@ export const TERRAIN_DEFS: TerrainDef[] = [
   /** 石地板——人造地形，移动速度快，无肥沃度 */
   {
     defId: 'floor_stone',
-    label: 'Stone Floor',
+    label: '石地板',
     passable: true,
     moveCost: 0.8,
     fertility: 0,

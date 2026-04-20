@@ -23,6 +23,8 @@ import { executeWait } from './toil-handlers/wait.handler';
 import { executeDeliver } from './toil-handlers/deliver.handler';
 import { executeInteract } from './toil-handlers/interact.handler';
 import { executePrepareConstruction } from './toil-handlers/prepare-construction.handler';
+import { executeStoreInStorage } from './toil-handlers/store-in-storage.handler';
+import { executeTakeFromStorage } from './toil-handlers/take-from-storage.handler';
 
 /** Toil 类型 → handler 注册表 */
 const toilHandlers: Record<string, ToilHandler> = {
@@ -34,6 +36,8 @@ const toilHandlers: Record<string, ToilHandler> = {
   [ToilType.Deliver]: executeDeliver,
   [ToilType.Interact]: executeInteract,
   [ToilType.PrepareConstruction]: executePrepareConstruction,
+  [ToilType.StoreInStorage]: executeStoreInStorage,
+  [ToilType.TakeFromStorage]: executeTakeFromStorage,
 };
 
 /**

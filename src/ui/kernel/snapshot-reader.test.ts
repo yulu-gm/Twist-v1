@@ -65,8 +65,8 @@ describe('readEngineSnapshot work decision projection', () => {
           evaluatedAtTick: 12,
         },
         {
-          kind: 'haul_to_stockpile',
-          label: 'Haul To Stockpile',
+          kind: 'haul_to_storage',
+          label: 'Haul To Storage',
           status: 'deferred',
           priority: 15,
           score: 10,
@@ -93,7 +93,7 @@ describe('readEngineSnapshot work decision projection', () => {
       detail: 'meal_simple',
     });
     expect(colonist.workDecision!.options[1]).toMatchObject({
-      kind: 'haul_to_stockpile',
+      kind: 'haul_to_storage',
       status: 'deferred',
     });
   });

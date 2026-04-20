@@ -1,6 +1,6 @@
 /**
  * @file top-status-bar.tsx
- * @description 顶部状态栏组件 — 显示游戏时钟、速度控制、殖民者计数和 tick 数
+ * @description 顶部状态栏组件 — 显示游戏时钟、速度控制、殖民者计数、tick 数和 FPS
  * @dependencies build.schemas — speedButtons；build.types — TopStatusBarViewModel
  * @part-of ui/domains/build — 建造 UI 领域
  */
@@ -21,7 +21,7 @@ interface TopStatusBarProps {
  *
  * - 左区：游戏时钟
  * - 中区：速度切换按钮组（当前速度高亮）
- * - 右区：殖民者计数和 tick 数
+ * - 右区：殖民者计数、tick 数和 FPS
  */
 export function TopStatusBar({ viewModel, onSetSpeed }: TopStatusBarProps) {
   return (
@@ -43,8 +43,9 @@ export function TopStatusBar({ viewModel, onSetSpeed }: TopStatusBarProps) {
         </div>
       </div>
       <div class="top-status-bar__right">
-        <span>{viewModel.colonistCount} colonists</span>
-        <span class="top-status-bar__muted">T:{viewModel.tick}</span>
+        <span>{viewModel.colonistCount} 名殖民者</span>
+        <span class="top-status-bar__muted">刻:{viewModel.tick}</span>
+        <span class="top-status-bar__muted">FPS:{Math.round(viewModel.fps)}</span>
       </div>
     </header>
   );

@@ -8,7 +8,7 @@
  */
 
 import {
-  DefId, Footprint, MaterialReq, Tag, CellCoord, StoragePriority
+  DefId, Footprint, MaterialReq, Tag, CellCoord
 } from '../core/types';
 
 // ── 建筑定义 ──
@@ -39,10 +39,12 @@ export interface BuildingDef {
   interactionCellOffset?: CellCoord;
   /** 耗电量（可选） */
   powerConsumption?: number;
-  /** 存储配置（如仓库区域允许存放的物品和优先级，可选） */
+  /** 存储配置——若设置则该建筑作为仓库挂载抽象库存容器 */
   storageConfig?: {
-    allowedDefIds: DefId[];
-    priority: StoragePriority;
+    /** 收纳模式：'all-haulable' = 接受所有 haulable 物品 */
+    mode: 'all-haulable';
+    /** 仓库最大可存储件数（按物品堆叠后的总件数） */
+    capacityMax: number;
   };
   category?: 'structure' | 'furniture';
   furnitureType?: 'bed' | 'table' | 'chair' | 'storage';

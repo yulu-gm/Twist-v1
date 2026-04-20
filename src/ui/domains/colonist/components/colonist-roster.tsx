@@ -31,7 +31,7 @@ export function ColonistRoster({ rows, activeId, onSelect }: ColonistRosterProps
 
   return (
     <div class="colonist-roster ui-panel">
-      <div class="ui-panel__title">Colonists</div>
+      <div class="ui-panel__title">殖民者</div>
       <div class="ui-panel__body">
         <ul class="colonist-roster__list">
           {rows.map(row => (

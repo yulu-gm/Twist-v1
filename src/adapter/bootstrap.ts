@@ -38,13 +38,16 @@ export function bootstrapPhaser(
     width: window.innerWidth,
     height: window.innerHeight,
     backgroundColor: '#1a1a2e',
+    // 关闭像素风采样并启用抗锯齿，使用线性过滤
+    antialias: true,
+    antialiasGL: true,
     scale: {
       mode: Phaser.Scale.RESIZE,
       autoCenter: Phaser.Scale.CENTER_BOTH,
     },
     scene: new MainScene(world, uiBridge),
-    pixelArt: true,
-    roundPixels: true,
+    pixelArt: false,
+    roundPixels: false,
   };
 
   return new Phaser.Game(config);

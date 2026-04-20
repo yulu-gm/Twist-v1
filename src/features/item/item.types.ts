@@ -27,7 +27,8 @@ export interface Item extends MapObjectBase {
 }
 
 // ── Item placement（落地/堆叠） ──
-export type ItemPlacementSearchScope = 'stockpile-only' | 'nearest-compatible';
+// stockpile 已下线；地面落地仅保留 'nearest-compatible' 一种搜索范围（用于 drop 兜底）。
+export type ItemPlacementSearchScope = 'nearest-compatible';
 export type ItemPlacementSelectionPreference = 'nearest' | 'prefer-existing-stacks';
 
 export type ItemNoCapacityPolicy = 'fail' | 'force-overflow';

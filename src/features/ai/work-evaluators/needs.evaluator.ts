@@ -5,7 +5,8 @@
  *               ai/work-types — WorkEvaluation 类型；
  *               pathfinding — 距离估算；
  *               ai/jobs — 工作工厂函数；
- *               building/building.queries — 床位查询
+ *               building/building.queries — 床位查询；
+ *               storage/storage.service — 仓库取材候选查询
  * @part-of AI 子系统（features/ai）
  */
 
@@ -17,14 +18,17 @@ import type { GameMap } from '../../../world/game-map';
 import type { World } from '../../../world/world';
 import { getTimeOfDayState, isHourWithinWindow } from '../../../core/clock';
 import { estimateDistance, isReachable } from '../../pathfinding/path.service';
-import { createEatJob } from '../jobs/eat-job';
+import { createEatJob, createEatFromWarehouseJob } from '../jobs/eat-job';
 import { createSleepJob } from '../jobs/sleep-job';
 import { getAllBeds, getBedByOwner, isBedAvailable } from '../../building/building.queries';
+import { findReachableWarehouseWithTaggedItem } from '../../storage/storage.service';
 
 /**
  * 进食工作评估器 — 评估 pawn 是否需要并可以进食
  *
- * 评估条件：food 低于 hungerSeekThreshold 时寻找最近的未预留食物
+ * 评估条件：food 低于 hungerSeekThreshold 时寻找食物
+ * 食物来源：地面带 'food' 标签的物品 + 仓库抽象库存中带 'food' 标签的条目；
+ *           两者按距离择优。仓库取食改走 GoTo → TakeFromStorage → Wait 链
  * 评分公式：100 + hungerUrgency * 200 - distance * 0.5
  */
 export const eatWorkEvaluator: WorkEvaluator = {
@@ -51,7 +55,7 @@ export const eatWorkEvaluator: WorkEvaluator = {
       return blocked('need_not_triggered', '还不够饿');
     }
 
-    // 寻找最近的未预留食物
+    // 1) 扫描地面带 'food' 标签的物品 — 选最近的未预留项
     const items = map.objects.allWithTag('food') as Item[];
     let bestItem: Item | null = null;
     let bestDist = Infinity;
@@ -71,19 +75,80 @@ export const eatWorkEvaluator: WorkEvaluator = {
       }
     }
 
-    if (!bestItem) {
-      // 如果存在食物但都被预留，报告 target_reserved
+    // 2) 仓库取食候选 — 用 carryCapacity 作为请求量上限，避免一次取超过手持容量
+    const warehouseCandidate = findReachableWarehouseWithTaggedItem(
+      pawn,
+      map,
+      world,
+      'food',
+      Math.max(1, pawn.inventory.carryCapacity),
+    );
+
+    // 3) 没有任何食物来源
+    if (!bestItem && !warehouseCandidate) {
+      // 如果存在地面食物但都被预留，报告 target_reserved
       if (hasReservedFood) {
         return blocked('target_reserved', '所有食物都已被预留');
       }
       return blocked('no_target', '没有可用食物');
     }
 
-    // 计算进食参数
-    const nutritionPerItem = Math.max(1, world.defs.items.get(bestItem.defId)?.nutritionValue ?? 30);
+    // 4) 在两条路径里挑距离更近者；并列时优先地面（避免对仓库的高频 withdraw）
+    const useWarehouse =
+      !bestItem
+      || (warehouseCandidate !== null && warehouseCandidate.distance < bestDist);
+
+    if (useWarehouse && warehouseCandidate) {
+      const foodDef = world.defs.items.get(warehouseCandidate.defId);
+      const nutritionPerItem = Math.max(1, foodDef?.nutritionValue ?? 30);
+      const missingFood = Math.max(1, pawn.needsProfile.mealTargetFood - pawn.needs.food);
+      const requestedCount = Math.min(
+        warehouseCandidate.availableCount,
+        pawn.inventory.carryCapacity,
+        Math.max(1, Math.ceil(missingFood / nutritionPerItem)),
+      );
+      if (requestedCount <= 0) {
+        return blocked('no_target', '没有可用食物');
+      }
+
+      const hungerSeekThreshold = Math.max(1, pawn.needsProfile.hungerSeekThreshold);
+      const hungerUrgency = (hungerSeekThreshold - pawn.needs.food) / hungerSeekThreshold;
+      const score = 100 + hungerUrgency * 200 - warehouseCandidate.distance * 0.5;
+
+      // 捕获闭包变量供 createJob 使用
+      const warehouseId = warehouseCandidate.warehouse.id;
+      const approachCell = { ...warehouseCandidate.approachCell };
+      const defId = warehouseCandidate.defId;
+      const totalNutrition = requestedCount * nutritionPerItem;
+
+      return {
+        kind: 'eat',
+        label: '吃饭',
+        priority: 100,
+        score,
+        failureReasonCode: 'none',
+        failureReasonText: null,
+        detail: defId,
+        jobDefId: 'job_eat',
+        evaluatedAtTick: world.tick,
+        createJob: () => createEatFromWarehouseJob(
+          pawn.id,
+          warehouseId,
+          approachCell,
+          defId,
+          requestedCount,
+          totalNutrition,
+        ),
+        onAssigned: null,
+      };
+    }
+
+    // 5) 走地面取食路径（保留原行为）
+    const foodItem = bestItem!;
+    const nutritionPerItem = Math.max(1, world.defs.items.get(foodItem.defId)?.nutritionValue ?? 30);
     const missingFood = Math.max(1, pawn.needsProfile.mealTargetFood - pawn.needs.food);
     const requestedCount = Math.min(
-      bestItem.stackCount,
+      foodItem.stackCount,
       pawn.inventory.carryCapacity,
       Math.max(1, Math.ceil(missingFood / nutritionPerItem)),
     );
@@ -96,8 +161,8 @@ export const eatWorkEvaluator: WorkEvaluator = {
     const score = 100 + hungerUrgency * 200 - bestDist * 0.5;
 
     // 捕获闭包变量供 createJob 使用
-    const foodId = bestItem.id;
-    const foodCell = { ...bestItem.cell };
+    const foodId = foodItem.id;
+    const foodCell = { ...foodItem.cell };
     const totalNutrition = requestedCount * nutritionPerItem;
 
     return {
@@ -107,7 +172,7 @@ export const eatWorkEvaluator: WorkEvaluator = {
       score,
       failureReasonCode: 'none',
       failureReasonText: null,
-      detail: bestItem.defId,
+      detail: foodItem.defId,
       jobDefId: 'job_eat',
       evaluatedAtTick: world.tick,
       createJob: () => createEatJob(pawn.id, foodId, foodCell, requestedCount, totalNutrition),

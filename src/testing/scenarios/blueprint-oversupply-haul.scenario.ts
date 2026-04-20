@@ -1,42 +1,68 @@
 import {
   createAssertStep,
   createScenario,
+  createSetupStep,
   createWaitForStep,
 } from '../scenario-dsl/scenario.builders';
-import { spawnItemFixture, spawnPawnFixture } from '../scenario-fixtures/world-fixtures';
+import { ObjectKind } from '@core/types';
+import { spawnBuildingFixture, spawnPawnFixture } from '../scenario-fixtures/world-fixtures';
 import { placeBlueprintCommand } from '../scenario-commands/player-commands';
 import {
   assertBuildingExists,
   waitForBuildingCreated,
 } from '../scenario-probes/building-probes';
 import { assertPawnNotCarrying } from '../scenario-probes/pawn-probes';
+import type { ScenarioQueryApi } from '../scenario-dsl/scenario.types';
 
 const BUILDER_NAME = 'Builder';
-const SOURCE_CELL = { x: 8, y: 10 } as const;
+const WAREHOUSE_CELL = { x: 8, y: 10 } as const;
+const WAREHOUSE_ALIAS = 'warehouse';
 const BLUEPRINT_CELL = { x: 12, y: 10 } as const;
+const PRESTOCKED_WOOD = 20;
+const WALL_WOOD_COST = 5;
+
+function findWarehouseFromHarness(harness: any) {
+  const all = harness.map.objects.allOfKind(ObjectKind.Building) as any[];
+  return all.find(
+    (b: any) =>
+      b.defId === 'warehouse_shed'
+      && b.cell.x === WAREHOUSE_CELL.x
+      && b.cell.y === WAREHOUSE_CELL.y,
+  );
+}
+
+function findWarehouseFromQuery(query: ScenarioQueryApi) {
+  return query.findBuildingAt('warehouse_shed', WAREHOUSE_CELL) as any;
+}
 
 export const blueprintOversupplyHaulScenario = createScenario({
   id: 'blueprint-oversupply-haul',
-  title: '大堆材料下的蓝图定量搬运',
-  description: '验证当地图上只有一大堆木头时，wall 蓝图仍只会搬运所需的 5 个木头，而不会超量搬运并把余料落在蓝图格。',
+  title: '仓库定量取材建造',
+  description:
+    '验证 wall 蓝图只会从仓库取出所需的 5 个木头，不会把仓库整堆 20 木头都搬到蓝图侧。',
   report: {
-    focus: '关注 builder 的携带数量、源木堆剩余数量，以及蓝图格是否出现多余木头落地。',
+    focus: '关注 builder 携带数量、仓库剩余存量，以及蓝图格是否出现多余木头落地。',
   },
   setup: [
     spawnPawnFixture({ x: 10, y: 10 }, BUILDER_NAME),
-    spawnItemFixture('wood', SOURCE_CELL, 20),
+    spawnBuildingFixture('warehouse_shed', WAREHOUSE_CELL, { alias: WAREHOUSE_ALIAS }),
+    createSetupStep('预先填充仓库 20 木头', ({ harness }) => {
+      const warehouse = findWarehouseFromHarness(harness);
+      if (warehouse?.storage) {
+        warehouse.storage.inventory.wood = PRESTOCKED_WOOD;
+        warehouse.storage.storedCount = PRESTOCKED_WOOD;
+      }
+    }),
   ],
   script: [
     placeBlueprintCommand('wall_wood', BLUEPRINT_CELL),
     createWaitForStep('等待 builder 只携带 wall 所需的 5 木头', ({ query }) => {
       const pawn = query.findPawnByName(BUILDER_NAME);
-      const sourceStack = query.findItemAt('wood', SOURCE_CELL);
       return pawn?.inventory.carrying?.defId === 'wood'
-        && pawn.inventory.carrying.count === 5
-        && sourceStack?.stackCount === 15;
+        && pawn.inventory.carrying.count === WALL_WOOD_COST;
     }, {
-      timeoutTicks: 200,
-      timeoutMessage: 'builder 没有表现出“只拿 5 木头、源堆剩 15”的定量搬运行为',
+      timeoutTicks: 400,
+      timeoutMessage: 'builder 没有表现出"只取 5 木头"的定量取材行为',
     }),
     waitForBuildingCreated('等待 wall 建成', 'wall_wood', BLUEPRINT_CELL, 600),
   ],
@@ -47,12 +73,14 @@ export const blueprintOversupplyHaulScenario = createScenario({
       const item = query.findItemAt('wood', BLUEPRINT_CELL);
       return item === null;
     }, {
-      failureMessage: '蓝图格残留了多余木头，疑似发生超量搬运后落地',
+      failureMessage: '蓝图格残留了多余木头，疑似发生超量取材后落地',
     }),
-    createAssertStep('木头总量守恒且建筑仅消耗 5 个', ({ query }) => {
-      return query.totalMaterialCountInWorld('wood') === 20;
+    createAssertStep('仓库应剩余 15 个木头（仅消耗了 5）', ({ query }) => {
+      const warehouse = findWarehouseFromQuery(query);
+      const remaining = warehouse?.storage?.inventory?.wood ?? 0;
+      return remaining === PRESTOCKED_WOOD - WALL_WOOD_COST;
     }, {
-      failureMessage: '木头总量不守恒，无法说明是定量搬运还是超量落地',
+      failureMessage: '仓库剩余木头数量不正确，定量取材未生效',
     }),
   ],
 });

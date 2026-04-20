@@ -8,11 +8,9 @@
 export type {
   Zone,
   ZoneConfig,
-  StockpileZoneConfig,
 } from '../../world/zone-manager';
 export {
   createDefaultZoneConfig,
-  createDefaultStockpileZoneConfig,
   normalizeZoneConfig,
 } from '../../world/zone-manager';
 export { ZoneType } from '../../core/types';

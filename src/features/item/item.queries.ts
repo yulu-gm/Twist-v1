@@ -1,13 +1,13 @@
 /**
  * @file item.queries.ts
- * @description 物品查询函数，提供按地图获取物品列表、按ID查找、按坐标筛选及放置可行性判断
- * @dependencies world/game-map, world/def-database, world/zone-manager, core/types, item.types
+ * @description 物品查询函数，提供按地图获取物品列表、按ID查找、按坐标筛选及放置可行性判断。
+ *              stockpile 已下线，落地仅遵循「地形可通行 + 同格只允许堆叠相同 defId」两条规则。
+ * @dependencies world/game-map, world/def-database, core/types, item.types
  * @part-of features/item 物品功能模块
  */
 
-import { ObjectKind, ZoneType, cellKey, parseKey } from '../../core/types';
+import { ObjectKind, cellKey } from '../../core/types';
 import type { CellCoord, CellCoordKey, DefId } from '../../core/types';
-import { createDefaultStockpileZoneConfig } from '../../world/zone-manager';
 import type { DefDatabase } from '../../world/def-database';
 import type { GameMap } from '../../world/game-map';
 import type { Item } from './item.types';
@@ -16,7 +16,6 @@ import type {
   ItemPlacementSelectionPreference,
 } from './item.types';
 
-const FALLBACK_ITEM_TAGS = new Set(['haulable', 'resource']);
 const FALLBACK_MAX_STACK = 100;
 
 /**
@@ -55,28 +54,17 @@ export function isCellCompatibleForItemDef(map: GameMap, cell: CellCoord, defId:
 
 /**
  * 判断某格是否可以接收指定物品。
- * 兼容规则包括：地形可通行、空间索引不被不可通行对象占用、若在 stockpile 中则满足该区域配置，
- * 且该格为空或已有同类未满堆。
+ * 规则：地形可通行、空间索引不被不可通行对象占用，且该格为空或已有同类未满堆。
  */
 export function canPlaceItemAtCell(
   map: GameMap,
   defs: DefDatabase,
   cell: CellCoord,
   defId: DefId,
-  searchScope: ItemPlacementSearchScope,
+  _searchScope: ItemPlacementSearchScope,
 ): boolean {
   if (!map.pathGrid.isPassable(cell.x, cell.y)) return false;
   if (!map.spatial.isPassable(cell)) return false;
-
-  const itemTags = getResolvedItemTags(defs, defId);
-  const zone = map.zones.getZoneAt(cellKey(cell));
-
-  if (searchScope === 'stockpile-only') {
-    if (!zone || zone.zoneType !== ZoneType.Stockpile) return false;
-    if (!isItemAcceptedByStockpile(zone, defId, itemTags)) return false;
-  } else if (zone?.zoneType === ZoneType.Stockpile) {
-    if (!isItemAcceptedByStockpile(zone, defId, itemTags)) return false;
-  }
 
   const items = getItemsAtCell(map, cell);
   if (items.length === 0) return true;
@@ -93,7 +81,7 @@ export interface FindNearestAcceptingCellOptions {
 
 /**
  * 在给定范围内寻找最近可接收指定物品的格子。
- * stockpile-only 只搜索 stockpile 格；nearest-compatible 则可搜索全图，但仍会尊重 stockpile 的 allowedDefIds。
+ * 由于 stockpile 已下线，搜索范围统一为全图。
  */
 export function findNearestAcceptingCell(
   map: GameMap,
@@ -130,18 +118,9 @@ export function findNearestAcceptingCell(
     }
   };
 
-  if (searchScope === 'stockpile-only') {
-    for (const zone of map.zones.getAll()) {
-      if (zone.zoneType !== ZoneType.Stockpile) continue;
-      for (const key of zone.cells) {
-        considerCell(parseKey(key));
-      }
-    }
-  } else {
-    for (let y = 0; y < map.height; y++) {
-      for (let x = 0; x < map.width; x++) {
-        considerCell({ x, y });
-      }
+  for (let y = 0; y < map.height; y++) {
+    for (let x = 0; x < map.width; x++) {
+      considerCell({ x, y });
     }
   }
 
@@ -150,19 +129,6 @@ export function findNearestAcceptingCell(
   }
 
   return bestCell;
-}
-
-function isItemAcceptedByStockpile(zone: { config: { stockpile?: { allowAllHaulable: boolean; allowedDefIds: Set<DefId> } } }, defId: DefId, itemTags: Set<string>): boolean {
-  const stockpile = zone.config.stockpile ?? createDefaultStockpileZoneConfig();
-  if (stockpile.allowAllHaulable) {
-    return itemTags.has('haulable');
-  }
-  return stockpile.allowedDefIds.has(defId);
-}
-
-function getResolvedItemTags(defs: DefDatabase, defId: DefId): Set<string> {
-  const itemDef = defs.items.get(defId);
-  return itemDef ? new Set(itemDef.tags) : new Set(FALLBACK_ITEM_TAGS);
 }
 
 function getResolvedMaxStack(defs: DefDatabase, defId: DefId, itemsAtCell: Item[]): number {

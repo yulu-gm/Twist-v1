@@ -20,7 +20,7 @@ import type { WorkEvaluation } from './work-types';
  * 4. 如果它被选中，应该如何创建真实的 Job？
  */
 export interface WorkEvaluator {
-  /** 工作类别标识（如 'eat'、'sleep'、'haul_to_stockpile'） */
+  /** 工作类别标识（如 'eat'、'sleep'、'haul_to_storage'） */
   kind: string;
   /** 面向用户的类别显示名 */
   label: string;

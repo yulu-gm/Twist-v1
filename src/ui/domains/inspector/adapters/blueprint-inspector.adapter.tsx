@@ -21,9 +21,9 @@ export const blueprintInspectorAdapter: ObjectInspectorAdapter = {
   buildViewModel(object: ObjectNode, context: AdapterContext): SpecializedInspectorViewModel {
     const bp = object as BlueprintObjectNode;
 
-    /** 材料行数据 */
+    /** 材料行数据 — label 已由 snapshot-reader 用 defs 解析为中文 */
     const materialRows = bp.materialsRequired.map((req, i) => ({
-      label: req.defId,
+      label: req.label,
       value: `${bp.materialsDelivered[i]?.count ?? 0}/${req.count}`,
     }));
 
@@ -31,36 +31,36 @@ export const blueprintInspectorAdapter: ObjectInspectorAdapter = {
       mode: 'specialized',
       targetId: context.targetId,
       title: bp.label,
-      subtitle: 'Blueprint',
+      subtitle: '蓝图',
       stack: context.stack,
       sections: [
         {
           id: 'overview',
-          title: 'Overview',
+          title: '概览',
           rows: [
-            { label: 'Target', value: bp.targetDefId },
-            { label: 'Position', value: `(${bp.cell.x}, ${bp.cell.y})` },
-            { label: 'Size', value: `${bp.footprint.width}x${bp.footprint.height}` },
+            { label: '目标', value: bp.targetLabel },
+            { label: '坐标', value: `(${bp.cell.x}, ${bp.cell.y})` },
+            { label: '尺寸', value: `${bp.footprint.width}x${bp.footprint.height}` },
           ],
         },
         {
           id: 'materials',
-          title: 'Materials',
+          title: '材料',
           rows: materialRows,
         },
       ],
       actions: [
-        { id: 'cancel_construction', label: 'Cancel Construction', enabled: true },
+        { id: 'cancel_construction', label: '取消建造', enabled: true },
       ],
       renderBody: (callbacks: InspectorBodyCallbacks) => (
         <>
-          <Section title="Overview">
-            <StatRow label="Target" value={bp.targetDefId} />
-            <StatRow label="Position" value={`(${bp.cell.x}, ${bp.cell.y})`} />
-            <StatRow label="Size" value={`${bp.footprint.width}x${bp.footprint.height}`} />
+          <Section title="概览">
+            <StatRow label="目标" value={bp.targetLabel} />
+            <StatRow label="坐标" value={`(${bp.cell.x}, ${bp.cell.y})`} />
+            <StatRow label="尺寸" value={`${bp.footprint.width}x${bp.footprint.height}`} />
           </Section>
 
-          <Section title="Materials">
+          <Section title="材料">
             <div data-testid="section-materials">
               {materialRows.map(row => (
                 <StatRow key={row.label} label={row.label} value={row.value} />
@@ -73,7 +73,7 @@ export const blueprintInspectorAdapter: ObjectInspectorAdapter = {
               onClick={() => callbacks.onRunAction('cancel_construction', context.targetId)}
               data-testid="action-cancel_construction"
             >
-              Cancel Construction
+              取消建造
             </button>
           </div>
         </>

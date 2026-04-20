@@ -18,7 +18,7 @@ function makeSnapshot(overrides: Partial<EngineSnapshot> = {}): EngineSnapshot {
     presentation: { activeTool: 'select', activeDesignationType: null, activeZoneType: null, activeBuildDefId: null, commandMenuPath: [], hoveredCell: null, selectedIds: [], showDebugPanel: false, showGrid: false },
     selection: { primaryId: null, selectedIds: [] },
     colonists: {},
-    build: { activeTool: 'select', activeDesignationType: null, activeZoneType: null, lastZoneType: 'stockpile', activeBuildDefId: null, activeModeLabel: 'Select' },
+    build: { activeTool: 'select', activeDesignationType: null, activeZoneType: null, lastZoneType: 'growing', activeBuildDefId: null, activeModeLabel: 'Select' },
     feedback: { recentEvents: [] },
     workOrders: { list: [], byId: {} },
     debugInfo: '',
@@ -29,11 +29,12 @@ function makeSnapshot(overrides: Partial<EngineSnapshot> = {}): EngineSnapshot {
 
 describe('selectTopStatusBar', () => {
   it('extracts clock, tick, speed, and colonist count', () => {
-    const vm = selectTopStatusBar(makeSnapshot());
+    const vm = selectTopStatusBar(makeSnapshot({ fps: 58.6 }));
     expect(vm.clockDisplay).toBe('Year 1, Spring, Day 1, 6:00');
     expect(vm.tick).toBe(100);
     expect(vm.speed).toBe(1);
     expect(vm.colonistCount).toBe(3);
+    expect(vm.fps).toBe(58.6);
   });
 });
 
@@ -81,7 +82,7 @@ describe('selectCommandMenuViewModel', () => {
       }),
     );
     expect(vm.path).toEqual(['build', 'furniture']);
-    expect(vm.entries.map((entry) => entry.label)).toEqual(['返回', '床']);
+    expect(vm.entries.map((entry) => entry.label)).toEqual(['返回', '床', '仓库']);
     expect(vm.entries[1].active).toBe(true);
   });
 
@@ -119,7 +120,7 @@ describe('selectCommandMenuViewModel', () => {
         },
       }),
     );
-    expect(zoneVm.entries.map((entry) => entry.label)).toEqual(['返回', '存储区', '种植区']);
+    expect(zoneVm.entries.map((entry) => entry.label)).toEqual(['返回', '种植区']);
     expect(zoneVm.entries.find((entry) => entry.label === '种植区')?.active).toBe(true);
   });
 });

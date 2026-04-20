@@ -24,36 +24,36 @@ export const plantInspectorAdapter: ObjectInspectorAdapter = {
 
     const actions: InspectorAction[] = [];
     if (plant.harvestReady) {
-      actions.push({ id: 'designate_harvest', label: 'Harvest', enabled: true });
+      actions.push({ id: 'designate_harvest', label: '收获', enabled: true });
     }
-    actions.push({ id: 'designate_cut', label: 'Cut', enabled: true });
+    actions.push({ id: 'designate_cut', label: '砍伐', enabled: true });
 
     return {
       mode: 'specialized',
       targetId: context.targetId,
       title: plant.label,
-      subtitle: 'Plant',
+      subtitle: '植物',
       stack: context.stack,
       sections: [
         {
           id: 'overview',
-          title: 'Overview',
+          title: '概览',
           rows: [
-            { label: 'Type', value: plant.defId },
-            { label: 'Growth', value: `${growthPercent}%` },
-            { label: 'Harvestable', value: plant.harvestReady ? 'Yes' : 'No' },
-            { label: 'Position', value: `(${plant.cell.x}, ${plant.cell.y})` },
+            { label: '类型', value: plant.label },
+            { label: '生长', value: `${growthPercent}%` },
+            { label: '可收获', value: plant.harvestReady ? '是' : '否' },
+            { label: '坐标', value: `(${plant.cell.x}, ${plant.cell.y})` },
           ],
         },
       ],
       actions,
       renderBody: (callbacks: InspectorBodyCallbacks) => (
         <>
-          <Section title="Overview">
-            <StatRow label="Type" value={plant.defId} />
-            <StatRow label="Growth" value={`${growthPercent}%`} />
-            <StatRow label="Harvestable" value={plant.harvestReady ? 'Yes' : 'No'} />
-            <StatRow label="Position" value={`(${plant.cell.x}, ${plant.cell.y})`} />
+          <Section title="概览">
+            <StatRow label="类型" value={plant.label} />
+            <StatRow label="生长" value={`${growthPercent}%`} />
+            <StatRow label="可收获" value={plant.harvestReady ? '是' : '否'} />
+            <StatRow label="坐标" value={`(${plant.cell.x}, ${plant.cell.y})`} />
           </Section>
 
           <div class="inspector-actions" data-testid="inspector-actions">
@@ -62,14 +62,14 @@ export const plantInspectorAdapter: ObjectInspectorAdapter = {
                 onClick={() => callbacks.onRunAction('designate_harvest', context.targetId)}
                 data-testid="action-designate_harvest"
               >
-                Harvest
+                收获
               </button>
             )}
             <button
               onClick={() => callbacks.onRunAction('designate_cut', context.targetId)}
               data-testid="action-designate_cut"
             >
-              Cut
+              砍伐
             </button>
           </div>
         </>
